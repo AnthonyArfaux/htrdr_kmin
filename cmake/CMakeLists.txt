@@ -45,8 +45,15 @@ set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
-set(HTRDR_FILES_SRC htrdr_main.c)
-set(HTRDR_FILES_INC )
+set(HTRDR_FILES_SRC
+  htrdr.c
+  htrdr_main.c
+  htrdr_args.c
+  htrdr_clouds.c)
+set(HTRDR_FILES_INC
+  htrdr.h
+  htrdr_args.h
+  htrdr_clouds.h)
 set(HTDRD_FILES_DOC COPYING README.md)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
