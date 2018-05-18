@@ -18,6 +18,8 @@
 #include "htrdr.h"
 #include "htrdr_args.h"
 #include "htrdr_clouds.h"
+#include "htrdr_rectangle.h"
+#include "htrdr_solve.h"
 
 #include <rsys/mem_allocator.h>
 
@@ -119,21 +121,40 @@ error:
   goto exit;
 }
 
+static void
+release_htrdr(ref_T* ref)
+{
+  struct htrdr* htrdr = CONTAINER_OF(ref, struct htrdr, ref);
+  ASSERT(htrdr);
+  if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
+  if(htrdr->clouds) SVX(tree_ref_put(htrdr->clouds));
+  if(htrdr->rect) htrdr_rectangle_ref_put(htrdr->rect);
+  logger_release(&htrdr->logger);
+  MEM_RM(htrdr->allocator, htrdr);
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_init
-  (struct mem_allocator* allocator,
+htrdr_create
+  (struct mem_allocator* mem_allocator,
    const struct htrdr_args* args,
-   struct htrdr* htrdr)
+   struct htrdr** out_htrdr)
 {
+  struct htrdr* htrdr = NULL;
+  struct mem_allocator* allocator = NULL;
   res_T res = RES_OK;
-  ASSERT(args && htrdr);
+  ASSERT(args && out_htrdr);
 
-  memset(htrdr, 0, sizeof(*htrdr));
-
-  htrdr->allocator = allocator ? allocator : &mem_default_allocator;
+  allocator = mem_allocator ? mem_allocator : &mem_default_allocator;
+  htrdr = MEM_CALLOC(allocator, 1, sizeof(*htrdr));
+  if(!htrdr) {
+    fprintf(stderr, "Could not allocat the htrdr main structure.\n");
+    goto error;
+  }
+  ref_init(&htrdr->ref);
+  htrdr->allocator = allocator;
 
   logger_init(htrdr->allocator, &htrdr->logger);
   logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
@@ -141,6 +162,11 @@ htrdr_init
 
   htrdr->dump_vtk = args->dump_vtk;
   htrdr->verbose = args->verbose;
+
+  /* Integration plane */
+  res = htrdr_rectangle_create(htrdr, args->rectangle.pos, args->rectangle.tgt,
+    args->rectangle.up, args->rectangle.sz, &htrdr->rect);
+  if(res != RES_OK) goto error;
 
   res = svx_device_create(&htrdr->logger, allocator, args->verbose, &htrdr->svx);
   if(res != RES_OK) {
@@ -158,19 +184,28 @@ htrdr_init
   if(res != RES_OK) goto error;
 
 exit:
+  *out_htrdr = htrdr;
   return res;
 error:
-  htrdr_release(htrdr);
+  if(htrdr) {
+    htrdr_ref_put(htrdr);
+    htrdr = NULL;
+  }
   goto exit;
 }
 
 void
-htrdr_release(struct htrdr* htrdr)
+htrdr_ref_get(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
-  if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
-  if(htrdr->clouds) SVX(tree_ref_put(htrdr->clouds));
-  logger_release(&htrdr->logger);
+  ref_get(&htrdr->ref);
+}
+
+void
+htrdr_ref_put(struct htrdr* htrdr)
+{
+  ASSERT(htrdr);
+  ref_put(&htrdr->ref, release_htrdr);
 }
 
 res_T
@@ -180,6 +215,13 @@ htrdr_run(struct htrdr* htrdr)
   if(htrdr->dump_vtk) {
     res = clouds_dump_vtk(htrdr, htrdr->output);
     if(res != RES_OK) goto error;
+  } else {
+    double pos[3] = {3.4,2.2,0};
+    double dir[3] = {0,0,1};
+    double val = 0;
+    res = htrdr_solve_transmission(htrdr, pos, dir, &val);
+    if(res != RES_OK) goto error;
+    printf(">>>> T = %g\n", val);
   }
 exit:
   return res;

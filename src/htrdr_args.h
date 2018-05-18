@@ -22,12 +22,41 @@ struct htrdr_args {
   const char* input;
   const char* output;
 
+  struct {
+    double pos[3]; /* Position */
+    double tgt[3]; /* Target */
+    double up[3]; /* Up vector */
+    double sz[2]; /* Plane size in world space */
+  } rectangle;
+
+  struct {
+    unsigned definition[2]; /* #pixels in X and Y */
+    unsigned spp; /* #samples per pixel */
+  } image;
+
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
   int verbose; /* Verbosity level */
   int quit;  /* Qui the application */
 };
-#define HTRDR_ARGS_DEFAULT__ {NULL, NULL, 0, 0, 0, 0}
+
+#define HTRDR_ARGS_DEFAULT__ {                                                 \
+  NULL, /* Input filename */                                                   \
+  NULL, /* Output filename */                                                  \
+  {                                                                            \
+    {0, 0, 0}, /* plane position */                                            \
+    {0, 0, 1}, /* plane target */                                              \
+    {0, 1, 0}, /* plane up */                                                  \
+    {1, 1},    /* plane size */                                                \
+  }, {                                                                         \
+    {32, 32},  /* image definition */                                          \
+    1          /* #samples per pixel */                                        \
+  },                                                                           \
+  0, /* Force overwriting */                                                   \
+  0, /* dump VTK */                                                            \
+  0, /* Verbose flag */                                                        \
+  0  /* Quit the application */                                                \
+}
 static const struct htrdr_args HTRDR_ARGS_DEFAULT = HTRDR_ARGS_DEFAULT__;
 
 extern LOCAL_SYM res_T

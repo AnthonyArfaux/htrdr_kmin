@@ -17,6 +17,7 @@
 #define HTRDR_H
 
 #include <rsys/logger.h>
+#include <rsys/ref_count.h>
 
 /* Forward declaration */
 struct svx_device;
@@ -28,22 +29,30 @@ struct htrdr {
   struct svx_device* svx;
   struct svx_tree* clouds;
 
+  struct htrdr_rectangle* rect;
+
   FILE* output;
 
   int dump_vtk;
   int verbose;
+
   struct logger logger;
   struct mem_allocator* allocator;
+  ref_T ref;
 };
 
 extern LOCAL_SYM res_T
-htrdr_init
+htrdr_create
   (struct mem_allocator* allocator,
    const struct htrdr_args* args,
-   struct htrdr* htrdr);
+   struct htrdr** htrdr);
 
 extern LOCAL_SYM void
-htrdr_release
+htrdr_ref_get
+  (struct htrdr* htrdr);
+
+extern LOCAL_SYM void
+htrdr_ref_put
   (struct htrdr* htrdr);
 
 extern LOCAL_SYM res_T

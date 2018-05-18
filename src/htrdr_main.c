@@ -24,10 +24,9 @@
 int
 main(int argc, char** argv)
 {
-  struct htrdr htrdr;
+  struct htrdr* htrdr = NULL;
   struct htrdr_args args;
   size_t memsz = 0;
-  int htrdr_is_init = 0;
   int err = 0;
   res_T res = RES_OK;
 
@@ -35,15 +34,15 @@ main(int argc, char** argv)
   if(res != RES_OK) goto error;
   if(args.quit) goto exit;
 
-  res = htrdr_init(NULL, &args, &htrdr);
+  res = htrdr_create(NULL, &args, &htrdr);
   if(res != RES_OK) goto error;
-  htrdr_is_init = 1;
 
-  res = htrdr_run(&htrdr);
+  res = htrdr_run(htrdr);
   if(res != RES_OK) goto error;
 
 exit:
-  if(htrdr_is_init) htrdr_release(&htrdr);
+  if(htrdr) htrdr_ref_put(htrdr);
+
   htrdr_args_release(&args);
   if((memsz = mem_allocated_size()) != 0) {
     fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);

@@ -1,0 +1,20 @@
+<image>       ::= <imgopt>[:<imgopt> ... ]
+<rectangle>   ::= <rectopt>[:<rectopt> ... ]
+
+<imgopt>      ::= <definition>
+                | <#samples>
+<definition>  ::= def=INTEGERxINTEGER # default 32x32
+<#samples>    ::= ssp=INTEGER # default 1
+
+<rectopt>     ::= <target>
+                | <position>
+                | <up>
+                | <size>
+<target>      ::= tgt=<float3>
+<position>    ::= pos=<float3>
+<up>          ::= up=<float3>
+<size>        ::= sz=<float2>
+
+<float3>      ::= FLOAT,FLOAT,FLOAT
+<float2>      ::= FLOAT,FLOAT
+<int2>        ::= INTEGER

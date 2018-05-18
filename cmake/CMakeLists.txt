@@ -49,11 +49,15 @@ set(HTRDR_FILES_SRC
   htrdr.c
   htrdr_main.c
   htrdr_args.c
-  htrdr_clouds.c)
+  htrdr_clouds.c
+  htrdr_rectangle.c
+  htrdr_transmission.c)
 set(HTRDR_FILES_INC
   htrdr.h
   htrdr_args.h
-  htrdr_clouds.h)
+  htrdr_clouds.h
+  htrdr_rectangle.h
+  htrdr_solve.h)
 set(HTDRD_FILES_DOC COPYING README.md)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
@@ -63,6 +67,9 @@ rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC})
 target_link_libraries(htrdr HTCP RSys SVX)
+if(CMAKE_COMPILER_IS_GNUCC)
+  target_link_libraries(htrdr m)
+endif()
 
 set_target_properties(htrdr PROPERTIES
   DEFINE_SYMBOL HTRDR_SHARED_BUILD
