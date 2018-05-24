@@ -18,6 +18,7 @@
 #include "htrdr_args.h"
 
 #include <rsys/cstr.h>
+#include <rsys/double3.h>
 
 #include <getopt.h>
 #include <string.h>
@@ -32,6 +33,8 @@ print_help(const char* cmd)
   printf("Usage: %s -i INPUT [OPIONS]\n\n", cmd);
   printf(
 "  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
+  printf(
+"  -D X,Y,Z         sun direction.\n");
   printf(
 "  -f               overwrite the OUTPUT file if it already exists.\n");
   printf(
@@ -177,6 +180,18 @@ parse_image_parameter(struct htrdr_args* args, const char* str)
   }
   #undef PARSE
 
+  if(!args->image.definition[0] || !args->image.definition[1]) {
+    fprintf(stderr, "The image definition cannot be null.n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!args->image.spp) {
+    fprintf(stderr, "The number of samples per pixel cannot be null.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+
 exit:
   return res;
 error:
@@ -215,6 +230,32 @@ error:
   goto exit;
 }
 
+static res_T
+parse_sun_dir(struct htrdr_args* args, const char* str)
+{
+  double norm;
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(args && str);
+
+  res = cstr_to_list_double(str, ',', args->main_dir, &len, 3);
+  if(res == RES_OK && len != 3) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid direction `%s'.\n", str);
+    goto error;
+  }
+  norm = d3_normalize(args->main_dir, args->main_dir);
+  if(eq_eps(norm, 0, 1.e-6)) {
+    fprintf(stderr, "Invalid null direction `%s'.\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -227,8 +268,9 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "dfhI:i:o:r:v")) != -1) {
+  while((opt = getopt(argc, argv, "D:dfhI:i:o:r:v")) != -1) {
     switch(opt) {
+      case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
       case 'f': args->force_overwriting = 1; break;
       case 'h':
