@@ -25,6 +25,7 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.6 REQUIRED)
+find_package(StarSP 0.7 REQUIRED)
 find_package(SVX REQUIRED)
 find_package(HTCP REQUIRED)
 
@@ -68,7 +69,7 @@ rcmake_prepend_path(HTRDR_FILES_INC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC})
-target_link_libraries(htrdr HTCP RSys SVX)
+target_link_libraries(htrdr HTCP RSys SVX StarSP)
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)
 endif()

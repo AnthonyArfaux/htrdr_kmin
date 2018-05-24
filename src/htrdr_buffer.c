@@ -64,8 +64,35 @@ htrdr_buffer_create
   struct htrdr_buffer* buf = NULL;
   size_t memsz = 0;
   res_T res = RES_OK;
-  ASSERT(htrdr && width && height && pitch && elmt_size && align && out_buf);
-  ASSERT(IS_POW2(align) && width <= pitch);
+  ASSERT(htrdr && out_buf);
+
+  if(!width || !height) {
+    htrdr_log_err(htrdr, "invalid buffer definition %lux%lu.\n",
+      (unsigned long)width, (unsigned long)height);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(pitch < width) {
+    htrdr_log_err(htrdr,
+      "invalid buffer pitch `%lu' wrt the buffer width `%lu'. "
+      "The buffer pitch cannot be less than the buffer width.\n",
+      (unsigned long)pitch, (unsigned long)width);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(elmtsz) {
+    htrdr_log_err(htrdr,
+      "the size of the buffer's elements cannot be null.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!IS_POW2(align)) {
+    htrdr_log_err(htrdr,
+      "invalid buffer alignment `%lu'. It must be a power of 2.\n",
+      (unsigned long)align);
+    res = RES_BAD_ARG;
+    goto error;
+  }
 
   buf = MEM_CALLOC(htrdr->allocator, 1, sizeof(*buf));
   if(!buf) {

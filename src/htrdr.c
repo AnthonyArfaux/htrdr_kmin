@@ -17,6 +17,7 @@
 
 #include "htrdr.h"
 #include "htrdr_args.h"
+#include "htrdr_buffer.h"
 #include "htrdr_clouds.h"
 #include "htrdr_rectangle.h"
 #include "htrdr_solve.h"
@@ -128,6 +129,7 @@ release_htrdr(ref_T* ref)
   ASSERT(htrdr);
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->clouds) SVX(tree_ref_put(htrdr->clouds));
+  if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->rect) htrdr_rectangle_ref_put(htrdr->rect);
   logger_release(&htrdr->logger);
   MEM_RM(htrdr->allocator, htrdr);
@@ -182,6 +184,28 @@ htrdr_create
   }
   res = clouds_load(htrdr, args->verbose, args->input);
   if(res != RES_OK) goto error;
+
+  if(!args->dump_vtk) { /* Legacy mode */
+    const size_t elmtsz = sizeof(double);
+    const size_t pitch = elmtsz * args->image.definition[0];
+
+    /* Create the image buffer */
+    res = htrdr_buffer_create(htrdr, args->image.definition[0],
+      args->image.definition[1], pitch, elmtsz, 16, &htrdr->buf);
+    if(res != RES_OK) goto error;
+
+    /* TODO check the validity of the parameters */
+    htrdr->main_dir[0] = args->main_dir[0];
+    htrdr->main_dir[1] = args->main_dir[1];
+    htrdr->main_dir[2] = args->main_dir[2];
+    htrdr->spp = args->image.spp;
+
+    /* Create the plane on which the image buffer lies */
+    res = htrdr_rectangle_create(htrdr, args->rectangle.pos, args->rectangle.tgt,
+      args->rectangle.up, args->rectangle.sz, &htrdr->rect);
+    if(res != RES_OK) goto error;
+
+  }
 
 exit:
   *out_htrdr = htrdr;

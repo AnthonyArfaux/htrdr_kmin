@@ -28,5 +28,9 @@ htrdr_solve_transmission
    const double dir[3],
    double *val);
 
+extern LOCAL_SYM res_T
+htrdr_solve_transmission_buffer
+  (struct htrdr* htrdr);
+
 #endif /* HTRDR_SOLVE_H */
 

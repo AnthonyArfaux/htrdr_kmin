@@ -20,16 +20,21 @@
 #include <rsys/ref_count.h>
 
 /* Forward declaration */
+struct htrdr_args;
+struct htrdr_buffer;
+struct htrdr_rectangle;
+struct mem_allocator;
 struct svx_device;
 struct svx_tree;
-struct mem_allocator;
-struct htrdr_args;
 
 struct htrdr {
   struct svx_device* svx;
   struct svx_tree* clouds;
 
+  struct htrdr_buffer* buf;
   struct htrdr_rectangle* rect;
+  double main_dir[3]; /* Main direction */
+  size_t spp; /* #samples per pixel */
 
   FILE* output;
 

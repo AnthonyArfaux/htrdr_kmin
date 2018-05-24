@@ -34,6 +34,8 @@ struct htrdr_args {
     unsigned spp; /* #samples per pixel */
   } image;
 
+  double main_dir[3];
+
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
   int verbose; /* Verbosity level */
@@ -52,6 +54,7 @@ struct htrdr_args {
     {32, 32},  /* image definition */                                          \
     1          /* #samples per pixel */                                        \
   },                                                                           \
+  {0, 0, -1}, /* Main direction */                                             \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
   0, /* Verbose flag */                                                        \
