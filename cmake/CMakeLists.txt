@@ -47,14 +47,16 @@ set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
 set(HTRDR_FILES_SRC
   htrdr.c
-  htrdr_main.c
   htrdr_args.c
+  htrdr_buffer.c
   htrdr_clouds.c
+  htrdr_main.c
   htrdr_rectangle.c
   htrdr_transmission.c)
 set(HTRDR_FILES_INC
   htrdr.h
   htrdr_args.h
+  htrdr_buffer.h
   htrdr_clouds.h
   htrdr_rectangle.h
   htrdr_solve.h)
