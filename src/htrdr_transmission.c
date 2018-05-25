@@ -22,6 +22,8 @@
 #include <star/svx.h>
 #include <rsys/math.h>
 
+#include <omp.h>
+
 struct transmit_context {
   double tau;
 };
@@ -30,6 +32,17 @@ static const struct transmit_context TRANSMIT_CONTEXT_NULL = {0};
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static FINLINE uint16_t
+morton2D_decode(const uint32_t u32)
+{
+  uint32_t x = u32 & 0x55555555;
+  x = (x | (x >> 1)) & 0x33333333;
+  x = (x | (x >> 2)) & 0x0F0F0F0F;
+  x = (x | (x >> 4)) & 0x00FF00FF;
+  x = (x | (x >> 8)) & 0x0000FFFF;
+  return (uint16_t)x;
+}
+
 static int
 discard_hit
   (const struct svx_hit* hit,
@@ -91,8 +104,9 @@ htrdr_solve_transmission_buffer(struct htrdr* htrdr)
   struct htrdr_buffer_layout buf_layout;
   struct ssp_rng* rng = NULL;
   double pixsz[2];
-  size_t ix, iy, ispp;
-  res_T res = RES_OK;
+  int64_t mcode_max;
+  int64_t mcode;
+  ATOMIC res = RES_OK;
   ASSERT(htrdr && htrdr->rect && htrdr->buf);
 
   htrdr_buffer_get_layout(htrdr->buf, &buf_layout);
@@ -107,40 +121,64 @@ htrdr_solve_transmission_buffer(struct htrdr* htrdr)
   pixsz[0] = 1.0 / (double)buf_layout.width;
   pixsz[1] = 1.0 / (double)buf_layout.height;
 
-  FOR_EACH(iy, 0, buf_layout.height) {
-    const double y = (double)iy * pixsz[1]; /* Y in normalized image space */
+  /* Compute the maximum morton code */
+  mcode_max = (int64_t)round_up_pow2(MMAX(buf_layout.height, buf_layout.width));
+  mcode_max = mcode_max*mcode_max;
 
-    FOR_EACH(ix, 0, buf_layout.width) {
-      const double x = (double)ix * pixsz[0]; /* X in normalized image space */
-      double* val = htrdr_buffer_at(htrdr->buf, ix, iy);
-      double accum = 0;
+  /* Setup the number of threads */
+  omp_set_num_threads((int)htrdr->nthreads);
 
-      FOR_EACH(ispp, 0, htrdr->spp) {
-        double pixsamp[2]; /* Pixel sample */
-        double pos[3]; /* World space position */
-        double T;
+  #pragma omp parallel for schedule(dynamic, 32/*chunck size*/)
+  for(mcode=0; mcode<mcode_max; ++mcode) {
+    size_t ispp;
+    double* val;
+    double x, y;
+    double accum;
+    uint16_t ix, iy;
+    res_T res_local = RES_OK;
 
-        /* Uniformaly sample the pixel in the normalized image space */
-        pixsamp[0] = x + ssp_rng_canonical(rng)*pixsz[0];
-        pixsamp[1] = y + ssp_rng_canonical(rng)*pixsz[1];
+    if(ATOMIC_GET(&res) != RES_OK) continue;
 
-        /* Compute the world space position of the sample according to the
-         * image plane */
-        htrdr_rectangle_sample_pos(htrdr->rect, pixsamp, pos);
+    ix = morton2D_decode((uint32_t)(mcode>>0));
+    if(ix > buf_layout.width) continue;
+    iy = morton2D_decode((uint32_t)(mcode>>1));
+    if(iy > buf_layout.height) continue;
 
-        /* Solve the transmission for the sample position wrt the main dir */
-        res = htrdr_solve_transmission(htrdr, pos, htrdr->main_dir, &T);
-        if(res != RES_OK) goto error;
+    val = htrdr_buffer_at(htrdr->buf, ix, iy);
 
-        accum += T;
+    /* Define lower left the pixel coordinate in the normalized image space */
+    x = (double)ix*pixsz[0];
+    y = (double)iy*pixsz[1];
+
+    accum = 0;
+    FOR_EACH(ispp, 0, htrdr->spp) {
+      double pixsamp[2]; /* Pixel sample */
+      double pos[3]; /* World space position */
+      double T;
+
+      /* Uniformaly sample the pixel in the normalized image space */
+      pixsamp[0] = x + ssp_rng_canonical(rng)*pixsz[0];
+      pixsamp[1] = y + ssp_rng_canonical(rng)*pixsz[1];
+
+      /* Compute the world space position of the sample according to the
+       * image plane */
+      htrdr_rectangle_sample_pos(htrdr->rect, pixsamp, pos);
+
+      /* Solve the transmission for the sample position wrt the main dir */
+      res_local = htrdr_solve_transmission(htrdr, pos, htrdr->main_dir, &T);
+      if(res_local != RES_OK) {
+        ATOMIC_SET(&res, res_local);
+        continue;
       }
-      *val = accum / (double)htrdr->spp;
+
+      accum += T;
     }
+    *val = accum / (double)htrdr->spp;
   }
 
 exit:
   if(rng) SSP(rng_ref_put(rng));
-  return res;
+  return (res_T)res;
 error:
   goto exit;
 }

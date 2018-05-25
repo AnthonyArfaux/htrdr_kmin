@@ -39,13 +39,10 @@ static void
 buffer_release(ref_T* ref)
 {
   struct htrdr_buffer* buf = NULL;
-  struct htrdr* htrdr = NULL;
   ASSERT(ref);
   buf = CONTAINER_OF(ref, struct htrdr_buffer, ref);
-  htrdr = buf->htrdr;
-  if(buf->mem) MEM_RM(htrdr->allocator, buf->mem);
-  MEM_RM(htrdr->allocator, buf);
-  htrdr_ref_put(htrdr);
+  if(buf->mem) MEM_RM(buf->htrdr->allocator, buf->mem);
+  MEM_RM(buf->htrdr->allocator, buf);
 }
 
 /*******************************************************************************
@@ -80,7 +77,7 @@ htrdr_buffer_create
     res = RES_BAD_ARG;
     goto error;
   }
-  if(elmtsz) {
+  if(!elmtsz) {
     htrdr_log_err(htrdr,
       "the size of the buffer's elements cannot be null.\n");
     res = RES_BAD_ARG;
@@ -100,13 +97,13 @@ htrdr_buffer_create
     goto error;
   }
   ref_init(&buf->ref);
-  htrdr_ref_get(htrdr);
   buf->htrdr = htrdr;
   buf->width = width;
   buf->height = height;
   buf->pitch = pitch;
   buf->elmtsz = elmtsz;
   buf->align = align;
+  buf->htrdr = htrdr;
 
   memsz = buf->pitch * buf->height * buf->elmtsz;
   buf->mem = MEM_ALLOC_ALIGNED(htrdr->allocator, memsz, align);

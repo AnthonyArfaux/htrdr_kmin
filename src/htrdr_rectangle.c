@@ -37,12 +37,9 @@ static void
 rectangle_release(ref_T* ref)
 {
   struct htrdr_rectangle* rect;
-  struct htrdr* htrdr;
   ASSERT(ref);
   rect = CONTAINER_OF(ref, struct htrdr_rectangle, ref);
-  htrdr = rect->htrdr;
-  MEM_RM(htrdr->allocator, rect);
-  htrdr_ref_put(htrdr);
+  MEM_RM(rect->htrdr->allocator, rect);
 }
 
 /*******************************************************************************
@@ -69,10 +66,9 @@ htrdr_rectangle_create
     goto error;
   }
   ref_init(&rect->ref);
-  htrdr_ref_get(htrdr);
   rect->htrdr = htrdr;
 
-  if(sz[0] <= 0 || sz[1] <= 1) {
+  if(sz[0] <= 0 || sz[1] <= 0) {
     htrdr_log_err(htrdr,
       "invalid rectangle size `%g %g'. It must be strictly positive.\n",
       SPLIT2(sz));

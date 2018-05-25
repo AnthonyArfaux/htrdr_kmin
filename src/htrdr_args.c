@@ -49,6 +49,9 @@ print_help(const char* cmd)
   printf(
 "  -r <rectangle>   define the integration plane.\n");
   printf(
+"  -t THREADS       hint on the number of threads to use. By default use as\n"
+"                   many threads as CPU cores.\n");
+  printf(
 "  -v               make the program more verbose.\n");
   printf("\n");
   printf(
@@ -171,7 +174,7 @@ parse_image_parameter(struct htrdr_args* args, const char* str)
     } (void)0
   if(!strcmp(key, "def")) {
     PARSE("definition", parse_definition(val, args->image.definition));
-  } else if(!strcmp(key, "ssp")) {
+  } else if(!strcmp(key, "spp")) {
     PARSE("#samples per pixel", cstr_to_uint(val, &args->image.spp));
   } else {
     fprintf(stderr, "Invalid image parameter `%s'.\n", key);
@@ -190,7 +193,6 @@ parse_image_parameter(struct htrdr_args* args, const char* str)
     res = RES_BAD_ARG;
     goto error;
   }
-
 
 exit:
   return res;
@@ -268,7 +270,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "D:dfhI:i:o:r:v")) != -1) {
+  while((opt = getopt(argc, argv, "D:dfhI:i:o:r:t:v")) != -1) {
     switch(opt) {
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
@@ -288,16 +290,20 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = parse_multiple_parameters
           (args, optarg, parse_rectangle_parameter);
         break;
+      case 't': /* Submit an hint on the number of threads to use */
+        res = cstr_to_uint(optarg, &args->nthreads);
+        if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
+        break;
       case 'v': args->verbose = 1; break;
       default: res = RES_BAD_ARG; break;
     }
-  }
-  if(res != RES_OK) {
-    if(optarg) {
-      fprintf(stderr, "%s: invalid option argumet '%s' -- '%c'\n",
-        argv[0], optarg, opt);
+    if(res != RES_OK) {
+      if(optarg) {
+        fprintf(stderr, "%s: invalid option argument '%s' -- '%c'\n",
+          argv[0], optarg, opt);
+      }
+      goto error;
     }
-    goto error;
   }
   if(!args->input) {
     fprintf(stderr, "Missing input file.\n");

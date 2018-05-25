@@ -36,6 +36,7 @@ struct htrdr_args {
 
   double main_dir[3];
 
+  unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
   int verbose; /* Verbosity level */
@@ -55,6 +56,7 @@ struct htrdr_args {
     1          /* #samples per pixel */                                        \
   },                                                                           \
   {0, 0, -1}, /* Main direction */                                             \
+  (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
   0, /* Verbose flag */                                                        \

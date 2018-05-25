@@ -38,26 +38,22 @@ struct htrdr {
 
   FILE* output;
 
+  unsigned nthreads;
   int dump_vtk;
   int verbose;
 
   struct logger logger;
   struct mem_allocator* allocator;
-  ref_T ref;
 };
 
 extern LOCAL_SYM res_T
-htrdr_create
+htrdr_init
   (struct mem_allocator* allocator,
    const struct htrdr_args* args,
-   struct htrdr** htrdr);
+   struct htrdr* htrdr);
 
 extern LOCAL_SYM void
-htrdr_ref_get
-  (struct htrdr* htrdr);
-
-extern LOCAL_SYM void
-htrdr_ref_put
+htrdr_release
   (struct htrdr* htrdr);
 
 extern LOCAL_SYM res_T
