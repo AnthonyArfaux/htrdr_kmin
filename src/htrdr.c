@@ -40,6 +40,18 @@
  * Helper functions
  ******************************************************************************/
 static void
+print_out(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_UNIX
+  fprintf(stderr, "\x1b[1m\x1b[32m>\x1b[0m %s", msg);
+#else
+  fprintf(stderr, "> %s", msg);
+#endif
+}
+
+static void
 print_err(const char* msg, void* ctx)
 {
   ASSERT(msg);
@@ -160,9 +172,12 @@ htrdr_init
   res_T res = RES_OK;
   ASSERT(args && htrdr);
 
+  memset(htrdr, 0, sizeof(*htrdr));
+
   htrdr->allocator = mem_allocator ? mem_allocator : &mem_default_allocator;
 
   logger_init(htrdr->allocator, &htrdr->logger);
+  logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, NULL);
   logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
   logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
 
@@ -241,7 +256,7 @@ htrdr_run(struct htrdr* htrdr)
     if(res != RES_OK) goto error;
     time_sub(&t0, time_current(&t1), &t0);
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
-    fprintf(stderr, "Elapsed time: %s\n", buf);
+    htrdr_log(htrdr, "Elapsed time: %s\n", buf);
 
     dump_buffer(htrdr);
   }
@@ -249,6 +264,16 @@ exit:
   return res;
 error:
   goto exit;
+}
+
+void
+htrdr_log(struct htrdr* htrdr, const char* msg, ...)
+{
+  va_list vargs_list;
+  ASSERT(htrdr && msg);
+  va_start(vargs_list, msg);
+  log_msg(htrdr, LOG_OUTPUT, msg, vargs_list);
+  va_end(vargs_list);
 }
 
 void

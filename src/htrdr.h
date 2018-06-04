@@ -61,6 +61,16 @@ htrdr_run
   (struct htrdr* htrdr);
 
 extern LOCAL_SYM void
+htrdr_log
+  (struct htrdr* htrdr,
+   const char* msg,
+   ...)
+#ifdef COMPILER_GCC
+  __attribute((format(printf, 2, 3)))
+#endif
+  ;
+
+extern LOCAL_SYM void
 htrdr_log_err
   (struct htrdr* htrdr,
    const char* msg,
