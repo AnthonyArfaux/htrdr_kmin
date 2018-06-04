@@ -94,7 +94,7 @@ open_output_stream(struct htrdr* htrdr, const struct htrdr_args* args)
   } else {
     fd = open(args->output, O_CREAT|O_WRONLY|O_EXCL|O_TRUNC, S_IRUSR|S_IWUSR);
     if(fd >= 0) {
-      fp = fdopen(fd, "l");
+      fp = fdopen(fd, "w");
       if(fp == NULL) {
         htrdr_log_err(htrdr,
           "could not open the output file `%s'.\n", args->output);
