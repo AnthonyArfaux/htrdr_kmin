@@ -151,11 +151,10 @@ dump_buffer(struct htrdr* htrdr)
     (unsigned long)buf_layout.height);
   FOR_EACH(y, 0, buf_layout.height) {
     FOR_EACH(x, 0, buf_layout.width) {
-      if(*((double*)htrdr_buffer_at(htrdr->buf, x, y)) < 1.0) {
-        fprintf(htrdr->output, "0 0 0\n");
-      } else {
-        fprintf(htrdr->output, "255 255 255\n");
-      }
+      double val = *((double*)htrdr_buffer_at(htrdr->buf, x, y));
+      int i;
+      i = (int)(val * 255);
+      fprintf(htrdr->output, "%d %d %d\n", i, i, i);
     }
   }
 }

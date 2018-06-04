@@ -19,6 +19,12 @@
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 
+enum htrdr_voxel_data {
+  HTRDR_K_EXT_MIN,
+  HTRDR_K_EXT_MAX,
+  HTRDR_VOXEL_DATA_COUNT__
+};
+
 /* Forward declaration */
 struct htrdr_args;
 struct htrdr_buffer;

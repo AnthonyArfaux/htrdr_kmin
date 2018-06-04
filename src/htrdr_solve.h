@@ -22,13 +22,6 @@
 struct htrdr;
 
 extern LOCAL_SYM res_T
-htrdr_solve_transmission
-  (struct htrdr* htrdr,
-   const double pos[3],
-   const double dir[3],
-   double *val);
-
-extern LOCAL_SYM res_T
 htrdr_solve_transmission_buffer
   (struct htrdr* htrdr);
 

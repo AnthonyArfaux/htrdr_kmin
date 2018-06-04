@@ -25,9 +25,11 @@
 #include <omp.h>
 
 struct transmit_context {
-  double tau;
+  double tau_sampled;
+  double tau_max_min;
+  double tau_min;
 };
-static const struct transmit_context TRANSMIT_CONTEXT_NULL = {0};
+static const struct transmit_context TRANSMIT_CONTEXT_NULL = {0,0,0};
 
 /*******************************************************************************
  * Helper functions
@@ -51,25 +53,29 @@ discard_hit
    const double range[2],
    void* context)
 {
+  const double* vox_data = NULL;
   struct transmit_context* ctx = context;
   double dst;
-  double k;
+  double k_ext_min;
+  double k_ext_max;
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit));
   (void)org, (void)dir, (void)range;
 
-  k = *((double*)hit->voxel.data);
+  vox_data = hit->voxel.data;
+  k_ext_min = vox_data[HTRDR_K_EXT_MIN];
+  k_ext_max = vox_data[HTRDR_K_EXT_MAX];
+
   dst = hit->distance[1] - hit->distance[0];
   ASSERT(dst >= 0);
-  ctx->tau += k*dst;
-  return 1;
+  ctx->tau_min += k_ext_min*dst;
+  ctx->tau_max_min += (k_ext_max - k_ext_min)*dst;
+  return ctx->tau_max_min < ctx->tau_sampled;
 }
 
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-res_T
-htrdr_solve_transmission
+static res_T
+transmission_realisation
   (struct htrdr* htrdr,
+   struct ssp_rng* rng,
    const double pos[3],
    const double dir[3],
    double *val)
@@ -80,6 +86,7 @@ htrdr_solve_transmission
   res_T res = RES_OK;
   ASSERT(htrdr && pos && dir && val);
 
+  ctx.tau_sampled = ssp_ran_exp(rng, 1.0);
   res = svx_octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
     discard_hit, &ctx, &hit);
   if(res != RES_OK) {
@@ -89,8 +96,11 @@ htrdr_solve_transmission
       SPLIT3(pos), SPLIT3(dir));
     goto error;
   }
-  ASSERT(SVX_HIT_NONE(&hit));
-  *val = ctx.tau ? exp(-ctx.tau) : 1.0;
+  if(!SVX_HIT_NONE(&hit)) {
+    *val = 0;
+  } else {
+    *val = ctx.tau_min ? exp(-ctx.tau_min) : 1.0;
+  }
 
 exit:
   return res;
@@ -98,6 +108,9 @@ error:
   goto exit;
 }
 
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
 res_T
 htrdr_solve_transmission_buffer(struct htrdr* htrdr)
 {
@@ -165,7 +178,7 @@ htrdr_solve_transmission_buffer(struct htrdr* htrdr)
       htrdr_rectangle_sample_pos(htrdr->rect, pixsamp, pos);
 
       /* Solve the transmission for the sample position wrt the main dir */
-      res_local = htrdr_solve_transmission(htrdr, pos, htrdr->main_dir, &T);
+      res_local =  transmission_realisation(htrdr, rng, pos, htrdr->main_dir, &T);
       if(res_local != RES_OK) {
         ATOMIC_SET(&res, res_local);
         continue;
