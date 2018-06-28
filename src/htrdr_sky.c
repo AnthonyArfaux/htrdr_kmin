@@ -348,7 +348,7 @@ htrdr_sky_create
     iz2 = 0;
     upp[2] = low[2] + sky->htcp_desc.vxsz_z[iz2];
     FOR_EACH(iz, 0, nsplits) {
-      const double upp_z = (double)(iz + 1) * min_vxsz_z;
+      const double upp_z = (double)(iz + 1) * min_vxsz_z + low[2];
       darray_split_data_get(&sky->svx2htcp_z)[iz].index = iz2;
       darray_split_data_get(&sky->svx2htcp_z)[iz].height = upp[2];
       if(upp_z >= upp[2]) upp[2] += sky->htcp_desc.vxsz_z[++iz2];
