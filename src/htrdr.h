@@ -19,24 +19,18 @@
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 
-enum htrdr_voxel_data {
-  HTRDR_K_EXT_MIN,
-  HTRDR_K_EXT_MAX,
-  HTRDR_VOXEL_DATA_COUNT__
-};
-
 /* Forward declaration */
 struct htrdr_args;
 struct htrdr_buffer;
+struct htrdr_sky;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct svx_device;
-struct svx_tree;
 
 struct htrdr {
   struct svx_device* svx;
-  struct svx_tree* clouds;
 
+  struct htrdr_sky* sky;
   struct htrdr_buffer* buf;
   struct htrdr_rectangle* rect;
   double main_dir[3]; /* Main direction */

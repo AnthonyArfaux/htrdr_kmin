@@ -18,8 +18,8 @@
 #include "htrdr.h"
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
-#include "htrdr_clouds.h"
 #include "htrdr_rectangle.h"
+#include "htrdr_sky.h"
 #include "htrdr_solve.h"
 
 #include <rsys/clock_time.h>
@@ -218,7 +218,7 @@ htrdr_init
     res = open_output_stream(htrdr, args);
     if(res != RES_OK) goto error;
   }
-  res = clouds_load(htrdr, args->verbose, args->input);
+  res = htrdr_sky_create(htrdr, args->input, &htrdr->sky);
   if(res != RES_OK) goto error;
 
 exit:
@@ -233,7 +233,7 @@ htrdr_release(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
-  if(htrdr->clouds) SVX(tree_ref_put(htrdr->clouds));
+  if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->rect) htrdr_rectangle_ref_put(htrdr->rect);
   logger_release(&htrdr->logger);
@@ -244,7 +244,7 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    res = clouds_dump_vtk(htrdr, htrdr->output);
+    res = htrdr_sky_dump_clouds_vtk(htrdr->sky, htrdr->output);
     if(res != RES_OK) goto error;
   } else {
     struct time t0, t1;

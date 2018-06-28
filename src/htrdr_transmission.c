@@ -16,6 +16,7 @@
 #include "htrdr.h"
 #include "htrdr_buffer.h"
 #include "htrdr_rectangle.h"
+#include "htrdr_sky.h"
 #include "htrdr_solve.h"
 
 #include <star/ssp.h>
@@ -62,8 +63,8 @@ discard_hit
   (void)org, (void)dir, (void)range;
 
   vox_data = hit->voxel.data;
-  k_ext_min = vox_data[HTRDR_K_EXT_MIN];
-  k_ext_max = vox_data[HTRDR_K_EXT_MAX];
+  k_ext_min = vox_data[HTRDR_SKY_SVX_Kext_MIN];
+  k_ext_max = vox_data[HTRDR_SKY_SVX_Kext_MAX];
 
   dst = hit->distance[1] - hit->distance[0];
   ASSERT(dst >= 0);
@@ -81,13 +82,15 @@ transmission_realisation
    double *val)
 {
   struct svx_hit hit = SVX_HIT_NULL;
+  struct svx_tree* svx_tree = NULL;
   struct transmit_context ctx = TRANSMIT_CONTEXT_NULL;
   const double range[2] = {0, INF};
   res_T res = RES_OK;
   ASSERT(htrdr && pos && dir && val);
 
   ctx.tau_sampled = ssp_ran_exp(rng, 1.0);
-  res = svx_octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
+  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
+  res = svx_octree_trace_ray(svx_tree, pos, dir, range, NULL,
     discard_hit, &ctx, &hit);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
