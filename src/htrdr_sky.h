@@ -18,25 +18,30 @@
 
 #include <rsys/rsys.h>
 
+/* Raw sky properties */
 enum htrdr_sky_property {
   HTRDR_SKY_Ks, /* Scattering coefficient */
   HTRDR_SKY_Ka /* Absorption coefficient */
 };
 
-enum htrdr_sky_component_flag {
-  HTRDR_GAZ = BIT(0),
-  HTRDR_PARTICLE = BIT(1)
-};
-
+/* Property of the sky computed by region and managed by Star-VoXel */
 enum htrdr_sky_svx_property {
   HTRDR_SKY_SVX_Kext_MIN,
   HTRDR_SKY_SVX_Kext_MAX,
   HTRDR_SKY_SVX_PROPS_COUNT__
 };
 
+/* Component of the sky for which the properties are queried */
+enum htrdr_sky_component_flag {
+  HTRDR_SKY_GAZ = BIT(0),
+  HTRDR_SKY_PARTICLE = BIT(1)
+};
+
 /* Forward declaration */
 struct htrdr;
 struct htrdr_sky;
+struct svx_tree;
+struct svx_voxel;
 
 extern LOCAL_SYM res_T
 htrdr_sky_create
@@ -53,16 +58,32 @@ htrdr_sky_ref_put
   (struct htrdr_sky* sky);
 
 extern LOCAL_SYM double
-htrdr_sky_fetch_property
+htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
-   const int components, /* Combination of htrdr_sky_component_flag */
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const double pos[3]);
 
 extern LOCAL_SYM struct svx_tree*
 htrdr_sky_get_svx_tree
   (struct htrdr_sky* sky);
+
+extern LOCAL_SYM double
+htrdr_sky_fetch_svx_property
+  (const struct htrdr_sky* sky,
+   const enum htrdr_sky_svx_property prop,
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const double wavelength,
+   const double pos[3]);
+
+extern LOCAL_SYM double
+htrdr_sky_fetch_svx_voxel_property
+  (const struct htrdr_sky* sky,
+   const enum htrdr_sky_svx_property prop,
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const double wavelength,
+   const struct svx_voxel* voxel);
 
 extern LOCAL_SYM res_T
 htrdr_sky_dump_clouds_vtk

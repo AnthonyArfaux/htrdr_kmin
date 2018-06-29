@@ -484,3 +484,47 @@ htrdr_sky_dump_clouds_vtk(const struct htrdr_sky* sky, FILE* stream)
   return RES_OK;
 }
 
+double
+htrdr_sky_fetch_svx_property
+  (const struct htrdr_sky* sky,
+   const enum htrdr_sky_svx_property prop,
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const double wavelength,
+   const double pos[3])
+{
+  struct svx_voxel voxel = SVX_VOXEL_NULL;
+  ASSERT(sky && pos);
+#ifndef NDEBUG
+  {
+    struct svx_tree_desc tree_desc = SVX_TREE_DESC_NULL;
+    SVX(tree_get_desc(sky->clouds, &tree_desc));
+    ASSERT(tree_desc.lower[0] <= pos[0] && tree_desc.upper[0] >= pos[0]);
+    ASSERT(tree_desc.lower[1] <= pos[1] && tree_desc.upper[1] >= pos[1]);
+    ASSERT(tree_desc.lower[2] <= pos[2] && tree_desc.upper[2] >= pos[2]);
+  }
+#endif
+  SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
+  return htrdr_sky_fetch_svx_voxel_property
+    (sky, prop, components_mask, wavelength, &voxel);
+}
+
+double
+htrdr_sky_fetch_svx_voxel_property
+  (const struct htrdr_sky* sky,
+   const enum htrdr_sky_svx_property prop,
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const double wavelength,
+   const struct svx_voxel* voxel)
+{
+  const double* pdbl = NULL;
+  ASSERT(sky && prop && components_mask && wavelength>=0 && voxel);
+  ASSERT((unsigned)prop < HTRDR_SKY_SVX_PROPS_COUNT__);
+  (void)sky, (void)wavelength;
+
+  if(components_mask != (HTRDR_SKY_GAZ|HTRDR_SKY_PARTICLE)) {
+    FATAL("Unsupported sky component\n");
+  }
+  pdbl = voxel->data;
+  return pdbl[prop];
+}
+

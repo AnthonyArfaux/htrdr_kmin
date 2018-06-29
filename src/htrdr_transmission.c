@@ -26,11 +26,12 @@
 #include <omp.h>
 
 struct transmit_context {
+  const struct htrdr_sky* sky;
   double tau_sampled;
   double tau_max_min;
   double tau_min;
 };
-static const struct transmit_context TRANSMIT_CONTEXT_NULL = {0,0,0};
+static const struct transmit_context TRANSMIT_CONTEXT_NULL = {NULL,0,0,0};
 
 /*******************************************************************************
  * Helper functions
@@ -54,7 +55,7 @@ discard_hit
    const double range[2],
    void* context)
 {
-  const double* vox_data = NULL;
+  const int comp = HTRDR_SKY_GAZ | HTRDR_SKY_PARTICLE;
   struct transmit_context* ctx = context;
   double dst;
   double k_ext_min;
@@ -62,9 +63,10 @@ discard_hit
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit));
   (void)org, (void)dir, (void)range;
 
-  vox_data = hit->voxel.data;
-  k_ext_min = vox_data[HTRDR_SKY_SVX_Kext_MIN];
-  k_ext_max = vox_data[HTRDR_SKY_SVX_Kext_MAX];
+  k_ext_min = htrdr_sky_fetch_svx_voxel_property
+    (ctx->sky, HTRDR_SKY_SVX_Kext_MIN, comp, -1/*FIXME*/, &hit->voxel);
+  k_ext_max = htrdr_sky_fetch_svx_voxel_property
+    (ctx->sky, HTRDR_SKY_SVX_Kext_MAX, comp, -1/*FIXME*/, &hit->voxel);
 
   dst = hit->distance[1] - hit->distance[0];
   ASSERT(dst >= 0);
@@ -89,6 +91,7 @@ transmission_realisation
   ASSERT(htrdr && pos && dir && val);
 
   ctx.tau_sampled = ssp_ran_exp(rng, 1.0);
+  ctx.sky = htrdr->sky;
   svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
   res = svx_octree_trace_ray(svx_tree, pos, dir, range, NULL,
     discard_hit, &ctx, &hit);
