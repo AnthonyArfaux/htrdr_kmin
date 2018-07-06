@@ -47,6 +47,7 @@ extern LOCAL_SYM res_T
 htrdr_sky_create
   (struct htrdr* htrdr,
    const char* htcp_filename,
+   const char* htmie_filename,
    struct htrdr_sky** sky);
 
 extern LOCAL_SYM void

@@ -19,7 +19,8 @@
 #include <rsys/rsys.h>
 
 struct htrdr_args {
-  const char* input;
+  const char* filename_les;
+  const char* filename_mie;
   const char* output;
 
   struct {
@@ -44,7 +45,8 @@ struct htrdr_args {
 };
 
 #define HTRDR_ARGS_DEFAULT__ {                                                 \
-  NULL, /* Input filename */                                                   \
+  NULL, /* LES filename */                                                     \
+  NULL, /* Mie filename */                                                     \
   NULL, /* Output filename */                                                  \
   {                                                                            \
     {0, 0, 0}, /* plane position */                                            \

@@ -32,6 +32,8 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s -i INPUT [OPIONS]\n\n", cmd);
   printf(
+"  -c FILENAME      path of the HTCP cloud properties file.\n");
+  printf(
 "  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
   printf(
 "  -D X,Y,Z         sun direction.\n");
@@ -40,9 +42,9 @@ print_help(const char* cmd)
   printf(
 "  -h               display this help and exit.\n");
   printf(
-"  -i INPUT         path of the input HTCP file.\n");
-  printf(
 "  -I <image>       define the image to compute.\n");
+  printf(
+"  -m FILENAME      path of the Mie data file.\n");
   printf(
 "  -o OUTPUT        file where data are written. If not defined, data are\n"
 "                   written to standard output.\n");
@@ -270,8 +272,9 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "D:dfhI:i:o:r:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "c:D:dfhI:m:o:r:t:v")) != -1) {
     switch(opt) {
+      case 'c': args->filename_les = optarg; break;
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
       case 'f': args->force_overwriting = 1; break;
@@ -284,7 +287,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
         break;
-      case 'i': args->input = optarg; break;
+      case 'm': args->filename_mie = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r':
         res = parse_multiple_parameters
@@ -305,11 +308,19 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       goto error;
     }
   }
-  if(!args->input) {
-    fprintf(stderr, "Missing input file.\n");
+  if(!args->filename_les) {
+    fprintf(stderr, 
+      "Missing the path of the cloud properties file -- option '-c'\n");
     res = RES_BAD_ARG;
     goto error;
   }
+  if(!args->filename_mie) {
+    fprintf(stderr, 
+      "Missing the path toward the file of the Mie's data -- option '-m'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
 exit:
   return res;
 error:

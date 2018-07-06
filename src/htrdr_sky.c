@@ -18,6 +18,7 @@
 
 #include <star/svx.h>
 #include <high_tune/htcp.h>
+#include <high_tune/htmie.h>
 
 #include <rsys/dynamic_array_double.h>
 #include <rsys/dynamic_array_size_t.h>
@@ -71,6 +72,7 @@ struct octree_data {
 struct htrdr_sky {
   struct svx_tree* clouds;
   struct htcp* htcp;
+  struct htmie* htmie;
 
   struct htcp_desc htcp_desc;
 
@@ -80,6 +82,10 @@ struct htrdr_sky {
   ref_T ref;
   struct htrdr* htrdr;
 };
+
+/*
+ * K<a|s> particle = C<a|s> * RCT
+ */
 
 /*******************************************************************************
  * Helper function
@@ -250,74 +256,39 @@ vox_challenge_merge(const void* voxels[], const size_t nvoxs, void* context)
   return (kext_max - kext_min)*ctx->dst_max <= ctx->tau_threshold;
 }
 
-static void
-release_sky(ref_T* ref)
+static res_T
+setup_clouds(struct htrdr_sky* sky)
 {
-  struct htrdr_sky* sky;
-  ASSERT(ref);
-  sky = CONTAINER_OF(ref, struct htrdr_sky, ref);
-  if(sky->clouds) SVX(tree_ref_put(sky->clouds));
-  if(sky->htcp) HTCP(ref_put(sky->htcp));
-  darray_split_release(&sky->svx2htcp_z);
-  MEM_RM(sky->htrdr->allocator, sky);
-}
-
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-res_T
-htrdr_sky_create
-  (struct htrdr* htrdr,
-   const char* htcp_filename,
-   struct htrdr_sky** out_sky)
-{
-  struct htrdr_sky* sky = NULL;
   struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
   struct build_octree_context ctx;
   size_t nvoxs[3];
-  double sz[3];
   double low[3];
   double upp[3];
+  double sz[3];
   res_T res = RES_OK;
-  ASSERT(htrdr && htcp_filename && out_sky);
+  ASSERT(sky);
 
-  sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
-  if(!sky) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  ref_init(&sky->ref);
-  sky->htrdr = htrdr;
-  darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
-
-  res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
+  res = htcp_get_desc(sky->htcp, &sky->htcp_desc);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the loader of cloud properties.\n");
+    htrdr_log_err(sky->htrdr, "could not retrieve the HTCP descriptor.\n");
     goto error;
   }
-
-  res = htcp_load(sky->htcp, htcp_filename);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "error loading the cloud properties -- `%s'.\n",
-      htcp_filename);
-    goto error;
-  }
-
-  HTCP(get_desc(sky->htcp, &sky->htcp_desc));
 
   /* Define the number of voxels */
   nvoxs[0] = sky->htcp_desc.spatial_definition[0];
   nvoxs[1] = sky->htcp_desc.spatial_definition[1];
   nvoxs[2] = sky->htcp_desc.spatial_definition[2];
 
-  /* Define the octree AABB */
+  /* Define the octree AABB exepted for the Z dimension */
   low[0] = sky->htcp_desc.lower[0];
   low[1] = sky->htcp_desc.lower[1];
   low[2] = sky->htcp_desc.lower[2];
   upp[0] = low[0] + (double)nvoxs[0] * sky->htcp_desc.vxsz_x;
   upp[1] = low[1] + (double)nvoxs[1] * sky->htcp_desc.vxsz_y;
 
-  if(!sky->htcp_desc.irregular_z) { /* Refular voxel size in Z */
+  if(!sky->htcp_desc.irregular_z) {
+    /* Regular voxel size along the Z dimension: compute its upper boundary as
+     * the others dimensions */
     upp[2] = low[2] + (double)nvoxs[2] * sky->htcp_desc.vxsz_z[0];
   } else { /* Irregular voxel size along Z */
     double min_vxsz_z;
@@ -332,13 +303,13 @@ htrdr_sky_create
       len_z += sky->htcp_desc.vxsz_z[iz];
       min_vxsz_z = MMIN(min_vxsz_z, sky->htcp_desc.vxsz_z[iz]);
     }
-    /* Allocate the svx2htcp LUT. The LUT is a regular table whose absolute
+    /* Allocate the svx2htcp LUT. This LUT is a regular table whose absolute
      * size is the size of a Z column in the htcp file. The size of its cells
      * is the minimal voxel size in Z of the htcp file */
     nsplits = (size_t)ceil(len_z / min_vxsz_z);
     res = darray_split_resize(&sky->svx2htcp_z, nsplits);
     if(res != RES_OK) {
-      htrdr_log_err(htrdr,
+      htrdr_log_err(sky->htrdr,
         "could not allocate the table mapping regular to irregular Z.\n");
       goto error;
     }
@@ -375,12 +346,87 @@ htrdr_sky_create
   vox_desc.size = sizeof(double)*HTRDR_SKY_SVX_PROPS_COUNT__;
 
   /* Create the octree */
-  res = svx_octree_create(htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds);
+  res = svx_octree_create
+    (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr,
+    htrdr_log_err(sky->htrdr,
       "could not create the octree of the cloud properties.\n");
     goto error;
   }
+
+exit:
+  return res;
+error:
+  if(sky->clouds) SVX(tree_ref_put(sky->clouds));
+  darray_split_clear(&sky->svx2htcp_z);
+  goto exit;
+}
+
+static void
+release_sky(ref_T* ref)
+{
+  struct htrdr_sky* sky;
+  ASSERT(ref);
+  sky = CONTAINER_OF(ref, struct htrdr_sky, ref);
+  if(sky->clouds) SVX(tree_ref_put(sky->clouds));
+  if(sky->htcp) HTCP(ref_put(sky->htcp));
+  if(sky->htmie) HTMIE(ref_put(sky->htmie));
+  darray_split_release(&sky->svx2htcp_z);
+  MEM_RM(sky->htrdr->allocator, sky);
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+htrdr_sky_create
+  (struct htrdr* htrdr,
+   const char* htcp_filename,
+   const char* htmie_filename,
+   struct htrdr_sky** out_sky)
+{
+  struct htrdr_sky* sky = NULL;
+  res_T res = RES_OK;
+  ASSERT(htrdr && htcp_filename && htmie_filename && out_sky);
+
+  sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
+  if(!sky) {
+    htrdr_log_err(htrdr, "could not allocate the sky data structure.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  ref_init(&sky->ref);
+  sky->htrdr = htrdr;
+  darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
+
+  res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the loader of cloud properties.\n");
+    goto error;
+  }
+
+  res = htcp_load(sky->htcp, htcp_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "error loading the cloud properties -- `%s'.\n",
+      htcp_filename);
+    goto error;
+  }
+
+  res = htmie_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htmie);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the loader of Mie's data.\n");
+    goto error;
+  }
+
+  res = htmie_load(sky->htmie, htmie_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "error loading the Mie's data -- `%s'.\n",
+      htmie_filename);
+    goto error;
+  }
+
+  res = setup_clouds(sky);
+  if(res != RES_OK) goto error;
 
 exit:
   *out_sky = sky;

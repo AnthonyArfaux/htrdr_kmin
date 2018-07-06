@@ -218,7 +218,8 @@ htrdr_init
     res = open_output_stream(htrdr, args);
     if(res != RES_OK) goto error;
   }
-  res = htrdr_sky_create(htrdr, args->input, &htrdr->sky);
+  res = htrdr_sky_create
+    (htrdr, args->filename_les, args->filename_mie, &htrdr->sky);
   if(res != RES_OK) goto error;
 
 exit:
