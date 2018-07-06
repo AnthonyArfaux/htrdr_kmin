@@ -18,9 +18,6 @@ struct scattering_context {
 
   double Ts; /* Sampled optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
-
-  double proba_s; /* Scattering probability */
-  double ks_max; /* Max scattering coef that emits a medium collision */
 };
 static const struct scattering_context SCATTERING_CONTEXT_NULL = {
   NULL, 0, 0, 0, 0
@@ -29,6 +26,7 @@ static const struct scattering_context SCATTERING_CONTEXT_NULL = {
 struct transmissivity_context {
   struct ssp_rng* rng;
   double Ts; /* Sampled optical thickness */
+  double Tmin; /* Minimal optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
 };
 static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
@@ -57,46 +55,44 @@ scattering_hit_filter
   vox_data = hit->voxel.data;
   ks_max = vox_data[HTRDR_Ks_MAX];
 
-  dst = hit->distance[1] - ctx->traversal_dst;
+  for(;;) {
+    dst = hit->distance[1] - ctx->traversal_dst;
+    T = dst * ks_max; /* Compute tau for the current leaf */
 
-  T = dst * ks_max; /* Compute tau for the current leaf */
+    /* A collision occurs behind `dst' */
+    if(ctx->Ts > T) {
+      ctx->Ts -= T;
+      ctx->traversal_dst = hit.distance[1];
+      pursue_traversal = 1;
+      break;
 
-  /* A collision occurs behind `dst' */
-  if(ctx->Ts > T) {
-    /*ctx->Tmin += T;*/
-    ctx->Ts -= T;
-    ctx->traversal_dst = hit.distance[1];
+    /*  A real/null collision occurs before `dst' */
+    } else {
+      double pos[3];
+      double proba_s;
+      double ks;
+      const float collision_dst = ctx->Ts / ks_max;
 
-  /*  A real/null collision occurs before `dst' */
-  } else {
-    double pos[3];
-    double proba_s;
-    double ks, kn;
-    const float collision_dst = ctx->Ts / ks_max;
-
-    /* Compute the traversed distance up to the challenged collision */
-    dst = ctx->traversal_dst + collision_dst;
-
-    /* Compute the world space position where a collision may occur */
-    pos[0] = org[0] + dst * dir[0];
-    pos[1] = org[1] + dst * dir[1];
-    pos[2] = org[2] + dst * dir[2];
-
-    ks = fetch_ks(ctx->medium, x); /* TODO */
-
-    /* Handle the case that ks_max is not *really* the max */
-    kn = ks_max - ks;
-    proba_s = ks / (ks + fabs(kn));
-
-    r = ssp_rng_canonical(ctx->rng);
-    if(r > proba_s) { /* Null Collision */
-      ctx->Ts = ssp_ran_exp(rng, 1); /* Sample a new Tau */
-      ctx->traversal_dst = hit->distance[1];
-    } else /* Real diffusion */
-      ctx->proba_s = proba_s;
-      ctx->ks_max = ks_max;
+      /* Compute the traversed distance up to the challenged collision */
+      dst = ctx->traversal_dst + collision_dst;
       ctx->traversal_dst = dst;
-      pursue_traversal = 0;
+
+      /* Compute the world space position where a collision may occur */
+      pos[0] = org[0] + dst * dir[0];
+      pos[1] = org[1] + dst * dir[1];
+      pos[2] = org[2] + dst * dir[2];
+
+      ks = fetch_ks(ctx->medium, x); /* TODO */
+
+      /* Handle the case that ks_max is not *really* the max */
+      proba_s = ks / ks_max;
+
+      if(ssp_rng_canonical(ctx->rng) < proba) {/* Collide <=> real scattering */
+        pursue_traversal = 0;
+        break;
+      } else { /* Null collision */
+        ctx->Ts = ssp_ran_exp(rng, 1); /* Sample a new optical thickness */
+      }
     }
   }
   return pursue_traversal;
@@ -113,48 +109,58 @@ transmissivty_hit_filter
   const double* vox_data = NULL;
   struct transmissivity_context* ctx = context;
   double dst;
-  double kext_max;
-  double kext_min;
+  double k_max;
+  double k_min;
   int pursue_traversal = 1;
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
   (void)range;
 
   vox_data = hit->voxel.data;
-  kext_max = vox_data[HTRDR_Ks_MAX];
-  kext_min = vox_data[HTRDR_Ks_MIN];
+  k_max = vox_data[HTRDR_K_MAX];
+  k_min = vox_data[HTRDR_K_MIN];
 
   dst = hit->distance[1] - ctx->traversal_dst;
-  ctx->Tmin += dst * kext_min * dst;
-  ctx->Tdif += dst * (kext_max-kext_min);
+  ctx->Tmin += dst * k_min;
 
-  if(ctx->Tdif >= ctx->Ts) {
-    double x[3];
-    double kext;
-    double kn;
-    double dst;
-    double proba_kext;
+  for(;;) {
+    Tdif = dst * (k_max-k_min);
 
-    /* Compute the traversed distance up to the challenged collision */
-    dst = ctx->traversal_dst + collision_dst;
-
-    /* Compute the world space position where a collision may occur */
-    x[0] = org[0] + dst * dir[0];
-    x[1] = org[1] + dst * dir[1];
-    x[2] = org[2] + dst * dir[2];
-
-    kext = fetch_kext(ctx->medium, x); /* TODO */
-
-    /* Handle the case that kext_max is not *really* the mx */
-    kn = kext_max - kext;
-    proba_ext = kext / (kext + fabs(kn));
-
-    if(ssp_rng_canonical(ctx->rng) < proba_ext) { /* Collide */
-      ctx->traversal_dst = dst;
-      pursue_traversal = 0;
-    } else { /* Null collision */
-      ctx->Ts += ssp_ran_exp(rng, 1); /*  FIXME check this */
+    /* A collision occurs behind `dst' */
+    if(ctx->Ts > ctx->Tdif) {
+      ctx->Ts -= Tdif;
       ctx->traversal_dst = hit->range[1];
       pursue_traversal = 1;
+      break;
+
+    /*  A real/null collision occurs before `dst' */
+    } else {
+      double x[3];
+      double k;
+      double dst;
+      double proba_kext;
+      double collision_dst = cts->Ts / (k_max - k_min);
+
+      /* Compute the traversed distance up to the challenged collision */
+      dst = ctx->traversal_dst + collision_dst;
+      ctx->traversal_dst = dst;
+
+      /* Compute the world space position where a collision may occur */
+      x[0] = org[0] + dst * dir[0];
+      x[1] = org[1] + dst * dir[1];
+      x[2] = org[2] + dst * dir[2];
+
+      k = fetch_k(ctx->medium, x); /* TODO */
+
+      /* Handle the case that k_max is not *really* the max */
+      proba = (k - k_min) / (k_max - k_min);
+
+      if(ssp_rng_canonical(ctx->rng) < proba) { /* Collide */
+        pursue_traversal = 0;
+        break;
+      } else { /* Null collision */
+        ctx->Ts = ssp_ran_exp(rng, 1); /* Sample a new optical thickness */
+        dst = hit->distance[1] - ctx->traversal_dst;
+      }
     }
   }
   return pursue_traversal;
@@ -196,7 +202,11 @@ transmissivity
   SVX(octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, &svx_hit));
 
-  return transmissivity_ctx.Tmin ? exp(-ctx.Tmin) : 1.0;
+  if(SVX_HIT_NONE(svx_hit)) {
+    return transmissivity_ctx.Tmin ? exp(-ctx.Tmin) : 1.0;
+  } else {
+    return 0;
+  }
 }
 
 /* Compute the radiance in short wave */
@@ -240,8 +250,7 @@ radiance_sw
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  /* Check if the sun is directly visible. TODO check this */
-  htrdr_sun_sample_dir(htrdr->sun, rng, pos, sun_dir);
+  /* Check that the sun is directly visible */
   f3_set_d3(ray_pos, pos);
   f3_set_d3(ray_dir, sun_dir);
   f2(ray_range, 0, FLT_MAX);
@@ -302,7 +311,6 @@ radiance_sw
     d2(range, 0, FLT_MAX);
     htrdr_sun_sample_dir(htrdr->sun, rng, pos_next, sun_dir);
     Tr = transmissivity(htrdr, rng, pos_next, sun_dir, range);
-    if(Tr <= 0) break;
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
@@ -315,8 +323,6 @@ radiance_sw
       if(ssp_rng_canonical(rng) > reflectivity) break; /* Russian roulette */
 
       R = ssf_bsdf_eval(htrdr->bsdf, wi, s3d_hit.normal, sun_dir);
-      ksi *= Tr_abs;
-      w += ksi * L_sun * sun_solid_angle * Tr * R;
 
     /* Scattering in the medium */
     } else {
@@ -337,12 +343,11 @@ radiance_sw
       }
 
       ssf_phase_sample(phase, rng, wi, dir_next, &pdf);
-      R = ssf_phase_eval(phase, wi, dir_next);
-
-      ksi *= ks / (scattering_ctx->proba_s * scattering_ctx->ks_max * Tr_abs);
+      R = ssf_phase_eval(phase, wi, sun_dir);
     }
 
     /* Update the MC weight */
+    ksi *= Tr_abs;
     w += ksi * L_sun * sun_solid_angle * Tr * R;
 
     /* Setup the next random walk state */
@@ -351,4 +356,5 @@ radiance_sw
   }
   return w;
 }
+
 
