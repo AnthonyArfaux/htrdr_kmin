@@ -25,7 +25,7 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.6 REQUIRED)
-find_package(StarSP 0.7 REQUIRED)
+find_package(StarSP 0.8 REQUIRED)
 find_package(SVX REQUIRED)
 find_package(HTCP REQUIRED)
 find_package(HTMIE REQUIRED)

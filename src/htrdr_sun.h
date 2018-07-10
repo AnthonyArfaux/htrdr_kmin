@@ -37,13 +37,13 @@ htrdr_sun_ref_put
   (struct htrdr_sun* sun);
 
 /* Setup the direction *toward* the sun "center" */
-extern LOCAL_SYM res_T
+extern LOCAL_SYM void
 htrdr_sun_set_direction
   (struct htrdr_sun* sun,
-   const double direction[3]);
+   const double direction[3]); /* Must be normalized */
 
 /* Return a direction that points *toward* the sun */
-extern LOCAL_SYM res_T
+extern LOCAL_SYM double*
 htrdr_sun_sample_direction
   (struct htrdr_sun* sun,
    struct ssp_rng* rng,
@@ -52,6 +52,11 @@ htrdr_sun_sample_direction
 extern LOCAL_SYM double
 htrdr_sun_get_solid_angle
   (const struct htrdr_sun* sun);
+
+extern LOCAL_SYM double /* W.sr^-1.m^-2 */
+htrdr_sun_get_radiance
+  (const struct htrdr_sun* sun,
+   const double wavelength);
 
 extern LOCAL_SYM int
 htrdr_sun_is_dir_in_solar_cone

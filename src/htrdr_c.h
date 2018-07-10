@@ -27,7 +27,7 @@ wavenumber_to_wavelength(const double nu/*In cm^-1*/)
 static FINLINE double
 wavelength_to_wavenumber(const double lambda/*In nanometer*/)
 {
-  return 1.e7 / lambda;
+  return wavenumber_to_wavelength(lambda);
 }
 
 #endif /* HTRDR_C_H */

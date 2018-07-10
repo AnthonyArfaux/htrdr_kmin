@@ -14,24 +14,28 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_sun.h"
 
-#include <rsys/double3.h>
+#include <rsys/algorithm.h>
+#include <rsys/double33.h>
 #include <rsys/dynamic_array_double.h>
 #include <rsys/ref_count.h>
 #include <rsys/math.h>
 
+#include <star/ssp.h>
+
 struct htrdr_sun {
   /* Short wave radiance in W.m^-2.sr^-1, for each spectral interval */
-  struct darray_double radiance_sw;
+  struct darray_double radiances_sw;
 
   /* Short wave spectral interval boundaries, in cm^-1 */
   struct darray_double wavenumbers_sw;
 
   double half_angle; /* In radian */
-  double solid_angle; /* In sr; solid_angle = 2*PI(1 - cos(half_angle)) */
-
-  double main_dir[3]; /* Direction *toward* the sun */
+  double cos_half_angle;
+  double solid_angle; /* In sr; solid_angle = 2*PI*(1 - cos(half_angle)) */
+  double frame[9];
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -40,13 +44,21 @@ struct htrdr_sun {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static INLINE int
+cmp_dbl(const void* a, const void* b)
+{
+  const double d0 = *((const double*)a);
+  const double d1 = *((const double*)b);
+  return d0 < d1 ? -1 : (d0 > d1 ? 1 : 0);
+}
+
 static void
 release_sun(ref_T* ref)
 {
   struct htrdr_sun* sun;
   ASSERT(ref);
   sun = CONTAINER_OF(ref, struct htrdr_sun, ref);
-  darray_double_release(&sun->radiance_sw);
+  darray_double_release(&sun->radiances_sw);
   darray_double_release(&sun->wavenumbers_sw);
   MEM_RM(sun->htrdr->allocator, sun);
 }
@@ -71,6 +83,7 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   };
 
   const size_t nspectral_intervals = sizeof(incoming_flux_sw)/sizeof(double);
+  const double main_dir[3] = {0, 0, 1}; /* Default main sun direction */
   struct htrdr_sun* sun = NULL;
   size_t i;
   res_T res = RES_OK;
@@ -85,12 +98,14 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   }
   ref_init(&sun->ref);
   sun->htrdr = htrdr;
-  darray_double_init(htrdr->allocator, &sun->radiance_sw);
+  darray_double_init(htrdr->allocator, &sun->radiances_sw);
   darray_double_init(htrdr->allocator, &sun->wavenumbers_sw);
   sun->half_angle = 4.6524e3;
-  sun->solid_angle = 2*PI*(1-cos(sun->half_angle));
+  sun->cos_half_angle = cos(sun->half_angle);
+  sun->solid_angle = 2*PI*(1-sun->cos_half_angle);
+  d33_basis(sun->frame, main_dir);
 
-  res = darray_double_resize(&sun->radiance_sw, nspectral_intervals);
+  res = darray_double_resize(&sun->radiances_sw, nspectral_intervals);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
       "could not allocate the list of per spectral band radiance of the sun.\n");
@@ -103,17 +118,13 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
     goto error;
   }
 
-  FOR_EACH(i, 0, darray_double_size_get(&sun->radiance_sw)) {
+  FOR_EACH(i, 0, darray_double_size_get(&sun->radiances_sw)) {
     /* Convert the incoming flux in radiance */
-    darray_double_data_get(&sun->radiance_sw)[i] = incoming_flux_sw[i] / PI;
+    darray_double_data_get(&sun->radiances_sw)[i] = incoming_flux_sw[i] / PI;
   }
   FOR_EACH(i, 0, darray_double_size_get(&sun->wavenumbers_sw)) {
     darray_double_data_get(&sun->wavenumbers_sw)[i] = wavenumbers_sw[i];
   }
-
-  sun->main_dir[0] = 0;
-  sun->main_dir[1] = 0;
-  sun->main_dir[2] = 1;
 
 exit:
   *out_sun = sun;
@@ -140,13 +151,22 @@ htrdr_sun_ref_put(struct htrdr_sun* sun)
   ref_put(&sun->ref, release_sun);
 }
 
-res_T
+void
 htrdr_sun_set_direction(struct htrdr_sun* sun, const double dir[3])
 {
-  double len;
-  ASSERT(sun && dir);
-  len = d3_normalize(sun->main_dir, dir);
-  return len <= 0 ? RES_BAD_ARG : RES_OK;
+  ASSERT(sun && dir && d3_is_normalized(dir));
+  d33_basis(sun->frame, dir);
+}
+
+double*
+htrdr_sun_sample_direction
+  (struct htrdr_sun* sun,
+   struct ssp_rng* rng,
+   double dir[3])
+{
+  ASSERT(sun && rng && dir);
+  ssp_ran_sphere_cap_uniform_local(rng, sun->cos_half_angle, dir, NULL);
+  return d33_muld3(dir, sun->frame, dir);
 }
 
 double
@@ -156,12 +176,48 @@ htrdr_sun_get_solid_angle(const struct htrdr_sun* sun)
   return sun->solid_angle;
 }
 
+double
+htrdr_sun_get_radiance(const struct htrdr_sun* sun, const double wavelength)
+{
+  const double* wavenumbers;
+  const double wnum = wavelength_to_wavenumber(wavelength);
+  const double* wnum_upp;
+  size_t nwavenumbers;
+  size_t ispectral_band;
+  ASSERT(sun && wavelength > 0);
+
+  wavenumbers = darray_double_cdata_get(&sun->wavenumbers_sw);
+  nwavenumbers = darray_double_size_get(&sun->wavenumbers_sw);
+  ASSERT(nwavenumbers);
+
+  if(wnum < wavenumbers[0] || wnum > wavenumbers[nwavenumbers-1]) {
+    htrdr_log_warn(sun->htrdr,
+      "the submitted wavelength is outside the sun spectrum.\n");
+  }
+
+  wnum_upp = search_lower_bound
+    (&wnum, wavenumbers, nwavenumbers, sizeof(double), cmp_dbl);
+
+  if(!wnum_upp) { /* Clamp to the upper spectral band */
+    ispectral_band = nwavenumbers - 2;
+    ASSERT(ispectral_band == darray_double_size_get(&sun->radiances_sw)-1);
+  } else if(wnum_upp == wavenumbers) { /* Clamp to the lower spectral band */
+    ispectral_band = 0;
+  } else {
+    ispectral_band = (size_t)(wnum_upp - wavenumbers - 1);
+  }
+  return darray_double_cdata_get(&sun->radiances_sw)[ispectral_band];
+}
+
 int
 htrdr_sun_is_dir_in_solar_cone(const struct htrdr_sun* sun, const double dir[3])
 {
-  double alpha;
+  const double* main_dir;
+  double dot;
   ASSERT(sun && dir && d3_is_normalized(dir));
-  ASSERT(d3_is_normalized(sun->main_dir));
-  alpha = acos(d3_dot(dir, sun->main_dir));
-  return alpha < sun->half_angle;
+  ASSERT(d3_is_normalized(sun->frame + 6));
+  main_dir = sun->frame + 6;
+  dot = d3_dot(dir, main_dir);
+  return dot >= sun->cos_half_angle;
 }
+
