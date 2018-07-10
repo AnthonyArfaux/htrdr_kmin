@@ -55,7 +55,7 @@ discard_hit
    const double range[2],
    void* context)
 {
-  const int comp = HTRDR_SKY_GAZ | HTRDR_SKY_PARTICLE;
+  const int comp = HTRDR_SKY_COMP_GAZ | HTRDR_SKY_COMP_PARTICLE;
   struct transmit_context* ctx = context;
   double dst;
   double k_ext_min;

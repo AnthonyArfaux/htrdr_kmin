@@ -71,6 +71,8 @@ struct octree_data {
 
 struct htrdr_sky {
   struct svx_tree* clouds;
+  struct svx_tree_desc cloud_desc;
+
   struct htcp* htcp;
   struct htmie* htmie;
 
@@ -354,6 +356,9 @@ setup_clouds(struct htrdr_sky* sky)
     goto error;
   }
 
+  /* Fetch the octree descriptor for future use */
+  SVX(tree_get_desc(sky->clouds, &sky->cloud_desc));
+
 exit:
   return res;
 error:
@@ -451,6 +456,70 @@ htrdr_sky_ref_put(struct htrdr_sky* sky)
 {
   ASSERT(sky);
   ref_put(&sky->ref, release_sky);
+}
+
+double
+htrdr_sky_fetch_raw_property
+  (const struct htrdr_sky* sky,
+   const int prop_mask, /* Combination of htrdr_sky_property_flag */
+   const int comp_mask_in, /* Combination of htrdr_sky_component_flag */
+   const double wavelength,
+   const double pos[3])
+{
+  size_t ivox[3];
+  int comp_mask = comp_mask_in;
+  double k_particle = 0;
+  double k_gaz = 0;
+  ASSERT(sky && pos && wavelength > 0);
+  ASSERT(prop_mask & HTRDR_SKY_PROP_Kext);
+  ASSERT(components_mask & HTRDR_SKY_COMP_ALL);
+
+  /* Is the position outside the clouds? */
+  if(pos[0] < sky->cloud_desc.lower[0]
+  || pos[1] < sky->cloud_desc.lower[1]
+  || pos[2] < sky->cloud_desc.lower[2]
+  || pos[0] > sky->cloud_desc.upper[0]
+  || pos[1] > sky->cloud_desc.upper[1]
+  || pos[2] > sky->cloud_desc.upper[2]) {
+    comp_mask &= ~HTRDR_SKY_COMP_PARTICLE; /* No particle */  
+  }
+
+  /* Compute the index of the voxel to fetch */
+  ivox[0] = (size_t)((pos[0] - sky->cloud_desc.lower[0])/sky->htcp_desc.vxsz_x);
+  ivox[1] = (size_t)((pos[1] - sky->cloud_desc.lower[1])/sky->htcp_desc.vxsz_y);
+  if(!sky->htcp_desc.irregular_z) {
+    /* The voxels along the Z dimension have the same size */
+    ivox[2] = (size_t)((pos[2] - sky->cloud_desc.lower[2])/sky->htcp_desc.vxsz_z[0]);
+  } else {
+    /* Irregular voxel size along the Z dimension. Compute the index Z position
+     * in the svx2htcp_z Look Up Table and use the LUT to define the voxel
+     * index into the HTCP descripptor */
+    const struct split* splits = darray_split_cdata_get(&sky->svx2htcp_z);
+    const size_t n = darray_split_size_get(&sky->svx2htcp_z);
+    const double sz = sky->cloud_desc.upper[2] - sky->cloud_desc.lower[2];
+    const double vxsz_lut = sz / (double)n;
+    const size_t ilut = (size_t)((pos[2] - sky->cloud_desc.lower[2])/vxsz_lut);
+    ivox[2] = splits[ilut].index + (pos[2] >= splits[ilut].height);
+  }
+
+  if(comp_mask & HTRDR_SKY_COMP_PARTICLE) {
+    double ql = 0; /* Droplet density In kg.m^-3 */
+    double ca = 0; /* Massic absorption cross section in m^2.kg^-1 */
+    double cs = 0; /* Massic scattering cross section in m^2.kg^-1 */
+
+    ql = htcp_desc_RCT_at(&sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+    if(prop_mask & HTRDR_SKY_PROP_Ks) {
+      cs = htmie_fetch_xsection_scattering
+        (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
+    }
+    if(prop_mask & HTRDR_SKY_PROP_Ka) {
+      ca = htmie_fetch_xsection_absorption
+        (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
+    }
+    k_particle = ql*(ca + cs);
+  }
+  if(comp_mask & HTRDR_SKY_COMP_GAZ) { /* TODO not implemented yet */ }
+  return k_particle + k_gaz;
 }
 
 struct svx_tree*
@@ -567,7 +636,7 @@ htrdr_sky_fetch_svx_voxel_property
   ASSERT((unsigned)prop < HTRDR_SKY_SVX_PROPS_COUNT__);
   (void)sky, (void)wavelength;
 
-  if(components_mask != (HTRDR_SKY_GAZ|HTRDR_SKY_PARTICLE)) {
+  if(components_mask != HTRDR_SKY_COMP_ALL) {
     FATAL("Unsupported sky component\n");
   }
   pdbl = voxel->data;

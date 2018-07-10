@@ -15,22 +15,30 @@
 
 struct scattering_context {
   struct ssp_rng* rng;
+  const struct htrdr_sky* sky
+  double wavelength;
 
   double Ts; /* Sampled optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
 };
 static const struct scattering_context SCATTERING_CONTEXT_NULL = {
-  NULL, 0, 0, 0, 0
+  NULL, NULL, 0, 0, 0, 0, 0
 };
 
 struct transmissivity_context {
   struct ssp_rng* rng;
+  const struct htrdr_sky* sky;
+  double wavelength;
+
   double Ts; /* Sampled optical thickness */
   double Tmin; /* Minimal optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
+
+
+  int prop_mask; /* Mask of htrdr_sky_property_flag */
 };
 static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
-  NULL, 0, 0;
+  NULL, NULL, 0, 0, 0, 0, 0
 };
 
 /*******************************************************************************
@@ -53,7 +61,7 @@ scattering_hit_filter
   (void)range;
 
   vox_data = hit->voxel.data;
-  ks_max = vox_data[HTRDR_Ks_MAX];
+  ks_max = vox_data[HTRDR_Ks_MAX/*TODO*/];
 
   for(;;) {
     dst = hit->distance[1] - ctx->traversal_dst;
@@ -67,7 +75,7 @@ scattering_hit_filter
       break;
 
     /*  A real/null collision occurs before `dst' */
-    } else {
+     else {
       double pos[3];
       double proba_s;
       double ks;
@@ -82,7 +90,14 @@ scattering_hit_filter
       pos[1] = org[1] + dst * dir[1];
       pos[2] = org[2] + dst * dir[2];
 
-      ks = fetch_ks(ctx->medium, x); /* TODO */
+      /* TODO use a per wavelength getter that will precompute the interpolated
+       * cross sections for a wavelength to improve the fetch efficiency */
+      ks = htrdr_sky_fetch_raw_property
+        (ctx->sky,
+         HTRDR_SKY_Ks,
+         HTRDR_SKY_PARTICLE | HTRDR_SKY_GAZ,
+         ctx->wavelength,
+         pos);
 
       /* Handle the case that ks_max is not *really* the max */
       proba_s = ks / ks_max;
@@ -149,7 +164,12 @@ transmissivty_hit_filter
       x[1] = org[1] + dst * dir[1];
       x[2] = org[2] + dst * dir[2];
 
-      k = fetch_k(ctx->medium, x); /* TODO */
+      k = htrdr_sky_fetch_raw_property
+        (ctx->sky,
+         ctx->prop_mask,
+         HTRDR_SKY_PARTICLE | HTRDR_SKY_GAZ,
+         ctx->wavelength,
+         x);
 
       /* Handle the case that k_max is not *really* the max */
       proba = (k - k_min) / (k_max - k_min);
@@ -170,6 +190,8 @@ static double
 transmissivity
   (struct htrdr* htrdr,
    struct ssp_rng* rng,
+   const int prop_mask, /* Combination of htrdr_sky_property_flag */
+   const double wavelength,
    const double pos[3],
    const double dir[3],
    const double range[2],
@@ -184,7 +206,8 @@ transmissivity
   float ray_dir[3];
   float ray_range[2];
 
-  ASSERT(htrdr && rng && pos && dir && range);
+  ASSERT(htrdr && rng && prop_mask && pos && dir && range);
+  ASSERT(prop_mask & HTRDR_SKY_PROP_Kext);
 
   /* Find the first intersection with a surface */
   f3_set_d3(ray_pos, pos);
@@ -196,7 +219,10 @@ transmissivity
   if(!S3D_HIT_NONE(&s3d_hit)) return 0;
 
   transmissivity_ctx->rng = rng;
+  transmissivity_ctx->sky = htrdr->sky;
+  transmissivity_ctx->wavelength = wavelength;
   transmissivity_ctx->Ts = ssp_ran_exp(rng, 1); /* Sample an optical thickness */
+  transmissivity_ctx->prop_mask = prop_mask;
 
   /* Compute the transmissivity */
   SVX(octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
@@ -246,23 +272,28 @@ radiance_sw
 
   ASSERT(htrdr && rng && pos && dir);
 
+  /* Fetch sun properties */
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
+  L_sun = htrdr_sun_get_radiance(htrdr->sun, wavelength);
+
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  /* Check that the sun is directly visible */
-  f3_set_d3(ray_pos, pos);
-  f3_set_d3(ray_dir, sun_dir);
-  f2(ray_range, 0, FLT_MAX);
-  S3D(scene_view_trace
-    (htrdr->s3d_scn, ray_pos, ray_dir, ray_range, NULL, &s3d_hit));
+  /* Add the directly contribution of the sun  */
+  if(htrdr_sun_is_dir_in_solar_cone(sun, dir)) {
+    f3_set_d3(ray_pos, pos);
+    f3_set_d3(ray_dir, dir);
+    f2(ray_range, 0, FLT_MAX);
+    S3D(scene_view_trace
+      (htrdr->s3d_scn, ray_pos, ray_dir, ray_range, NULL, &s3d_hit));
 
-  /* Add the direct contribution of the sun */
-  if(!S3D_HIT_NONE(&s3d_hit)) {
-    d3(range, 0, FLT_MAX);
-    L_sun = htrdr_sun_get_luminance(htrdr->sun, sun_dir, wavelength);
-    Tr = transmissivity(htrdr, rng, pos, sun_dir, range);
-    w = L_sun * Tr;
+    /* Add the direct contribution of the sun */
+    if(!S3D_HIT_NONE(&s3d_hit)) {
+      d3(range, 0, FLT_MAX);
+      Tr = transmissivity
+        (htrdr, rng, HTRDR_SKY_PROP_Kext, wavelength , pos, dir, range);
+      w = L_sun * Tr;
+    }
   }
 
   /* Radiative random walk */
@@ -279,8 +310,12 @@ radiance_sw
       &s3d_hit_prev, &s3d_hit));
 
     /* Sample an optical thicknes */
-    scattering_ctx->rng = rng;
     scattering_ctx->Ts = ssp_ran_exp(rng, 1);
+
+    /* Setup the remaining scattering context fields */
+    scattering_ctx->rng = rng;
+    scattering_ctx->sky = htrdr->sky;
+    scattering_ctx->wavelength = wavelength;
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
@@ -304,13 +339,15 @@ radiance_sw
     /* Define the absorption transmissivity from the current position to the
      * next position */
     d2(range, 0, scattering_ctx->traversal_dst);
-    Tr_abs = transmissivity_absorption(htrdr, rng, pos, dir, range);
+    Tr_abs = transmissivity
+      (htrdr, rng, HTRDR_SKY_PROP_Ka, wavelength, pos, dir, range);
     if(Tr_abs <= 0) break;
 
     /* Define the transmissivity from the new position to the sun */
     d2(range, 0, FLT_MAX);
     htrdr_sun_sample_dir(htrdr->sun, rng, pos_next, sun_dir);
-    Tr = transmissivity(htrdr, rng, pos_next, sun_dir, range);
+    Tr = transmissivity
+      (htrdr, rng, HTRDR_SKY_PROP_Kext, wavelength, pos_next, sun_dir, range);
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {

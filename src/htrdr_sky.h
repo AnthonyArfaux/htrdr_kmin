@@ -19,9 +19,10 @@
 #include <rsys/rsys.h>
 
 /* Raw sky properties */
-enum htrdr_sky_property {
-  HTRDR_SKY_Ks, /* Scattering coefficient */
-  HTRDR_SKY_Ka /* Absorption coefficient */
+enum htrdr_sky_property_flag {
+  HTRDR_SKY_PROP_Ks = BIT(0), /* Scattering coefficient */
+  HTRDR_SKY_PROP_Ka = BIT(1), /* Absorption coefficient */
+  HTRDR_SKY_PROP_Kext  = HTRDR_SKY_PROP_Ks | HTRDR_SKY_PROP_Ka
 };
 
 /* Property of the sky computed by region and managed by Star-VoXel */
@@ -29,12 +30,14 @@ enum htrdr_sky_svx_property {
   HTRDR_SKY_SVX_Kext_MIN,
   HTRDR_SKY_SVX_Kext_MAX,
   HTRDR_SKY_SVX_PROPS_COUNT__
+
 };
 
 /* Component of the sky for which the properties are queried */
 enum htrdr_sky_component_flag {
-  HTRDR_SKY_GAZ = BIT(0),
-  HTRDR_SKY_PARTICLE = BIT(1)
+  HTRDR_SKY_COMP_GAZ = BIT(0),
+  HTRDR_SKY_COMP_PARTICLE = BIT(1),
+  HTRDR_SKY_COMP_ALL = HTRDR_SKY_COMP_GAZ | HTRDR_SKY_COMP_PARTICLE
 };
 
 /* Forward declaration */
@@ -61,7 +64,7 @@ htrdr_sky_ref_put
 extern LOCAL_SYM double
 htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
-   const enum htrdr_sky_property prop,
+   const int prop_mask, /* Combination of htrdr_sky_property_flag */
    const int components_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const double pos[3]);
