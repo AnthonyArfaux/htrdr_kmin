@@ -55,7 +55,6 @@ discard_hit
    const double range[2],
    void* context)
 {
-  const int comp = HTRDR_SKY_COMP_GAZ | HTRDR_SKY_COMP_PARTICLE;
   struct transmit_context* ctx = context;
   double dst;
   double k_ext_min;
@@ -63,10 +62,10 @@ discard_hit
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit));
   (void)org, (void)dir, (void)range;
 
-  k_ext_min = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_SKY_SVX_Kext_MIN, comp, -1/*FIXME*/, &hit->voxel);
-  k_ext_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_SKY_SVX_Kext_MAX, comp, -1/*FIXME*/, &hit->voxel);
+  k_ext_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
+    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, &hit->voxel);
+  k_ext_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, &hit->voxel);
 
   dst = hit->distance[1] - hit->distance[0];
   ASSERT(dst >= 0);

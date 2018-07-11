@@ -18,26 +18,24 @@
 
 #include <rsys/rsys.h>
 
-/* Raw sky properties */
-enum htrdr_sky_property_flag {
-  HTRDR_SKY_PROP_Ks = BIT(0), /* Scattering coefficient */
-  HTRDR_SKY_PROP_Ka = BIT(1), /* Absorption coefficient */
-  HTRDR_SKY_PROP_Kext  = HTRDR_SKY_PROP_Ks | HTRDR_SKY_PROP_Ka
-};
-
-/* Property of the sky computed by region and managed by Star-VoXel */
-enum htrdr_sky_svx_property {
-  HTRDR_SKY_SVX_Kext_MIN,
-  HTRDR_SKY_SVX_Kext_MAX,
-  HTRDR_SKY_SVX_PROPS_COUNT__
-
+/* Properties of the sky */
+enum htrdr_sky_property {
+  HTRDR_Ks, /* Scattering coefficient */
+  HTRDR_Ka, /* Absorption coefficient */
+  HTRDR_Kext /* Extinction coefficient = Ks + Ka */
 };
 
 /* Component of the sky for which the properties are queried */
 enum htrdr_sky_component_flag {
-  HTRDR_SKY_COMP_GAZ = BIT(0),
-  HTRDR_SKY_COMP_PARTICLE = BIT(1),
-  HTRDR_SKY_COMP_ALL = HTRDR_SKY_COMP_GAZ | HTRDR_SKY_COMP_PARTICLE
+  HTRDR_GAS = BIT(0),
+  HTRDR_PARTICLES = BIT(1),
+  HTRDR_ALL_COMPONENTS = HTRDR_GAS | HTRDR_PARTICLES
+};
+
+enum htrdr_svx_op {
+  HTRDR_SVX_MIN,
+  HTRDR_SVX_MAX,
+  HTRDR_SVX_OPS_COUNT__
 };
 
 /* Forward declaration */
@@ -64,8 +62,8 @@ htrdr_sky_ref_put
 extern LOCAL_SYM double
 htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
-   const int prop_mask, /* Combination of htrdr_sky_property_flag */
-   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const enum htrdr_sky_property prop,
+   const int comp_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const double pos[3]);
 
@@ -76,16 +74,18 @@ htrdr_sky_get_svx_tree
 extern LOCAL_SYM double
 htrdr_sky_fetch_svx_property
   (const struct htrdr_sky* sky,
-   const enum htrdr_sky_svx_property prop,
-   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const enum htrdr_sky_property prop,
+   const enum htrdr_svx_op op,
+   const int comp_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const double pos[3]);
 
 extern LOCAL_SYM double
 htrdr_sky_fetch_svx_voxel_property
   (const struct htrdr_sky* sky,
-   const enum htrdr_sky_svx_property prop,
-   const int components_mask, /* Combination of htrdr_sky_component_flag */
+   const enum htrdr_sky_property prop,
+   const enum htrdr_svx_op op,
+   const int comp_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const struct svx_voxel* voxel);
 
