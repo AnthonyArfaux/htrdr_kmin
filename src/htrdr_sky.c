@@ -472,7 +472,7 @@ htrdr_sky_fetch_raw_property
   double k_gaz = 0;
   ASSERT(sky && pos && wavelength > 0);
   ASSERT(prop_mask & HTRDR_SKY_PROP_Kext);
-  ASSERT(components_mask & HTRDR_SKY_COMP_ALL);
+  ASSERT(comp_mask & HTRDR_SKY_COMP_ALL);
 
   /* Is the position outside the clouds? */
   if(pos[0] < sky->cloud_desc.lower[0]
