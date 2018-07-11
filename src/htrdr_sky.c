@@ -636,7 +636,7 @@ htrdr_sky_fetch_svx_voxel_property
   ASSERT(sky && prop && wavelength>=0 && voxel);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
   ASSERT((unsigned)prop < HTRDR_SVX_OPS_COUNT__);
-  (void)sky, (void)wavelength;
+  (void)sky, (void)wavelength, (void)prop;
 
   if(comp_mask != HTRDR_ALL_COMPONENTS) {
     FATAL("Unsupported sky component\n");

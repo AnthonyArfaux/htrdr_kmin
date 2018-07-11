@@ -221,3 +221,25 @@ htrdr_sun_is_dir_in_solar_cone(const struct htrdr_sun* sun, const double dir[3])
   return dot >= sun->cos_half_angle;
 }
 
+size_t
+htrdr_sun_get_spectral_bands_count(const struct htrdr_sun* sun)
+{
+  ASSERT(sun);
+  return darray_double_size_get(&sun->radiances_sw);
+}
+
+void
+htrdr_sun_get_spectral_band_bounds
+  (const struct htrdr_sun* sun,
+   const size_t ispectral_band,
+   double bounds[2])
+{
+  const double* wnums;
+  ASSERT(sun && ispectral_band < htrdr_sun_get_spectral_bands_count(sun));
+  ASSERT(ispectral_band + 1 < darray_double_size_get(&sun->wavenumbers_sw));
+  wnums = darray_double_cdata_get(&sun->wavenumbers_sw);
+  bounds[0] = wavenumber_to_wavelength(wnums[ispectral_band+0]);
+  bounds[1] = wavenumber_to_wavelength(wnums[ispectral_band+1]);
+  ASSERT(bounds[0] <= bounds[1]);
+}
+

@@ -63,4 +63,14 @@ htrdr_sun_is_dir_in_solar_cone
   (const struct htrdr_sun* sun,
    const double dir[3]);
 
+extern LOCAL_SYM size_t
+htrdr_sun_get_spectral_bands_count
+  (const struct htrdr_sun* sun);
+
+extern LOCAL_SYM void
+htrdr_sun_get_spectral_band_bounds
+  (const struct htrdr_sun* sun,
+   const size_t ispectral_band,
+   double bounds[2]); /* Lower and upper wavelength in nanometer */
+
 #endif /* HTRDR_SUN_H */
