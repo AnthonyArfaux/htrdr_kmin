@@ -20,6 +20,7 @@
 #include "htrdr_buffer.h"
 #include "htrdr_rectangle.h"
 #include "htrdr_sky.h"
+#include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
 #include <rsys/clock_time.h>
@@ -218,8 +219,11 @@ htrdr_init
     res = open_output_stream(htrdr, args);
     if(res != RES_OK) goto error;
   }
-  res = htrdr_sky_create
-    (htrdr, args->filename_les, args->filename_mie, &htrdr->sky);
+
+  res = htrdr_sun_create(htrdr, &htrdr->sun);
+  if(res != RES_OK) goto error;
+  res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
+    args->filename_mie, &htrdr->sky);
   if(res != RES_OK) goto error;
 
 exit:
@@ -235,6 +239,7 @@ htrdr_release(struct htrdr* htrdr)
   ASSERT(htrdr);
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
+  if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->rect) htrdr_rectangle_ref_put(htrdr->rect);
   logger_release(&htrdr->logger);

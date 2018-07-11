@@ -31,6 +31,8 @@ struct htrdr {
   struct svx_device* svx;
 
   struct htrdr_sky* sky;
+  struct htrdr_sun* sun;
+
   struct htrdr_buffer* buf;
   struct htrdr_rectangle* rect;
   double main_dir[3]; /* Main direction */

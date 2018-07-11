@@ -15,6 +15,7 @@
 
 #include "htrdr.h"
 #include "htrdr_sky.h"
+#include "htrdr_sun.h"
 
 #include <star/svx.h>
 #include <high_tune/htcp.h>
@@ -72,6 +73,8 @@ struct octree_data {
 struct htrdr_sky {
   struct svx_tree* clouds;
   struct svx_tree_desc cloud_desc;
+
+  struct htrdr_sun* sun;
 
   struct htcp* htcp;
   struct htmie* htmie;
@@ -373,6 +376,7 @@ release_sky(ref_T* ref)
   struct htrdr_sky* sky;
   ASSERT(ref);
   sky = CONTAINER_OF(ref, struct htrdr_sky, ref);
+  if(sky->sun) htrdr_sun_ref_put(sky->sun);
   if(sky->clouds) SVX(tree_ref_put(sky->clouds));
   if(sky->htcp) HTCP(ref_put(sky->htcp));
   if(sky->htmie) HTMIE(ref_put(sky->htmie));
@@ -386,13 +390,14 @@ release_sky(ref_T* ref)
 res_T
 htrdr_sky_create
   (struct htrdr* htrdr,
+   struct htrdr_sun* sun,
    const char* htcp_filename,
    const char* htmie_filename,
    struct htrdr_sky** out_sky)
 {
   struct htrdr_sky* sky = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && htcp_filename && htmie_filename && out_sky);
+  ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
 
   sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
   if(!sky) {
@@ -401,7 +406,9 @@ htrdr_sky_create
     goto error;
   }
   ref_init(&sky->ref);
+  htrdr_sun_ref_get(sun);
   sky->htrdr = htrdr;
+  sky->sun = sun;
   darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
 
   res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);

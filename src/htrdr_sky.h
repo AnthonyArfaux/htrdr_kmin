@@ -41,12 +41,14 @@ enum htrdr_svx_op {
 /* Forward declaration */
 struct htrdr;
 struct htrdr_sky;
+struct htrdr_sun;
 struct svx_tree;
 struct svx_voxel;
 
 extern LOCAL_SYM res_T
 htrdr_sky_create
   (struct htrdr* htrdr,
+   struct htrdr_sun* sun,
    const char* htcp_filename,
    const char* htmie_filename,
    struct htrdr_sky** sky);
