@@ -8,10 +8,12 @@ Monte-Carlo algorithms in cloudy atmopsheres.
 This program is compatible GNU/Linux 64-bits. It relies on the
 [CMake](http://www.cmake.org) and the
 [RCMake](https://gitlab.com/vaplv/rcmake/) packages to build.  It also depends
-on the 
+on the
+[HTCP](https://gitlab.com/meso-star/htcp/),
+[HTMIE](https://gitlab.com/meso-star/htmie/),
 [RSys](https://gitlab.com/vaplv/rsys/),
-[Star-VX](https://gitlab.com/meso-star/star-vx/) and
-[HTCP](https://gitlab.com/meso-star/htcp/) libraries.
+[Star-VX](https://gitlab.com/meso-star/star-vx/), and
+[Star-SP](https://gitlab.com/meso-star/stat-sp/) libraries
 
 First ensure that CMake is installed on your system. Then install the RCMake
 package as well as the aforementioned prerequisites. Finally generate the
