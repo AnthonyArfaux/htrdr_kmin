@@ -94,8 +94,8 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   if(!sun) {
     htrdr_log_err(htrdr, "could not allocate the sun data structure.\n");
     res = RES_MEM_ERR;
-    goto error;
-  }
+  goto error;
+}
   ref_init(&sun->ref);
   sun->htrdr = htrdr;
   darray_double_init(htrdr->allocator, &sun->radiances_sw);
@@ -234,12 +234,46 @@ htrdr_sun_get_spectral_band_bounds
    const size_t ispectral_band,
    double bounds[2])
 {
+  size_t iband_wlen;
   const double* wnums;
   ASSERT(sun && ispectral_band < htrdr_sun_get_spectral_bands_count(sun));
   ASSERT(ispectral_band + 1 < darray_double_size_get(&sun->wavenumbers_sw));
+
+  /* The spectral bands are internally defined with wavenumbers, while the sun
+   * API uses wavelengths. But since wavelengths are inversely proportionnal to
+   * wavenumbers, one have to reversed the spectral band index */
+  iband_wlen = htrdr_sun_get_spectral_bands_count(sun) - 1 - ispectral_band;
   wnums = darray_double_cdata_get(&sun->wavenumbers_sw);
-  bounds[0] = wavenumber_to_wavelength(wnums[ispectral_band+0]);
-  bounds[1] = wavenumber_to_wavelength(wnums[ispectral_band+1]);
+  bounds[1] = wavenumber_to_wavelength(wnums[iband_wlen+0]);
+  bounds[0] = wavenumber_to_wavelength(wnums[iband_wlen+1]);
   ASSERT(bounds[0] <= bounds[1]);
+}
+
+void
+htrdr_sun_get_XYZ_spectral_bands_range
+  (const struct htrdr_sun* sun, size_t band_range[2])
+{
+  /* Bounds of the X, Y and Z functions as defined by the CIE */
+  const double nu_min = wavelength_to_wavenumber(780); /* In cm^-1 */
+  const double nu_max = wavelength_to_wavenumber(380); /* In cm^-1 */
+  const double* wnums = NULL;
+  size_t iband_low_nu = SIZE_MAX;
+  size_t iband_upp_nu = SIZE_MAX;
+  size_t i;
+  ASSERT(sun && band_range);
+
+  wnums = darray_double_cdata_get(&sun->wavenumbers_sw);
+
+  /* Perform a linear search since the number of spectral bands is small */
+  FOR_EACH(i, 0, htrdr_sun_get_spectral_bands_count(sun)) {
+    if(wnums[i] <= nu_min && nu_min < wnums[i+1]) iband_low_nu = i;
+    if(wnums[i] <= nu_max && nu_max < wnums[i+1]) iband_upp_nu = i;
+  }
+  ASSERT(iband_low_nu <= iband_upp_nu);
+
+  /* Transform the band index from "wavenumber space" to "wavelength space" */
+  band_range[0] = htrdr_sun_get_spectral_bands_count(sun) - 1 - iband_upp_nu;
+  band_range[1] = htrdr_sun_get_spectral_bands_count(sun) - 1 - iband_low_nu;
+  ASSERT(band_range[0] <= band_range[1]);
 }
 

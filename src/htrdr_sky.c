@@ -487,7 +487,7 @@ htrdr_sky_fetch_raw_property
   || pos[0] > sky->cloud_desc.upper[0]
   || pos[1] > sky->cloud_desc.upper[1]
   || pos[2] > sky->cloud_desc.upper[2]) {
-    comp_mask &= ~HTRDR_PARTICLES; /* No particle */  
+    comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
 
   /* Compute the index of the voxel to fetch */
@@ -497,9 +497,9 @@ htrdr_sky_fetch_raw_property
     /* The voxels along the Z dimension have the same size */
     ivox[2] = (size_t)((pos[2] - sky->cloud_desc.lower[2])/sky->htcp_desc.vxsz_z[0]);
   } else {
-    /* Irregular voxel size along the Z dimension. Compute the index Z position
-     * in the svx2htcp_z Look Up Table and use the LUT to define the voxel
-     * index into the HTCP descripptor */
+    /* Irregular voxel size along the Z dimension. Compute the index of the Z
+     * position in the svx2htcp_z Look Up Table and use the LUT to define the
+     * voxel index into the HTCP descripptor */
     const struct split* splits = darray_split_cdata_get(&sky->svx2htcp_z);
     const size_t n = darray_split_size_get(&sky->svx2htcp_z);
     const double sz = sky->cloud_desc.upper[2] - sky->cloud_desc.lower[2];
