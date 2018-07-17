@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 
@@ -26,6 +27,9 @@
 #include <rsys/hash_table.h>
 #include <rsys/ref_count.h>
 
+#define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
+#define GAS_CONSTANT 8.3144598 /* In kg.m^2.s^-2.mol^-1.K */
+
 struct split {
   size_t index; /* Index of the current htcp voxel */
   double height; /* Absolute height where the next voxel starts */
@@ -36,8 +40,7 @@ struct split {
 #include <rsys/dynamic_array.h>
 
 struct build_octree_context {
-  const struct htcp_desc* htcp_desc;
-  const struct darray_split* svx2htcp_z;
+  const struct htrdr_sky* sky;
   double dst_max; /* Max traversal distance */
   double tau_threshold; /* Threshold criteria for the merge process */
 };
@@ -68,6 +71,7 @@ struct octree_data {
   struct darray_double vertices; /* Array of unique vertices */
   struct darray_double data;
   struct darray_size_t cells;
+  const struct htrdr_sky* sky;
 };
 
 struct htrdr_sky {
@@ -84,25 +88,40 @@ struct htrdr_sky {
   /* Map the index in Z from the regular SVX to the irregular HTCP data */
   struct darray_split svx2htcp_z;
 
+  /* Average cross section in Short Wave, i.e. in [380, 780] nanometers */
+  double Ca_avg_sw;
+  double Cs_avg_sw;
+
   ref_T ref;
   struct htrdr* htrdr;
 };
 
-/*
- * K<a|s> particle = C<a|s> * RCT
- */
-
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
+/* Compute the dry air density in the cloud */
+static FINLINE double
+cloud_dry_air_density
+  (const struct htcp_desc* desc,
+   const size_t ivox[3]) /* Index of the voxel */
+{
+  double P = 0; /* Pressure in Pa */
+  double T = 0; /* Temperature in K */
+  ASSERT(desc);
+  P = htcp_desc_PABST_at(desc, ivox[0], ivox[1], ivox[2], 0);
+  T = htcp_desc_T_at(desc, ivox[0], ivox[1], ivox[2], 0);
+  return (P*DRY_AIR_MOLAR_MASS)/(T*GAS_CONSTANT);
+}
+
 static INLINE void
-octree_data_init(struct octree_data* data)
+octree_data_init(const struct htrdr_sky* sky, struct octree_data* data)
 {
   ASSERT(data);
-  htable_vertex_init(NULL, &data->vertex2id);
-  darray_double_init(NULL, &data->vertices);
-  darray_double_init(NULL, &data->data);
-  darray_size_t_init(NULL, &data->cells);
+  htable_vertex_init(sky->htrdr->allocator, &data->vertex2id);
+  darray_double_init(sky->htrdr->allocator, &data->vertices);
+  darray_double_init(sky->htrdr->allocator, &data->data);
+  darray_size_t_init(sky->htrdr->allocator, &data->cells);
+  data->sky = sky;
 }
 
 static INLINE void
@@ -123,12 +142,11 @@ register_leaf
 {
   struct octree_data* ctx = context;
   struct vertex v[8];
-  const double* data;
+  double kext_min;
+  double kext_max;
   int i;
   ASSERT(leaf && ctx);
   (void)ileaf;
-
-  data = leaf->data;
 
   /* Compute the leaf vertices */
   v[0].x = leaf->lower[0]; v[0].y = leaf->lower[1]; v[0].z = leaf->lower[2];
@@ -155,108 +173,135 @@ register_leaf
     /* Add the vertex id to the leaf cell */
     CHK(RES_OK == darray_size_t_push_back(&ctx->cells, &id));
   }
-  FOR_EACH(i, 0, HTRDR_SVX_OPS_COUNT__) {
-    CHK(RES_OK == darray_double_push_back(&ctx->data, data+i));
-  }
-}
 
-static double
-compute_kext(const struct htcp_desc* htcp_desc, const size_t xyz[3])
-{
-  const double c_ext = 6.e-10; /* Extinction cross section in m^2.particle^-1 */
-  const double rho_air = 1.293; /* Volumic mass of terrestrial air in kg.m^-3 */
-  const double rho_h2o = 1000; /* Volumic mass of water in kg.m^-3 */
-  const double sigma = 0.1; /* Std deviation of the `r' parameter */
-  const double r = 9.76617; /* Modal radius of water particles in um */
-  double ql; /* Mass of the liquid water in the voxel in kg.m^-3 */
-  double v; /* typical volume of a particle */
-  double nv; /* Number density  */
-  double k_ext; /* Extinction coefficient in m^-1 */
-  ASSERT(xyz && htcp_desc);
-
-  ql = htcp_desc_RCT_at(htcp_desc, xyz[0], xyz[1], xyz[2], 0/*time*/);
-  v = 4*PI*(r*r*r)*exp(4.5*sigma*sigma) / 3.0;
-  nv = 1.e18 * ql * rho_air / (v * rho_h2o);
-  k_ext = c_ext*nv;
-
-  return k_ext;
+  /* Register the leaf data */
+  kext_min = htrdr_sky_fetch_svx_voxel_property
+    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, -1, leaf);
+  kext_max = htrdr_sky_fetch_svx_voxel_property
+    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MAX, -1, leaf);
+  CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_min));
+  CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_max));
 }
 
 static void
 vox_get(const size_t xyz[3], void* dst, void* context)
 {
   struct build_octree_context* ctx = context;
-  double kext_min;
-  double kext_max;
-  double* pdbl = dst;
+  double rct;
+  double ka, ks, kext;
+  double ka_min, ka_max;
+  double ks_min, ks_max;
+  double kext_min, kext_max;
+  double rho_da; /* Dry air density */
+  float* pflt = dst;
   ASSERT(xyz && dst && context);
 
-  if(!ctx->htcp_desc->irregular_z) {
-    kext_min = kext_max = compute_kext(ctx->htcp_desc, xyz);
+  if(!ctx->sky->htcp_desc.irregular_z) {
+    rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, xyz);
+    rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], 0);
+    ka_min = ka_max = ka = ctx->sky->Ca_avg_sw * rho_da * rct;
+    ks_min = ks_max = ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+    kext_min = kext_max = kext = ka + ks;
   } else {
     size_t ivox[3];
     size_t ivox_next;
-    ASSERT(xyz[2] < darray_split_size_get(ctx->svx2htcp_z));
+    ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
     ivox[0] = xyz[0];
     ivox[1] = xyz[1];
-    ivox[2] = darray_split_cdata_get(ctx->svx2htcp_z)[xyz[2]].index;
+    ivox[2] = darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2]].index;
 
-    kext_min = kext_max = compute_kext(ctx->htcp_desc, ivox);
+    rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
+    rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+
+    ka_min = ka_max = ka = ctx->sky->Ca_avg_sw * rho_da * rct;
+    ks_min = ks_max = ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+    kext_min = kext_max = kext = ka + ks;
 
     /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
-    ivox_next = xyz[2] + 1 < darray_split_size_get(ctx->svx2htcp_z)
-      ? darray_split_cdata_get(ctx->svx2htcp_z)[xyz[2] + 1].index
+    ivox_next = xyz[2] + 1 < darray_split_size_get(&ctx->sky->svx2htcp_z)
+      ? darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2] + 1].index
       : ivox[2];
 
     if(ivox_next != ivox[2]) {
-      double kext;
       ASSERT(ivox[2] < ivox_next);
       ivox[2] = ivox_next;
-      kext = compute_kext(ctx->htcp_desc, ivox);
+
+      rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
+      rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+      ka = ctx->sky->Ca_avg_sw * rho_da * rct;
+      ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+      kext = ka + ks;
+
+      ka_min = MMIN(ka_min, ka);
+      ka_max = MMAX(ka_max, ka);
+      ks_min = MMIN(ks_min, ks);
+      ks_max = MMAX(ks_max, ks);
       kext_min = MMIN(kext_min, kext);
       kext_max = MMAX(kext_max, kext);
     }
   }
 
-  pdbl[HTRDR_SVX_MIN] = kext_min;
-  pdbl[HTRDR_SVX_MAX] = kext_max;
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
 }
 
 static void
-vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* ctx)
+vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
 {
-  double* pdbl = dst;
-  double kext_min = DBL_MAX;
-  double kext_max =-DBL_MAX;
+  float* pflt = dst;
+  float ka_min = FLT_MAX;
+  float ka_max =-FLT_MAX;
+  float ks_min = FLT_MAX;
+  float ks_max =-FLT_MAX;
+  float kext_min = FLT_MAX;
+  float kext_max =-FLT_MAX;
   size_t ivox;
   ASSERT(dst && voxels && nvoxs);
-  (void)ctx;
+  (void)context;
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const double* voxel_data = voxels[ivox];
-    ASSERT(voxel_data[HTRDR_SVX_MIN]
-        <= voxel_data[HTRDR_SVX_MAX]);
-    kext_min = MMIN(kext_min, voxel_data[HTRDR_SVX_MIN]);
-    kext_max = MMAX(kext_max, voxel_data[HTRDR_SVX_MAX]);
+    const float* ka = (const float*)voxels + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
+    const float* ks = (const float*)voxels + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
+    const float* kext = (const float*)voxels + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    ASSERT(ka[HTRDR_SVX_MIN] <= ka[HTRDR_SVX_MAX]);
+    ASSERT(ks[HTRDR_SVX_MIN] <= ks[HTRDR_SVX_MAX]);
+    ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
+
+    ka_min = MMIN(ka_min, ka[HTRDR_SVX_MIN]);
+    ka_max = MMAX(ka_max, ka[HTRDR_SVX_MIN]);
+    ks_min = MMIN(ks_min, ks[HTRDR_SVX_MIN]);
+    ks_max = MMAX(ks_max, ks[HTRDR_SVX_MIN]);
+    kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
+    kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
   }
-  pdbl[HTRDR_SVX_MIN] = kext_min;
-  pdbl[HTRDR_SVX_MAX] = kext_max;
+
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
 }
 
 static int
 vox_challenge_merge(const void* voxels[], const size_t nvoxs, void* context)
 {
   struct build_octree_context* ctx = context;
-  double kext_min = DBL_MAX;
-  double kext_max =-DBL_MAX;
+  float kext_min = FLT_MAX;
+  float kext_max =-FLT_MAX;
   size_t ivox;
-  ASSERT(voxels && nvoxs);
+  ASSERT(voxels && nvoxs && context);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const double* voxel_data = voxels[ivox];
-    kext_min = MMIN(kext_min, voxel_data[HTRDR_SVX_MIN]);
-    kext_max = MMAX(kext_max, voxel_data[HTRDR_SVX_MAX]);
+    const float* kext = (float*)voxels + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
+    kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
+    kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
   }
   return (kext_max - kext_min)*ctx->dst_max <= ctx->tau_threshold;
 }
@@ -338,8 +383,7 @@ setup_clouds(struct htrdr_sky* sky)
   sz[2] = upp[2] - low[2];
 
   /* Setup the build context */
-  ctx.htcp_desc = &sky->htcp_desc;
-  ctx.svx2htcp_z = &sky->svx2htcp_z;
+  ctx.sky = sky;
   ctx.dst_max = sz[2];
   ctx.tau_threshold = 0.0;
 
@@ -348,7 +392,8 @@ setup_clouds(struct htrdr_sky* sky)
   vox_desc.merge = vox_merge;
   vox_desc.challenge_merge = vox_challenge_merge;
   vox_desc.context = &ctx;
-  vox_desc.size = sizeof(double)*HTRDR_SVX_OPS_COUNT__;
+  vox_desc.size = sizeof(float)
+    * HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__;
 
   /* Create the octree */
   res = svx_octree_create
@@ -395,6 +440,7 @@ htrdr_sky_create
    const char* htmie_filename,
    struct htrdr_sky** out_sky)
 {
+  const double band_sw[2] = {SW_WAVELENGTH_MIN, SW_WAVELENGTH_MAX};
   struct htrdr_sky* sky = NULL;
   res_T res = RES_OK;
   ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
@@ -437,6 +483,11 @@ htrdr_sky_create
     goto error;
   }
 
+  sky->Ca_avg_sw = htmie_compute_xsection_absorption_average
+    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
+  sky->Cs_avg_sw = htmie_compute_xsection_scattering_average
+    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
+
   res = setup_clouds(sky);
   if(res != RES_OK) goto error;
 
@@ -470,15 +521,16 @@ htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const int components_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const double wavelength, /* FIXME Unused */
    const double pos[3])
 {
   size_t ivox[3];
   int comp_mask = components_mask;
   double k_particle = 0;
   double k_gaz = 0;
-  ASSERT(sky && pos && wavelength > 0);
+  ASSERT(sky && pos);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
+  (void)wavelength; /* FIXME */
 
   /* Is the position outside the clouds? */
   if(pos[0] < sky->cloud_desc.lower[0]
@@ -509,20 +561,35 @@ htrdr_sky_fetch_raw_property
   }
 
   if(comp_mask & HTRDR_PARTICLES) {
+    double rho_da = 0; /* Dry air density */
+    double rct = 0; /* #droplets in kg of water per kg of dry air */
     double ql = 0; /* Droplet density In kg.m^-3 */
-    double ca = 0; /* Massic absorption cross section in m^2.kg^-1 */
-    double cs = 0; /* Massic scattering cross section in m^2.kg^-1 */
+    double Ca = 0; /* Massic absorption cross section in m^2.kg^-1 */
+    double Cs = 0; /* Massic scattering cross section in m^2.kg^-1 */
 
-    ql = htcp_desc_RCT_at(&sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+    /* Compute he dry air density */
+    rho_da = cloud_dry_air_density(&sky->htcp_desc, ivox);
+
+    /* Compute the droplet density */
+    rct = htcp_desc_RCT_at(&sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+    ql = rho_da * rct;
+
+    /* FIXME do not use the wavelength yet. Simply use the average cross
+     * section on the while short wave range */
+#if 1
+    if(prop == HTRDR_Ka || prop == HTRDR_Kext) Ca = sky->Ca_avg_sw;
+    if(prop == HTRDR_Ks || prop == HTRDR_Kext) Cs = sky->Cs_avg_sw;
+#else
     if(prop == HTRDR_Ks || prop == HTRDR_Kext) {
-      cs = htmie_fetch_xsection_scattering
+      Cs = htmie_fetch_xsection_scattering
         (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
     }
     if(prop == HTRDR_Ka || prop == HTRDR_Kext) {
-      ca = htmie_fetch_xsection_absorption
+      Ca = htmie_fetch_xsection_absorption
         (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
     }
-    k_particle = ql*(ca + cs);
+#endif
+    k_particle = ql*(Ca + Cs);
   }
   if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
   return k_particle + k_gaz;
@@ -546,7 +613,7 @@ htrdr_sky_dump_clouds_vtk(const struct htrdr_sky* sky, FILE* stream)
   size_t i;
   ASSERT(sky && stream);
 
-  octree_data_init(&data);
+  octree_data_init(sky, &data);
   SVX(tree_get_desc(sky->clouds, &desc));
   ASSERT(desc.type == SVX_OCTREE);
 
@@ -592,14 +659,10 @@ htrdr_sky_dump_clouds_vtk(const struct htrdr_sky* sky, FILE* stream)
   /* Write the cell data */
   leaf_data = darray_double_cdata_get(&data.data);
   fprintf(stream, "CELL_DATA %lu\n", (unsigned long)ncells);
-  fprintf(stream, "SCALARS Val double %d\n", HTRDR_SVX_OPS_COUNT__);
+  fprintf(stream, "SCALARS Kext double 2\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(i, 0, ncells) {
-    size_t idata;
-    FOR_EACH(idata, 0, HTRDR_SVX_OPS_COUNT__) {
-      fprintf(stream, "%g ", leaf_data[i*HTRDR_SVX_OPS_COUNT__ + idata]);
-    }
-    fprintf(stream, "\n");
+    fprintf(stream, "%g %g\n", leaf_data[i*2+0], leaf_data[i*2+1]);
   }
   octree_data_release(&data);
   return RES_OK;
@@ -610,24 +673,52 @@ htrdr_sky_fetch_svx_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
-   const int comp_mask, /* Combination of htrdr_sky_component_flag */
+   const int components_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const double pos[3])
 {
   struct svx_voxel voxel = SVX_VOXEL_NULL;
+  int comp_mask = components_mask;
+  double a, b;
+  double gas = 0;
+  double particle = 0;
+  double data;
   ASSERT(sky && pos);
-#ifndef NDEBUG
-  {
-    struct svx_tree_desc tree_desc = SVX_TREE_DESC_NULL;
-    SVX(tree_get_desc(sky->clouds, &tree_desc));
-    ASSERT(tree_desc.lower[0] <= pos[0] && tree_desc.upper[0] >= pos[0]);
-    ASSERT(tree_desc.lower[1] <= pos[1] && tree_desc.upper[1] >= pos[1]);
-    ASSERT(tree_desc.lower[2] <= pos[2] && tree_desc.upper[2] >= pos[2]);
+  ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
+
+  /* Is the position outside the clouds? */
+  if(pos[0] < sky->cloud_desc.lower[0]
+  || pos[1] < sky->cloud_desc.lower[1]
+  || pos[2] < sky->cloud_desc.lower[2]
+  || pos[0] > sky->cloud_desc.upper[0]
+  || pos[1] > sky->cloud_desc.upper[1]
+  || pos[2] > sky->cloud_desc.upper[2]) {
+    comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
-#endif
-  SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
-  return htrdr_sky_fetch_svx_voxel_property
-    (sky, prop, op, comp_mask, wavelength, &voxel);
+
+  if(comp_mask & HTRDR_PARTICLES) {
+    SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
+    particle = htrdr_sky_fetch_svx_voxel_property
+      (sky, prop, op, wavelength, &voxel);
+  }
+
+  if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
+
+  switch(op) {
+    case HTRDR_SVX_MIN:
+      a = comp_mask & HTRDR_PARTICLES ? particle : DBL_MAX;
+      b = comp_mask & HTRDR_GAS ? gas : DBL_MAX;
+      data = MMIN(a, b);
+      break;
+    case HTRDR_SVX_MAX:
+      a = comp_mask & HTRDR_PARTICLES ? particle : -DBL_MAX;
+      b = comp_mask & HTRDR_GAS ? gas : -DBL_MAX;
+      data = MMAX(a, b);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+
+  return data;
 }
 
 double
@@ -635,20 +726,15 @@ htrdr_sky_fetch_svx_voxel_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
-   const int comp_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const double wavelength, /* FIXME Unused */
    const struct svx_voxel* voxel)
 {
-  const double* pdbl = NULL;
-  ASSERT(sky && prop && wavelength>=0 && voxel);
-  ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
-  ASSERT((unsigned)prop < HTRDR_SVX_OPS_COUNT__);
-  (void)sky, (void)wavelength, (void)prop;
-
-  if(comp_mask != HTRDR_ALL_COMPONENTS) {
-    FATAL("Unsupported sky component\n");
-  }
-  pdbl = voxel->data;
-  return pdbl[op];
+  const float* pflt = NULL;
+  ASSERT(sky && prop && voxel);
+  ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
+  ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
+  (void)sky, (void)wavelength;
+  pflt = voxel->data;
+  return pflt[prop * HTRDR_SVX_OPS_COUNT__ + op];
 }
 

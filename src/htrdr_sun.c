@@ -254,8 +254,8 @@ htrdr_sun_get_XYZ_spectral_bands_range
   (const struct htrdr_sun* sun, size_t band_range[2])
 {
   /* Bounds of the X, Y and Z functions as defined by the CIE */
-  const double nu_min = wavelength_to_wavenumber(780); /* In cm^-1 */
-  const double nu_max = wavelength_to_wavenumber(380); /* In cm^-1 */
+  const double nu_min = wavelength_to_wavenumber(SW_WAVELENGTH_MIN);/*In cm^-1*/
+  const double nu_max = wavelength_to_wavenumber(SW_WAVELENGTH_MAX);/*In cm^-1*/
   const double* wnums = NULL;
   size_t iband_low_nu = SIZE_MAX;
   size_t iband_upp_nu = SIZE_MAX;

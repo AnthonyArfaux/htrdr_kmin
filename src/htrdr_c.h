@@ -16,6 +16,9 @@
 #ifndef HTRDR_C_H
 #define HTRDR_C_H
 
+#define SW_WAVELENGTH_MIN 380 /* In nanometer */
+#define SW_WAVELENGTH_MAX 780 /* In nanometer */
+
 /* In nanometer */
 static FINLINE double
 wavenumber_to_wavelength(const double nu/*In cm^-1*/)
