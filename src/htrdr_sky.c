@@ -176,9 +176,9 @@ register_leaf
 
   /* Register the leaf data */
   kext_min = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, -1, leaf);
+    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
   kext_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MAX, -1, leaf);
+    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_min));
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_max));
 }
@@ -679,10 +679,6 @@ htrdr_sky_fetch_svx_property
 {
   struct svx_voxel voxel = SVX_VOXEL_NULL;
   int comp_mask = components_mask;
-  double a, b;
-  double gas = 0;
-  double particle = 0;
-  double data;
   ASSERT(sky && pos);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
 
@@ -696,12 +692,34 @@ htrdr_sky_fetch_svx_property
     comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
 
-  if(comp_mask & HTRDR_PARTICLES) {
-    SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
-    particle = htrdr_sky_fetch_svx_voxel_property
-      (sky, prop, op, wavelength, &voxel);
-  }
+  SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
+  return htrdr_sky_fetch_svx_voxel_property
+      (sky, prop, op, comp_mask, wavelength, &voxel);
+}
 
+double
+htrdr_sky_fetch_svx_voxel_property
+  (const struct htrdr_sky* sky,
+   const enum htrdr_sky_property prop,
+   const enum htrdr_svx_op op,
+   const int comp_mask,
+   const double wavelength, /* FIXME Unused */
+   const struct svx_voxel* voxel)
+{
+  const float* pflt = NULL;
+  double a, b, data;
+  double gas = 0;
+  double particle = 0;
+  ASSERT(sky && prop && voxel);
+  ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
+  ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
+  (void)sky, (void)wavelength;
+
+  pflt = voxel->data;
+
+  if(comp_mask) {
+    particle = pflt[prop * HTRDR_SVX_OPS_COUNT__ + op];
+  }
   if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
 
   switch(op) {
@@ -717,24 +735,6 @@ htrdr_sky_fetch_svx_property
       break;
     default: FATAL("Unreachable code.\n"); break;
   }
-
   return data;
-}
-
-double
-htrdr_sky_fetch_svx_voxel_property
-  (const struct htrdr_sky* sky,
-   const enum htrdr_sky_property prop,
-   const enum htrdr_svx_op op,
-   const double wavelength, /* FIXME Unused */
-   const struct svx_voxel* voxel)
-{
-  const float* pflt = NULL;
-  ASSERT(sky && prop && voxel);
-  ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
-  ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
-  (void)sky, (void)wavelength;
-  pflt = voxel->data;
-  return pflt[prop * HTRDR_SVX_OPS_COUNT__ + op];
 }
 

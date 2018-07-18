@@ -88,6 +88,7 @@ htrdr_sky_fetch_svx_voxel_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
+   const int comp_mask, /* Combination of htrdr_sky_component_flag */
    const double wavelength,
    const struct svx_voxel* voxel);
 

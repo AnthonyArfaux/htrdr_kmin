@@ -63,9 +63,9 @@ discard_hit
   (void)org, (void)dir, (void)range;
 
   k_ext_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
-    HTRDR_SVX_MIN, -1/*FIXME*/, &hit->voxel);
+    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, &hit->voxel);
   k_ext_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
-    HTRDR_SVX_MAX, -1/*FIXME*/, &hit->voxel);
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, &hit->voxel);
 
   dst = hit->distance[1] - hit->distance[0];
   ASSERT(dst >= 0);
