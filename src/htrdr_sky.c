@@ -175,10 +175,10 @@ register_leaf
   }
 
   /* Register the leaf data */
-  kext_min = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
   kext_max = htrdr_sky_fetch_svx_voxel_property
     (ctx->sky, HTRDR_Kext, HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
+  kext_min = htrdr_sky_fetch_svx_voxel_property
+    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_min));
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_max));
 }
@@ -265,9 +265,10 @@ vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
   (void)context;
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* ka = (const float*)voxels + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
-    const float* ks = (const float*)voxels + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
-    const float* kext = (const float*)voxels + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    const float* vox_data = (const float*)voxels[ivox];
+    const float* ka = vox_data + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
+    const float* ks = vox_data + HTRDR_Ks * HTRDR_SVX_OPS_COUNT__;
+    const float* kext = vox_data + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
     ASSERT(ka[HTRDR_SVX_MIN] <= ka[HTRDR_SVX_MAX]);
     ASSERT(ks[HTRDR_SVX_MIN] <= ks[HTRDR_SVX_MAX]);
     ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
@@ -298,7 +299,7 @@ vox_challenge_merge(const void* voxels[], const size_t nvoxs, void* context)
   ASSERT(voxels && nvoxs && context);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* kext = (float*)voxels + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    const float* kext = (const float*)voxels[ivox] + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
     ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
     kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
     kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
@@ -702,11 +703,12 @@ htrdr_sky_fetch_svx_voxel_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
-   const int comp_mask,
+   const int components_mask,
    const double wavelength, /* FIXME Unused */
    const struct svx_voxel* voxel)
 {
   const float* pflt = NULL;
+  int comp_mask = components_mask;
   double a, b, data;
   double gas = 0;
   double particle = 0;
@@ -720,7 +722,7 @@ htrdr_sky_fetch_svx_voxel_property
   if(comp_mask) {
     particle = pflt[prop * HTRDR_SVX_OPS_COUNT__ + op];
   }
-  if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
+  if(comp_mask & HTRDR_GAS) { comp_mask &= ~HTRDR_GAS; /* TODO not implemented yet */ }
 
   switch(op) {
     case HTRDR_SVX_MIN:
