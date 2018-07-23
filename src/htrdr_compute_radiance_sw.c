@@ -13,21 +13,31 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_solve.h"
 #include "htrdr_sky.h"
+#include "htrdr_sun.h"
 
+#include <star/s3d.h>
+#include <star/ssf.h>
 #include <star/ssp.h>
+#include <star/svx.h>
+
+#include <rsys/double2.h>
+#include <rsys/float2.h>
+#include <rsys/float3.h>
 
 struct scattering_context {
   struct ssp_rng* rng;
-  const struct htrdr_sky* sky
+  const struct htrdr_sky* sky;
   double wavelength;
 
   double Ts; /* Sampled optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
 };
 static const struct scattering_context SCATTERING_CONTEXT_NULL = {
-  NULL, NULL, 0, 0, 0, 0, 0
+  NULL, NULL, 0, 0, 0
 };
 
 struct transmissivity_context {
@@ -57,32 +67,34 @@ scattering_hit_filter
    void* context)
 {
   struct scattering_context* ctx = context;
-  double dst;
   double ks_max;
   int pursue_traversal = 1;
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
   (void)range;
 
-  ks_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Ks, HTRDR_SVX_MAX, ctx->wavelength, &hit->voxel);
+  ks_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Ks,
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
 
   for(;;) {
+    double dst;
+    double T;
+
     dst = hit->distance[1] - ctx->traversal_dst;
     T = dst * ks_max; /* Compute tau for the current leaf */
 
     /* A collision occurs behind `dst' */
     if(ctx->Ts > T) {
       ctx->Ts -= T;
-      ctx->traversal_dst = hit.distance[1];
+      ctx->traversal_dst = hit->distance[1];
       pursue_traversal = 1;
       break;
 
     /*  A real/null collision occurs before `dst' */
-     else {
+    } else {
       double pos[3];
-      double proba_s;
+      double proba;
       double ks;
-      const float collision_dst = ctx->Ts / ks_max;
+      const double collision_dst = ctx->Ts / ks_max;
 
       /* Compute the traversed distance up to the challenged collision */
       dst = ctx->traversal_dst + collision_dst;
@@ -99,28 +111,27 @@ scattering_hit_filter
         (ctx->sky, HTRDR_Ks, HTRDR_ALL_COMPONENTS, ctx->wavelength, pos);
 
       /* Handle the case that ks_max is not *really* the max */
-      proba_s = ks / ks_max;
+      proba = ks / ks_max;
 
       if(ssp_rng_canonical(ctx->rng) < proba) {/* Collide <=> real scattering */
         pursue_traversal = 0;
         break;
       } else { /* Null collision */
-        ctx->Ts = ssp_ran_exp(rng, 1); /* Sample a new optical thickness */
+        ctx->Ts = ssp_ran_exp(ctx->rng, 1); /* Sample a new optical thickness */
       }
     }
   }
   return pursue_traversal;
 }
 
-static double
-transmissivty_hit_filter
+static int
+transmissivity_hit_filter
   (const struct svx_hit* hit,
    const double org[3],
    const double dir[3],
    const double range[2],
    void* context)
 {
-  const double* vox_data = NULL;
   struct transmissivity_context* ctx = context;
   double dst;
   double k_max;
@@ -138,12 +149,12 @@ transmissivty_hit_filter
   ctx->Tmin += dst * k_min;
 
   for(;;) {
-    Tdif = dst * (k_max-k_min);
+    const double Tdif = dst * (k_max-k_min);
 
     /* A collision occurs behind `dst' */
-    if(ctx->Ts > ctx->Tdif) {
+    if(ctx->Ts > Tdif) {
       ctx->Ts -= Tdif;
-      ctx->traversal_dst = hit->range[1];
+      ctx->traversal_dst = hit->distance[1];
       pursue_traversal = 1;
       break;
 
@@ -151,9 +162,8 @@ transmissivty_hit_filter
     } else {
       double x[3];
       double k;
-      double dst;
-      double proba_kext;
-      double collision_dst = cts->Ts / (k_max - k_min);
+      double proba;
+      double collision_dst = ctx->Ts / (k_max - k_min);
 
       /* Compute the traversed distance up to the challenged collision */
       dst = ctx->traversal_dst + collision_dst;
@@ -176,7 +186,7 @@ transmissivty_hit_filter
         pursue_traversal = 0;
         break;
       } else { /* Null collision */
-        ctx->Ts = ssp_ran_exp(rng, 1); /* Sample a new optical thickness */
+        ctx->Ts = ssp_ran_exp(ctx->rng, 1); /* Sample a new optical thickness */
         dst = hit->distance[1] - ctx->traversal_dst;
       }
     }
@@ -197,9 +207,10 @@ transmissivity
 {
   struct s3d_hit s3d_hit;
   struct svx_hit svx_hit;
+  struct svx_tree* svx_tree;
 
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
-  const struct s3d_hit s3d_hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
+  struct s3d_hit s3d_hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
   float ray_pos[3];
   float ray_dir[3];
   float ray_range[2];
@@ -210,23 +221,24 @@ transmissivity
   f3_set_d3(ray_pos, pos);
   f3_set_d3(ray_dir, dir);
   f2_set_d2(ray_range, range);
-  S3D(scene_view_trace(htrdr->s3d_scn, ray_pos, ray_dir, ray_range,
+  S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
     &s3d_hit_prev, &s3d_hit));
 
   if(!S3D_HIT_NONE(&s3d_hit)) return 0;
 
-  transmissivity_ctx->rng = rng;
-  transmissivity_ctx->sky = htrdr->sky;
-  transmissivity_ctx->wavelength = wavelength;
-  transmissivity_ctx->Ts = ssp_ran_exp(rng, 1); /* Sample an optical thickness */
-  transmissivity_ctx->prop = prop;
+  transmissivity_ctx.rng = rng;
+  transmissivity_ctx.sky = htrdr->sky;
+  transmissivity_ctx.wavelength = wavelength;
+  transmissivity_ctx.Ts = ssp_ran_exp(rng, 1); /* Sample an optical thickness */
+  transmissivity_ctx.prop = prop;
 
   /* Compute the transmissivity */
-  SVX(octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
+  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
+  SVX(octree_trace_ray(svx_tree, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, &svx_hit));
 
-  if(SVX_HIT_NONE(svx_hit)) {
-    return transmissivity_ctx.Tmin ? exp(-ctx.Tmin) : 1.0;
+  if(SVX_HIT_NONE(&svx_hit)) {
+    return transmissivity_ctx.Tmin ? exp(-transmissivity_ctx.Tmin) : 1.0;
   } else {
     return 0;
   }
@@ -247,6 +259,7 @@ htrdr_compute_radiance_sw
   struct s3d_hit s3d_hit = S3D_HIT_NULL;
   struct svx_hit svx_hit = SVX_HIT_NULL;
   struct s3d_hit s3d_hit_prev = S3D_HIT_NULL;
+  struct svx_tree* svx_tree = NULL;
 
   double pos[3];
   double dir[3];
@@ -256,7 +269,7 @@ htrdr_compute_radiance_sw
 
   double R;
   double r; /* Random number */
-  double wi[3]; /* -dir */
+  double wo[3]; /* -dir */
   double pdf;
   double sun_solid_angle;
   double Tr; /* Overall transmissivity */
@@ -271,28 +284,30 @@ htrdr_compute_radiance_sw
   float ray_range[2];
 
   ASSERT(wavelength >= SW_WAVELENGTH_MIN && wavelength <= SW_WAVELENGTH_MAX);
-  ASSERT(htrdr && rng && pos && dir);
+  ASSERT(htrdr && rng && pos_in && dir_in);
 
   /* Fetch sun properties */
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wavelength);
 
+  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
+
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
   /* Add the directly contribution of the sun  */
-  if(htrdr_sun_is_dir_in_solar_cone(sun, dir)) {
+  if(htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
     f3_set_d3(ray_pos, pos);
     f3_set_d3(ray_dir, dir);
     f2(ray_range, 0, FLT_MAX);
-    S3D(scene_view_trace
-      (htrdr->s3d_scn, ray_pos, ray_dir, ray_range, NULL, &s3d_hit));
+    S3D(scene_view_trace_ray
+      (htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range, NULL, &s3d_hit));
 
     /* Add the direct contribution of the sun */
-    if(!S3D_HIT_NONE(&s3d_hit)) {
-      d3(range, 0, FLT_MAX);
+    if(S3D_HIT_NONE(&s3d_hit)) {
+      d2(range, 0, FLT_MAX);
       Tr = transmissivity
-        (htrdr, rng, HTRDR_Kext, wavelength , pos, dir, range);
+        (htrdr, rng, HTRDR_Kext, wavelength , pos, dir, range, NULL);
       w = L_sun * Tr;
     }
   }
@@ -307,20 +322,20 @@ htrdr_compute_radiance_sw
     f2(ray_range, 0, FLT_MAX);
 
     /* Find the first intersection with a surface */
-    S3D(scene_view_trace(htrdr->s3d_scn, ray_pos, ray_dir, ray_range,
+    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
       &s3d_hit_prev, &s3d_hit));
 
     /* Sample an optical thicknes */
-    scattering_ctx->Ts = ssp_ran_exp(rng, 1);
+    scattering_ctx.Ts = ssp_ran_exp(rng, 1);
 
     /* Setup the remaining scattering context fields */
-    scattering_ctx->rng = rng;
-    scattering_ctx->sky = htrdr->sky;
-    scattering_ctx->wavelength = wavelength;
+    scattering_ctx.rng = rng;
+    scattering_ctx.sky = htrdr->sky;
+    scattering_ctx.wavelength = wavelength;
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
-    SVX(octree_trace_ray(htrdr->clouds, pos, dir, range, NULL,
+    SVX(octree_trace_ray(svx_tree, pos, dir, range, NULL,
       scattering_hit_filter, &scattering_ctx, &svx_hit));
 
     /* No scattering and no surface reflection. Stop the radiative random walk */
@@ -330,37 +345,38 @@ htrdr_compute_radiance_sw
     }
 
     /* Negative the incoming dir to match the convention of the SSF library */
-    d3_minus(wi, dir);
+    d3_minus(wo, dir);
 
     /* Compute the new position */
-    pos_next[0] = pos[0] + dir[0]*scattering_ctx->traversal_dst;
-    pos_next[1] = pos[1] + dir[1]*scattering_ctx->traversal_dst;
-    pos_next[2] = pos[2] + dir[2]*scattering_ctx->traversal_dst;
+    pos_next[0] = pos[0] + dir[0]*scattering_ctx.traversal_dst;
+    pos_next[1] = pos[1] + dir[1]*scattering_ctx.traversal_dst;
+    pos_next[2] = pos[2] + dir[2]*scattering_ctx.traversal_dst;
 
     /* Define the absorption transmissivity from the current position to the
      * next position */
-    d2(range, 0, scattering_ctx->traversal_dst);
+    d2(range, 0, scattering_ctx.traversal_dst);
     Tr_abs = transmissivity
-      (htrdr, rng, HTRDR_Ka, wavelength, pos, dir, range);
+      (htrdr, rng, HTRDR_Ka, wavelength, pos, dir, range, &s3d_hit_prev);
     if(Tr_abs <= 0) break;
 
     /* Define the transmissivity from the new position to the sun */
     d2(range, 0, FLT_MAX);
-    htrdr_sun_sample_dir(htrdr->sun, rng, pos_next, sun_dir);
+    htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
     Tr = transmissivity
-      (htrdr, rng, HTRDR_Kext, wavelength, pos_next, sun_dir, range);
+      (htrdr, rng, HTRDR_Kext, wavelength, pos_next, sun_dir, range, &s3d_hit);
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
       double reflectivity;
-      double R;
+      double N[3];
       int type;
 
+      d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       reflectivity = ssf_bsdf_sample
-        (htrdr->bsdf, rng, wi, s3d_hit.normal, dir_next, &type, &pdf);
+        (htrdr->bsdf, rng, wo, N, dir_next, &type, &pdf);
       if(ssp_rng_canonical(rng) > reflectivity) break; /* Russian roulette */
 
-      R = ssf_bsdf_eval(htrdr->bsdf, wi, s3d_hit.normal, sun_dir);
+      R = ssf_bsdf_eval(htrdr->bsdf, wo, N, sun_dir);
 
     /* Scattering in the medium */
     } else {
@@ -376,14 +392,14 @@ htrdr_compute_radiance_sw
       ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);
-      if(r < ks_gaz / ks) { /* Gas scattering */
-        FATAL("Gas scattering is not supported, yet.\n");
+      if(r < ks_gas / ks) { /* Gas scattering */
+        phase = htrdr->phase_rayleigh;
       } else { /* Cloud scattering */
         phase = htrdr->phase_hg;
       }
 
-      ssf_phase_sample(phase, rng, wi, dir_next, &pdf);
-      R = ssf_phase_eval(phase, wi, sun_dir);
+      ssf_phase_sample(phase, rng, wo, dir_next, NULL);
+      R = ssf_phase_eval(phase, wo, sun_dir);
     }
 
     /* Update the MC weight */
@@ -393,6 +409,8 @@ htrdr_compute_radiance_sw
     /* Setup the next random walk state */
     d3_set(pos, pos_next);
     d3_set(dir, dir_next);
+
+    s3d_hit_prev = s3d_hit;
   }
   return w;
 }

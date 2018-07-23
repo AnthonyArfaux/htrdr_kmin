@@ -25,6 +25,8 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.6 REQUIRED)
+find_package(Star3D 0.5 REQUIRED)
+find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
 find_package(StarVX REQUIRED)
@@ -38,8 +40,13 @@ include(rcmake_runtime)
 
 include_directories(
   ${RSys_INCLUDE_DIR}
-  ${SVX_INCLUDE_DIR}
-  ${HTCP_INCLUDE_DIR})
+  ${Star3D_INCLUDE_DIR}
+  ${Star3DAW_INCLUDE_DIR}
+  ${StarSF_INCLUDE_DIR}
+  ${StarSP_INCLUDE_DIR}
+  ${StarVX_INCLUDE_DIR}
+  ${HTCP_INCLUDE_DIR}
+  ${HTMIE_INCLUDE_DIR})
 
 ################################################################################
 # Configure and define targets
@@ -53,6 +60,7 @@ set(HTRDR_FILES_SRC
   htrdr.c
   htrdr_args.c
   htrdr_buffer.c
+  htrdr_compute_radiance_sw.c
   htrdr_main.c
   htrdr_rectangle.c
   htrdr_sky.c
@@ -75,7 +83,7 @@ rcmake_prepend_path(HTRDR_FILES_INC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC})
-target_link_libraries(htrdr HTCP HTMIE RSys StarSF StarSP StarVX)
+target_link_libraries(htrdr HTCP HTMIE RSys Star3D Star3DAW StarSF StarSP StarVX)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)

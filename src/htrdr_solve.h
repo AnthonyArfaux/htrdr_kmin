@@ -26,7 +26,7 @@ extern LOCAL_SYM res_T
 htrdr_solve_transmission_buffer
   (struct htrdr* htrdr);
 
-extern LOCAL_SYM res_T
+extern LOCAL_SYM double
 htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    struct ssp_rng* rng,

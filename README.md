@@ -12,6 +12,8 @@ on the
 [HTCP](https://gitlab.com/meso-star/htcp/),
 [HTMIE](https://gitlab.com/meso-star/htmie/),
 [RSys](https://gitlab.com/vaplv/rsys/),
+[Star-3D](https://gitlab.com/meso-star/star-3d/),
+[Star-3DAW](https://gitlab.com/meso-star/star-3daw/),
 [Star-SF](https://gitlab.com/meso-star/star-sf/),
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
 [Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on the

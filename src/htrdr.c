@@ -26,6 +26,8 @@
 #include <rsys/clock_time.h>
 #include <rsys/mem_allocator.h>
 
+#include <star/s3d.h>
+#include <star/s3daw.h>
 #include <star/ssf.h>
 #include <star/svx.h>
 
@@ -161,6 +163,52 @@ dump_buffer(struct htrdr* htrdr)
   }
 }
 
+static res_T
+setup_geometry(struct htrdr* htrdr, const char* filename)
+{
+  struct s3d_scene* scn = NULL;
+  struct s3daw* s3daw = NULL;
+  res_T res = RES_OK;
+  ASSERT(htrdr);
+
+  res = s3d_scene_create(htrdr->s3d, &scn);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the Star-3D scene.\n");
+    goto error;
+  }
+
+  if(filename) {
+    res = s3daw_create(&htrdr->logger, htrdr->allocator, NULL, NULL, htrdr->s3d,
+      htrdr->verbose, &s3daw);
+    if(res != RES_OK) {
+      htrdr_log_err(htrdr, "could not create the Star-3DAW device.\n");
+      goto error;
+    }
+    res = s3daw_load(s3daw, filename);
+    if(res != RES_OK) {
+      htrdr_log_err(htrdr, "could not load the obj file `%s'.\n", filename);
+      goto error;
+    }
+    res = s3daw_attach_to_scene(s3daw, scn);
+    if(res != RES_OK) {
+      htrdr_log_err(htrdr,
+        "could not attach the loaded geometry to the Star-3D scene.\n");
+      goto error;
+    }
+  }
+
+  res = s3d_scene_view_create(scn, S3D_TRACE, &htrdr->s3d_scn_view);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the Star-3D scene view.\n");
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -190,6 +238,13 @@ htrdr_init
     (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->svx);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "could not create the Star-VoXel device.\n");
+    goto error;
+  }
+
+  res = s3d_device_create
+    (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->s3d);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the Star-3D device.\n");
     goto error;
   }
 
@@ -237,7 +292,7 @@ htrdr_init
 
   res = ssf_phase_create(htrdr->allocator, &ssf_phase_hg, &htrdr->phase_hg);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, 
+    htrdr_log_err(htrdr,
       "could not create the Henyey & Greenstein phase function.\n");
     goto error;
   }
@@ -249,6 +304,9 @@ htrdr_init
     htrdr_log_err(htrdr,"could not create the Rayleigh phase function.\n");
     goto error;
   }
+
+  res = setup_geometry(htrdr, args->filename_obj);
+  if(res != RES_OK) goto error;
 
 exit:
   return res;
@@ -264,6 +322,8 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->bsdf) SSF(bsdf_ref_put(htrdr->bsdf));
   if(htrdr->phase_hg) SSF(phase_ref_put(htrdr->phase_hg));
   if(htrdr->phase_rayleigh) SSF(phase_ref_put(htrdr->phase_rayleigh));
+  if(htrdr->s3d_scn_view) S3D(scene_view_ref_put(htrdr->s3d_scn_view));
+  if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);

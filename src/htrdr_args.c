@@ -40,6 +40,8 @@ print_help(const char* cmd)
   printf(
 "  -f               overwrite the OUTPUT file if it already exists.\n");
   printf(
+"  -g FILENAME      path of the OBJ geometry file.\n");
+  printf(
 "  -h               display this help and exit.\n");
   printf(
 "  -I <image>       define the image to compute.\n");
@@ -278,6 +280,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
       case 'f': args->force_overwriting = 1; break;
+      case 'g': args->filename_obj = optarg; break;
       case 'h':
         print_help(argv[0]);
         htrdr_args_release(args);

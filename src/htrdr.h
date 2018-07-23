@@ -19,24 +19,29 @@
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 
-/* Forward declaration */
+/* Forward declarations */
 struct htrdr_args;
 struct htrdr_buffer;
 struct htrdr_sky;
 struct htrdr_rectangle;
 struct mem_allocator;
+struct s3d_device;
+struct s3d_scene;
 struct ssf_bsdf;
 struct ssf_phase;
 struct svx_device;
 
 struct htrdr {
   struct svx_device* svx;
+  struct s3d_device* s3d;
+
+  struct s3d_scene_view* s3d_scn_view; 
 
   struct htrdr_sky* sky;
   struct htrdr_sun* sun;
 
   /* Scattering functions */
-  struct ssf_bsdf* bsdf; /* BSDF of the ground geometry */
+  struct ssf_bsdf* bsdf; /* BSDF of the 3D geometry */
   struct ssf_phase* phase_hg; /* Henyey & Greenstein phase function */
   struct ssf_phase* phase_rayleigh; /* Rayleigh phase function */
 
