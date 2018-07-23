@@ -26,6 +26,7 @@
 #include <rsys/clock_time.h>
 #include <rsys/mem_allocator.h>
 
+#include <star/ssf.h>
 #include <star/svx.h>
 
 #include <errno.h>
@@ -226,6 +227,29 @@ htrdr_init
     args->filename_mie, &htrdr->sky);
   if(res != RES_OK) goto error;
 
+  res = ssf_bsdf_create
+    (htrdr->allocator, &ssf_lambertian_reflection, &htrdr->bsdf);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the BSDF of the ground.\n");
+    goto error;
+  }
+  SSF(lambertian_reflection_setup(htrdr->bsdf, 1));
+
+  res = ssf_phase_create(htrdr->allocator, &ssf_phase_hg, &htrdr->phase_hg);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, 
+      "could not create the Henyey & Greenstein phase function.\n");
+    goto error;
+  }
+  SSF(phase_hg_setup(htrdr->phase_hg, 0));
+
+  res = ssf_phase_create
+    (htrdr->allocator, &ssf_phase_rayleigh, &htrdr->phase_rayleigh);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,"could not create the Rayleigh phase function.\n");
+    goto error;
+  }
+
 exit:
   return res;
 error:
@@ -237,6 +261,9 @@ void
 htrdr_release(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
+  if(htrdr->bsdf) SSF(bsdf_ref_put(htrdr->bsdf));
+  if(htrdr->phase_hg) SSF(phase_ref_put(htrdr->phase_hg));
+  if(htrdr->phase_rayleigh) SSF(phase_ref_put(htrdr->phase_rayleigh));
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);

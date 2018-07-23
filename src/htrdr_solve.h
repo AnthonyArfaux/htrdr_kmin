@@ -18,12 +18,21 @@
 
 #include <rsys/rsys.h>
 
-/* Forward declaration */
+/* Forward declarations */
 struct htrdr;
+struct ssp_rng;
 
 extern LOCAL_SYM res_T
 htrdr_solve_transmission_buffer
   (struct htrdr* htrdr);
+
+extern LOCAL_SYM res_T
+htrdr_compute_radiance_sw
+  (struct htrdr* htrdr,
+   struct ssp_rng* rng,
+   const double pos[3],
+   const double dir[3],
+   const double wavelength);
 
 #endif /* HTRDR_SOLVE_H */
 

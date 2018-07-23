@@ -13,6 +13,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#include "htrdr_solve.h"
+#include "htrdr_sky.h"
+
+#include <star/ssp.h>
+
 struct scattering_context {
   struct ssp_rng* rng;
   const struct htrdr_sky* sky
@@ -59,7 +64,7 @@ scattering_hit_filter
   (void)range;
 
   ks_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Ks, HTRDR_SVX_MAX, -1/*FIXME*/, &hit->voxel);
+    (ctx->sky, HTRDR_Ks, HTRDR_SVX_MAX, ctx->wavelength, &hit->voxel);
 
   for(;;) {
     dst = hit->distance[1] - ctx->traversal_dst;
@@ -124,10 +129,10 @@ transmissivty_hit_filter
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
   (void)range;
 
-  k_min = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, ctx->prop, HTRDR_SVX_MIN, -1/*FIXME*/, &hit->voxel);
-  k_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, ctx->prop, HTRDR_SVX_MAX, -1/*FIXME*/, &hit->voxel);
+  k_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
+    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
+  k_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
 
   dst = hit->distance[1] - ctx->traversal_dst;
   ctx->Tmin += dst * k_min;
@@ -159,6 +164,8 @@ transmissivty_hit_filter
       x[1] = org[1] + dst * dir[1];
       x[2] = org[2] + dst * dir[2];
 
+      /* TODO use a per wavelength getter that will precompute the interpolated
+       * cross sections for a wavelength to improve the fetch efficiency */
       k = htrdr_sky_fetch_raw_property
         (ctx->sky, ctx->prop, HTRDR_ALL_COMPONENTS, ctx->wavelength, x);
 
@@ -225,9 +232,12 @@ transmissivity
   }
 }
 
-/* Compute the radiance in short wave */
-static double
-radiance_sw
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+double
+htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    struct ssp_rng* rng,
    const double pos_in[3],
@@ -260,6 +270,7 @@ radiance_sw
   float ray_dir[3];
   float ray_range[2];
 
+  ASSERT(wavelength >= SW_WAVELENGTH_MIN && wavelength <= SW_WAVELENGTH_MAX);
   ASSERT(htrdr && rng && pos && dir);
 
   /* Fetch sun properties */
@@ -354,17 +365,19 @@ radiance_sw
     /* Scattering in the medium */
     } else {
       struct ssf_phase* phase;
-      double ks_partical; /* Scattering coefficient of the particles */
-      double ks_gaz; /* Scattering coefficient of the gaz */
+      double ks_particle; /* Scattering coefficient of the particles */
+      double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
 
-      ks_gaz = htrdr_medium_get_ks_gaz(htrdr->medium);
-      ks_cloud = hrdr_medium_get_ks_particle(htrdr->medium);
-      ks = ks_particle + ks_gaz;
+      ks_gas = htrdr_sky_fetch_raw_property
+        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, wavelength, pos_next);
+      ks_particle = htrdr_sky_fetch_raw_property
+        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, wavelength, pos_next);
+      ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);
-      if(r < ks_gaz / ks) { /* Gaz scattering */
-        phase = htrdr->phase_rayleigh;
+      if(r < ks_gaz / ks) { /* Gas scattering */
+        FATAL("Gas scattering is not supported, yet.\n");
       } else { /* Cloud scattering */
         phase = htrdr->phase_hg;
       }

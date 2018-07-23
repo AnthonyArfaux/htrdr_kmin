@@ -12,8 +12,11 @@ on the
 [HTCP](https://gitlab.com/meso-star/htcp/),
 [HTMIE](https://gitlab.com/meso-star/htmie/),
 [RSys](https://gitlab.com/vaplv/rsys/),
-[Star-VX](https://gitlab.com/meso-star/star-vx/), and
-[Star-SP](https://gitlab.com/meso-star/stat-sp/) libraries
+[Star-SF](https://gitlab.com/meso-star/star-sf/),
+[Star-SP](https://gitlab.com/meso-star/stat-sp/) and
+[Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on the
+[OpenMP](http://www.openmp.org) 1.2 specification to parallelize its
+computations.
 
 First ensure that CMake is installed on your system. Then install the RCMake
 package as well as the aforementioned prerequisites. Finally generate the

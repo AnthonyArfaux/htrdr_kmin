@@ -25,6 +25,8 @@ struct htrdr_buffer;
 struct htrdr_sky;
 struct htrdr_rectangle;
 struct mem_allocator;
+struct ssf_bsdf;
+struct ssf_phase;
 struct svx_device;
 
 struct htrdr {
@@ -32,6 +34,11 @@ struct htrdr {
 
   struct htrdr_sky* sky;
   struct htrdr_sun* sun;
+
+  /* Scattering functions */
+  struct ssf_bsdf* bsdf; /* BSDF of the ground geometry */
+  struct ssf_phase* phase_hg; /* Henyey & Greenstein phase function */
+  struct ssf_phase* phase_rayleigh; /* Rayleigh phase function */
 
   struct htrdr_buffer* buf;
   struct htrdr_rectangle* rect;
