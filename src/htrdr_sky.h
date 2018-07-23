@@ -39,7 +39,7 @@ enum htrdr_svx_op {
   HTRDR_SVX_OPS_COUNT__
 };
 
-/* Forward declaration */
+/* Forward declarations */
 struct htrdr;
 struct htrdr_sky;
 struct htrdr_sun;

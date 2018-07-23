@@ -60,6 +60,7 @@ set(HTRDR_FILES_SRC
   htrdr.c
   htrdr_args.c
   htrdr_buffer.c
+  htrdr_camera.c
   htrdr_compute_radiance_sw.c
   htrdr_main.c
   htrdr_rectangle.c
@@ -71,6 +72,7 @@ set(HTRDR_FILES_INC
   htrdr_c.h
   htrdr_args.h
   htrdr_buffer.h
+  htrdr_camera.h
   htrdr_rectangle.h
   htrdr_sky.h
   htrdr_sun.h
