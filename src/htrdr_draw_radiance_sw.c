@@ -21,6 +21,7 @@
 
 #include <star/ssp.h>
 
+#include <omp.h>
 #include <rsys/math.h>
 
 #define TILE_SIZE 32 /* definition in X & Y of a tile */
@@ -43,6 +44,7 @@ morton2D_decode(const uint32_t u32)
 static res_T
 draw_tile
   (struct htrdr* htrdr,
+   int64_t tile_mcode, /* For debug only */
    const size_t tile_org[2], /* Origin of the tile in pixel space */
    const size_t tile_sz[2], /* Definition of the tile */
    const double pix_sz[2], /* Size of a pixel in the normalized image plane */
@@ -54,7 +56,7 @@ draw_tile
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
   ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && buf);
-
+  (void)tile_mcode;
   /* Adjust the #pixels to process them wrt a morton order */
   npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
   npixels *= npixels;
@@ -117,12 +119,14 @@ htrdr_draw_radiance_sw
    const size_t spp,
    struct htrdr_buffer* buf)
 {
-  struct ssp_rng* rng = NULL;
+  struct ssp_rng_proxy* rng_proxy = NULL;
+  struct ssp_rng** rngs = NULL;
   size_t ntiles_x, ntiles_y, ntiles;
+  size_t i;
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
-  res_T res = RES_OK;
+  ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
 
   htrdr_buffer_get_layout(buf, &layout);
@@ -138,10 +142,26 @@ htrdr_draw_radiance_sw
     goto error;
   }
 
-  res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng);
+  res = ssp_rng_proxy_create
+    (htrdr->allocator, &ssp_rng_mt19937_64, htrdr->nthreads, &rng_proxy);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "%s: could not create the RNG.\n", FUNC_NAME);
+    htrdr_log_err(htrdr, "%s: could not create the RNG proxy.\n", FUNC_NAME);
     goto error;
+  }
+
+  rngs = MEM_CALLOC(htrdr->allocator, htrdr->nthreads, sizeof(*rngs));
+  if(!rngs) {
+    htrdr_log_err(htrdr, "%s: could not allocate the RNGs list.\n", FUNC_NAME);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  FOR_EACH(i, 0, htrdr->nthreads) {
+    res = ssp_rng_proxy_create_rng(rng_proxy, i, &rngs[i]);
+    if(res != RES_OK) {
+      htrdr_log_err(htrdr,"%s: could not create the per thread RNG.\n", FUNC_NAME);
+      goto error;
+    }
   }
 
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
@@ -152,9 +172,15 @@ htrdr_draw_radiance_sw
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
+  #pragma omp parallel for schedule(static, 1/*chunck size*/)
   for(mcode=0; mcode<(int32_t)ntiles; ++mcode) {
+    const int ithread = omp_get_thread_num();
+    struct ssp_rng* rng = rngs[ithread];
     size_t tile_org[2];
     size_t tile_sz[2];
+    res_T res_local = RES_OK;
+
+    if(ATOMIC_GET(&res) != RES_OK) continue;
 
     /* Decode the morton code to retrieve the tile index  */
     tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
@@ -162,7 +188,7 @@ htrdr_draw_radiance_sw
     tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
     if(tile_org[1] >= ntiles_y) continue; /* Skip border tile */
 
-    /* Define the tile origin to pixel space */
+    /* Define the tile origin in pixel space */
     tile_org[0] *= TILE_SIZE;
     tile_org[1] *= TILE_SIZE;
 
@@ -170,13 +196,23 @@ htrdr_draw_radiance_sw
     tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
     tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
 
-    res = draw_tile(htrdr, tile_org, tile_sz, pix_sz, cam, spp, rng, buf);
-    if(res != RES_OK) goto error;
+    res_local = draw_tile
+      (htrdr, mcode, tile_org, tile_sz, pix_sz, cam, spp, rng, buf);
+    if(res_local != RES_OK) {
+      ATOMIC_SET(&res, res_local);
+      continue;
+    }
   }
 
 exit:
-  if(rng) SSP(rng_ref_put(rng));
-  return res;
+  if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
+  if(rngs) {
+    FOR_EACH(i, 0, htrdr->nthreads) {
+      if(rngs[i]) SSP(rng_ref_put(rngs[i]));
+    }
+    MEM_RM(htrdr->allocator, rngs);
+  }
+  return (res_T)res;
 error:
   goto exit;
 }
