@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_solve.h"
@@ -93,7 +94,7 @@ draw_tile
 
       /* Compute the radiance that reach the pixel through the ray */
       weight = htrdr_compute_radiance_sw
-        (htrdr, rng, ray_org, ray_dir, -1/*FIXME wavelength*/);
+        (htrdr, rng, ray_org, ray_dir, SW_WAVELENGTH_MIN/*FIXME wavelength*/);
       ASSERT(weight >= 0);
 
       /* Update the pixel accumulator */

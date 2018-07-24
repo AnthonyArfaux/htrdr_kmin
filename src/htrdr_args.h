@@ -71,7 +71,7 @@ struct htrdr_args {
     {32, 32},  /* image definition */                                          \
     1          /* #samples per pixel */                                        \
   },                                                                           \
-  {0, 0, -1}, /* Main direction */                                             \
+  {0, 0, 1}, /* Main direction */                                              \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \

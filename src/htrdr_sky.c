@@ -712,7 +712,7 @@ htrdr_sky_fetch_svx_voxel_property
   double a, b, data;
   double gas = 0;
   double particle = 0;
-  ASSERT(sky && prop && voxel);
+  ASSERT(sky && voxel);
   ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
   ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
   (void)sky, (void)wavelength;

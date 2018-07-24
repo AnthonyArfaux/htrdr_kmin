@@ -100,7 +100,7 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   sun->htrdr = htrdr;
   darray_double_init(htrdr->allocator, &sun->radiances_sw);
   darray_double_init(htrdr->allocator, &sun->wavenumbers_sw);
-  sun->half_angle = 4.6524e3;
+  sun->half_angle = 4.6524e-3;
   sun->cos_half_angle = cos(sun->half_angle);
   sun->solid_angle = 2*PI*(1-sun->cos_half_angle);
   d33_basis(sun->frame, main_dir);

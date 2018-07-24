@@ -145,6 +145,7 @@ static void
 dump_buffer(struct htrdr_buffer* buf, FILE* output)
 {
   struct htrdr_buffer_layout buf_layout;
+  double max_val = -DBL_MAX;
   size_t x, y;
   ASSERT(buf && output);
 
@@ -158,7 +159,15 @@ dump_buffer(struct htrdr_buffer* buf, FILE* output)
     FOR_EACH(x, 0, buf_layout.width) {
       const struct htrdr_accum* acc = htrdr_buffer_at(buf, x, y);
       const double E = acc->nweights ? acc->sum_weights/(double)acc->nweights:0;
-      const uint16_t val_ui16 = (uint16_t)(E * 65535.0 + 0.5/*round*/);
+      max_val = MMAX(E, max_val);
+    }
+  }
+  FOR_EACH(y, 0, buf_layout.height) {
+    FOR_EACH(x, 0, buf_layout.width) {
+      const struct htrdr_accum* acc = htrdr_buffer_at(buf, x, y);
+      const double E = acc->nweights ? acc->sum_weights/(double)acc->nweights:0;
+      const double En = E / (double)max_val;
+      const uint16_t val_ui16 = (uint16_t)(En * 65535.0 + 0.5/*round*/);
       fprintf(output, "%u %u %u\n", val_ui16, val_ui16, val_ui16);
     }
   }
@@ -239,6 +248,13 @@ htrdr_init
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
   htrdr->spp = args->image.spp;
 
+  if(!args->output) {
+    htrdr->output = stdout;
+  } else {
+    res = open_output_stream(htrdr, args);
+    if(res != RES_OK) goto error;
+  }
+
   res = svx_device_create
     (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->svx);
   if(res != RES_OK) {
@@ -257,7 +273,7 @@ htrdr_init
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
   res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
-    args->camera.up, proj_ratio, args->camera.fov_x, &htrdr->cam);
+    args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_x), &htrdr->cam);
   if(res != RES_OK) goto error;
 
   res = htrdr_buffer_create(htrdr,
@@ -302,13 +318,6 @@ htrdr_init
 
   res = setup_geometry(htrdr, args->filename_obj);
   if(res != RES_OK) goto error;
-
-  if(!args->output) {
-    htrdr->output = stdout;
-  } else {
-    res = open_output_stream(htrdr, args);
-    if(res != RES_OK) goto error;
-  }
 
 exit:
   return res;
