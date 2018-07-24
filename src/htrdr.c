@@ -18,7 +18,7 @@
 #include "htrdr.h"
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
-#include "htrdr_rectangle.h"
+#include "htrdr_camera.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
@@ -218,6 +218,7 @@ htrdr_init
    const struct htrdr_args* args,
    struct htrdr* htrdr)
 {
+  double proj_ratio;
   res_T res = RES_OK;
   ASSERT(args && htrdr);
 
@@ -233,6 +234,7 @@ htrdr_init
   htrdr->dump_vtk = args->dump_vtk;
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
+  htrdr->spp = args->image.spp;
 
   res = svx_device_create
     (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->svx);
@@ -248,36 +250,26 @@ htrdr_init
     goto error;
   }
 
-  if(!args->dump_vtk) { /* Legacy mode */
-    const size_t elmtsz = sizeof(double);
-    const size_t pitch = elmtsz * args->image.definition[0];
+  proj_ratio =
+    (double)args->image.definition[0]
+  / (double)args->image.definition[1];
+  res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
+    args->camera.up, proj_ratio, args->camera.fov_x, &htrdr->cam);
+  if(res != RES_OK) goto error;
 
-    /* Create the image buffer */
-    res = htrdr_buffer_create(htrdr, args->image.definition[0],
-      args->image.definition[1], pitch, elmtsz, 16, &htrdr->buf);
-    if(res != RES_OK) goto error;
-
-    /* TODO check the validity of the parameters */
-    htrdr->main_dir[0] = args->main_dir[0];
-    htrdr->main_dir[1] = args->main_dir[1];
-    htrdr->main_dir[2] = args->main_dir[2];
-    htrdr->spp = args->image.spp;
-
-    /* Create the plane on which the image buffer lies */
-    res = htrdr_rectangle_create(htrdr, args->rectangle.pos, args->rectangle.tgt,
-      args->rectangle.up, args->rectangle.sz, &htrdr->rect);
-    if(res != RES_OK) goto error;
-  }
-
-  if(!args->output) {
-    htrdr->output = stdout;
-  } else {
-    res = open_output_stream(htrdr, args);
-    if(res != RES_OK) goto error;
-  }
+  res = htrdr_buffer_create(htrdr,
+    args->image.definition[0], /* Width */
+    args->image.definition[1], /* Height */
+    args->image.definition[0]*sizeof(struct htrdr_accum), /* Pitch */
+    sizeof(struct htrdr_accum), /* Element size */
+    16, /* Alignement */
+    &htrdr->buf);
+  if(res != RES_OK) goto error;
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);
   if(res != RES_OK) goto error;
+  htrdr_sun_set_direction(htrdr->sun, args->main_dir);
+
   res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
     args->filename_mie, &htrdr->sky);
   if(res != RES_OK) goto error;
@@ -308,6 +300,13 @@ htrdr_init
   res = setup_geometry(htrdr, args->filename_obj);
   if(res != RES_OK) goto error;
 
+  if(!args->output) {
+    htrdr->output = stdout;
+  } else {
+    res = open_output_stream(htrdr, args);
+    if(res != RES_OK) goto error;
+  }
+
 exit:
   return res;
 error:
@@ -327,8 +326,8 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
+  if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
-  if(htrdr->rect) htrdr_rectangle_ref_put(htrdr->rect);
   logger_release(&htrdr->logger);
 }
 
@@ -344,13 +343,13 @@ htrdr_run(struct htrdr* htrdr)
     char buf[128];
 
     time_current(&t0);
-    res = htrdr_solve_transmission_buffer(htrdr);
+    res = htrdr_draw_radiance_sw(htrdr, htrdr->cam, htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     time_sub(&t0, time_current(&t1), &t0);
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
     htrdr_log(htrdr, "Elapsed time: %s\n", buf);
 
-    dump_buffer(htrdr);
+    /*dump_buffer(htrdr);*/
   }
 exit:
   return res;

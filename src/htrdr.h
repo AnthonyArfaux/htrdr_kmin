@@ -45,9 +45,8 @@ struct htrdr {
   struct ssf_phase* phase_hg; /* Henyey & Greenstein phase function */
   struct ssf_phase* phase_rayleigh; /* Rayleigh phase function */
 
+  struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
-  struct htrdr_rectangle* rect;
-  double main_dir[3]; /* Main direction */
   size_t spp; /* #samples per pixel */
 
   FILE* output;

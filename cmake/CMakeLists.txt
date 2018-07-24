@@ -66,8 +66,7 @@ set(HTRDR_FILES_SRC
   htrdr_main.c
   htrdr_rectangle.c
   htrdr_sky.c
-  htrdr_sun.c
-  htrdr_transmission.c)
+  htrdr_sun.c)
 set(HTRDR_FILES_INC
   htrdr.h
   htrdr_c.h

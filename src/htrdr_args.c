@@ -34,9 +34,11 @@ print_help(const char* cmd)
   printf(
 "  -c FILENAME      path of the HTCP cloud properties file.\n");
   printf(
+"  -C <camera>      define the rendering point of view.\n");
+  printf(
 "  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
   printf(
-"  -D X,Y,Z         sun direction.\n");
+"  -D X,Y,Z         direction toward the sun.\n");
   printf(
 "  -f               overwrite the OUTPUT file if it already exists.\n");
   printf(
@@ -44,14 +46,12 @@ print_help(const char* cmd)
   printf(
 "  -h               display this help and exit.\n");
   printf(
-"  -I <image>       define the image to compute.\n");
+"  -i <image>       define the image to compute.\n");
   printf(
 "  -m FILENAME      path of the Mie data file.\n");
   printf(
 "  -o OUTPUT        file where data are written. If not defined, data are\n"
 "                   written to standard output.\n");
-  printf(
-"  -r <rectangle>   define the integration plane.\n");
   printf(
 "  -t THREADS       hint on the number of threads to use. By default use as\n"
 "                   many threads as CPU cores.\n");
@@ -90,57 +90,23 @@ parse_definition(const char* str, unsigned val[2])
 }
 
 static res_T
-parse_rectangle_parameter(struct htrdr_args* args, const char* str)
+parse_fov(const char* str, double* out_fov)
 {
-  char buf[128];
-  char* key;
-  char* val;
-  char* ctx;
-  res_T res;
-  ASSERT(str && args);
+  double fov;
+  res_T res = RES_OK;
+  ASSERT(str && out_fov);
 
-  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
-    fprintf(stderr,
-      "Could not duplicate the rectangle option string `%s'.\n", str);
-    res = RES_MEM_ERR;
-    goto error;
+  res = cstr_to_double(str, &fov);
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid field of view `%s'.\n", str);
+    return RES_BAD_ARG;
   }
-  strncpy(buf, str, sizeof(buf));
-
-  key = strtok_r(buf, "=", &ctx);
-  val = strtok_r(NULL, "", &ctx);
-
-  if(!val) {
-    fprintf(stderr, "Missing a value to the rectangle option `%s'.\n", key);
-    res = RES_BAD_ARG;
-    goto error;
+  if(fov < 30 || fov > 120) {
+    fprintf(stderr, "The field of view %g is not in [30, 120].\n", fov);
+    return RES_BAD_ARG;
   }
-
-  #define PARSE(Name, Func)                                                    \
-    res = Func;                                                                \
-    if(res != RES_OK) {                                                        \
-      fprintf(stderr, "Invalid rectangle "Name" `%s'.\n", val);                \
-      goto error;                                                              \
-    } (void)0
-  if(!strcmp(key, "pos")) {
-    PARSE("position", parse_doubleX(val, args->rectangle.pos, 3));
-  } else if(!strcmp(key, "tgt")) {
-    PARSE("target", parse_doubleX(val, args->rectangle.tgt, 3));
-  } else if(!strcmp(key, "up")) {
-    PARSE("up vector", parse_doubleX(val, args->rectangle.up, 3));
-  } else if(!strcmp(key, "sz")) {
-    PARSE("size", parse_doubleX(val, args->rectangle.sz, 2));
-  } else {
-    fprintf(stderr, "Invalid rectangle parameter `%s'.\n", key);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  #undef PARSE
-
-exit:
-  return res;
-error:
-  goto exit;
+  *out_fov = fov;
+  return RES_OK;
 }
 
 static res_T
@@ -150,7 +116,7 @@ parse_image_parameter(struct htrdr_args* args, const char* str)
   char* key;
   char* val;
   char* ctx;
-  res_T res;
+  res_T res = RES_OK;
   ASSERT(str && args);
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
@@ -198,6 +164,58 @@ parse_image_parameter(struct htrdr_args* args, const char* str)
     goto error;
   }
 
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_camera_parameter(struct htrdr_args* args, const char* str)
+{
+  char buf[128];
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the rectangle option string `%s'.\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &ctx);
+  val = strtok_r(NULL, "", &ctx);
+
+  if(!val) {
+    fprintf(stderr, "Missing value to the camera option `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  #define PARSE(Name, Func) {                                                  \
+    if(RES_OK != (res = Func)) {                                               \
+      fprintf(stderr, "Invalid camera "Name" `%s'.\n", val);                   \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+  if(!strcmp(key, "pos")) {
+    PARSE("position", parse_doubleX(val, args->camera.pos, 3));
+  } else if(!strcmp(key, "tgt")) {
+    PARSE("target", parse_doubleX(val, args->camera.tgt, 3));
+  } else if(!strcmp(key, "up")) {
+    PARSE("up vector", parse_doubleX(val, args->camera.up, 3));
+  } else if(!strcmp(key, "fov")) {
+    PARSE("field-of-view", parse_fov(val, &args->camera.fov_x));
+  } else {
+    fprintf(stderr, "Invalid camera parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  #undef PARSE
 exit:
   return res;
 error:
@@ -274,8 +292,12 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "c:D:dfhI:m:o:r:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "C:c:D:dfhi:m:o:t:v")) != -1) {
     switch(opt) {
+      case 'C':
+        res = parse_multiple_parameters
+          (args, optarg, parse_camera_parameter);
+        break;
       case 'c': args->filename_les = optarg; break;
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
@@ -286,16 +308,12 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         htrdr_args_release(args);
         args->quit = 1;
         goto exit;
-      case 'I':
+      case 'i':
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
         break;
       case 'm': args->filename_mie = optarg; break;
       case 'o': args->output = optarg; break;
-      case 'r':
-        res = parse_multiple_parameters
-          (args, optarg, parse_rectangle_parameter);
-        break;
       case 't': /* Submit an hint on the number of threads to use */
         res = cstr_to_uint(optarg, &args->nthreads);
         if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
@@ -312,13 +330,13 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
   if(!args->filename_les) {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Missing the path of the cloud properties file -- option '-c'\n");
     res = RES_BAD_ARG;
     goto error;
   }
   if(!args->filename_mie) {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Missing the path toward the file of the Mie's data -- option '-m'\n");
     res = RES_BAD_ARG;
     goto error;

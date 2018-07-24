@@ -32,6 +32,13 @@ struct htrdr_args {
   } rectangle;
 
   struct {
+    double pos[3];
+    double tgt[3];
+    double up[3];
+    double fov_x; /* In degrees */
+  } camera;
+
+  struct {
     unsigned definition[2]; /* #pixels in X and Y */
     unsigned spp; /* #samples per pixel */
   } image;
@@ -55,6 +62,11 @@ struct htrdr_args {
     {0, 0, 1}, /* plane target */                                              \
     {0, 1, 0}, /* plane up */                                                  \
     {1, 1},    /* plane size */                                                \
+  }, {                                                                         \
+    {0, 0, 0}, /* Camera position */                                           \
+    {0, 0, 1}, /* Camera target */                                             \
+    {0, 1, 0}, /* Camera up */                                                 \
+    70, /* Horizontal field of view */                                         \
   }, {                                                                         \
     {32, 32},  /* image definition */                                          \
     1          /* #samples per pixel */                                        \

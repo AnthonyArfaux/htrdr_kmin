@@ -28,7 +28,7 @@ htrdr_camera_create
    const double position[3],
    const double target[3],
    const double up[3],
-   const double proj_ratio,
+   const double proj_ratio, /* Width / Height */
    const double fov, /* In radian */
    struct htrdr_camera** cam);
 
