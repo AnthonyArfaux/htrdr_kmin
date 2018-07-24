@@ -116,7 +116,7 @@ htrdr_draw_radiance_sw
    const size_t spp,
    struct htrdr_buffer* buf)
 {
-  struct ssp_rng* rng;
+  struct ssp_rng* rng = NULL;
   size_t ntiles_x, ntiles_y, ntiles;
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
@@ -128,7 +128,7 @@ htrdr_draw_radiance_sw
   ASSERT(layout.width || layout.height || layout.elmt_size);
 
   if(layout.elmt_size != sizeof(struct htrdr_accum)
-  || layout.alignment != ALIGNOF(struct htrdr_accum)) {
+  || layout.alignment < ALIGNOF(struct htrdr_accum)) {
     htrdr_log_err(htrdr,
       "%s: invalid buffer layout. "
       "The pixel size must be the size of an accumulator.\n",
