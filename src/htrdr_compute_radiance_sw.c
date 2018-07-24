@@ -144,6 +144,7 @@ transmissivity_hit_filter
     HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
   k_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
     HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
+  ASSERT(k_min <= k_max);
 
   dst = hit->distance[1] - ctx->traversal_dst;
   ctx->Tmin += dst * k_min;
@@ -178,6 +179,7 @@ transmissivity_hit_filter
        * cross sections for a wavelength to improve the fetch efficiency */
       k = htrdr_sky_fetch_raw_property
         (ctx->sky, ctx->prop, HTRDR_ALL_COMPONENTS, ctx->wavelength, x);
+      ASSERT(k >= k_min && k <= k_max);
 
       /* Handle the case that k_max is not *really* the max */
       proba = (k - k_min) / (k_max - k_min);

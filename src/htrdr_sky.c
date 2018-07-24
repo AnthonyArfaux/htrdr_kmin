@@ -13,6 +13,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 200112L /* nextafterf support */
+
 #include "htrdr.h"
 #include "htrdr_c.h"
 #include "htrdr_sky.h"
@@ -26,6 +28,8 @@
 #include <rsys/dynamic_array_size_t.h>
 #include <rsys/hash_table.h>
 #include <rsys/ref_count.h>
+
+#include <math.h>
 
 #define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
 #define GAS_CONSTANT 8.3144598 /* In kg.m^2.s^-2.mol^-1.K */
@@ -242,6 +246,15 @@ vox_get(const size_t xyz[3], void* dst, void* context)
     }
   }
 
+  /* Ensure that the single precision bounds include their double precision
+   * version. */
+  if(ka_min != (float)ka_min) ka_min = nextafterf((float)ka_min,-FLT_MAX);
+  if(ka_max != (float)ka_max) ka_max = nextafterf((float)ka_max, FLT_MAX);
+  if(ks_min != (float)ks_min) ks_min = nextafterf((float)ks_min,-FLT_MAX);
+  if(ks_max != (float)ks_max) ks_max = nextafterf((float)ks_max, FLT_MAX);
+  if(kext_min != (float)kext_min) kext_min = nextafterf((float)kext_min,-FLT_MAX);
+  if(kext_max != (float)kext_max) kext_max = nextafterf((float)kext_max, FLT_MAX);
+
   pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
   pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
   pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
@@ -274,19 +287,19 @@ vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
     ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
 
     ka_min = MMIN(ka_min, ka[HTRDR_SVX_MIN]);
-    ka_max = MMAX(ka_max, ka[HTRDR_SVX_MIN]);
+    ka_max = MMAX(ka_max, ka[HTRDR_SVX_MAX]);
     ks_min = MMIN(ks_min, ks[HTRDR_SVX_MIN]);
-    ks_max = MMAX(ks_max, ks[HTRDR_SVX_MIN]);
+    ks_max = MMAX(ks_max, ks[HTRDR_SVX_MAX]);
     kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
     kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
   }
 
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ka_min;
+  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ka_max;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ks_min;
+  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ks_max;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = kext_min;
+  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = kext_max;
 }
 
 static int
@@ -386,7 +399,7 @@ setup_clouds(struct htrdr_sky* sky)
   /* Setup the build context */
   ctx.sky = sky;
   ctx.dst_max = sz[2];
-  ctx.tau_threshold = 0.0;
+  ctx.tau_threshold = 0.7;
 
   /* Setup the voxel descriptor */
   vox_desc.get = vox_get;
