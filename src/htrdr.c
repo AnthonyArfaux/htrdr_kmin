@@ -146,7 +146,7 @@ dump_buffer(struct htrdr_buffer* buf, FILE* output)
 {
   struct htrdr_buffer_layout buf_layout;
   size_t x, y;
-  ASSERT(htrdr);
+  ASSERT(buf && output);
 
   htrdr_buffer_get_layout(buf, &buf_layout);
   ASSERT(buf_layout.elmt_size == sizeof(struct htrdr_accum));
