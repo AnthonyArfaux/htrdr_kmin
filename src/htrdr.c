@@ -205,6 +205,8 @@ setup_geometry(struct htrdr* htrdr, const char* filename)
   }
 
 exit:
+  if(scn) S3D(scene_ref_put(scn));
+  if(s3daw) S3DAW(ref_put(s3daw));
   return res;
 error:
   goto exit;
