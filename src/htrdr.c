@@ -142,23 +142,24 @@ error:
 }
 
 static void
-dump_buffer(struct htrdr* htrdr)
+dump_buffer(struct htrdr_buffer* buf, FILE* output)
 {
   struct htrdr_buffer_layout buf_layout;
   size_t x, y;
   ASSERT(htrdr);
 
-  htrdr_buffer_get_layout(htrdr->buf, &buf_layout);
+  htrdr_buffer_get_layout(buf, &buf_layout);
+  ASSERT(buf_layout.elmt_size == sizeof(struct htrdr_accum));
 
-  fprintf(htrdr->output, "P3 %lu %lu\n255\n",
+  fprintf(output, "P3 %lu %lu\n65535\n",
     (unsigned long)buf_layout.width,
     (unsigned long)buf_layout.height);
   FOR_EACH(y, 0, buf_layout.height) {
     FOR_EACH(x, 0, buf_layout.width) {
-      double val = *((double*)htrdr_buffer_at(htrdr->buf, x, y));
-      int i;
-      i = (int)(val * 255);
-      fprintf(htrdr->output, "%d %d %d\n", i, i, i);
+      const struct htrdr_accum* acc = htrdr_buffer_at(buf, x, y);
+      const double E = acc->nweights ? acc->sum_weights/(double)acc->nweights:0;
+      const uint16_t val_ui16 = (uint16_t)(E * 65535.0 + 0.5/*round*/);
+      fprintf(output, "%u %u %u\n", val_ui16, val_ui16, val_ui16);
     }
   }
 }
@@ -349,7 +350,7 @@ htrdr_run(struct htrdr* htrdr)
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
     htrdr_log(htrdr, "Elapsed time: %s\n", buf);
 
-    /*dump_buffer(htrdr);*/
+    dump_buffer(htrdr->buf, htrdr->output);
   }
 exit:
   return res;
