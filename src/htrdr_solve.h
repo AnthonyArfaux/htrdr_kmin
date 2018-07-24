@@ -18,8 +18,19 @@
 
 #include <rsys/rsys.h>
 
+/* Monte carlo accumulator */
+struct htrdr_accum {
+  double sum_weights; /* Sum of Monte-Carlo weights */
+  double sum_weights_sqr; /* Sum of Monte-Carlo square weights */
+  size_t nweights; /* #accumlated weights */
+  size_t nfailures; /* #failures */
+};
+#define HTRDR_ACCUM_NULL__ {0,0,0,0}
+static const struct htrdr_accum HTRDR_ACCUM_NULL = HTRDR_ACCUM_NULL__;
+
 /* Forward declarations */
 struct htrdr;
+struct htrdr_camera;
 struct ssp_rng;
 
 extern LOCAL_SYM res_T
@@ -34,5 +45,11 @@ htrdr_compute_radiance_sw
    const double dir[3],
    const double wavelength);
 
-#endif /* HTRDR_SOLVE_H */
+extern LOCAL_SYM res_T
+htrdr_draw_radiance_sw
+  (struct htrdr* htrdr,
+   const struct htrdr_camera* cam,
+   const size_t spp, /* #samples per pixel, i.e. #realisations */
+   struct htrdr_buffer* buf); /* Buffer of struct htrdr_accum */
 
+#endif /* HTRDR_SOLVE_H */

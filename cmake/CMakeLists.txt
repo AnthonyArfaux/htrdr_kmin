@@ -62,6 +62,7 @@ set(HTRDR_FILES_SRC
   htrdr_buffer.c
   htrdr_camera.c
   htrdr_compute_radiance_sw.c
+  htrdr_draw_radiance_sw.c
   htrdr_main.c
   htrdr_rectangle.c
   htrdr_sky.c
