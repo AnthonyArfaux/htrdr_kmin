@@ -280,6 +280,7 @@ htrdr_compute_radiance_sw
   double sun_dir[3];
   double ksi = 1; /* Throughput */
   double w = 0; /* MC weight */
+  double g = 0; /* Asymmetry parameter of the HG phase function */
 
   float ray_pos[3];
   float ray_dir[3];
@@ -287,6 +288,11 @@ htrdr_compute_radiance_sw
 
   ASSERT(wavelength >= SW_WAVELENGTH_MIN && wavelength <= SW_WAVELENGTH_MAX);
   ASSERT(htrdr && rng && pos_in && dir_in);
+
+  /* Setup the phase function for this wavelength */
+  g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
+    (htrdr->sky, wavelength);
+  SSF(phase_hg_setup(htrdr->phase_hg, g));
 
   /* Fetch sun properties */
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
