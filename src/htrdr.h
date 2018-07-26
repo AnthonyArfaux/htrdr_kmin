@@ -50,6 +50,7 @@ struct htrdr {
   size_t spp; /* #samples per pixel */
 
   FILE* output;
+  const char* output_name;
 
   unsigned nthreads;
   int dump_vtk;

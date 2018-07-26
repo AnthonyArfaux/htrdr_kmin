@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 2.8)
-project(htrdr C)
+project(htrdr C CXX)
 enable_testing()
 
 set(HTRDR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
@@ -23,6 +23,9 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 # Check dependencies
 ################################################################################
+get_filename_component(_current_source_dir ${CMAKE_CURRENT_LIST_FILE} PATH)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${_current_source_dir})
+
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.6 REQUIRED)
 find_package(Star3D 0.5 REQUIRED)
@@ -33,10 +36,16 @@ find_package(StarVX REQUIRED)
 find_package(HTCP REQUIRED)
 find_package(HTMIE REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
+find_package(OpenEXR REQUIRED)
+
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+  string(REPLACE "-fno-rtti" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+endif()
 
 include_directories(
   ${RSys_INCLUDE_DIR}
@@ -46,7 +55,17 @@ include_directories(
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
   ${HTCP_INCLUDE_DIR}
-  ${HTMIE_INCLUDE_DIR})
+  ${HTMIE_INCLUDE_DIR}
+  ${OPENEXR_INCLUDE_DIR})
+
+################################################################################
+# Build the EXR static library
+################################################################################
+set_source_files_properties(${HTRDR_SOURCE_DIR}/htrdr_openexr.c
+  PROPERTIES LANGUAGE CXX)
+
+add_library(htrdr_openexr STATIC ${HTRDR_SOURCE_DIR}/htrdr_openexr.c)
+target_link_libraries(htrdr_openexr ${OPENEXR_LIBRARIES})
 
 ################################################################################
 # Configure and define targets
@@ -79,13 +98,15 @@ set(HTRDR_FILES_INC
   htrdr_solve.h)
 set(HTDRD_FILES_DOC COPYING README.md)
 
+
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_FILES_SRC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_INC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC})
-target_link_libraries(htrdr HTCP HTMIE RSys Star3D Star3DAW StarSF StarSP StarVX)
+target_link_libraries(htrdr HTCP HTMIE RSys Star3D Star3DAW StarSF StarSP
+  StarVX htrdr_openexr)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)

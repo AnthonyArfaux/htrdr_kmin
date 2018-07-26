@@ -19,6 +19,7 @@
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
+#include "htrdr_openexr.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
@@ -141,36 +142,64 @@ error:
   goto exit;
 }
 
-static void
-dump_buffer(struct htrdr_buffer* buf, FILE* output)
+static res_T
+dump_buffer
+  (struct htrdr* htrdr,
+   struct htrdr_buffer* buf,
+   const char* stream_name,
+   FILE* stream)
 {
-  struct htrdr_buffer_layout buf_layout;
-  double max_val = -DBL_MAX;
+  struct htrdr_buffer_layout layout;
+  const char* mem;
+  float* pixels = NULL;
+  size_t ipix_slice;
   size_t x, y;
-  ASSERT(buf && output);
+  res_T res = RES_OK;
+  ASSERT(htrdr && buf && stream_name && stream);
 
-  htrdr_buffer_get_layout(buf, &buf_layout);
-  ASSERT(buf_layout.elmt_size == sizeof(struct htrdr_accum));
+  htrdr_buffer_get_layout(buf, &layout);
+  if(layout.elmt_size != sizeof(struct htrdr_accum)
+  || layout.alignment < ALIGNOF(struct htrdr_accum)) {
+    htrdr_log_err(htrdr,
+      "%s: invalid buffer layout. "
+      "The pixel size must be the size of an accumulator.\n",
+      FUNC_NAME);
+    res = RES_BAD_ARG;
+    goto error;
+  }
 
-  fprintf(output, "P3 %lu %lu\n65535\n",
-    (unsigned long)buf_layout.width,
-    (unsigned long)buf_layout.height);
-  FOR_EACH(y, 0, buf_layout.height) {
-    FOR_EACH(x, 0, buf_layout.width) {
-      const struct htrdr_accum* acc = htrdr_buffer_at(buf, x, y);
-      const double E = acc->nweights ? acc->sum_weights/(double)acc->nweights:0;
-      max_val = MMAX(E, max_val);
-    }
+  /* Allocate the slice memory */
+  pixels = MEM_CALLOC
+    (htrdr->allocator, layout.width*layout.height, sizeof(*pixels));
+  if(!pixels) {
+    htrdr_log_err(htrdr,
+      "%s: could not allocate the memory of the OpenEXR slice.\n", FUNC_NAME);
+    res = RES_MEM_ERR;
+    goto error;
   }
-  FOR_EACH(y, 0, buf_layout.height) {
-    FOR_EACH(x, 0, buf_layout.width) {
-      const struct htrdr_accum* acc = htrdr_buffer_at(buf, x, y);
-      const double E = acc->nweights ? acc->sum_weights/(double)acc->nweights:0;
-      const double En = E / (double)max_val;
-      const uint16_t val_ui16 = (uint16_t)(En * 65535.0 + 0.5/*round*/);
-      fprintf(output, "%u %u %u\n", val_ui16, val_ui16, val_ui16);
+
+  /* Define the slice data from the buf */
+  mem = (const char*)htrdr_buffer_get_data(buf);
+  ipix_slice = 0;
+  FOR_EACH(y, 0, layout.height) {
+    const struct htrdr_accum* row =
+      (const struct htrdr_accum*)(mem + y*layout.pitch);
+    FOR_EACH(x, 0, layout.width) {
+      const struct htrdr_accum* accum = row + x;
+      const double E = accum->nweights
+        ? accum->sum_weights / (double)accum->nweights
+        : 0;
+      pixels[ipix_slice] = (float)E;
+      fprintf(stream, "%g ", E);
     }
+    fprintf(stream, "\n");
   }
+
+exit:
+  if(pixels) MEM_RM(htrdr->allocator, pixels);
+  return res;
+error:
+  goto exit;
 }
 
 static res_T
@@ -250,9 +279,11 @@ htrdr_init
 
   if(!args->output) {
     htrdr->output = stdout;
+    htrdr->output_name = "<stdout>";
   } else {
     res = open_output_stream(htrdr, args);
     if(res != RES_OK) goto error;
+    htrdr->output_name = "todo";
   }
 
   res = svx_device_create
@@ -361,7 +392,7 @@ htrdr_run(struct htrdr* htrdr)
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
     htrdr_log(htrdr, "Elapsed time: %s\n", buf);
 
-    dump_buffer(htrdr->buf, htrdr->output);
+    dump_buffer(htrdr, htrdr->buf, htrdr->output_name, htrdr->output);
   }
 exit:
   return res;
