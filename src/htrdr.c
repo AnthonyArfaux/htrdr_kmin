@@ -19,7 +19,6 @@
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
-#include "htrdr_openexr.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
@@ -143,19 +142,17 @@ error:
 }
 
 static res_T
-dump_buffer
+dump_accum_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
    const char* stream_name,
    FILE* stream)
 {
   struct htrdr_buffer_layout layout;
-  const char* mem;
-  float* pixels = NULL;
-  size_t ipix_slice;
   size_t x, y;
   res_T res = RES_OK;
   ASSERT(htrdr && buf && stream_name && stream);
+  (void)stream_name;
 
   htrdr_buffer_get_layout(buf, &layout);
   if(layout.elmt_size != sizeof(struct htrdr_accum)
@@ -168,35 +165,17 @@ dump_buffer
     goto error;
   }
 
-  /* Allocate the slice memory */
-  pixels = MEM_CALLOC
-    (htrdr->allocator, layout.width*layout.height, sizeof(*pixels));
-  if(!pixels) {
-    htrdr_log_err(htrdr,
-      "%s: could not allocate the memory of the OpenEXR slice.\n", FUNC_NAME);
-    res = RES_MEM_ERR;
-    goto error;
-  }
-
-  /* Define the slice data from the buf */
-  mem = (const char*)htrdr_buffer_get_data(buf);
-  ipix_slice = 0;
   FOR_EACH(y, 0, layout.height) {
-    const struct htrdr_accum* row =
-      (const struct htrdr_accum*)(mem + y*layout.pitch);
     FOR_EACH(x, 0, layout.width) {
-      const struct htrdr_accum* accum = row + x;
+      const struct htrdr_accum* accum = htrdr_buffer_at(buf, x, y);
       const double E = accum->nweights
-        ? accum->sum_weights / (double)accum->nweights
-        : 0;
-      pixels[ipix_slice] = (float)E;
+        ? accum->sum_weights / (double)accum->nweights : 0;
       fprintf(stream, "%g ", E);
     }
     fprintf(stream, "\n");
   }
 
 exit:
-  if(pixels) MEM_RM(htrdr->allocator, pixels);
   return res;
 error:
   goto exit;
@@ -260,6 +239,7 @@ htrdr_init
    struct htrdr* htrdr)
 {
   double proj_ratio;
+  const char* output_name = NULL;
   res_T res = RES_OK;
   ASSERT(args && htrdr);
 
@@ -272,6 +252,8 @@ htrdr_init
   logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
   logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
 
+  str_init(htrdr->allocator, &htrdr->output_name);
+
   htrdr->dump_vtk = args->dump_vtk;
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
@@ -279,11 +261,17 @@ htrdr_init
 
   if(!args->output) {
     htrdr->output = stdout;
-    htrdr->output_name = "<stdout>";
+    output_name = "<stdout>";
   } else {
     res = open_output_stream(htrdr, args);
     if(res != RES_OK) goto error;
-    htrdr->output_name = "todo";
+    output_name = args->output;
+  }
+  res = str_set(&htrdr->output_name, output_name);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "could not store the name of the output stream `%s'.\n", output_name);
+    goto error;
   }
 
   res = svx_device_create
@@ -293,8 +281,11 @@ htrdr_init
     goto error;
   }
 
+  /* Disable the Star-3D verbosity since the Embree backend print some messages
+   * on stdout rather than stderr. This is annoying since stdout may be used by
+   * htrdr to write output data */
   res = s3d_device_create
-    (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->s3d);
+    (&htrdr->logger, htrdr->allocator, 0, &htrdr->s3d);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "could not create the Star-3D device.\n");
     goto error;
@@ -312,7 +303,7 @@ htrdr_init
     args->image.definition[1], /* Height */
     args->image.definition[0]*sizeof(struct htrdr_accum), /* Pitch */
     sizeof(struct htrdr_accum), /* Element size */
-    16, /* Alignement */
+    16, /* Alignment */
     &htrdr->buf);
   if(res != RES_OK) goto error;
 
@@ -371,6 +362,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
+  str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
 }
 
@@ -392,7 +384,9 @@ htrdr_run(struct htrdr* htrdr)
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
     htrdr_log(htrdr, "Elapsed time: %s\n", buf);
 
-    dump_buffer(htrdr, htrdr->buf, htrdr->output_name, htrdr->output);
+    res = dump_accum_buffer
+      (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);
+    if(res != RES_OK) goto error;
   }
 exit:
   return res;

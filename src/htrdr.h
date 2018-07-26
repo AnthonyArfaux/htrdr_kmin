@@ -18,6 +18,7 @@
 
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
+#include <rsys/str.h>
 
 /* Forward declarations */
 struct htrdr_args;
@@ -50,7 +51,7 @@ struct htrdr {
   size_t spp; /* #samples per pixel */
 
   FILE* output;
-  const char* output_name;
+  struct str output_name;
 
   unsigned nthreads;
   int dump_vtk;
