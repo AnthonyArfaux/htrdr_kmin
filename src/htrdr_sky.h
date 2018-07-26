@@ -63,6 +63,11 @@ htrdr_sky_ref_put
   (struct htrdr_sky* sky);
 
 extern LOCAL_SYM double
+htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
+  (const struct htrdr_sky* sky,
+   const double wavelength);
+
+extern LOCAL_SYM double
 htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,

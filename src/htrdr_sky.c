@@ -96,6 +96,9 @@ struct htrdr_sky {
   double Ca_avg_sw;
   double Cs_avg_sw;
 
+  /* Average asymmetry parameter in Short Wave, in [380, 780] nanometers */
+  double g_avg_sw;
+
   ref_T ref;
   struct htrdr* htrdr;
 };
@@ -501,6 +504,9 @@ htrdr_sky_create
     (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
   sky->Cs_avg_sw = htmie_compute_xsection_scattering_average
     (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
+  sky->g_avg_sw = htmie_compute_asymmetry_parameter_average
+    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
+  ASSERT(sky->Ca_avg_sw > 0 && sky->Cs_avg_sw > 0 && sky->g_avg_sw > 0);
 
   res = setup_clouds(sky);
   if(res != RES_OK) goto error;
@@ -528,6 +534,15 @@ htrdr_sky_ref_put(struct htrdr_sky* sky)
 {
   ASSERT(sky);
   ref_put(&sky->ref, release_sky);
+}
+
+double
+htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
+  (const struct htrdr_sky* sky, const double wavelength)
+{
+  ASSERT(sky && wavelength > 0);
+  (void)wavelength;
+  return sky->g_avg_sw;
 }
 
 double
