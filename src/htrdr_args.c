@@ -292,7 +292,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:c:D:dfhi:m:o:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "C:c:D:dfg:hi:m:o:t:v")) != -1) {
     switch(opt) {
       case 'C':
         res = parse_multiple_parameters

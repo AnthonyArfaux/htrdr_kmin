@@ -321,7 +321,8 @@ htrdr_init
     htrdr_log_err(htrdr, "could not create the BSDF of the ground.\n");
     goto error;
   }
-  SSF(lambertian_reflection_setup(htrdr->bsdf, 1));
+  SSF(lambertian_reflection_setup(htrdr->bsdf, 0.02));
+/*  SSF(lambertian_reflection_setup(htrdr->bsdf, 1));*/
 
   res = ssf_phase_create(htrdr->allocator, &ssf_phase_hg, &htrdr->phase_hg);
   if(res != RES_OK) {
