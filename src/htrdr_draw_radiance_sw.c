@@ -126,6 +126,8 @@ htrdr_draw_radiance_sw
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
+  ATOMIC nsolved_tiles = 0;
+  ATOMIC progress = 0;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
 
@@ -173,12 +175,21 @@ htrdr_draw_radiance_sw
   pix_sz[1] = 1.0 / (double)layout.height;
 
   #pragma omp parallel for schedule(static, 1/*chunck size*/)
-  for(mcode=0; mcode<(int32_t)ntiles; ++mcode) {
+  for(mcode=0; mcode<(int64_t)ntiles; ++mcode) {
     const int ithread = omp_get_thread_num();
     struct ssp_rng* rng = rngs[ithread];
     size_t tile_org[2];
     size_t tile_sz[2];
+    size_t pcent;
+    size_t n;
     res_T res_local = RES_OK;
+
+    n = (size_t)ATOMIC_INCR(&nsolved_tiles);
+    pcent = n * 100 / ntiles;
+    if((size_t)ATOMIC_CAS(&progress, pcent, pcent-1) == pcent-1) {
+      fprintf(stderr, "%c[2K\rProgress: %3lu%%", 27, (unsigned long)pcent);
+      fflush(stderr);
+    }
 
     if(ATOMIC_GET(&res) != RES_OK) continue;
 
@@ -203,6 +214,7 @@ htrdr_draw_radiance_sw
       continue;
     }
   }
+  fprintf(stderr, "\n");
 
 exit:
   if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
