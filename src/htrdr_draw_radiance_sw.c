@@ -129,7 +129,7 @@ htrdr_draw_radiance_sw
 {
   struct ssp_rng_proxy* rng_proxy = NULL;
   struct ssp_rng** rngs = NULL;
-  size_t ntiles_x, ntiles_y, ntiles;
+  size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
   size_t i;
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
@@ -176,14 +176,17 @@ htrdr_draw_radiance_sw
 
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
-  ntiles = round_up_pow2(MMAX(ntiles_x, ntiles_y));
-  ntiles *= ntiles;
+  ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
+  ntiles_adjusted *= ntiles_adjusted;
+  ntiles = ntiles_x * ntiles_y;
 
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
+  fprintf(stderr, "Progress: %3i%%", 0);
+
   #pragma omp parallel for schedule(static, 1/*chunck size*/)
-  for(mcode=0; mcode<(int64_t)ntiles; ++mcode) {
+  for(mcode=0; mcode<(int64_t)ntiles_adjusted; ++mcode) {
     const int ithread = omp_get_thread_num();
     struct ssp_rng* rng = rngs[ithread];
     size_t tile_org[2];
@@ -191,15 +194,6 @@ htrdr_draw_radiance_sw
     size_t pcent;
     size_t n;
     res_T res_local = RES_OK;
-
-    n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-    pcent = n * 100 / ntiles;
-    if((size_t)ATOMIC_CAS(&progress, pcent, pcent-1) == pcent-1) {
-      fprintf(stderr, "%c[2K\rProgress: %3lu%%", 27, (unsigned long)pcent);
-      fflush(stderr);
-    }
-
-    if(ATOMIC_GET(&res) != RES_OK) continue;
 
     /* Decode the morton code to retrieve the tile index  */
     tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
@@ -221,6 +215,17 @@ htrdr_draw_radiance_sw
       ATOMIC_SET(&res, res_local);
       continue;
     }
+
+    n = (size_t)ATOMIC_INCR(&nsolved_tiles);
+    pcent = n * 100 / ntiles;
+    if((size_t)ATOMIC_CAS(&progress, pcent, pcent-1) == pcent-1) {
+      fprintf(stderr, "%c[2K\rProgress: %3lu%%", 27, (unsigned long)pcent);
+      fflush(stderr);
+    }
+
+    if(ATOMIC_GET(&res) != RES_OK) continue;
+
+
   }
   fprintf(stderr, "\n");
 
