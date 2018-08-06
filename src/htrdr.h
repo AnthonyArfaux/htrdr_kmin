@@ -36,15 +36,10 @@ struct htrdr {
   struct svx_device* svx;
   struct s3d_device* s3d;
 
-  struct s3d_scene_view* s3d_scn_view; 
+  struct s3d_scene_view* s3d_scn_view;
 
   struct htrdr_sky* sky;
   struct htrdr_sun* sun;
-
-  /* Scattering functions */
-  struct ssf_bsdf* bsdf; /* BSDF of the 3D geometry */
-  struct ssf_phase* phase_hg; /* Henyey & Greenstein phase function */
-  struct ssf_phase* phase_rayleigh; /* Rayleigh phase function */
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
@@ -59,6 +54,7 @@ struct htrdr {
 
   struct logger logger;
   struct mem_allocator* allocator;
+  struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */
 };
 
 extern LOCAL_SYM res_T

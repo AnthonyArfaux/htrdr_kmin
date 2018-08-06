@@ -17,6 +17,7 @@
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
+#include "htrdr_sky.h"
 #include "htrdr_solve.h"
 
 #include <star/ssp.h>
@@ -44,7 +45,8 @@ morton2D_decode(const uint32_t u32)
 static res_T
 draw_tile
   (struct htrdr* htrdr,
-   int64_t tile_mcode, /* For debug only */
+   const size_t ithread,
+   const int64_t tile_mcode, /* For debug only */
    const size_t tile_org[2], /* Origin of the tile in pixel space */
    const size_t tile_sz[2], /* Definition of the tile */
    const double pix_sz[2], /* Size of a pixel in the normalized image plane */
@@ -85,6 +87,8 @@ draw_tile
       double ray_org[3];
       double ray_dir[3];
       double weight;
+      size_t iband;
+      size_t iquad;
 
       /* Sample a position into the pixel, in the normalized image plane */
       pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
@@ -94,9 +98,13 @@ draw_tile
        * pixel sample */
       htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
 
+      /* Sample a spectral band and a quadrature point */
+      htrdr_sky_sample_sw_spectral_data_CIE_1931_X
+        (htrdr->sky, rng, &iband, &iquad);
+
       /* Compute the radiance that reach the pixel through the ray */
       weight = htrdr_compute_radiance_sw
-        (htrdr, rng, ray_org, ray_dir, SW_WAVELENGTH_MIN/*FIXME wavelength*/);
+        (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
       ASSERT(weight >= 0);
 
       /* Update the pixel accumulator */
@@ -207,8 +215,8 @@ htrdr_draw_radiance_sw
     tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
     tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
 
-    res_local = draw_tile
-      (htrdr, mcode, tile_org, tile_sz, pix_sz, cam, spp, rng, buf);
+    res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
+      pix_sz, cam, spp, rng, buf);
     if(res_local != RES_OK) {
       ATOMIC_SET(&res, res_local);
       continue;

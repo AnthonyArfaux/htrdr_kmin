@@ -31,19 +31,21 @@
 struct scattering_context {
   struct ssp_rng* rng;
   const struct htrdr_sky* sky;
-  double wavelength;
+  size_t iband; /* Index of the spectrald */
+  size_t iquad; /* Index of the quadrature point into the band */
 
   double Ts; /* Sampled optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
 };
 static const struct scattering_context SCATTERING_CONTEXT_NULL = {
-  NULL, NULL, 0, 0, 0
+  NULL, NULL, 0, 0, 0, 0
 };
 
 struct transmissivity_context {
   struct ssp_rng* rng;
   const struct htrdr_sky* sky;
-  double wavelength;
+  size_t iband; /* Index of the spectrald */
+  size_t iquad; /* Index of the quadrature point into the band */
 
   double Ts; /* Sampled optical thickness */
   double Tmin; /* Minimal optical thickness */
@@ -52,7 +54,7 @@ struct transmissivity_context {
   enum htrdr_sky_property prop;
 };
 static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
-  NULL, NULL, 0, 0, 0, 0, 0
+  NULL, NULL, 0, 0, 0, 0, 0, 0
 };
 
 /*******************************************************************************
@@ -74,7 +76,7 @@ scattering_hit_filter
   (void)range;
 
   ks_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Ks,
-    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
 
   /* Compute the distance to traverse into the voxel */
   vox_dst = hit->distance[1] - hit->distance[0];
@@ -108,10 +110,8 @@ scattering_hit_filter
       pos[1] = org[1] + ctx->traversal_dst * dir[1];
       pos[2] = org[2] + ctx->traversal_dst * dir[2];
 
-      /* TODO use a per wavelength getter that will precompute the interpolated
-       * cross sections for a wavelength to improve the fetch efficiency */
-      ks = htrdr_sky_fetch_raw_property
-        (ctx->sky, HTRDR_Ks, HTRDR_ALL_COMPONENTS, ctx->wavelength, pos);
+      ks = htrdr_sky_fetch_raw_property(ctx->sky, HTRDR_Ks,
+        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, pos);
 
       /* Handle the case that ks_max is not *really* the max */
       proba = ks / ks_max;
@@ -146,9 +146,9 @@ transmissivity_hit_filter
   (void)range;
 
   k_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
+    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
   k_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->wavelength, &hit->voxel);
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
   ASSERT(k_min <= k_max);
 
   /* Compute the distance to traverse into the voxel */
@@ -184,10 +184,8 @@ transmissivity_hit_filter
       x[1] = org[1] + ctx->traversal_dst * dir[1];
       x[2] = org[2] + ctx->traversal_dst * dir[2];
 
-      /* TODO use a per wavelength getter that will precompute the interpolated
-       * cross sections for a wavelength to improve the fetch efficiency */
-      k = htrdr_sky_fetch_raw_property
-        (ctx->sky, ctx->prop, HTRDR_ALL_COMPONENTS, ctx->wavelength, x);
+      k = htrdr_sky_fetch_raw_property(ctx->sky, ctx->prop,
+        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, x);
       ASSERT(k >= k_min && k <= k_max);
 
       /* Handle the case that k_max is not *really* the max */
@@ -211,7 +209,8 @@ transmissivity
   (struct htrdr* htrdr,
    struct ssp_rng* rng,
    const enum htrdr_sky_property prop,
-   const double wavelength,
+   const size_t iband,
+   const size_t iquad,
    const double pos[3],
    const double dir[3],
    const double range[2],
@@ -240,12 +239,13 @@ transmissivity
 
   transmissivity_ctx.rng = rng;
   transmissivity_ctx.sky = htrdr->sky;
-  transmissivity_ctx.wavelength = wavelength;
+  transmissivity_ctx.iband = iband;
+  transmissivity_ctx.iquad = iquad;
   transmissivity_ctx.Ts = ssp_ran_exp(rng, 1); /* Sample an optical thickness */
   transmissivity_ctx.prop = prop;
 
   /* Compute the transmissivity */
-  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
+  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky, iband, iquad);
   SVX(octree_trace_ray(svx_tree, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, &svx_hit));
 
@@ -256,29 +256,35 @@ transmissivity
   }
 }
 
-
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
 double
 htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
+   const size_t ithread,
    struct ssp_rng* rng,
    const double pos_in[3],
    const double dir_in[3],
-   const double wavelength)
+   const size_t iband,
+   const size_t iquad)
 {
   struct s3d_hit s3d_hit = S3D_HIT_NULL;
   struct svx_hit svx_hit = SVX_HIT_NULL;
   struct s3d_hit s3d_hit_prev = S3D_HIT_NULL;
   struct svx_tree* svx_tree = NULL;
+  struct ssf_phase* phase_hg = NULL;
+  struct ssf_phase* phase_rayleigh = NULL;
+  struct ssf_bsdf* bsdf = NULL;
 
   double pos[3];
   double dir[3];
   double range[2];
   double pos_next[3];
   double dir_next[3];
+  double band_bounds[2]; /* In nanometers */
 
+  double wlen;
   double R;
   double r; /* Random number */
   double wo[3]; /* -dir */
@@ -296,19 +302,33 @@ htrdr_compute_radiance_sw
   float ray_dir[3];
   float ray_range[2];
 
-  ASSERT(wavelength >= SW_WAVELENGTH_MIN && wavelength <= SW_WAVELENGTH_MAX);
-  ASSERT(htrdr && rng && pos_in && dir_in);
+  ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
 
-  /* Setup the phase function for this wavelength */
+  CHK(RES_OK == ssf_bsdf_create
+    (&htrdr->lifo_allocators[ithread], &ssf_lambertian_reflection, &bsdf));
+  CHK(RES_OK == ssf_phase_create
+    (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
+  CHK(RES_OK == ssf_phase_create
+    (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
+
+  SSF(lambertian_reflection_setup(bsdf, 0.02));
+
+  /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, wavelength);
-  SSF(phase_hg_setup(htrdr->phase_hg, g));
+    (htrdr->sky, iband, iquad);
+  SSF(phase_hg_setup(phase_hg, g));
 
-  /* Fetch sun properties */
+  /* Fetch sun properties. Arbitrarily use the wavelength at the center of the
+   * band to retrieve the sun radiance of the current band. Note that the sun
+   * spectral data are defined by bands that, actually are the same of the SW
+   * spectral bands defined in the default "ecrad_opt_prot.txt" file provided
+   * by the HTGOP project. */
+  htrdr_sky_get_sw_spectral_band_bounds(htrdr->sky, iband, band_bounds);
+  wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
-  L_sun = htrdr_sun_get_radiance(htrdr->sun, wavelength);
+  L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
 
-  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky);
+  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky, iband, iquad);
 
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
@@ -325,7 +345,7 @@ htrdr_compute_radiance_sw
     if(S3D_HIT_NONE(&s3d_hit)) {
       d2(range, 0, FLT_MAX);
       Tr = transmissivity
-        (htrdr, rng, HTRDR_Kext, wavelength , pos, dir, range, NULL);
+        (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range, NULL);
       w = L_sun * Tr;
     }
   }
@@ -349,7 +369,8 @@ htrdr_compute_radiance_sw
     /* Setup the remaining scattering context fields */
     scattering_ctx.rng = rng;
     scattering_ctx.sky = htrdr->sky;
-    scattering_ctx.wavelength = wavelength;
+    scattering_ctx.iband = iband;
+    scattering_ctx.iquad = iquad;
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
@@ -377,14 +398,14 @@ htrdr_compute_radiance_sw
      * next position */
     d2(range, 0, scattering_ctx.traversal_dst);
     Tr_abs = transmissivity
-      (htrdr, rng, HTRDR_Ka, wavelength, pos, dir, range, &s3d_hit_prev);
+      (htrdr, rng, HTRDR_Ka, iband, iquad, pos, dir, range, &s3d_hit_prev);
     if(Tr_abs <= 0) break;
 
     /* Define the transmissivity from the new position to the sun */
     d2(range, 0, FLT_MAX);
     htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
-    Tr = transmissivity
-      (htrdr, rng, HTRDR_Kext, wavelength, pos_next, sun_dir, range, &s3d_hit);
+    Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
+      sun_dir, range, &s3d_hit);
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
@@ -395,10 +416,10 @@ htrdr_compute_radiance_sw
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
       reflectivity = ssf_bsdf_sample
-        (htrdr->bsdf, rng, wo, N, dir_next, &type, &pdf);
+        (bsdf, rng, wo, N, dir_next, &type, &pdf);
       if(ssp_rng_canonical(rng) > reflectivity) break; /* Russian roulette */
 
-      R = ssf_bsdf_eval(htrdr->bsdf, wo, N, sun_dir);
+      R = ssf_bsdf_eval(bsdf, wo, N, sun_dir);
 
     /* Scattering in the medium */
     } else {
@@ -408,16 +429,16 @@ htrdr_compute_radiance_sw
       double ks; /* Overall scattering coefficient */
 
       ks_gas = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, wavelength, pos_next);
+        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, iband, iquad, pos_next);
       ks_particle = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, wavelength, pos_next);
+        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, iband, iquad, pos_next);
       ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);
       if(r < ks_gas / ks) { /* Gas scattering */
-        phase = htrdr->phase_rayleigh;
+        phase = phase_rayleigh;
       } else { /* Cloud scattering */
-        phase = htrdr->phase_hg;
+        phase = phase_hg;
       }
 
       ssf_phase_sample(phase, rng, wo, dir_next, NULL);
@@ -434,6 +455,9 @@ htrdr_compute_radiance_sw
 
     s3d_hit_prev = s3d_hit;
   }
+  SSF(bsdf_ref_put(bsdf));
+  SSF(phase_ref_put(phase_hg));
+  SSF(phase_ref_put(phase_rayleigh));
   return w;
 }
 

@@ -10,6 +10,7 @@ This program is compatible GNU/Linux 64-bits. It relies on the
 [RCMake](https://gitlab.com/vaplv/rcmake/) packages to build.  It also depends
 on the
 [HTCP](https://gitlab.com/meso-star/htcp/),
+[HTGOP](https://gitlab.com/meso-star/htgop/),
 [HTMIE](https://gitlab.com/meso-star/htmie/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),

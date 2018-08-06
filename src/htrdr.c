@@ -240,6 +240,7 @@ htrdr_init
 {
   double proj_ratio;
   const char* output_name = NULL;
+  size_t ithread;
   res_T res = RES_OK;
   ASSERT(args && htrdr);
 
@@ -312,31 +313,27 @@ htrdr_init
   htrdr_sun_set_direction(htrdr->sun, args->main_dir);
 
   res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
-    args->filename_mie, &htrdr->sky);
+    args->filename_gas, args->filename_mie, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  res = ssf_bsdf_create
-    (htrdr->allocator, &ssf_lambertian_reflection, &htrdr->bsdf);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the BSDF of the ground.\n");
-    goto error;
-  }
-  SSF(lambertian_reflection_setup(htrdr->bsdf, 0.02));
-/*  SSF(lambertian_reflection_setup(htrdr->bsdf, 1));*/
-
-  res = ssf_phase_create(htrdr->allocator, &ssf_phase_hg, &htrdr->phase_hg);
-  if(res != RES_OK) {
+  htrdr->lifo_allocators = MEM_CALLOC
+    (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
+  if(!htrdr->lifo_allocators) {
     htrdr_log_err(htrdr,
-      "could not create the Henyey & Greenstein phase function.\n");
+      "could not allocate the list of per thread LIFO allocator.\n");
+    res = RES_MEM_ERR;
     goto error;
   }
-  SSF(phase_hg_setup(htrdr->phase_hg, 0));
 
-  res = ssf_phase_create
-    (htrdr->allocator, &ssf_phase_rayleigh, &htrdr->phase_rayleigh);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,"could not create the Rayleigh phase function.\n");
-    goto error;
+  FOR_EACH(ithread, 0, htrdr->nthreads) {
+    res = mem_init_lifo_allocator
+      (&htrdr->lifo_allocators[ithread], htrdr->allocator, 4096);
+    if(res != RES_OK) {
+      htrdr_log_err(htrdr,
+        "could not initialise the LIFO allocator of the thread %lu.\n",
+        (unsigned long)ithread);
+      goto error;
+    }
   }
 
   res = setup_geometry(htrdr, args->filename_obj);
@@ -353,9 +350,6 @@ void
 htrdr_release(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
-  if(htrdr->bsdf) SSF(bsdf_ref_put(htrdr->bsdf));
-  if(htrdr->phase_hg) SSF(phase_ref_put(htrdr->phase_hg));
-  if(htrdr->phase_rayleigh) SSF(phase_ref_put(htrdr->phase_rayleigh));
   if(htrdr->s3d_scn_view) S3D(scene_view_ref_put(htrdr->s3d_scn_view));
   if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
@@ -363,6 +357,13 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
+  if(htrdr->lifo_allocators) {
+    size_t i;
+    FOR_EACH(i, 0, htrdr->nthreads) {
+      mem_shutdown_lifo_allocator(&htrdr->lifo_allocators[i]);
+    }
+    MEM_RM(htrdr->allocator, htrdr->lifo_allocators);
+  }
   str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
 }
@@ -372,7 +373,8 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    res = htrdr_sky_dump_clouds_vtk(htrdr->sky, htrdr->output);
+    const size_t iband = htrdr_sky_get_sw_spectral_band_id(htrdr->sky, 0);
+    res = htrdr_sky_dump_clouds_vtk(htrdr->sky, iband, 0, htrdr->output);
     if(res != RES_OK) goto error;
   } else {
     struct time t0, t1;

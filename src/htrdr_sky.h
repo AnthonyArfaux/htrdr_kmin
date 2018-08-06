@@ -43,6 +43,7 @@ enum htrdr_svx_op {
 struct htrdr;
 struct htrdr_sky;
 struct htrdr_sun;
+struct ssp_rng;
 struct svx_tree;
 struct svx_voxel;
 
@@ -51,6 +52,7 @@ htrdr_sky_create
   (struct htrdr* htrdr,
    struct htrdr_sun* sun,
    const char* htcp_filename,
+   const char* htgop_filename,
    const char* htmie_filename,
    struct htrdr_sky** sky);
 
@@ -65,19 +67,23 @@ htrdr_sky_ref_put
 extern LOCAL_SYM double
 htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
   (const struct htrdr_sky* sky,
-   const double wavelength);
+   const size_t ispectral_band,
+   const size_t iquadrature_pt);
 
 extern LOCAL_SYM double
 htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const int comp_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt,
    const double pos[3]);
 
 extern LOCAL_SYM struct svx_tree*
 htrdr_sky_get_svx_tree
-  (struct htrdr_sky* sky);
+  (struct htrdr_sky* sky,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt);
 
 extern LOCAL_SYM double
 htrdr_sky_fetch_svx_property
@@ -85,7 +91,8 @@ htrdr_sky_fetch_svx_property
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
    const int comp_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt,
    const double pos[3]);
 
 extern LOCAL_SYM double
@@ -94,13 +101,52 @@ htrdr_sky_fetch_svx_voxel_property
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
    const int comp_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt,
    const struct svx_voxel* voxel);
 
 extern LOCAL_SYM res_T
 htrdr_sky_dump_clouds_vtk
   (const struct htrdr_sky* sky,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt,
    FILE* stream);
+
+extern LOCAL_SYM size_t
+htrdr_sky_get_sw_spectral_bands_count
+  (const struct htrdr_sky* sky);
+
+extern LOCAL_SYM size_t
+htrdr_sky_get_sw_spectral_band_id
+  (const struct htrdr_sky* sky,
+   const size_t i); /* in [0, htrdr_sky_get_sw_spectral_bands_count[ */
+
+extern LOCAL_SYM res_T
+htrdr_sky_get_sw_spectral_band_bounds
+  (const struct htrdr_sky* sky,
+   const size_t iband,
+   double wavelengths[2]);
+
+extern LOCAL_SYM void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_X
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt);
+
+extern LOCAL_SYM void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt);
+
+extern LOCAL_SYM void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt);
 
 #endif /* HTRDR_SKY_H */
 

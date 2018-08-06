@@ -32,6 +32,8 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s -i INPUT [OPIONS]\n\n", cmd);
   printf(
+"  -a FILENAME      path of gas optical properties file.\n");
+  printf(
 "  -c FILENAME      path of the HTCP cloud properties file.\n");
   printf(
 "  -C <camera>      define the rendering point of view.\n");
@@ -292,8 +294,9 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:c:D:dfg:hi:m:o:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:t:v")) != -1) {
     switch(opt) {
+      case 'a': args->filename_gas = optarg; break;
       case 'C':
         res = parse_multiple_parameters
           (args, optarg, parse_camera_parameter);
@@ -328,6 +331,12 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       }
       goto error;
     }
+  }
+  if(!args->filename_gas) {
+    fprintf(stderr,
+      "Missing the path of the gas optical properties file -- option '-a'\n");
+    res = RES_BAD_ARG;
+    goto error;
   }
   if(!args->filename_les) {
     fprintf(stderr,

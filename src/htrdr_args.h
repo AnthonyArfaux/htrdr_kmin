@@ -19,9 +19,10 @@
 #include <rsys/rsys.h>
 
 struct htrdr_args {
-  const char* filename_les; /* Path toward the HTCP file */
-  const char* filename_mie; /* Path toward the Mie properties */
-  const char* filename_obj; /* Path toward the 3D geometry */
+  const char* filename_gas; /* Path of the gas file */
+  const char* filename_les; /* Path of the HTCP file */
+  const char* filename_mie; /* Path of the Mie properties */
+  const char* filename_obj; /* Path of the 3D geometry */
   const char* output;
 
   struct {
@@ -53,6 +54,7 @@ struct htrdr_args {
 };
 
 #define HTRDR_ARGS_DEFAULT__ {                                                 \
+  NULL, /* Gas filename */                                                     \
   NULL, /* LES filename */                                                     \
   NULL, /* Mie filename */                                                     \
   NULL, /* Obj filename */                                                     \

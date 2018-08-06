@@ -250,7 +250,7 @@ htrdr_sun_get_spectral_band_bounds
 }
 
 void
-htrdr_sun_get_XYZ_spectral_bands_range
+htrdr_sun_get_CIE_XYZ_spectral_bands_range
   (const struct htrdr_sun* sun, size_t band_range[2])
 {
   /* Bounds of the X, Y and Z functions as defined by the CIE */

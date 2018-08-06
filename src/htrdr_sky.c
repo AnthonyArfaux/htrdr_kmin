@@ -20,8 +20,10 @@
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 
+#include <star/ssp.h>
 #include <star/svx.h>
 #include <high_tune/htcp.h>
+#include <high_tune/htgop.h>
 #include <high_tune/htmie.h>
 
 #include <rsys/dynamic_array_double.h>
@@ -47,6 +49,7 @@ struct build_octree_context {
   const struct htrdr_sky* sky;
   double dst_max; /* Max traversal distance */
   double tau_threshold; /* Threshold criteria for the merge process */
+  size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
 };
 
 struct vertex {
@@ -70,34 +73,53 @@ vertex_eq(const struct vertex* v0, const struct vertex* v1)
 #define HTABLE_KEY_FUNCTOR_EQ vertex_eq
 #include <rsys/hash_table.h>
 
+/* Temporary data structure used to dump the octree data into a VTK file */
 struct octree_data {
   struct htable_vertex vertex2id; /* Map a coordinate to its vertex id */
   struct darray_double vertices; /* Array of unique vertices */
   struct darray_double data;
   struct darray_size_t cells;
+  size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
+  size_t iquad; /* Index of the quadrature point into the band */
   const struct htrdr_sky* sky;
 };
 
+/* Properties of a short wave spectral band */
+struct sw_band_prop {
+  /* Average cross section in the band */
+  double Ca_avg; /* Absorption cross section */
+  double Cs_avg; /* Scattering cross section */
+
+  /* Average asymmetry parameter the band */
+  double g_avg;
+};
+
+/* Encompass the hierarchical data structure of the cloud data and its
+ * associated descriptor */
+struct cloud {
+  struct svx_tree* octree;
+  struct svx_tree_desc octree_desc;
+};
+
 struct htrdr_sky {
-  struct svx_tree* clouds;
-  struct svx_tree_desc cloud_desc;
+  struct cloud* clouds; /* Per sw_band cloud data structure */
 
-  struct htrdr_sun* sun;
+  struct htrdr_sun* sun; /* Sun attached to the sky */
 
-  struct htcp* htcp;
-  struct htmie* htmie;
+  /* Loaders of... */
+  struct htcp* htcp;   /* ... Cloud properties */
+  struct htgop* htgop; /* ... Gas optical properties */
+  struct htmie* htmie; /* ... Mie's data */
 
   struct htcp_desc htcp_desc;
 
   /* Map the index in Z from the regular SVX to the irregular HTCP data */
   struct darray_split svx2htcp_z;
 
-  /* Average cross section in Short Wave, i.e. in [380, 780] nanometers */
-  double Ca_avg_sw;
-  double Cs_avg_sw;
-
-  /* Average asymmetry parameter in Short Wave, in [380, 780] nanometers */
-  double g_avg_sw;
+  /* Ids and optical properties of the short wave spectral bands loaded by
+   * HTGOP and that overlap the CIE XYZ color space */
+  size_t sw_bands_range[2];
+  struct sw_band_prop* sw_bands;
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -121,14 +143,23 @@ cloud_dry_air_density
 }
 
 static INLINE void
-octree_data_init(const struct htrdr_sky* sky, struct octree_data* data)
+octree_data_init
+  (const struct htrdr_sky* sky,
+   const size_t ispectral_band,
+   const size_t iquad,
+   struct octree_data* data)
 {
   ASSERT(data);
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  (void)iquad;
   htable_vertex_init(sky->htrdr->allocator, &data->vertex2id);
   darray_double_init(sky->htrdr->allocator, &data->vertices);
   darray_double_init(sky->htrdr->allocator, &data->data);
   darray_size_t_init(sky->htrdr->allocator, &data->cells);
   data->sky = sky;
+  data->iband = ispectral_band - sky->sw_bands_range[0];
+  data->iquad = iquad;
 }
 
 static INLINE void
@@ -182,10 +213,10 @@ register_leaf
   }
 
   /* Register the leaf data */
-  kext_max = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
-  kext_min = htrdr_sky_fetch_svx_voxel_property
-    (ctx->sky, HTRDR_Kext, HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, -1/*FIXME*/, leaf);
+  kext_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
+    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, leaf);
+  kext_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Kext,
+    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, leaf);
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_min));
   CHK(RES_OK == darray_double_push_back(&ctx->data, &kext_max));
 }
@@ -200,14 +231,20 @@ vox_get(const size_t xyz[3], void* dst, void* context)
   double ks_min, ks_max;
   double kext_min, kext_max;
   double rho_da; /* Dry air density */
+  double Ca_avg;
+  double Cs_avg;
   float* pflt = dst;
   ASSERT(xyz && dst && context);
+
+  /* Fetch the optical properties of the spectral band */
+  Ca_avg = ctx->sky->sw_bands[ctx->iband].Ca_avg;
+  Cs_avg = ctx->sky->sw_bands[ctx->iband].Cs_avg;
 
   if(!ctx->sky->htcp_desc.irregular_z) {
     rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, xyz);
     rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], 0);
-    ka_min = ka_max = ka = ctx->sky->Ca_avg_sw * rho_da * rct;
-    ks_min = ks_max = ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+    ka_min = ka_max = ka = Ca_avg * rho_da * rct;
+    ks_min = ks_max = ks = Cs_avg * rho_da * rct;
     kext_min = kext_max = kext = ka + ks;
   } else {
     size_t ivox[3];
@@ -221,8 +258,8 @@ vox_get(const size_t xyz[3], void* dst, void* context)
     rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
     rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
 
-    ka_min = ka_max = ka = ctx->sky->Ca_avg_sw * rho_da * rct;
-    ks_min = ks_max = ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+    ka_min = ka_max = ka = Ca_avg * rho_da * rct;
+    ks_min = ks_max = ks = Cs_avg * rho_da * rct;
     kext_min = kext_max = kext = ka + ks;
 
     /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
@@ -236,8 +273,8 @@ vox_get(const size_t xyz[3], void* dst, void* context)
 
       rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
       rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
-      ka = ctx->sky->Ca_avg_sw * rho_da * rct;
-      ks = ctx->sky->Cs_avg_sw * rho_da * rct;
+      ka = Ca_avg * rho_da * rct;
+      ks = Cs_avg * rho_da * rct;
       kext = ka + ks;
 
       ka_min = MMIN(ka_min, ka);
@@ -332,8 +369,10 @@ setup_clouds(struct htrdr_sky* sky)
   double low[3];
   double upp[3];
   double sz[3];
+  size_t nbands;
+  size_t iband;
   res_T res = RES_OK;
-  ASSERT(sky);
+  ASSERT(sky && sky->sw_bands);
 
   res = htcp_get_desc(sky->htcp, &sky->htcp_desc);
   if(res != RES_OK) {
@@ -412,24 +451,122 @@ setup_clouds(struct htrdr_sky* sky)
   vox_desc.size = sizeof(float)
     * HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__;
 
-  /* Create the octree */
-  res = svx_octree_create
-    (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds);
-  if(res != RES_OK) {
+  /* Create as many cloud data structure than considered SW spectral bands */
+  nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
+  sky->clouds = MEM_CALLOC(sky->htrdr->allocator, nbands, sizeof(*sky->clouds));
+  if(!sky->clouds) {
     htrdr_log_err(sky->htrdr,
-      "could not create the octree of the cloud properties.\n");
+      "could not create the list of per SW band cloud data structure.\n");
+    res = RES_MEM_ERR;
     goto error;
   }
 
-  /* Fetch the octree descriptor for future use */
-  SVX(tree_get_desc(sky->clouds, &sky->cloud_desc));
+  FOR_EACH(iband, 0, nbands) {
+    ctx.iband = iband;
+
+    /* Create the octree */
+    res = svx_octree_create
+      (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds[iband].octree);
+    if(res != RES_OK) {
+      htrdr_log_err(sky->htrdr, "could not create the octree of the cloud "
+        "properties for the %luth band.\n", (unsigned long)iband);
+      goto error;
+    }
+
+    /* Fetch the octree descriptor for future use */
+    SVX(tree_get_desc
+      (sky->clouds[iband].octree, &sky->clouds[iband].octree_desc));
+  }
 
 exit:
   return res;
 error:
-  if(sky->clouds) SVX(tree_ref_put(sky->clouds));
+  if(sky->clouds) {
+    FOR_EACH(iband, 0, nbands) {
+      if(sky->clouds[iband].octree) {
+        SVX(tree_ref_put(sky->clouds[iband].octree));
+        sky->clouds[iband].octree = NULL;
+      }
+    }
+    MEM_RM(sky->htrdr->allocator, sky->clouds);
+  }
   darray_split_clear(&sky->svx2htcp_z);
   goto exit;
+}
+
+static res_T
+setup_sw_bands_properties(struct htrdr_sky* sky)
+{
+  res_T res = RES_OK;
+  size_t iband;
+  size_t nbands;
+  ASSERT(sky);
+
+  res = htgop_get_sw_spectral_intervals_CIE_XYZ(sky->htgop, sky->sw_bands_range);
+  if(res != RES_OK) goto error;
+
+  nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
+  ASSERT(nbands);
+  sky->sw_bands = MEM_CALLOC
+    (sky->htrdr->allocator, nbands, sizeof(*sky->sw_bands));
+  if(!sky->sw_bands) {
+    htrdr_log_err(sky->htrdr,
+      "could not allocate the list of SW band properties.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  FOR_EACH(iband, 0, nbands) {
+    struct htgop_spectral_interval band;
+    double band_wlens[2];
+
+    HTGOP(get_sw_spectral_interval
+      (sky->htgop, iband + sky->sw_bands_range[0], &band));
+    band_wlens[0] = wavenumber_to_wavelength(band.wave_numbers[1]);
+    band_wlens[1] = wavenumber_to_wavelength(band.wave_numbers[0]);
+    ASSERT(band_wlens[0] < band_wlens[1]);
+
+    sky->sw_bands[iband].Ca_avg = htmie_compute_xsection_absorption_average
+      (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
+    sky->sw_bands[iband].Cs_avg = htmie_compute_xsection_scattering_average
+      (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
+    sky->sw_bands[iband].g_avg = htmie_compute_asymmetry_parameter_average
+      (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
+    ASSERT(sky->sw_bands[iband].Ca_avg > 0);
+    ASSERT(sky->sw_bands[iband].Cs_avg > 0);
+    ASSERT(sky->sw_bands[iband].g_avg > 0);
+  }
+
+exit:
+  return res;
+error:
+  if(sky->sw_bands) {
+    MEM_RM(sky->htrdr->allocator, sky->sw_bands);
+    sky->sw_bands = NULL;
+  }
+  goto exit;
+}
+
+static void
+sample_sw_spectral_data
+  (struct htgop* htgop,
+   struct ssp_rng* rng,
+   res_T (*sample_sw_band)(const struct htgop*, const double, size_t*),
+   size_t* ispectral_band,
+   size_t* iquadrature_pt)
+{
+  struct htgop_spectral_interval specint;
+  double r1, r2;
+  res_T res = RES_OK;
+  ASSERT(htgop && rng && sample_sw_band && ispectral_band && iquadrature_pt);
+  ASSERT(ispectral_band && iquadrature_pt);
+  (void)res;
+  r1 = ssp_rng_canonical(rng);
+  r2 = ssp_rng_canonical(rng);
+  res = sample_sw_band(htgop, r1, ispectral_band);
+  ASSERT(res == RES_OK);
+  HTGOP(get_sw_spectral_interval(htgop, *ispectral_band, &specint));
+  HTGOP(spectral_interval_sample_quadrature(&specint, r2, iquadrature_pt));
 }
 
 static void
@@ -439,9 +576,21 @@ release_sky(ref_T* ref)
   ASSERT(ref);
   sky = CONTAINER_OF(ref, struct htrdr_sky, ref);
   if(sky->sun) htrdr_sun_ref_put(sky->sun);
-  if(sky->clouds) SVX(tree_ref_put(sky->clouds));
   if(sky->htcp) HTCP(ref_put(sky->htcp));
+  if(sky->htgop) HTGOP(ref_put(sky->htgop));
   if(sky->htmie) HTMIE(ref_put(sky->htmie));
+  if(sky->sw_bands) MEM_RM(sky->htrdr->allocator, sky->sw_bands);
+  if(sky->clouds) {
+    const size_t nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
+    size_t iband;
+    FOR_EACH(iband, 0, nbands) {
+      if(sky->clouds[iband].octree) {
+        SVX(tree_ref_put(sky->clouds[iband].octree));
+        sky->clouds[iband].octree = NULL;
+      }
+    }
+    MEM_RM(sky->htrdr->allocator, sky->clouds);
+  }
   darray_split_release(&sky->svx2htcp_z);
   MEM_RM(sky->htrdr->allocator, sky);
 }
@@ -454,10 +603,10 @@ htrdr_sky_create
   (struct htrdr* htrdr,
    struct htrdr_sun* sun,
    const char* htcp_filename,
+   const char* htgop_filename,
    const char* htmie_filename,
    struct htrdr_sky** out_sky)
 {
-  const double band_sw[2] = {SW_WAVELENGTH_MIN, SW_WAVELENGTH_MAX};
   struct htrdr_sky* sky = NULL;
   res_T res = RES_OK;
   ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
@@ -474,12 +623,12 @@ htrdr_sky_create
   sky->sun = sun;
   darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
 
+  /* Load clouds properties */
   res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "could not create the loader of cloud properties.\n");
     goto error;
   }
-
   res = htcp_load(sky->htcp, htcp_filename);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "error loading the cloud properties -- `%s'.\n",
@@ -487,12 +636,12 @@ htrdr_sky_create
     goto error;
   }
 
+  /* Load MIE data */
   res = htmie_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htmie);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "could not create the loader of Mie's data.\n");
     goto error;
   }
-
   res = htmie_load(sky->htmie, htmie_filename);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "error loading the Mie's data -- `%s'.\n",
@@ -500,13 +649,23 @@ htrdr_sky_create
     goto error;
   }
 
-  sky->Ca_avg_sw = htmie_compute_xsection_absorption_average
-    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
-  sky->Cs_avg_sw = htmie_compute_xsection_scattering_average
-    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
-  sky->g_avg_sw = htmie_compute_asymmetry_parameter_average
-    (sky->htmie, band_sw, HTMIE_FILTER_LINEAR);
-  ASSERT(sky->Ca_avg_sw > 0 && sky->Cs_avg_sw > 0 && sky->g_avg_sw > 0);
+  /* Load the gas optical properties */
+  res = htgop_create
+    (&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htgop);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "could not create the loader of the gas optical properties.\n");
+    goto error;
+  }
+  res = htgop_load(sky->htgop, htgop_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "error loading the gas optical properties -- `%s'.\n",
+      htgop_filename);
+    goto error;
+  }
+
+  res = setup_sw_bands_properties(sky);
+  if(res != RES_OK) goto error;
 
   res = setup_clouds(sky);
   if(res != RES_OK) goto error;
@@ -538,11 +697,17 @@ htrdr_sky_ref_put(struct htrdr_sky* sky)
 
 double
 htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
-  (const struct htrdr_sky* sky, const double wavelength)
+  (const struct htrdr_sky* sky,
+   const size_t ispectral_band,
+   const size_t iquad)
 {
-  ASSERT(sky && wavelength > 0);
-  (void)wavelength;
-  return sky->g_avg_sw;
+  size_t iband;
+  ASSERT(sky);
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  (void)iquad;
+  iband = ispectral_band - sky->sw_bands_range[0];
+  return sky->sw_bands[iband].g_avg;
 }
 
 double
@@ -550,42 +715,50 @@ htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const int components_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength, /* FIXME Unused */
+   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iquad, /* Index of the quadrature point in the spectral band */
    const double pos[3])
 {
   size_t ivox[3];
+  size_t iband;
+  const struct svx_tree_desc* cloud_desc;
   int comp_mask = components_mask;
   double k_particle = 0;
   double k_gaz = 0;
   ASSERT(sky && pos);
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
-  (void)wavelength; /* FIXME */
+  (void)iquad; /* TODO */
+
+  iband = ispectral_band - sky->sw_bands_range[0];
+  cloud_desc = &sky->clouds[iband].octree_desc;
 
   /* Is the position outside the clouds? */
-  if(pos[0] < sky->cloud_desc.lower[0]
-  || pos[1] < sky->cloud_desc.lower[1]
-  || pos[2] < sky->cloud_desc.lower[2]
-  || pos[0] > sky->cloud_desc.upper[0]
-  || pos[1] > sky->cloud_desc.upper[1]
-  || pos[2] > sky->cloud_desc.upper[2]) {
+  if(pos[0] < cloud_desc->lower[0]
+  || pos[1] < cloud_desc->lower[1]
+  || pos[2] < cloud_desc->lower[2]
+  || pos[0] > cloud_desc->upper[0]
+  || pos[1] > cloud_desc->upper[1]
+  || pos[2] > cloud_desc->upper[2]) {
     comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
 
   /* Compute the index of the voxel to fetch */
-  ivox[0] = (size_t)((pos[0] - sky->cloud_desc.lower[0])/sky->htcp_desc.vxsz_x);
-  ivox[1] = (size_t)((pos[1] - sky->cloud_desc.lower[1])/sky->htcp_desc.vxsz_y);
+  ivox[0] = (size_t)((pos[0] - cloud_desc->lower[0])/sky->htcp_desc.vxsz_x);
+  ivox[1] = (size_t)((pos[1] - cloud_desc->lower[1])/sky->htcp_desc.vxsz_y);
   if(!sky->htcp_desc.irregular_z) {
     /* The voxels along the Z dimension have the same size */
-    ivox[2] = (size_t)((pos[2] - sky->cloud_desc.lower[2])/sky->htcp_desc.vxsz_z[0]);
+    ivox[2] = (size_t)((pos[2] - cloud_desc->lower[2])/sky->htcp_desc.vxsz_z[0]);
   } else {
     /* Irregular voxel size along the Z dimension. Compute the index of the Z
      * position in the svx2htcp_z Look Up Table and use the LUT to define the
      * voxel index into the HTCP descripptor */
     const struct split* splits = darray_split_cdata_get(&sky->svx2htcp_z);
     const size_t n = darray_split_size_get(&sky->svx2htcp_z);
-    const double sz = sky->cloud_desc.upper[2] - sky->cloud_desc.lower[2];
+    const double sz = cloud_desc->upper[2] - cloud_desc->lower[2];
     const double vxsz_lut = sz / (double)n;
-    const size_t ilut = (size_t)((pos[2] - sky->cloud_desc.lower[2])/vxsz_lut);
+    const size_t ilut = (size_t)((pos[2] - cloud_desc->lower[2])/vxsz_lut);
     ivox[2] = splits[ilut].index + (pos[2] >= splits[ilut].height);
   }
 
@@ -603,21 +776,10 @@ htrdr_sky_fetch_raw_property
     rct = htcp_desc_RCT_at(&sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
     ql = rho_da * rct;
 
-    /* FIXME do not use the wavelength yet. Simply use the average cross
-     * section on the while short wave range */
-#if 1
-    if(prop == HTRDR_Ka || prop == HTRDR_Kext) Ca = sky->Ca_avg_sw;
-    if(prop == HTRDR_Ks || prop == HTRDR_Kext) Cs = sky->Cs_avg_sw;
-#else
-    if(prop == HTRDR_Ks || prop == HTRDR_Kext) {
-      Cs = htmie_fetch_xsection_scattering
-        (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
-    }
-    if(prop == HTRDR_Ka || prop == HTRDR_Kext) {
-      Ca = htmie_fetch_xsection_absorption
-        (sky->htmie, wavelength, HTMIE_FILTER_LINEAR);
-    }
-#endif
+    /* Use the average cross section of the current spectral band */
+    if(prop == HTRDR_Ka || prop == HTRDR_Kext) Ca = sky->sw_bands[iband].Ca_avg;
+    if(prop == HTRDR_Ks || prop == HTRDR_Kext) Cs = sky->sw_bands[iband].Cs_avg;
+
     k_particle = ql*(Ca + Cs);
   }
   if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
@@ -625,36 +787,59 @@ htrdr_sky_fetch_raw_property
 }
 
 struct svx_tree*
-htrdr_sky_get_svx_tree(struct htrdr_sky* sky)
+htrdr_sky_get_svx_tree
+  (struct htrdr_sky* sky,
+   const size_t ispectral_band,
+   const size_t iquadrature_pt)
 {
+  size_t iband;
   ASSERT(sky);
-  return sky->clouds;
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  (void)iquadrature_pt;
+  iband = ispectral_band - sky->sw_bands_range[0];
+  return sky->clouds[iband].octree;
 }
 
 res_T
-htrdr_sky_dump_clouds_vtk(const struct htrdr_sky* sky, FILE* stream)
+htrdr_sky_dump_clouds_vtk
+  (const struct htrdr_sky* sky,
+   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iquad, /* Index of the quadrature point */
+   FILE* stream)
 {
+  struct htgop_spectral_interval specint;
   struct svx_tree_desc desc;
   struct octree_data data;
   const double* leaf_data;
+  size_t iband;
   size_t nvertices;
   size_t ncells;
   size_t i;
   ASSERT(sky && stream);
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
 
-  octree_data_init(sky, &data);
-  SVX(tree_get_desc(sky->clouds, &desc));
+  iband = ispectral_band - sky->sw_bands_range[0];
+
+  octree_data_init(sky, ispectral_band, iquad, &data);
+  SVX(tree_get_desc(sky->clouds[iband].octree, &desc));
   ASSERT(desc.type == SVX_OCTREE);
 
   /* Register leaf data */
-  SVX(tree_for_each_leaf(sky->clouds, register_leaf, &data));
+  SVX(tree_for_each_leaf(sky->clouds[iband].octree, register_leaf, &data));
   nvertices = darray_double_size_get(&data.vertices) / 3/*#coords per vertex*/;
   ncells = darray_size_t_size_get(&data.cells)/8/*#ids per cell*/;
   ASSERT(ncells == desc.nleaves);
 
+  /* Fetch the spectral interval descriptor */
+  HTGOP(get_sw_spectral_interval(sky->htgop, ispectral_band, &specint));
+
   /* Write headers */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
-  fprintf(stream, "Volume\n");
+  fprintf(stream, "Clouds optical properties in [%g, %g] nanometers\n",
+    wavenumber_to_wavelength(specint.wave_numbers[1]),
+    wavenumber_to_wavelength(specint.wave_numbers[0]));
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET UNSTRUCTURED_GRID\n");
 
@@ -703,27 +888,33 @@ htrdr_sky_fetch_svx_property
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
    const int components_mask, /* Combination of htrdr_sky_component_flag */
-   const double wavelength,
+   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iquad, /* Index of the quadrature point in the spectral band */
    const double pos[3])
 {
   struct svx_voxel voxel = SVX_VOXEL_NULL;
+  size_t iband;
   int comp_mask = components_mask;
   ASSERT(sky && pos);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
+  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
+  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+
+  iband = ispectral_band - sky->sw_bands_range[0];
 
   /* Is the position outside the clouds? */
-  if(pos[0] < sky->cloud_desc.lower[0]
-  || pos[1] < sky->cloud_desc.lower[1]
-  || pos[2] < sky->cloud_desc.lower[2]
-  || pos[0] > sky->cloud_desc.upper[0]
-  || pos[1] > sky->cloud_desc.upper[1]
-  || pos[2] > sky->cloud_desc.upper[2]) {
+  if(pos[0] < sky->clouds[iband].octree_desc.lower[0]
+  || pos[1] < sky->clouds[iband].octree_desc.lower[1]
+  || pos[2] < sky->clouds[iband].octree_desc.lower[2]
+  || pos[0] > sky->clouds[iband].octree_desc.upper[0]
+  || pos[1] > sky->clouds[iband].octree_desc.upper[1]
+  || pos[2] > sky->clouds[iband].octree_desc.upper[2]) {
     comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
 
-  SVX(tree_at(sky->clouds, pos, NULL, NULL, &voxel));
+  SVX(tree_at(sky->clouds[iband].octree, pos, NULL, NULL, &voxel));
   return htrdr_sky_fetch_svx_voxel_property
-      (sky, prop, op, comp_mask, wavelength, &voxel);
+    (sky, prop, op, comp_mask, ispectral_band, iquad, &voxel);
 }
 
 double
@@ -732,7 +923,8 @@ htrdr_sky_fetch_svx_voxel_property
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
    const int components_mask,
-   const double wavelength, /* FIXME Unused */
+   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iquad, /* Index of the quadrature point in the spectral band */
    const struct svx_voxel* voxel)
 {
   const float* pflt = NULL;
@@ -743,7 +935,7 @@ htrdr_sky_fetch_svx_voxel_property
   ASSERT(sky && voxel);
   ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
   ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
-  (void)sky, (void)wavelength;
+  (void)sky, (void)ispectral_band, (void)iquad;
 
   pflt = voxel->data;
 
@@ -766,5 +958,75 @@ htrdr_sky_fetch_svx_voxel_property
     default: FATAL("Unreachable code.\n"); break;
   }
   return data;
+}
+
+size_t
+htrdr_sky_get_sw_spectral_bands_count(const struct htrdr_sky* sky)
+{
+  ASSERT(sky);
+  return sky->sw_bands_range[1] - sky->sw_bands_range[0] + 1;
+}
+
+size_t
+htrdr_sky_get_sw_spectral_band_id
+  (const struct htrdr_sky* sky, const size_t iband)
+{
+  ASSERT(sky && iband < htrdr_sky_get_sw_spectral_bands_count(sky));
+  return sky->sw_bands_range[0] + iband;
+}
+
+res_T
+htrdr_sky_get_sw_spectral_band_bounds
+  (const struct htrdr_sky* sky,
+   const size_t iband,
+   double wavelengths[2])
+{
+  struct htgop_spectral_interval specint;
+  res_T res = RES_OK;
+  ASSERT(sky && wavelengths);
+
+  res = htgop_get_sw_spectral_interval(sky->htgop, iband, &specint);
+  if(res != RES_OK) return res;
+
+  wavelengths[0] = wavenumber_to_wavelength(specint.wave_numbers[1]);
+  wavelengths[1] = wavenumber_to_wavelength(specint.wave_numbers[0]);
+  ASSERT(wavelengths[0] < wavelengths[1]);
+  return RES_OK;
+}
+
+void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_X
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt)
+{
+  sample_sw_spectral_data
+    (sky->htgop, rng, htgop_sample_sw_spectral_interval_CIE_1931_X,
+     ispectral_band, iquadrature_pt);
+}
+
+void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt)
+{
+  sample_sw_spectral_data
+    (sky->htgop, rng, htgop_sample_sw_spectral_interval_CIE_1931_Y,
+     ispectral_band, iquadrature_pt);
+}
+
+void
+htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
+  (const struct htrdr_sky* sky,
+   struct ssp_rng* rng,
+   size_t* ispectral_band,
+   size_t* iquadrature_pt)
+{
+  sample_sw_spectral_data
+    (sky->htgop, rng, htgop_sample_sw_spectral_interval_CIE_1931_Z,
+     ispectral_band, iquadrature_pt);
 }
 

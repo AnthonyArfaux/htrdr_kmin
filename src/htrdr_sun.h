@@ -73,10 +73,10 @@ htrdr_sun_get_spectral_band_bounds
    const size_t ispectral_band,
    double bounds[2]); /* Lower and upper wavelength in nanometer */
 
-/* Return the ranges of the spectral bands where the XYZ color space is defined
- * XYZ in [band_min, band_max] */
+/* Return the ranges of the spectral bands where the CIE XYZ color space is
+ * defined. CIE XYZ in [band_range[0], band_range[1]] */
 extern LOCAL_SYM void
-htrdr_sun_get_XYZ_spectral_bands_range
+htrdr_sun_get_CIE_XYZ_spectral_bands_range
   (const struct htrdr_sun* sun,
    size_t band_range[2]);
 
