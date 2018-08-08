@@ -34,7 +34,10 @@
 #include <math.h>
 
 #define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
+#define H2O_MOLAR_MASS 0.01801528 /* In kg.mol^-1 */
 #define GAS_CONSTANT 8.3144598 /* In kg.m^2.s^-2.mol^-1.K */
+
+#define NFLOATS_PER_COMPONENT (HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__)
 
 struct split {
   size_t index; /* Index of the current htcp voxel */
@@ -136,29 +139,41 @@ cloud_dry_air_density
 {
   double P = 0; /* Pressure in Pa */
   double T = 0; /* Temperature in K */
-  ASSERT(desc);
-  P = htcp_desc_PABST_at(desc, ivox[0], ivox[1], ivox[2], 0);
-  T = htcp_desc_T_at(desc, ivox[0], ivox[1], ivox[2], 0);
+  ASSERT(desc && ivox);
+  P = htcp_desc_PABST_at(desc, ivox[0], ivox[1], ivox[2], 0/*time*/);
+  T = htcp_desc_T_at(desc, ivox[0], ivox[1], ivox[2], 0/*time*/);
   return (P*DRY_AIR_MOLAR_MASS)/(T*GAS_CONSTANT);
+}
+
+/* Compute the water molar fraction */
+static FINLINE double
+cloud_water_molar_fraction
+  (const struct htcp_desc* desc,
+   const size_t ivox[3])
+{
+  double rvt = 0;
+  ASSERT(desc && ivox);
+  rvt = htcp_desc_RVT_at(desc, ivox[0], ivox[1], ivox[2], 0/*time*/);
+  return rvt / (rvt + H2O_MOLAR_MASS/DRY_AIR_MOLAR_MASS);
 }
 
 static INLINE void
 octree_data_init
   (const struct htrdr_sky* sky,
-   const size_t ispectral_band,
+   const size_t iband,
    const size_t iquad,
    struct octree_data* data)
 {
   ASSERT(data);
-  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
-  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  ASSERT(iband >= sky->sw_bands_range[0]);
+  ASSERT(iband <= sky->sw_bands_range[1]);
   (void)iquad;
   htable_vertex_init(sky->htrdr->allocator, &data->vertex2id);
   darray_double_init(sky->htrdr->allocator, &data->vertices);
   darray_double_init(sky->htrdr->allocator, &data->data);
   darray_size_t_init(sky->htrdr->allocator, &data->cells);
   data->sky = sky;
-  data->iband = ispectral_band - sky->sw_bands_range[0];
+  data->iband = iband;
   data->iquad = iquad;
 }
 
@@ -222,9 +237,11 @@ register_leaf
 }
 
 static void
-vox_get(const size_t xyz[3], void* dst, void* context)
+vox_get_particle
+  (const size_t xyz[3],
+   float particle[],
+   const struct build_octree_context* ctx)
 {
-  struct build_octree_context* ctx = context;
   double rct;
   double ka, ks, kext;
   double ka_min, ka_max;
@@ -233,12 +250,13 @@ vox_get(const size_t xyz[3], void* dst, void* context)
   double rho_da; /* Dry air density */
   double Ca_avg;
   double Cs_avg;
-  float* pflt = dst;
-  ASSERT(xyz && dst && context);
+  size_t i;
+  ASSERT(xyz && particle && ctx);
 
+  i = ctx->iband - ctx->sky->sw_bands_range[0];
   /* Fetch the optical properties of the spectral band */
-  Ca_avg = ctx->sky->sw_bands[ctx->iband].Ca_avg;
-  Cs_avg = ctx->sky->sw_bands[ctx->iband].Cs_avg;
+  Ca_avg = ctx->sky->sw_bands[i].Ca_avg;
+  Cs_avg = ctx->sky->sw_bands[i].Cs_avg;
 
   if(!ctx->sky->htcp_desc.irregular_z) {
     rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, xyz);
@@ -295,18 +313,125 @@ vox_get(const size_t xyz[3], void* dst, void* context)
   if(kext_min != (float)kext_min) kext_min = nextafterf((float)kext_min,-FLT_MAX);
   if(kext_max != (float)kext_max) kext_max = nextafterf((float)kext_max, FLT_MAX);
 
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
+  particle[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
+  particle[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
+  particle[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
+  particle[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
+  particle[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
+  particle[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
 }
 
 static void
-vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
+vox_get_gas
+  (const size_t xyz[3],
+   float gas[],
+   const struct build_octree_context* ctx)
 {
-  float* pflt = dst;
+  struct htgop_layer layer;
+  struct htgop_layer_sw_spectral_interval band;
+  size_t ilayer;
+  size_t layer_range[2];
+  size_t quad_range[2];
+  double x_h2o_range[2];
+  double lower[3], upper[3]; /* AABB */
+  double ka[2] = {DBL_MAX, -DBL_MAX};
+  double ks[2] = {DBL_MAX, -DBL_MAX};
+  double kext[2] = {DBL_MAX, -DBL_MAX};
+  ASSERT(xyz && gas && ctx);
+
+  /* Define the xH2O range from the LES data */
+  if(!ctx->sky->htcp_desc.irregular_z) { /* 1 LES voxel <=> 1 SVX voxel */
+    const double x_h2o = cloud_water_molar_fraction(&ctx->sky->htcp_desc, xyz);
+    x_h2o_range[0] = x_h2o_range[1] = x_h2o;
+  } else { /* A SVX voxel can be overlapped by 2 LES voxels */
+    size_t ivox[3];
+    size_t ivox_next;
+    ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
+
+    ivox[0] = xyz[0];
+    ivox[1] = xyz[1];
+    ivox[2] = darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2]].index;
+
+    x_h2o_range[0] = cloud_water_molar_fraction(&ctx->sky->htcp_desc, ivox);
+
+    /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
+    ivox_next = xyz[2] + 1 < darray_split_size_get(&ctx->sky->svx2htcp_z)
+      ? darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2] + 1].index
+      : ivox[2];
+
+    if(ivox_next == ivox[2]) { /* No overlap */
+      x_h2o_range[1] = x_h2o_range[0];
+    } else { /* Overlap */
+      ASSERT(ivox[2] < ivox_next);
+      ivox[2] = ivox_next;
+      x_h2o_range[1]  = cloud_water_molar_fraction(&ctx->sky->htcp_desc, ivox);
+      if(x_h2o_range[0] > x_h2o_range[1])
+        SWAP(double, x_h2o_range[0], x_h2o_range[1]);
+    }
+  }
+
+  /* Retrieve the range of atmospheric layers that overlap the SVX voxel */
+  htcp_desc_get_voxel_aabb
+    (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], lower, upper);
+  HTGOP(position_to_layer_id(ctx->sky->htgop, lower[2], &layer_range[0]));
+  HTGOP(position_to_layer_id(ctx->sky->htgop, upper[2], &layer_range[1]));
+
+  /* For each atmospheric layer that overlaps the SVX voxel ... */
+  FOR_EACH(ilayer, layer_range[0], layer_range[1]+1) {
+    double k[2];
+
+    HTGOP(get_layer(ctx->sky->htgop, ilayer, &layer));
+
+    /* ... retrieve the considered spectral interval */
+    HTGOP(layer_get_sw_spectral_interval(&layer, ctx->iband, &band));
+    quad_range[0] = 0;
+    quad_range[1] = band.quadrature_length-1;
+
+    /* ... and compute the radiative properties and upd their bounds */
+    HTGOP(layer_sw_spectral_interval_quadpoints_get_ka_bounds
+      (&band, quad_range, x_h2o_range, k));
+    ka[0] = MMIN(ka[0], k[0]);
+    ka[1] = MMAX(ka[1], k[1]);
+    HTGOP(layer_sw_spectral_interval_quadpoints_get_ks_bounds
+      (&band, quad_range, x_h2o_range, k));
+    ks[0] = MMIN(ks[0], k[0]);
+    ks[1] = MMAX(ks[1], k[1]);
+    HTGOP(layer_sw_spectral_interval_quadpoints_get_kext_bounds
+      (&band, quad_range, x_h2o_range, k));
+    kext[0] = MMIN(kext[0], k[0]);
+    kext[1] = MMAX(kext[1], k[1]);
+  }
+
+  /* Ensure that the single precision bounds include their double precision
+   * version. */
+  if(ka[0] != (float)ka[0]) ka[0] = nextafterf((float)ka[0],-FLT_MAX);
+  if(ka[1] != (float)ka[1]) ka[1] = nextafterf((float)ka[1], FLT_MAX);
+  if(ks[0] != (float)ks[0]) ks[0] = nextafterf((float)ks[0],-FLT_MAX);
+  if(ks[1] != (float)ks[1]) ks[1] = nextafterf((float)ks[1], FLT_MAX);
+  if(kext[0] != (float)kext[0]) kext[0] = nextafterf((float)kext[0],-FLT_MAX);
+  if(kext[1] != (float)kext[1]) kext[1] = nextafterf((float)kext[1], FLT_MAX);
+
+  gas[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka[0];
+  gas[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka[1];
+  gas[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks[0];
+  gas[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks[1];
+  gas[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext[0];
+  gas[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext[1];
+}
+
+static void
+vox_get(const size_t xyz[3], void* dst, void* ctx)
+{
+  float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
+  float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
+  vox_get_particle(xyz, par, ctx);
+  vox_get_gas(xyz, gas, ctx);
+}
+
+static INLINE void
+vox_merge_component
+  (float* comp, const float* voxels[], const size_t off, const size_t nvoxs)
+{
   float ka_min = FLT_MAX;
   float ka_max =-FLT_MAX;
   float ks_min = FLT_MAX;
@@ -314,14 +439,12 @@ vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
   float kext_min = FLT_MAX;
   float kext_max =-FLT_MAX;
   size_t ivox;
-  ASSERT(dst && voxels && nvoxs);
-  (void)context;
+  ASSERT(comp && voxels && nvoxs);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* vox_data = (const float*)voxels[ivox];
-    const float* ka = vox_data + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
-    const float* ks = vox_data + HTRDR_Ks * HTRDR_SVX_OPS_COUNT__;
-    const float* kext = vox_data + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    const float* ka = voxels[ivox] + off + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
+    const float* ks = voxels[ivox] + off + HTRDR_Ks * HTRDR_SVX_OPS_COUNT__;
+    const float* kext = voxels[ivox] + off + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
     ASSERT(ka[HTRDR_SVX_MIN] <= ka[HTRDR_SVX_MAX]);
     ASSERT(ks[HTRDR_SVX_MIN] <= ks[HTRDR_SVX_MAX]);
     ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
@@ -334,30 +457,54 @@ vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
     kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
   }
 
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ka_min;
-  pflt[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ka_max;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ks_min;
-  pflt[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ks_max;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = kext_min;
-  pflt[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = kext_max;
+  comp[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ka_min;
+  comp[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ka_max;
+  comp[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ks_min;
+  comp[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ks_max;
+  comp[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = kext_min;
+  comp[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = kext_max;
 }
 
-static int
-vox_challenge_merge(const void* voxels[], const size_t nvoxs, void* context)
+static void
+vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
 {
-  struct build_octree_context* ctx = context;
+  float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
+  float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
+  ASSERT(dst && voxels);
+  (void) context;
+  vox_merge_component(par, (const float**)voxels, 0*NFLOATS_PER_COMPONENT, nvoxs);
+  vox_merge_component(gas, (const float**)voxels, 1*NFLOATS_PER_COMPONENT, nvoxs);
+}
+
+static INLINE int
+vox_challenge_merge_component
+  (const float* voxels[],
+   const size_t nvoxs,
+   const size_t off,
+   struct build_octree_context* ctx)
+{
   float kext_min = FLT_MAX;
   float kext_max =-FLT_MAX;
   size_t ivox;
-  ASSERT(voxels && nvoxs && context);
+  ASSERT(voxels && nvoxs && ctx);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* kext = (const float*)voxels[ivox] + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
+    const float* kext = voxels[ivox] + off + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
     ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
     kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
     kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
   }
   return (kext_max - kext_min)*ctx->dst_max <= ctx->tau_threshold;
+}
+
+static int
+vox_challenge_merge
+  (const void* voxels[], const size_t nvoxs, void* ctx)
+{
+  const float** vox = (const float**)voxels;
+  ASSERT(voxels);
+  return vox_challenge_merge_component(vox, nvoxs, 0*NFLOATS_PER_COMPONENT, ctx)
+      && vox_challenge_merge_component(vox, nvoxs, 1*NFLOATS_PER_COMPONENT, ctx);
 }
 
 static res_T
@@ -370,7 +517,7 @@ setup_clouds(struct htrdr_sky* sky)
   double upp[3];
   double sz[3];
   size_t nbands;
-  size_t iband;
+  size_t i;
   res_T res = RES_OK;
   ASSERT(sky && sky->sw_bands);
 
@@ -441,7 +588,7 @@ setup_clouds(struct htrdr_sky* sky)
   /* Setup the build context */
   ctx.sky = sky;
   ctx.dst_max = sz[2];
-  ctx.tau_threshold = 0.7;
+  ctx.tau_threshold = 0.5;
 
   /* Setup the voxel descriptor */
   vox_desc.get = vox_get;
@@ -449,7 +596,7 @@ setup_clouds(struct htrdr_sky* sky)
   vox_desc.challenge_merge = vox_challenge_merge;
   vox_desc.context = &ctx;
   vox_desc.size = sizeof(float)
-    * HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__;
+    * HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__ * 2/*Gas & particles*/;
 
   /* Create as many cloud data structure than considered SW spectral bands */
   nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
@@ -461,31 +608,31 @@ setup_clouds(struct htrdr_sky* sky)
     goto error;
   }
 
-  FOR_EACH(iband, 0, nbands) {
-    ctx.iband = iband;
+  FOR_EACH(i, 0, nbands) {
+    ctx.iband = i + sky->sw_bands_range[0];
 
     /* Create the octree */
     res = svx_octree_create
-      (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds[iband].octree);
+      (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds[i].octree);
     if(res != RES_OK) {
       htrdr_log_err(sky->htrdr, "could not create the octree of the cloud "
-        "properties for the %luth band.\n", (unsigned long)iband);
+        "properties for the band %lu.\n", (unsigned long)ctx.iband);
       goto error;
     }
 
     /* Fetch the octree descriptor for future use */
     SVX(tree_get_desc
-      (sky->clouds[iband].octree, &sky->clouds[iband].octree_desc));
+      (sky->clouds[i].octree, &sky->clouds[i].octree_desc));
   }
 
 exit:
   return res;
 error:
   if(sky->clouds) {
-    FOR_EACH(iband, 0, nbands) {
-      if(sky->clouds[iband].octree) {
-        SVX(tree_ref_put(sky->clouds[iband].octree));
-        sky->clouds[iband].octree = NULL;
+    FOR_EACH(i, 0, nbands) {
+      if(sky->clouds[i].octree) {
+        SVX(tree_ref_put(sky->clouds[i].octree));
+        sky->clouds[i].octree = NULL;
       }
     }
     MEM_RM(sky->htrdr->allocator, sky->clouds);
@@ -498,8 +645,8 @@ static res_T
 setup_sw_bands_properties(struct htrdr_sky* sky)
 {
   res_T res = RES_OK;
-  size_t iband;
   size_t nbands;
+  size_t i;
   ASSERT(sky);
 
   res = htgop_get_sw_spectral_intervals_CIE_XYZ(sky->htgop, sky->sw_bands_range);
@@ -516,25 +663,25 @@ setup_sw_bands_properties(struct htrdr_sky* sky)
     goto error;
   }
 
-  FOR_EACH(iband, 0, nbands) {
+  FOR_EACH(i, 0, nbands) {
     struct htgop_spectral_interval band;
     double band_wlens[2];
 
     HTGOP(get_sw_spectral_interval
-      (sky->htgop, iband + sky->sw_bands_range[0], &band));
+      (sky->htgop, i+ sky->sw_bands_range[0], &band));
     band_wlens[0] = wavenumber_to_wavelength(band.wave_numbers[1]);
     band_wlens[1] = wavenumber_to_wavelength(band.wave_numbers[0]);
     ASSERT(band_wlens[0] < band_wlens[1]);
 
-    sky->sw_bands[iband].Ca_avg = htmie_compute_xsection_absorption_average
+    sky->sw_bands[i].Ca_avg = htmie_compute_xsection_absorption_average
       (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
-    sky->sw_bands[iband].Cs_avg = htmie_compute_xsection_scattering_average
+    sky->sw_bands[i].Cs_avg = htmie_compute_xsection_scattering_average
       (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
-    sky->sw_bands[iband].g_avg = htmie_compute_asymmetry_parameter_average
+    sky->sw_bands[i].g_avg = htmie_compute_asymmetry_parameter_average
       (sky->htmie, band_wlens, HTMIE_FILTER_LINEAR);
-    ASSERT(sky->sw_bands[iband].Ca_avg > 0);
-    ASSERT(sky->sw_bands[iband].Cs_avg > 0);
-    ASSERT(sky->sw_bands[iband].g_avg > 0);
+    ASSERT(sky->sw_bands[i].Ca_avg > 0);
+    ASSERT(sky->sw_bands[i].Cs_avg > 0);
+    ASSERT(sky->sw_bands[i].g_avg > 0);
   }
 
 exit:
@@ -582,11 +729,11 @@ release_sky(ref_T* ref)
   if(sky->sw_bands) MEM_RM(sky->htrdr->allocator, sky->sw_bands);
   if(sky->clouds) {
     const size_t nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
-    size_t iband;
-    FOR_EACH(iband, 0, nbands) {
-      if(sky->clouds[iband].octree) {
-        SVX(tree_ref_put(sky->clouds[iband].octree));
-        sky->clouds[iband].octree = NULL;
+    size_t i;
+    FOR_EACH(i, 0, nbands) {
+      if(sky->clouds[i].octree) {
+        SVX(tree_ref_put(sky->clouds[i].octree));
+        sky->clouds[i].octree = NULL;
       }
     }
     MEM_RM(sky->htrdr->allocator, sky->clouds);
@@ -701,13 +848,13 @@ htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
    const size_t ispectral_band,
    const size_t iquad)
 {
-  size_t iband;
+  size_t i;
   ASSERT(sky);
   ASSERT(ispectral_band >= sky->sw_bands_range[0]);
   ASSERT(ispectral_band <= sky->sw_bands_range[1]);
   (void)iquad;
-  iband = ispectral_band - sky->sw_bands_range[0];
-  return sky->sw_bands[iband].g_avg;
+  i = ispectral_band - sky->sw_bands_range[0];
+  return sky->sw_bands[i].g_avg;
 }
 
 double
@@ -715,24 +862,24 @@ htrdr_sky_fetch_raw_property
   (const struct htrdr_sky* sky,
    const enum htrdr_sky_property prop,
    const int components_mask, /* Combination of htrdr_sky_component_flag */
-   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iband, /* Index of the spectral band */
    const size_t iquad, /* Index of the quadrature point in the spectral band */
    const double pos[3])
 {
   size_t ivox[3];
-  size_t iband;
+  size_t i;
   const struct svx_tree_desc* cloud_desc;
   int comp_mask = components_mask;
   double k_particle = 0;
-  double k_gaz = 0;
+  double k_gas = 0;
+  double k = 0;
   ASSERT(sky && pos);
-  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
-  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  ASSERT(iband >= sky->sw_bands_range[0]);
+  ASSERT(iband <= sky->sw_bands_range[1]);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
-  (void)iquad; /* TODO */
 
-  iband = ispectral_band - sky->sw_bands_range[0];
-  cloud_desc = &sky->clouds[iband].octree_desc;
+  i = iband - sky->sw_bands_range[0];
+  cloud_desc = &sky->clouds[i].octree_desc;
 
   /* Is the position outside the clouds? */
   if(pos[0] < cloud_desc->lower[0]
@@ -777,13 +924,43 @@ htrdr_sky_fetch_raw_property
     ql = rho_da * rct;
 
     /* Use the average cross section of the current spectral band */
-    if(prop == HTRDR_Ka || prop == HTRDR_Kext) Ca = sky->sw_bands[iband].Ca_avg;
-    if(prop == HTRDR_Ks || prop == HTRDR_Kext) Cs = sky->sw_bands[iband].Cs_avg;
+    if(prop == HTRDR_Ka || prop == HTRDR_Kext) Ca = sky->sw_bands[i].Ca_avg;
+    if(prop == HTRDR_Ks || prop == HTRDR_Kext) Cs = sky->sw_bands[i].Cs_avg;
 
     k_particle = ql*(Ca + Cs);
   }
-  if(comp_mask & HTRDR_GAS) { /* TODO not implemented yet */ }
-  return k_particle + k_gaz;
+
+  if(comp_mask & HTRDR_GAS) {
+    struct htgop_layer layer;
+    struct htgop_layer_sw_spectral_interval band;
+    struct htgop_layer_sw_spectral_interval_tab tab;
+    const double x_h2o = cloud_water_molar_fraction(&sky->htcp_desc, ivox);
+    size_t ilayer = 0;
+
+    /* Retrieve the quadrature point into the spectral band of the layer into
+     * which `pos' lies */
+    HTGOP(position_to_layer_id(sky->htgop, pos[2], &ilayer));
+    HTGOP(get_layer(sky->htgop, ilayer, &layer));
+    HTGOP(layer_get_sw_spectral_interval(&layer, iband, &band));
+    HTGOP(layer_sw_spectral_interval_get_tab(&band, iquad, &tab));
+
+    /* Fetch the optical properties wrt x_h2o */
+    switch(prop) {
+      case HTRDR_Ka: 
+        HTGOP(layer_sw_spectral_interval_tab_fetch_ka(&tab, x_h2o, &k_gas));
+        break;
+      case HTRDR_Ks:
+        HTGOP(layer_sw_spectral_interval_tab_fetch_ks(&tab, x_h2o, &k_gas));
+        break;
+      case HTRDR_Kext:
+        HTGOP(layer_sw_spectral_interval_tab_fetch_kext(&tab, x_h2o, &k_gas));
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
+  }
+
+  k = k_particle + k_gas;
+  return k;
 }
 
 struct svx_tree*
@@ -792,19 +969,19 @@ htrdr_sky_get_svx_tree
    const size_t ispectral_band,
    const size_t iquadrature_pt)
 {
-  size_t iband;
+  size_t i;
   ASSERT(sky);
   ASSERT(ispectral_band >= sky->sw_bands_range[0]);
   ASSERT(ispectral_band <= sky->sw_bands_range[1]);
   (void)iquadrature_pt;
-  iband = ispectral_band - sky->sw_bands_range[0];
-  return sky->clouds[iband].octree;
+  i = ispectral_band - sky->sw_bands_range[0];
+  return sky->clouds[i].octree;
 }
 
 res_T
 htrdr_sky_dump_clouds_vtk
   (const struct htrdr_sky* sky,
-   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iband, /* Index of the spectral band */
    const size_t iquad, /* Index of the quadrature point */
    FILE* stream)
 {
@@ -812,28 +989,27 @@ htrdr_sky_dump_clouds_vtk
   struct svx_tree_desc desc;
   struct octree_data data;
   const double* leaf_data;
-  size_t iband;
   size_t nvertices;
   size_t ncells;
   size_t i;
   ASSERT(sky && stream);
-  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
-  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  ASSERT(iband >= sky->sw_bands_range[0]);
+  ASSERT(iband <= sky->sw_bands_range[1]);
 
-  iband = ispectral_band - sky->sw_bands_range[0];
+  i = iband - sky->sw_bands_range[0];
 
-  octree_data_init(sky, ispectral_band, iquad, &data);
-  SVX(tree_get_desc(sky->clouds[iband].octree, &desc));
+  octree_data_init(sky, iband, iquad, &data);
+  SVX(tree_get_desc(sky->clouds[i].octree, &desc));
   ASSERT(desc.type == SVX_OCTREE);
 
   /* Register leaf data */
-  SVX(tree_for_each_leaf(sky->clouds[iband].octree, register_leaf, &data));
+  SVX(tree_for_each_leaf(sky->clouds[i].octree, register_leaf, &data));
   nvertices = darray_double_size_get(&data.vertices) / 3/*#coords per vertex*/;
   ncells = darray_size_t_size_get(&data.cells)/8/*#ids per cell*/;
   ASSERT(ncells == desc.nleaves);
 
   /* Fetch the spectral interval descriptor */
-  HTGOP(get_sw_spectral_interval(sky->htgop, ispectral_band, &specint));
+  HTGOP(get_sw_spectral_interval(sky->htgop, iband, &specint));
 
   /* Write headers */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
@@ -888,33 +1064,33 @@ htrdr_sky_fetch_svx_property
    const enum htrdr_sky_property prop,
    const enum htrdr_svx_op op,
    const int components_mask, /* Combination of htrdr_sky_component_flag */
-   const size_t ispectral_band, /* Index of the spectral band */
+   const size_t iband, /* Index of the spectral band */
    const size_t iquad, /* Index of the quadrature point in the spectral band */
    const double pos[3])
 {
   struct svx_voxel voxel = SVX_VOXEL_NULL;
-  size_t iband;
+  size_t i;
   int comp_mask = components_mask;
   ASSERT(sky && pos);
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
-  ASSERT(ispectral_band >= sky->sw_bands_range[0]);
-  ASSERT(ispectral_band <= sky->sw_bands_range[1]);
+  ASSERT(iband >= sky->sw_bands_range[0]);
+  ASSERT(iband <= sky->sw_bands_range[1]);
 
-  iband = ispectral_band - sky->sw_bands_range[0];
+  i = iband - sky->sw_bands_range[0];
 
   /* Is the position outside the clouds? */
-  if(pos[0] < sky->clouds[iband].octree_desc.lower[0]
-  || pos[1] < sky->clouds[iband].octree_desc.lower[1]
-  || pos[2] < sky->clouds[iband].octree_desc.lower[2]
-  || pos[0] > sky->clouds[iband].octree_desc.upper[0]
-  || pos[1] > sky->clouds[iband].octree_desc.upper[1]
-  || pos[2] > sky->clouds[iband].octree_desc.upper[2]) {
+  if(pos[0] < sky->clouds[i].octree_desc.lower[0]
+  || pos[1] < sky->clouds[i].octree_desc.lower[1]
+  || pos[2] < sky->clouds[i].octree_desc.lower[2]
+  || pos[0] > sky->clouds[i].octree_desc.upper[0]
+  || pos[1] > sky->clouds[i].octree_desc.upper[1]
+  || pos[2] > sky->clouds[i].octree_desc.upper[2]) {
     comp_mask &= ~HTRDR_PARTICLES; /* No particle */
   }
 
-  SVX(tree_at(sky->clouds[iband].octree, pos, NULL, NULL, &voxel));
+  SVX(tree_at(sky->clouds[i].octree, pos, NULL, NULL, &voxel));
   return htrdr_sky_fetch_svx_voxel_property
-    (sky, prop, op, comp_mask, ispectral_band, iquad, &voxel);
+    (sky, prop, op, comp_mask, iband, iquad, &voxel);
 }
 
 double
@@ -927,33 +1103,37 @@ htrdr_sky_fetch_svx_voxel_property
    const size_t iquad, /* Index of the quadrature point in the spectral band */
    const struct svx_voxel* voxel)
 {
-  const float* pflt = NULL;
+  const float* par_data = NULL;
+  const float* gas_data = NULL;
   int comp_mask = components_mask;
   double a, b, data;
   double gas = 0;
-  double particle = 0;
+  double par = 0;
   ASSERT(sky && voxel);
   ASSERT((unsigned)prop < HTRDR_PROPERTIES_COUNT__);
   ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
   (void)sky, (void)ispectral_band, (void)iquad;
 
-  pflt = voxel->data;
+  par_data = (const float*)voxel->data + 0*NFLOATS_PER_COMPONENT;
+  gas_data = (const float*)voxel->data + 1*NFLOATS_PER_COMPONENT;
 
-  if(comp_mask) {
-    particle = pflt[prop * HTRDR_SVX_OPS_COUNT__ + op];
+  if(comp_mask & HTRDR_PARTICLES) {
+    par = par_data[prop * HTRDR_SVX_OPS_COUNT__ + op];
   }
-  if(comp_mask & HTRDR_GAS) { comp_mask &= ~HTRDR_GAS; /* TODO not implemented yet */ }
+  if(comp_mask & HTRDR_GAS) {
+    gas = gas_data[prop * HTRDR_SVX_OPS_COUNT__ + op];
+  }
 
   switch(op) {
     case HTRDR_SVX_MIN:
-      a = comp_mask & HTRDR_PARTICLES ? particle : DBL_MAX;
+      a = comp_mask & HTRDR_PARTICLES ? par : DBL_MAX;
       b = comp_mask & HTRDR_GAS ? gas : DBL_MAX;
       data = MMIN(a, b);
       break;
     case HTRDR_SVX_MAX:
-      a = comp_mask & HTRDR_PARTICLES ? particle : -DBL_MAX;
-      b = comp_mask & HTRDR_GAS ? gas : -DBL_MAX;
-      data = MMAX(a, b);
+      a = comp_mask & HTRDR_PARTICLES ? par : 0;
+      b = comp_mask & HTRDR_GAS ? gas : 0;
+      data = a+b;
       break;
     default: FATAL("Unreachable code.\n"); break;
   }
@@ -969,10 +1149,10 @@ htrdr_sky_get_sw_spectral_bands_count(const struct htrdr_sky* sky)
 
 size_t
 htrdr_sky_get_sw_spectral_band_id
-  (const struct htrdr_sky* sky, const size_t iband)
+  (const struct htrdr_sky* sky, const size_t i)
 {
-  ASSERT(sky && iband < htrdr_sky_get_sw_spectral_bands_count(sky));
-  return sky->sw_bands_range[0] + iband;
+  ASSERT(sky && i < htrdr_sky_get_sw_spectral_bands_count(sky));
+  return sky->sw_bands_range[0] + i;
 }
 
 res_T

@@ -373,9 +373,14 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    const size_t iband = htrdr_sky_get_sw_spectral_band_id(htrdr->sky, 0);
-    res = htrdr_sky_dump_clouds_vtk(htrdr->sky, iband, 0, htrdr->output);
-    if(res != RES_OK) goto error;
+    const size_t nbands = htrdr_sky_get_sw_spectral_bands_count(htrdr->sky);
+    size_t i;
+    FOR_EACH(i, 0, nbands) {
+      const size_t iband = htrdr_sky_get_sw_spectral_band_id(htrdr->sky, i);
+      res = htrdr_sky_dump_clouds_vtk(htrdr->sky, iband, 0, htrdr->output);
+      if(res != RES_OK) goto error;
+      fprintf(htrdr->output, "---\n");
+    }
   } else {
     struct time t0, t1;
     char buf[128];
