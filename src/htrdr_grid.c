@@ -310,3 +310,12 @@ htrdr_grid_at(struct htrdr_grid* grid, const size_t xyz[3])
   return grid->data + xyz[2]*slice + xyz[1]*pitch + xyz[0]*grid->cell_sz;
 }
 
+void
+htrdr_grid_get_definition(struct htrdr_grid* grid, size_t definition[3])
+{
+  ASSERT(grid && definition);
+  definition[0] = grid->definition[0];
+  definition[1] = grid->definition[1];
+  definition[2] = grid->definition[2];
+}
+

@@ -17,6 +17,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
+#include "htrdr_grid.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 
@@ -31,6 +32,7 @@
 #include <rsys/hash_table.h>
 #include <rsys/ref_count.h>
 
+#include <libgen.h>
 #include <math.h>
 
 #define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
@@ -102,6 +104,9 @@ struct sw_band_prop {
 struct cloud {
   struct svx_tree* octree;
   struct svx_tree_desc octree_desc;
+
+  /* Cached data used to speed up the octree building */
+  struct htrdr_grid* grid;
 };
 
 struct htrdr_sky {
@@ -642,6 +647,88 @@ error:
 }
 
 static res_T
+setup_cloud_grid
+  (struct htrdr_sky* sky,
+   const size_t definition[3],
+   const size_t iband,
+   const char* htcp_filename,
+   const int force_update,
+   struct htrdr_grid** out_grid)
+{
+  struct htrdr_grid* grid = NULL;
+  struct str str;
+  struct build_octree_context ctx;
+  size_t sizeof_cell;
+  size_t xyz[3];
+  char buf[16];
+  res_T res = RES_OK;
+  ASSERT(sky && definition && htcp_filename && out_grid);
+  ASSERT(definition[0] && definition[1] && definition[2]);
+  ASSERT(iband >= sky->sw_bands_range[0] && iband <= sky->sw_bands_range[1]);
+
+  CHK((size_t)snprintf(buf, sizeof(buf), "_%lu_", iband) < sizeof(buf));
+
+  /* Build the grid name */
+  str_init(sky->htrdr->allocator, &str);
+  CHK(RES_OK == str_set(&str, htcp_filename));
+  CHK(RES_OK == str_set(&str, basename(str_get(&str))));
+  CHK(RES_OK == str_insert(&str, 0, ".htrdr_"));
+  CHK(RES_OK == str_append(&str, buf));
+  CHK(RES_OK == str_append(&str, ".grid"));
+
+  if(!force_update) {
+    /* Try to open the saved grid */
+    res = htrdr_grid_open(sky->htrdr, str_cget(&str), &grid);
+    if(res != RES_OK) {
+      htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&str));
+    } else {
+      size_t grid_def[3];
+
+      /* Check that the definition is the loaded grid is the same of the
+       * submitted grid definition */
+      htrdr_grid_get_definition(grid, grid_def);
+      if(grid_def[0] == definition[0]
+      && grid_def[1] == definition[1]
+      && grid_def[2] == definition[2])
+        goto exit; /* No more work to do. The loaded data seems valid */
+
+      /* The grid is no more valid. Update it! */
+      htrdr_grid_ref_put(grid);
+      grid = NULL;
+    }
+  }
+
+  sizeof_cell = NFLOATS_PER_COMPONENT * 2/*gas & particle*/ * sizeof(float);
+
+  res = htrdr_grid_create
+    (sky->htrdr, definition, sizeof_cell, str_cget(&str), 1, &grid);
+  if(res != RES_OK) goto error;
+
+  ctx.sky = sky;
+  ctx.dst_max = DBL_MAX; /* Unused for grid construction */
+  ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
+  ctx.iband = iband;
+
+  FOR_EACH(xyz[2], 0, definition[2]) {
+  FOR_EACH(xyz[1], 0, definition[1]) {
+  FOR_EACH(xyz[0], 0, definition[0]) {
+    float* data = htrdr_grid_at(grid, xyz);
+    vox_get(xyz, data, &ctx);
+  }}}
+
+exit:
+  *out_grid = grid;
+  str_release(&str);
+  return res;
+error:
+  if(grid) {
+    htrdr_grid_ref_put(grid);
+    grid = NULL;
+  }
+  goto exit;
+}
+
+static res_T
 setup_sw_bands_properties(struct htrdr_sky* sky)
 {
   res_T res = RES_OK;
@@ -822,7 +909,7 @@ htrdr_sky_create
   if(res != RES_OK) goto error;
 
   if(htcp_upd || htmie_upd || htgop_upd) {
-    htrdr_log(sky->htrdr, "Cloud cache needs to be rebuid.\n");
+    htrdr_log(sky->htrdr, "Cloud grid needs to be rebuid.\n");
   }
 
   res = setup_sw_bands_properties(sky);

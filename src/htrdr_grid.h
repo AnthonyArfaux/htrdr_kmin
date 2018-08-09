@@ -50,5 +50,10 @@ htrdr_grid_at
   (struct htrdr_grid* grid,
    const size_t xyz[3]);
 
+extern LOCAL_SYM void
+htrdr_grid_get_definition
+  (struct htrdr_grid* grid,
+   size_t definition[3]);
+
 #endif /* HTRDR_GRID_H */
 
