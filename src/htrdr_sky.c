@@ -946,7 +946,7 @@ htrdr_sky_fetch_raw_property
 
     /* Fetch the optical properties wrt x_h2o */
     switch(prop) {
-      case HTRDR_Ka: 
+      case HTRDR_Ka:
         HTGOP(layer_sw_spectral_interval_tab_fetch_ka(&tab, x_h2o, &k_gas));
         break;
       case HTRDR_Ks:
@@ -1106,7 +1106,6 @@ htrdr_sky_fetch_svx_voxel_property
   const float* par_data = NULL;
   const float* gas_data = NULL;
   int comp_mask = components_mask;
-  double a, b, data;
   double gas = 0;
   double par = 0;
   ASSERT(sky && voxel);
@@ -1123,21 +1122,9 @@ htrdr_sky_fetch_svx_voxel_property
   if(comp_mask & HTRDR_GAS) {
     gas = gas_data[prop * HTRDR_SVX_OPS_COUNT__ + op];
   }
-
-  switch(op) {
-    case HTRDR_SVX_MIN:
-      a = comp_mask & HTRDR_PARTICLES ? par : DBL_MAX;
-      b = comp_mask & HTRDR_GAS ? gas : DBL_MAX;
-      data = MMIN(a, b);
-      break;
-    case HTRDR_SVX_MAX:
-      a = comp_mask & HTRDR_PARTICLES ? par : 0;
-      b = comp_mask & HTRDR_GAS ? gas : 0;
-      data = a+b;
-      break;
-    default: FATAL("Unreachable code.\n"); break;
-  }
-  return data;
+  /* Interval arithmetic to ensure that the returned Min/Max includes the
+   * Min/Max of the "gas + particles mixture" */
+  return par + gas;
 }
 
 size_t
