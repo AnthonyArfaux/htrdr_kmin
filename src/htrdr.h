@@ -20,6 +20,15 @@
 #include <rsys/ref_count.h>
 #include <rsys/str.h>
 
+/* Helper macro that asserts if the invocation of the htrdr function `Func'
+ * returns an error. One should use this macro on htcp function calls for
+ * which no explicit error checking is performed */
+#ifndef NDEBUG
+  #define HTRDR(Func) ASSERT(htrdr_ ## Func == RES_OK)
+#else
+  #define HTRDR(Func) htrdr_ ## Func
+#endif
+
 /* Forward declarations */
 struct htrdr_args;
 struct htrdr_buffer;

@@ -37,6 +37,7 @@ extern LOCAL_SYM  res_T
 open_output_stream
   (struct htrdr* htrdr,
    const char* filename,
+   const int read, /* Enable read access */
    int force_overwrite,
    FILE** out_fp);
 

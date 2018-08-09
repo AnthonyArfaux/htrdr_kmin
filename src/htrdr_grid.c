@@ -84,7 +84,7 @@ htrdr_grid_create
   long grid_offset;
   int n;
   res_T res = RES_OK;
-  ASSERT(!htrdr || !out_grid || !filename || !definition);
+  ASSERT(htrdr && out_grid && filename && definition);
 
   if(!definition[0] || !definition[1] || !definition[2]) {
     htrdr_log_err(htrdr, "%s: invalid definition [%lu, %lu, %lu].\n", FUNC_NAME,
@@ -115,13 +115,13 @@ htrdr_grid_create
   grid->pagesize = (size_t)sysconf(_SC_PAGESIZE);
   grid->htrdr = htrdr;
 
-  res = open_output_stream(htrdr, filename, force_overwrite, &grid->fp);
+  res = open_output_stream(htrdr, filename, 1, force_overwrite, &grid->fp);
   if(res != RES_OK) goto error;
 
   #define WRITE(Var, N, Name) {                                                \
     if(fwrite((Var), sizeof(*(Var)), (N), grid->fp) != (N)) {                  \
-      htrdr_log_err(htrdr, "%s:%s: could not write `%s'.\n",                   \
-        FUNC_NAME, filename, (Name));                                          \
+      htrdr_log_err(htrdr, "%s:%s: could not write `%s' -- %s.\n",             \
+        FUNC_NAME, filename, (Name), strerror(errno));                         \
       res = RES_IO_ERR;                                                        \
       goto error;                                                              \
     }                                                                          \
@@ -159,12 +159,15 @@ htrdr_grid_create
   }
 
   /* Write one char at the end of the file to position the EOF indicator */
-  CHK(fseek(grid->fp, -1, SEEK_CUR) == 1);
+  CHK(fseek(grid->fp, -1, SEEK_CUR) != -1);
   WRITE(&byte, 1, "Dummy Byte");
   #undef WRITE
 
+  /* Avoid to be positionned on the EOF */
+  rewind(grid->fp);
+
   grid->data = mmap(NULL, grid_sz, PROT_READ|PROT_WRITE,
-    MAP_PRIVATE|MAP_POPULATE, fileno(grid->fp), grid_offset);
+    MAP_SHARED|MAP_POPULATE, fileno(grid->fp), grid_offset);
   if(grid->data == MAP_FAILED) {
     htrdr_log_err(htrdr, "%s:%s: could not map the grid data -- %s.\n",
       FUNC_NAME, filename, strerror(errno));
@@ -239,7 +242,7 @@ htrdr_grid_open
     goto error;
   }
 
-  READ(&grid->definition, 3, "definition");
+  READ(grid->definition, 3, "definition");
   if(!grid->definition[0] || !grid->definition[1] || !grid->definition[2]) {
     htrdr_log_err(htrdr, "%s:%s: invalid definition [%lu, %lu, %lu].\n",
       FUNC_NAME, filename,
@@ -259,7 +262,7 @@ htrdr_grid_open
   grid_sz = ALIGN_SIZE(grid_sz, grid->pagesize);
 
   grid->data = mmap(NULL, grid_sz, PROT_READ|PROT_WRITE,
-    MAP_PRIVATE|MAP_POPULATE, fileno(grid->fp), (off_t)grid_offset);
+    MAP_SHARED|MAP_POPULATE, fileno(grid->fp), (off_t)grid_offset);
 
   if(grid->data == MAP_FAILED) {
     htrdr_log_err(htrdr, "%s:%s: could not map the grid data -- %s.\n",

@@ -220,7 +220,7 @@ htrdr_init
     output_name = "<stdout>";
   } else {
     res = open_output_stream
-      (htrdr, args->output, args->force_overwriting, &htrdr->output);
+      (htrdr, args->output, 0/*read*/, args->force_overwriting, &htrdr->output);
     if(res != RES_OK) goto error;
     output_name = args->output;
   }
@@ -395,24 +395,29 @@ extern LOCAL_SYM  res_T
 open_output_stream
   (struct htrdr* htrdr,
    const char* filename,
+   const int read,
    int force_overwrite,
    FILE** out_fp)
 {
   FILE* fp = NULL;
   int fd = -1;
+  const char* mode;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_fp);
 
+  mode = read ? "w+" : "w";
+
   if(force_overwrite) {
-    fp = fopen(filename, "w");
+    fp = fopen(filename, mode);
     if(!fp) {
       htrdr_log_err(htrdr, "could not open the output file `%s'.\n", filename);
       goto error;
     }
   } else {
-    fd = open(filename, O_CREAT|O_WRONLY|O_EXCL|O_TRUNC, S_IRUSR|S_IWUSR);
+    const int access_flags = read ? O_RDWR : O_WRONLY;
+    fd = open(filename, O_CREAT|O_EXCL|O_TRUNC|access_flags, S_IRUSR|S_IWUSR);
     if(fd >= 0) {
-      fp = fdopen(fd, "w");
+      fp = fdopen(fd, mode);
       if(fp == NULL) {
         htrdr_log_err(htrdr, "could not open the output file `%s'.\n", filename);
         goto error;
