@@ -755,6 +755,9 @@ htrdr_sky_create
    struct htrdr_sky** out_sky)
 {
   struct htrdr_sky* sky = NULL;
+  int htcp_upd = 1;
+  int htmie_upd = 1;
+  int htgop_upd = 1;
   res_T res = RES_OK;
   ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
 
@@ -809,6 +812,17 @@ htrdr_sky_create
     htrdr_log_err(htrdr, "error loading the gas optical properties -- `%s'.\n",
       htgop_filename);
     goto error;
+  }
+
+  res = is_file_updated(sky->htrdr, htcp_filename, &htcp_upd);
+  if(res != RES_OK) goto error;
+  res = is_file_updated(sky->htrdr, htmie_filename, &htmie_upd);
+  if(res != RES_OK) goto error;
+  res = is_file_updated(sky->htrdr, htgop_filename, &htgop_upd);
+  if(res != RES_OK) goto error;
+
+  if(htcp_upd || htmie_upd || htgop_upd) {
+    htrdr_log(sky->htrdr, "Cloud cache needs to be rebuid.\n");
   }
 
   res = setup_sw_bands_properties(sky);

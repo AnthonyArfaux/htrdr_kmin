@@ -13,38 +13,42 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_C_H
-#define HTRDR_C_H
+#ifndef HTRDR_GRID_H
+#define HTRDR_GRID_H
 
-#define SW_WAVELENGTH_MIN 380 /* In nanometer */
-#define SW_WAVELENGTH_MAX 780 /* In nanometer */
+#include <rsys/rsys.h>
 
-/* In nanometer */
-static FINLINE double
-wavenumber_to_wavelength(const double nu/*In cm^-1*/)
-{
-  return 1.e7 / nu;
-}
-
-/* In cm^-1 */
-static FINLINE double
-wavelength_to_wavenumber(const double lambda/*In nanometer*/)
-{
-  return wavenumber_to_wavelength(lambda);
-}
-
-extern LOCAL_SYM  res_T
-open_output_stream
-  (struct htrdr* htrdr,
-   const char* filename,
-   int force_overwrite,
-   FILE** out_fp);
+/* Forwared declarations */
+struct htrdr;
+struct htrdr_grid;
 
 extern LOCAL_SYM res_T
-is_file_updated
+htrdr_grid_create
+  (struct htrdr* htrdr,
+   const size_t definition[3],
+   const size_t sizeof_cell, /* Size of an cell in Bytes */
+   const char* filename,
+   const int force_overwrite,
+   struct htrdr_grid** grid);
+
+extern LOCAL_SYM res_T
+htrdr_grid_open
   (struct htrdr* htrdr,
    const char* filename,
-   int* is_upd);
+   struct htrdr_grid** grid);
 
-#endif /* HTRDR_C_H */
+extern LOCAL_SYM void
+htrdr_grid_ref_get
+  (struct htrdr_grid* grid);
+
+extern LOCAL_SYM void
+htrdr_grid_ref_put
+  (struct htrdr_grid* grid);
+
+extern LOCAL_SYM void*
+htrdr_grid_at
+  (struct htrdr_grid* grid,
+   const size_t xyz[3]);
+
+#endif /* HTRDR_GRID_H */
 

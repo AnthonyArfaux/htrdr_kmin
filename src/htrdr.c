@@ -97,55 +97,6 @@ log_msg
 }
 
 static res_T
-open_output_stream(struct htrdr* htrdr, const struct htrdr_args* args)
-{
-  FILE* fp = NULL;
-  int fd = -1;
-  res_T res = RES_OK;
-  ASSERT(htrdr && args);
-
-  if(args->force_overwriting) {
-    fp = fopen(args->output, "w");
-    if(!fp) {
-      htrdr_log_err(htrdr,
-        "could not open the output file `%s'.\n", args->output);
-      goto error;
-    }
-  } else {
-    fd = open(args->output, O_CREAT|O_WRONLY|O_EXCL|O_TRUNC, S_IRUSR|S_IWUSR);
-    if(fd >= 0) {
-      fp = fdopen(fd, "w");
-      if(fp == NULL) {
-        htrdr_log_err(htrdr,
-          "could not open the output file `%s'.\n", args->output);
-        goto error;
-      }
-    } else if(errno == EEXIST) {
-      htrdr_log_err(htrdr,
-        "the output file `%s' already exists. Use -f to overwrite it.\n",
-        args->output);
-      goto error;
-    } else {
-      htrdr_log_err(htrdr,
-        "unexpected error while opening the output file `%s'.\n", args->output);
-      goto error;
-    }
-  }
-exit:
-  htrdr->output = fp;
-  return res;
-error:
-  res = RES_IO_ERR;
-  if(fp) {
-    CHK(fclose(fp) == 0);
-    fp = NULL;
-  } else if(fd >= 0) {
-    CHK(close(fd) == 0);
-  }
-  goto exit;
-}
-
-static res_T
 dump_accum_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
@@ -268,7 +219,8 @@ htrdr_init
     htrdr->output = stdout;
     output_name = "<stdout>";
   } else {
-    res = open_output_stream(htrdr, args);
+    res = open_output_stream
+      (htrdr, args->output, args->force_overwriting, &htrdr->output);
     if(res != RES_OK) goto error;
     output_name = args->output;
   }
@@ -439,6 +391,56 @@ htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
+extern LOCAL_SYM  res_T
+open_output_stream
+  (struct htrdr* htrdr,
+   const char* filename,
+   int force_overwrite,
+   FILE** out_fp)
+{
+  FILE* fp = NULL;
+  int fd = -1;
+  res_T res = RES_OK;
+  ASSERT(htrdr && filename && out_fp);
+
+  if(force_overwrite) {
+    fp = fopen(filename, "w");
+    if(!fp) {
+      htrdr_log_err(htrdr, "could not open the output file `%s'.\n", filename);
+      goto error;
+    }
+  } else {
+    fd = open(filename, O_CREAT|O_WRONLY|O_EXCL|O_TRUNC, S_IRUSR|S_IWUSR);
+    if(fd >= 0) {
+      fp = fdopen(fd, "w");
+      if(fp == NULL) {
+        htrdr_log_err(htrdr, "could not open the output file `%s'.\n", filename);
+        goto error;
+      }
+    } else if(errno == EEXIST) {
+      htrdr_log_err(htrdr, "the output file `%s' already exists. \n",
+        filename);
+      goto error;
+    } else {
+      htrdr_log_err(htrdr,
+        "unexpected error while opening the output file `%s'.\n", filename);
+      goto error;
+    }
+  }
+exit:
+  *out_fp = fp;
+  return res;
+error:
+  res = RES_IO_ERR;
+  if(fp) {
+    CHK(fclose(fp) == 0);
+    fp = NULL;
+  } else if(fd >= 0) {
+    CHK(close(fd) == 0);
+  }
+  goto exit;
+}
+
 res_T
 is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
 {
@@ -449,7 +451,7 @@ is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
   struct timespec mtime;
   int fd = -1;
   int err;
-  int upd;
+  int upd = 1;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_upd);
 
