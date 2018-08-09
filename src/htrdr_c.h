@@ -33,5 +33,11 @@ wavelength_to_wavenumber(const double lambda/*In nanometer*/)
   return wavenumber_to_wavelength(lambda);
 }
 
+extern LOCAL_SYM res_T
+is_file_updated
+  (struct htrdr* htrdr,
+   const char* filename,
+   int* is_upd);
+
 #endif /* HTRDR_C_H */
 

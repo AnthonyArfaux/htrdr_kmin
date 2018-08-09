@@ -13,9 +13,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* open support */
+#define _POSIX_C_SOURCE 200809L /* stat.st_tim support */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
@@ -25,6 +26,7 @@
 
 #include <rsys/clock_time.h>
 #include <rsys/mem_allocator.h>
+#include <rsys/str.h>
 
 #include <star/s3d.h>
 #include <star/s3daw.h>
@@ -32,10 +34,12 @@
 #include <star/svx.h>
 
 #include <errno.h>
+#include <fcntl.h> /* open */
+#include <libgen.h> /* basename */
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h> /* open */
+#include <sys/time.h> /* timespec */
 #include <sys/stat.h> /* S_IRUSR & S_IWUSR */
 
 #include <omp.h>
@@ -432,3 +436,95 @@ htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
   va_end(vargs_list);
 }
 
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
+{
+  struct str str;
+  struct stat statbuf;
+  ssize_t n;
+  off_t size;
+  struct timespec mtime;
+  int fd = -1;
+  int err;
+  int upd;
+  res_T res = RES_OK;
+  ASSERT(htrdr && filename && out_upd);
+
+  str_init(htrdr->allocator, &str);
+
+  err = stat(filename, &statbuf);
+  if(err) {
+    htrdr_log_err(htrdr, "%s: could not stat the file -- %s.\n",
+      filename, strerror(errno));
+    res = RES_IO_ERR;
+    goto error;
+  }
+
+  if(!S_ISREG(statbuf.st_mode)) {
+    htrdr_log_err(htrdr, "%s: not a regular file.\n", filename);
+    res = RES_IO_ERR;
+    goto error;
+  }
+
+  #define CHK_STR(Func, ErrMsg) {                                              \
+    res = str_##Func;                                                          \
+    if(res != RES_OK) {                                                        \
+      htrdr_log_err(htrdr, "%s: "ErrMsg"\n", filename);                        \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+  CHK_STR(set(&str, filename), "could not copy the filename");
+  CHK_STR(set(&str, basename(str_get(&str))), "could not setup the basename");
+  CHK_STR(insert(&str, 0, ".htrdr_"), "could not setup the stamp prefix");
+  CHK_STR(append(&str, ".stamp"), "could not setup the stamp extension");
+  #undef CHK_STR
+
+  #define CHK_IO(Func, ErrMsg) {                                               \
+    if((Func) < 0) {                                                           \
+      htrdr_log_err(htrdr, "%s: "ErrMsg" -- %s.\n",                            \
+        str_cget(&str), strerror(errno));                                      \
+      res = RES_IO_ERR;                                                        \
+      goto error;                                                              \
+    }                                                                          \
+  } (void) 0
+
+  fd = open(str_cget(&str), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+  CHK_IO(fd, "could not open/create the file");
+
+  CHK_IO(n = read(fd, &mtime, sizeof(mtime)), "could read the `mtime' data");
+
+  upd = (size_t)n != sizeof(mtime)
+      ||mtime.tv_nsec != statbuf.st_mtim.tv_nsec
+      ||mtime.tv_sec  != statbuf.st_mtim.tv_sec;
+
+  if(!upd) {
+    CHK_IO(n = read(fd, &size, sizeof(size)), "could not read the `size' data");
+    upd = (size_t)n != sizeof(size) || statbuf.st_size != size;
+  }
+
+  if(upd) {
+    CHK_IO(lseek(fd, 0, SEEK_SET), "could not rewind the file descriptor");
+
+    /* NOTE: Ignore n >=0 but != sizeof(DATA). In such case stamp is currupted
+     * and on the next invocation on the same filename, this function will
+     * return 1 */
+    n = write(fd, &statbuf.st_mtim, sizeof(statbuf.st_mtim));
+    CHK_IO(n, "could not update the `mtime' data");
+    n = write(fd, &statbuf.st_size, sizeof(statbuf.st_size));
+    CHK_IO(n, "could not update the `size' data");
+
+    CHK_IO(fsync(fd), "could not sync the file with storage device");
+  }
+
+  #undef CHK_IO
+exit:
+  *out_upd = upd;
+  str_release(&str);
+  if(fd >= 0) CHK(close(fd) == 0);
+  return res;
+error:
+  goto exit;
+}
