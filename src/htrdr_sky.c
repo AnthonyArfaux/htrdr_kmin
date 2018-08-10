@@ -547,7 +547,8 @@ setup_cloud_grid
   struct str str;
   struct build_octree_context ctx = BUILD_OCTREE_CONTEXT_NULL;
   size_t sizeof_cell;
-  size_t xyz[3];
+  uint64_t mcode;
+  uint64_t mcode_max;
   char buf[16];
   res_T res = RES_OK;
   ASSERT(sky && definition && htcp_filename && out_grid);
@@ -578,7 +579,7 @@ setup_cloud_grid
       if(grid_def[0] == definition[0]
       && grid_def[1] == definition[1]
       && grid_def[2] == definition[2]) {
-        htrdr_log(sky->htrdr, 
+        htrdr_log(sky->htrdr,
           "Use the precomputed grid `%s'.\n", str_cget(&str));
         goto exit; /* No more work to do. The loaded data seems valid */
       }
@@ -602,12 +603,18 @@ setup_cloud_grid
   ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
   ctx.iband = iband;
 
-  FOR_EACH(xyz[2], 0, definition[2]) {
-  FOR_EACH(xyz[1], 0, definition[1]) {
-  FOR_EACH(xyz[0], 0, definition[0]) {
-    float* data = htrdr_grid_at(grid, xyz);
-    vox_get(xyz, data, &ctx);
-  }}}
+  mcode_max = MMAX(MMAX(definition[0], definition[1]), definition[2]);
+  mcode_max = round_up_pow2(mcode_max);
+  mcode_max = mcode_max*mcode_max*mcode_max;
+
+  #pragma omp parallel for
+  for(mcode=0; mcode<mcode_max; ++mcode) {
+    size_t xyz[3];
+    if((xyz[0] = morton3D_decode_u21(mcode >> 2)) >= definition[0]) continue;
+    if((xyz[1] = morton3D_decode_u21(mcode >> 1)) >= definition[1]) continue;
+    if((xyz[2] = morton3D_decode_u21(mcode >> 0)) >= definition[2]) continue;
+    vox_get(xyz, htrdr_grid_at_mcode(grid, mcode), &ctx);
+  }  
 
 exit:
   *out_grid = grid;
@@ -728,7 +735,7 @@ setup_clouds
   FOR_EACH(i, 0, nbands) {
     ctx.iband = i + sky->sw_bands_range[0];
 
-    /* Compute raw grid */
+    /* Compute grid of voxels data */
     res = setup_cloud_grid(sky, nvoxs, ctx.iband, htcp_filename,
       force_cache_update, &ctx.grid);
     if(res != RES_OK) goto error;
