@@ -111,7 +111,7 @@ scattering_hit_filter
       pos[2] = org[2] + ctx->traversal_dst * dir[2];
 
       ks = htrdr_sky_fetch_raw_property(ctx->sky, HTRDR_Ks,
-        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, pos);
+        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, pos, -DBL_MAX, DBL_MAX);
 
       /* Handle the case that ks_max is not *really* the max */
       proba = ks / ks_max;
@@ -185,7 +185,7 @@ transmissivity_hit_filter
       x[2] = org[2] + ctx->traversal_dst * dir[2];
 
       k = htrdr_sky_fetch_raw_property(ctx->sky, ctx->prop,
-        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, x);
+        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, x, k_min, k_max);
       ASSERT(k >= k_min && k <= k_max);
 
       /* Handle the case that k_max is not *really* the max */
@@ -429,9 +429,9 @@ htrdr_compute_radiance_sw
       double ks; /* Overall scattering coefficient */
 
       ks_gas = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, iband, iquad, pos_next);
+        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks_particle = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, iband, iquad, pos_next);
+        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);

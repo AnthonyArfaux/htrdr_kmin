@@ -276,41 +276,73 @@ vox_get_particle
     ks_min = ks_max = ks = Cs_avg * rho_da * rct;
     kext_min = kext_max = kext = ka + ks;
   } else {
-    size_t ivox[3];
-    size_t ivox_next;
-    ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
+    double vox_low[3], vox_upp[3];
+    double colsz;
+    double tmp0, tmp1;
+    double pos_z;
+    double delta;
+    size_t ivox_z_prev;
+    size_t ilow, iupp;
+    size_t n;
 
-    ivox[0] = xyz[0];
-    ivox[1] = xyz[1];
-    ivox[2] = darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2]].index;
+/** TODO Factorize this with the gas */
+    htcp_desc_get_voxel_aabb
+      (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], vox_low, vox_upp);
 
-    rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
-    rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
+    /* Compute the normalized position of the lower/upper Z LES voxel
+     * coordinate along the Z dimension of the LES */
+    colsz = ctx->sky->htcp_desc.upper[2] - ctx->sky->htcp_desc.lower[2];
+    tmp0 = (vox_low[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
+    tmp1 = (vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
+    ASSERT(tmp0 >= 0 && tmp0 <= 1);
+    ASSERT(tmp1 >= 0 && tmp1 <= 1);
 
-    ka_min = ka_max = ka = Ca_avg * rho_da * rct;
-    ks_min = ks_max = ks = Cs_avg * rho_da * rct;
-    kext_min = kext_max = kext = ka + ks;
+    /* Compute the lower/upper *inclusive* bounds of the voxel into the
+     * svx2htcp_z LUT */
+    n = darray_split_size_get(&ctx->sky->svx2htcp_z);
+    ilow = tmp0 == 1 ? n - 1 : (size_t)(tmp0 * (double)n);
+    iupp = tmp1 == 1 ? n - 1 : (size_t)(tmp1 * (double)n);
+    ASSERT(ilow < iupp);
+/** TODO Factorize this with the gas */
 
-    /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
-    ivox_next = xyz[2] + 1 < darray_split_size_get(&ctx->sky->svx2htcp_z)
-      ? darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2] + 1].index
-      : ivox[2];
+    /* Compute the size of a LUT cell along the Z dimension */
+    delta = colsz / (double)n;
 
-    if(ivox_next != ivox[2]) {
-      ASSERT(ivox[2] < ivox_next);
-      ivox[2] = ivox_next;
+    ivox_z_prev = SIZE_MAX;
+    ka_min = ks_min = kext_min = DBL_MAX;
+    ka_max = ks_max = kext_max =-DBL_MAX;
+    pos_z = vox_low[2];
+    ASSERT(pos_z >= (double)ilow*delta && pos_z <= (double)iupp*delta);
 
+    /* Iterate over the LUT cells overlapped by the voxel */
+    FOR_EACH(i, ilow, iupp+1) {
+      size_t ivox[3];
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+i;
+      ASSERT(i < darray_split_size_get(&ctx->sky->svx2htcp_z));
+
+      ivox[0] = xyz[0];
+      ivox[1] = xyz[1];
+      ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+
+      pos_z = MMIN((double)(i+1)*delta, vox_upp[2]);
+
+      /* Does the LUT voxel overlap an already handled LES voxel? */
+      if(ivox[2] == ivox_z_prev) continue;
+      ivox_z_prev = ivox[2];
+
+      /* Compute the radiative properties */
       rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, ivox);
       rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, ivox[0], ivox[1], ivox[2], 0);
       ka = Ca_avg * rho_da * rct;
       ks = Cs_avg * rho_da * rct;
       kext = ka + ks;
 
-      ka_min = MMIN(ka_min, ka);
+      /* Update the boundaries of the radiative properties */
+      ka_min = MMIN(ka_min, ka);  
       ka_max = MMAX(ka_max, ka);
-      ks_min = MMIN(ks_min, ks);
+      ks_min = MMIN(ks_min, ks); 
       ks_max = MMAX(ks_max, ks);
-      kext_min = MMIN(kext_min, kext);
+      kext_min = MMIN(kext_min, kext); 
       kext_max = MMAX(kext_max, kext);
     }
   }
@@ -344,11 +376,15 @@ vox_get_gas
   size_t layer_range[2];
   size_t quad_range[2];
   double x_h2o_range[2];
-  double lower[3], upper[3]; /* AABB */
+  double vox_low[3], vox_upp[3]; /* Voxel AABB */
   double ka[2] = {DBL_MAX, -DBL_MAX};
   double ks[2] = {DBL_MAX, -DBL_MAX};
   double kext[2] = {DBL_MAX, -DBL_MAX};
   ASSERT(xyz && gas && ctx);
+
+  /* Retrieve the range of atmospheric layers that overlap the SVX voxel */
+  htcp_desc_get_voxel_aabb
+    (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], vox_low, vox_upp);
 
   /* Define the xH2O range from the LES data */
   if(!ctx->sky->htcp_desc.irregular_z) { /* 1 LES voxel <=> 1 SVX voxel */
@@ -356,38 +392,70 @@ vox_get_gas
     x_h2o = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, xyz);
     x_h2o_range[0] = x_h2o_range[1] = x_h2o;
   } else { /* A SVX voxel can be overlapped by 2 LES voxels */
-    size_t ivox[3];
-    size_t ivox_next;
+    double colsz;
+    double delta;
+    double pos_z;
+    double tmp0, tmp1;
+    size_t ilow, iupp;
+    size_t ivox_z_prev;
+    size_t i, n;
     ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
-    ivox[0] = xyz[0];
-    ivox[1] = xyz[1];
-    ivox[2] = darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2]].index;
+/** TODO Factorize this with the particle */
+    /* Compute the normalized position of the lower/upper Z voxel coordinate
+     * along the Z dimension of the LES */
+    colsz = ctx->sky->htcp_desc.upper[2] - ctx->sky->htcp_desc.lower[2];
+    tmp0 = (vox_low[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
+    tmp1 = (vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
+    ASSERT(tmp0 >= 0 && tmp0 <= 1);
+    ASSERT(tmp1 >= 0 && tmp1 <= 1);
 
-    x_h2o_range[0] = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
+    /* Compute the lower/upper *inclusive* bounds of the voxel into the
+     * svx2htcp_z LUT */
+    n = darray_split_size_get(&ctx->sky->svx2htcp_z);
+    ilow = tmp0 == 1 ? n - 1 : (size_t)(tmp0 * (double)n);
+    iupp = tmp1 == 1 ? n - 1 : (size_t)(tmp1 * (double)n);
+    ASSERT(ilow < iupp);
+/** TODO Factorize this with the particle */
 
-    /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
-    ivox_next = xyz[2] + 1 < darray_split_size_get(&ctx->sky->svx2htcp_z)
-      ? darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2] + 1].index
-      : ivox[2];
+    /* Compute the size of a LUT cell along the Z dimension */
+    delta = colsz / (double)n;
 
-    if(ivox_next == ivox[2]) { /* No overlap */
-      x_h2o_range[1] = x_h2o_range[0];
-    } else { /* Overlap */
-      ASSERT(ivox[2] < ivox_next);
-      ivox[2] = ivox_next;
-      x_h2o_range[1] =
-        cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
-      if(x_h2o_range[0] > x_h2o_range[1])
-        SWAP(double, x_h2o_range[0], x_h2o_range[1]);
+    pos_z = vox_low[2];
+    ivox_z_prev = SIZE_MAX;
+    x_h2o_range[0] = DBL_MAX;
+    x_h2o_range[1] =-DBL_MAX;
+
+    ASSERT(pos_z >= (double)ilow*delta && pos_z <= (double)iupp*delta);
+
+    /* Iterate over the LUT cells overlapped by the voxel */
+    FOR_EACH(i, ilow, iupp+1) {
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+i;
+      size_t ivox[3];
+      double x_h2o;
+      ASSERT(i < darray_split_size_get(&ctx->sky->svx2htcp_z));
+
+      ivox[0] = xyz[0];
+      ivox[1] = xyz[1];
+      ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+
+      pos_z = MMIN((double)(i+1)*delta, vox_upp[2]);
+
+      /* Does the LUT voxel overlap an already handled LES voxel? */
+      if(ivox[2] == ivox_z_prev) continue; 
+      ivox_z_prev = ivox[2];
+
+      /* Compute the xH2O for the current LES voxel */
+      x_h2o = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
+
+      /* Update the xH2O range of the SVX voxel */
+      x_h2o_range[0] = MMIN(x_h2o, x_h2o_range[0]);
+      x_h2o_range[1] = MMAX(x_h2o, x_h2o_range[1]);
     }
   }
 
-  /* Retrieve the range of atmospheric layers that overlap the SVX voxel */
-  htcp_desc_get_voxel_aabb
-    (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], lower, upper);
-  HTGOP(position_to_layer_id(ctx->sky->htgop, lower[2], &layer_range[0]));
-  HTGOP(position_to_layer_id(ctx->sky->htgop, upper[2], &layer_range[1]));
+  HTGOP(position_to_layer_id(ctx->sky->htgop, vox_low[2], &layer_range[0]));
+  HTGOP(position_to_layer_id(ctx->sky->htgop, vox_upp[2], &layer_range[1]));
 
   /* For each atmospheric layer that overlaps the SVX voxel ... */
   FOR_EACH(ilayer, layer_range[0], layer_range[1]+1) {
@@ -736,7 +804,7 @@ setup_clouds
   /* Setup the build context */
   ctx.sky = sky;
   ctx.dst_max = sz[2];
-  ctx.tau_threshold = 0.5;
+  ctx.tau_threshold = 0.1;
 
   /* Setup the voxel descriptor */
   vox_desc.get = vox_get;
@@ -1036,7 +1104,9 @@ htrdr_sky_fetch_raw_property
    const int components_mask, /* Combination of htrdr_sky_component_flag */
    const size_t iband, /* Index of the spectral band */
    const size_t iquad, /* Index of the quadrature point in the spectral band */
-   const double pos[3])
+   const double pos[3],
+   double k_min,
+   double k_max)
 {
   size_t ivox[3];
   size_t i;
@@ -1078,7 +1148,7 @@ htrdr_sky_fetch_raw_property
     const double sz = cloud_desc->upper[2] - cloud_desc->lower[2];
     const double vxsz_lut = sz / (double)n;
     const size_t ilut = (size_t)((pos[2] - cloud_desc->lower[2])/vxsz_lut);
-    ivox[2] = splits[ilut].index + (pos[2] >= splits[ilut].height);
+    ivox[2] = splits[ilut].index + (pos[2] > splits[ilut].height);
   }
 
   if(comp_mask & HTRDR_PARTICLES) {
@@ -1132,6 +1202,7 @@ htrdr_sky_fetch_raw_property
   }
 
   k = k_particle + k_gas;
+  ASSERT(k >= k_min && k <= k_max);
   return k;
 }
 
