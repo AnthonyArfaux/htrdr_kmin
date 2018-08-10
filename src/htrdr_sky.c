@@ -34,6 +34,7 @@
 
 #include <libgen.h>
 #include <math.h>
+#include <omp.h>
 
 #define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
 #define H2O_MOLAR_MASS 0.01801528 /* In kg.mol^-1 */
@@ -547,9 +548,12 @@ setup_cloud_grid
   struct str str;
   struct build_octree_context ctx = BUILD_OCTREE_CONTEXT_NULL;
   size_t sizeof_cell;
+  size_t ncells;
   uint64_t mcode;
   uint64_t mcode_max;
   char buf[16];
+  size_t progress = 0;
+  ATOMIC ncells_computed = 0;
   res_T res = RES_OK;
   ASSERT(sky && definition && htcp_filename && out_grid);
   ASSERT(definition[0] && definition[1] && definition[2]);
@@ -607,14 +611,34 @@ setup_cloud_grid
   mcode_max = round_up_pow2(mcode_max);
   mcode_max = mcode_max*mcode_max*mcode_max;
 
+  ncells = definition[0] * definition[1] * definition[2];
+
+  fprintf(stderr, "Generating cloud grid %lu: %3u%%", iband, 0);
+  fflush(stderr);
+
+  omp_set_num_threads((int)sky->htrdr->nthreads);
+
   #pragma omp parallel for
   for(mcode=0; mcode<mcode_max; ++mcode) {
     size_t xyz[3];
+    size_t pcent;
+    size_t n;
     if((xyz[0] = morton3D_decode_u21(mcode >> 2)) >= definition[0]) continue;
     if((xyz[1] = morton3D_decode_u21(mcode >> 1)) >= definition[1]) continue;
     if((xyz[2] = morton3D_decode_u21(mcode >> 0)) >= definition[2]) continue;
     vox_get(xyz, htrdr_grid_at_mcode(grid, mcode), &ctx);
-  }  
+
+    n = (size_t)ATOMIC_INCR(&ncells_computed);
+    pcent = n * 100 / ncells;
+    #pragma omp critical 
+    if(pcent > progress) {
+      progress = pcent;
+      fprintf(stderr, "%c[2K\rGenerating cloud grid %lu: %3u%%",
+        27, iband, (unsigned)pcent);
+      fflush(stderr);
+    }
+  }
+  fprintf(stderr, "\n");
 
 exit:
   *out_grid = grid;
