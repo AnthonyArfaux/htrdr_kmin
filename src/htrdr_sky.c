@@ -55,7 +55,15 @@ struct build_octree_context {
   double dst_max; /* Max traversal distance */
   double tau_threshold; /* Threshold criteria for the merge process */
   size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
+
+  /* Precomputed voxel data of the finest level. May be NULL <=> compute the
+   * voxel data at runtime. */
+  struct htrdr_grid* grid;
 };
+
+#define BUILD_OCTREE_CONTEXT_NULL__ { NULL, 0, 0, 0, NULL }
+static const struct build_octree_context BUILD_OCTREE_CONTEXT_NULL =
+  BUILD_OCTREE_CONTEXT_NULL__;
 
 struct vertex {
   double x;
@@ -82,8 +90,8 @@ vertex_eq(const struct vertex* v0, const struct vertex* v1)
 struct octree_data {
   struct htable_vertex vertex2id; /* Map a coordinate to its vertex id */
   struct darray_double vertices; /* Array of unique vertices */
-  struct darray_double data;
-  struct darray_size_t cells;
+  struct darray_double data; /* List of registered leaf data */
+  struct darray_size_t cells; /* Ids of the cell vertices */
   size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
   size_t iquad; /* Index of the quadrature point into the band */
   const struct htrdr_sky* sky;
@@ -104,9 +112,6 @@ struct sw_band_prop {
 struct cloud {
   struct svx_tree* octree;
   struct svx_tree_desc octree_desc;
-
-  /* Cached data used to speed up the octree building */
-  struct htrdr_grid* grid;
 };
 
 struct htrdr_sky {
@@ -152,7 +157,7 @@ cloud_dry_air_density
 
 /* Compute the water molar fraction */
 static FINLINE double
-cloud_water_molar_fraction
+cloud_water_vapor_molar_fraction
   (const struct htcp_desc* desc,
    const size_t ivox[3])
 {
@@ -346,7 +351,8 @@ vox_get_gas
 
   /* Define the xH2O range from the LES data */
   if(!ctx->sky->htcp_desc.irregular_z) { /* 1 LES voxel <=> 1 SVX voxel */
-    const double x_h2o = cloud_water_molar_fraction(&ctx->sky->htcp_desc, xyz);
+    double x_h2o;
+    x_h2o = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, xyz);
     x_h2o_range[0] = x_h2o_range[1] = x_h2o;
   } else { /* A SVX voxel can be overlapped by 2 LES voxels */
     size_t ivox[3];
@@ -357,7 +363,7 @@ vox_get_gas
     ivox[1] = xyz[1];
     ivox[2] = darray_split_cdata_get(&ctx->sky->svx2htcp_z)[xyz[2]].index;
 
-    x_h2o_range[0] = cloud_water_molar_fraction(&ctx->sky->htcp_desc, ivox);
+    x_h2o_range[0] = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
 
     /* Define if the SVX voxel is overlapped by 2 HTCP voxels */
     ivox_next = xyz[2] + 1 < darray_split_size_get(&ctx->sky->svx2htcp_z)
@@ -369,7 +375,8 @@ vox_get_gas
     } else { /* Overlap */
       ASSERT(ivox[2] < ivox_next);
       ivox[2] = ivox_next;
-      x_h2o_range[1]  = cloud_water_molar_fraction(&ctx->sky->htcp_desc, ivox);
+      x_h2o_range[1] =
+        cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
       if(x_h2o_range[0] > x_h2o_range[1])
         SWAP(double, x_h2o_range[0], x_h2o_range[1]);
     }
@@ -425,12 +432,21 @@ vox_get_gas
 }
 
 static void
-vox_get(const size_t xyz[3], void* dst, void* ctx)
+vox_get(const size_t xyz[3], void* dst, void* context)
 {
-  float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
-  float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
-  vox_get_particle(xyz, par, ctx);
-  vox_get_gas(xyz, gas, ctx);
+  struct build_octree_context* ctx = context;
+  ASSERT(context);
+
+  if(ctx->grid) { /* Fetch voxel data from precomputed grid */
+    const float* vox_data = htrdr_grid_at(ctx->grid, xyz);
+    memcpy(dst, vox_data, NFLOATS_PER_COMPONENT*2*sizeof(float));
+  } else {
+    /* No precomputed grid. Compute the voxel data at runtime */
+    float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
+    float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
+    vox_get_particle(xyz, par, ctx);
+    vox_get_gas(xyz, gas, ctx);
+  }
 }
 
 static INLINE void
@@ -512,11 +528,107 @@ vox_challenge_merge
       && vox_challenge_merge_component(vox, nvoxs, 1*NFLOATS_PER_COMPONENT, ctx);
 }
 
+/* Create/load a grid of cloud data used by SVX to build the octree. The grid
+ * is saved in the directory where htrdr is run with a name generated from the
+ * "htcp_filename" path. If a grid with the same name exists, the function
+ * tries to load it except if the force_update flag is set. Even though the
+ * grid is loaded from disk, the function will recompute and store it if the
+ * definition of the loaded grid is different from the submitted definition. */
 static res_T
-setup_clouds(struct htrdr_sky* sky)
+setup_cloud_grid
+  (struct htrdr_sky* sky,
+   const size_t definition[3],
+   const size_t iband,
+   const char* htcp_filename,
+   const int force_update,
+   struct htrdr_grid** out_grid)
+{
+  struct htrdr_grid* grid = NULL;
+  struct str str;
+  struct build_octree_context ctx = BUILD_OCTREE_CONTEXT_NULL;
+  size_t sizeof_cell;
+  size_t xyz[3];
+  char buf[16];
+  res_T res = RES_OK;
+  ASSERT(sky && definition && htcp_filename && out_grid);
+  ASSERT(definition[0] && definition[1] && definition[2]);
+  ASSERT(iband >= sky->sw_bands_range[0] && iband <= sky->sw_bands_range[1]);
+
+  CHK((size_t)snprintf(buf, sizeof(buf), ".%lu", iband) < sizeof(buf));
+
+  /* Build the grid name */
+  str_init(sky->htrdr->allocator, &str);
+  CHK(RES_OK == str_set(&str, htcp_filename));
+  CHK(RES_OK == str_set(&str, basename(str_get(&str))));
+  CHK(RES_OK == str_insert(&str, 0, ".htrdr_"));
+  CHK(RES_OK == str_append(&str, ".grid"));
+  CHK(RES_OK == str_append(&str, buf));
+
+  if(!force_update) {
+    /* Try to open the saved grid */
+    res = htrdr_grid_open(sky->htrdr, str_cget(&str), &grid);
+    if(res != RES_OK) {
+      htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&str));
+    } else {
+      size_t grid_def[3];
+
+      /* Check that the definition is the loaded grid is the same of the
+       * submitted grid definition */
+      htrdr_grid_get_definition(grid, grid_def);
+      if(grid_def[0] == definition[0]
+      && grid_def[1] == definition[1]
+      && grid_def[2] == definition[2]) {
+        htrdr_log(sky->htrdr, 
+          "Use the precomputed grid `%s'.\n", str_cget(&str));
+        goto exit; /* No more work to do. The loaded data seems valid */
+      }
+
+      /* The grid is no more valid. Update it! */
+      htrdr_grid_ref_put(grid);
+      grid = NULL;
+    }
+  }
+
+  sizeof_cell = NFLOATS_PER_COMPONENT * 2/*gas & particle*/ * sizeof(float);
+
+  htrdr_log(sky->htrdr, "Compute the grid `%s'.\n", str_cget(&str));
+
+  res = htrdr_grid_create
+    (sky->htrdr, definition, sizeof_cell, str_cget(&str), 1, &grid);
+  if(res != RES_OK) goto error;
+
+  ctx.sky = sky;
+  ctx.dst_max = DBL_MAX; /* Unused for grid construction */
+  ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
+  ctx.iband = iband;
+
+  FOR_EACH(xyz[2], 0, definition[2]) {
+  FOR_EACH(xyz[1], 0, definition[1]) {
+  FOR_EACH(xyz[0], 0, definition[0]) {
+    float* data = htrdr_grid_at(grid, xyz);
+    vox_get(xyz, data, &ctx);
+  }}}
+
+exit:
+  *out_grid = grid;
+  str_release(&str);
+  return res;
+error:
+  if(grid) {
+    htrdr_grid_ref_put(grid);
+    grid = NULL;
+  }
+  goto exit;
+}
+
+static res_T
+setup_clouds
+  (struct htrdr_sky* sky,
+   const char* htcp_filename,
+   const int force_cache_update)
 {
   struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
-  struct build_octree_context ctx;
+  struct build_octree_context ctx = BUILD_OCTREE_CONTEXT_NULL;
   size_t nvoxs[3];
   double low[3];
   double upp[3];
@@ -537,7 +649,7 @@ setup_clouds(struct htrdr_sky* sky)
   nvoxs[1] = sky->htcp_desc.spatial_definition[1];
   nvoxs[2] = sky->htcp_desc.spatial_definition[2];
 
-  /* Define the octree AABB exepted for the Z dimension */
+  /* Define the octree AABB excepted for the Z dimension */
   low[0] = sky->htcp_desc.lower[0];
   low[1] = sky->htcp_desc.lower[1];
   low[2] = sky->htcp_desc.lower[2];
@@ -616,6 +728,11 @@ setup_clouds(struct htrdr_sky* sky)
   FOR_EACH(i, 0, nbands) {
     ctx.iband = i + sky->sw_bands_range[0];
 
+    /* Compute raw grid */
+    res = setup_cloud_grid(sky, nvoxs, ctx.iband, htcp_filename,
+      force_cache_update, &ctx.grid);
+    if(res != RES_OK) goto error;
+
     /* Create the octree */
     res = svx_octree_create
       (sky->htrdr->svx, low, upp, nvoxs, &vox_desc, &sky->clouds[i].octree);
@@ -628,11 +745,17 @@ setup_clouds(struct htrdr_sky* sky)
     /* Fetch the octree descriptor for future use */
     SVX(tree_get_desc
       (sky->clouds[i].octree, &sky->clouds[i].octree_desc));
+
+    if(ctx.grid) {
+      htrdr_grid_ref_put(ctx.grid);
+      ctx.grid = NULL;
+    }
   }
 
 exit:
   return res;
 error:
+  if(ctx.grid) htrdr_grid_ref_put(ctx.grid);
   if(sky->clouds) {
     FOR_EACH(i, 0, nbands) {
       if(sky->clouds[i].octree) {
@@ -643,88 +766,6 @@ error:
     MEM_RM(sky->htrdr->allocator, sky->clouds);
   }
   darray_split_clear(&sky->svx2htcp_z);
-  goto exit;
-}
-
-static res_T
-setup_cloud_grid
-  (struct htrdr_sky* sky,
-   const size_t definition[3],
-   const size_t iband,
-   const char* htcp_filename,
-   const int force_update,
-   struct htrdr_grid** out_grid)
-{
-  struct htrdr_grid* grid = NULL;
-  struct str str;
-  struct build_octree_context ctx;
-  size_t sizeof_cell;
-  size_t xyz[3];
-  char buf[16];
-  res_T res = RES_OK;
-  ASSERT(sky && definition && htcp_filename && out_grid);
-  ASSERT(definition[0] && definition[1] && definition[2]);
-  ASSERT(iband >= sky->sw_bands_range[0] && iband <= sky->sw_bands_range[1]);
-
-  CHK((size_t)snprintf(buf, sizeof(buf), "_%lu_", iband) < sizeof(buf));
-
-  /* Build the grid name */
-  str_init(sky->htrdr->allocator, &str);
-  CHK(RES_OK == str_set(&str, htcp_filename));
-  CHK(RES_OK == str_set(&str, basename(str_get(&str))));
-  CHK(RES_OK == str_insert(&str, 0, ".htrdr_"));
-  CHK(RES_OK == str_append(&str, buf));
-  CHK(RES_OK == str_append(&str, ".grid"));
-
-  if(!force_update) {
-    /* Try to open the saved grid */
-    res = htrdr_grid_open(sky->htrdr, str_cget(&str), &grid);
-    if(res != RES_OK) {
-      htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&str));
-    } else {
-      size_t grid_def[3];
-
-      /* Check that the definition is the loaded grid is the same of the
-       * submitted grid definition */
-      htrdr_grid_get_definition(grid, grid_def);
-      if(grid_def[0] == definition[0]
-      && grid_def[1] == definition[1]
-      && grid_def[2] == definition[2])
-        goto exit; /* No more work to do. The loaded data seems valid */
-
-      /* The grid is no more valid. Update it! */
-      htrdr_grid_ref_put(grid);
-      grid = NULL;
-    }
-  }
-
-  sizeof_cell = NFLOATS_PER_COMPONENT * 2/*gas & particle*/ * sizeof(float);
-
-  res = htrdr_grid_create
-    (sky->htrdr, definition, sizeof_cell, str_cget(&str), 1, &grid);
-  if(res != RES_OK) goto error;
-
-  ctx.sky = sky;
-  ctx.dst_max = DBL_MAX; /* Unused for grid construction */
-  ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
-  ctx.iband = iband;
-
-  FOR_EACH(xyz[2], 0, definition[2]) {
-  FOR_EACH(xyz[1], 0, definition[1]) {
-  FOR_EACH(xyz[0], 0, definition[0]) {
-    float* data = htrdr_grid_at(grid, xyz);
-    vox_get(xyz, data, &ctx);
-  }}}
-
-exit:
-  *out_grid = grid;
-  str_release(&str);
-  return res;
-error:
-  if(grid) {
-    htrdr_grid_ref_put(grid);
-    grid = NULL;
-  }
   goto exit;
 }
 
@@ -845,6 +886,7 @@ htrdr_sky_create
   int htcp_upd = 1;
   int htmie_upd = 1;
   int htgop_upd = 1;
+  int force_upd = 1;
   res_T res = RES_OK;
   ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
 
@@ -901,21 +943,19 @@ htrdr_sky_create
     goto error;
   }
 
+  res = setup_sw_bands_properties(sky);
+  if(res != RES_OK) goto error;
+
+  /* Define if the cached grid data must be updated */
   res = is_file_updated(sky->htrdr, htcp_filename, &htcp_upd);
   if(res != RES_OK) goto error;
   res = is_file_updated(sky->htrdr, htmie_filename, &htmie_upd);
   if(res != RES_OK) goto error;
   res = is_file_updated(sky->htrdr, htgop_filename, &htgop_upd);
   if(res != RES_OK) goto error;
+  force_upd = htcp_upd || htmie_upd || htgop_upd;
 
-  if(htcp_upd || htmie_upd || htgop_upd) {
-    htrdr_log(sky->htrdr, "Cloud grid needs to be rebuid.\n");
-  }
-
-  res = setup_sw_bands_properties(sky);
-  if(res != RES_OK) goto error;
-
-  res = setup_clouds(sky);
+  res = setup_clouds(sky, htcp_filename, force_upd);
   if(res != RES_OK) goto error;
 
 exit:
@@ -1035,7 +1075,7 @@ htrdr_sky_fetch_raw_property
     struct htgop_layer layer;
     struct htgop_layer_sw_spectral_interval band;
     struct htgop_layer_sw_spectral_interval_tab tab;
-    const double x_h2o = cloud_water_molar_fraction(&sky->htcp_desc, ivox);
+    const double x_h2o = cloud_water_vapor_molar_fraction(&sky->htcp_desc, ivox);
     size_t ilayer = 0;
 
     /* Retrieve the quadrature point into the spectral band of the layer into

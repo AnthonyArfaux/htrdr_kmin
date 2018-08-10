@@ -238,7 +238,7 @@ htrdr_init
     goto error;
   }
 
-  /* Disable the Star-3D verbosity since the Embree backend print some messages
+  /* Disable the Star-3D verbosity since the Embree backend prints some messages
    * on stdout rather than stderr. This is annoying since stdout may be used by
    * htrdr to write output data */
   res = s3d_device_create
@@ -501,7 +501,7 @@ is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
   fd = open(str_cget(&str), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
   CHK_IO(fd, "could not open/create the file");
 
-  CHK_IO(n = read(fd, &mtime, sizeof(mtime)), "could read the `mtime' data");
+  CHK_IO(n = read(fd, &mtime, sizeof(mtime)), "could not read the `mtime' data");
 
   upd = (size_t)n != sizeof(mtime)
       ||mtime.tv_nsec != statbuf.st_mtim.tv_nsec

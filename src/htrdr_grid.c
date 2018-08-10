@@ -48,7 +48,11 @@ grid_release(ref_T* ref)
   struct htrdr_grid* grid;
   ASSERT(ref);
   grid = CONTAINER_OF(ref, struct htrdr_grid, ref);
-  if(grid->fp) fclose(grid->fp);
+  if(grid->fp) {
+    const int is_finalized = 1;
+    CHK(fwrite(&is_finalized, sizeof(int), 1, grid->fp) == 1);
+    fclose(grid->fp);
+  }
   if(grid->data) {
     size_t grid_sz;
     grid_sz =
@@ -82,6 +86,7 @@ htrdr_grid_create
   struct htrdr_grid* grid = NULL;
   size_t grid_sz;
   long grid_offset;
+  int is_finalized = 0;
   int n;
   res_T res = RES_OK;
   ASSERT(htrdr && out_grid && filename && definition);
@@ -126,8 +131,11 @@ htrdr_grid_create
       goto error;                                                              \
     }                                                                          \
   } (void)0
+  is_finalized = 0;
+  WRITE(&is_finalized, 1, "is_finalized");
   WRITE(&grid->pagesize, 1, "pagesize");
   WRITE(&grid->cell_sz, 1, "cell_sz");
+  WRITE(grid->definition, 3, "definition");
   WRITE(grid->definition, 3, "definition");
 
   /* Align the grid data on pagesize */
@@ -197,6 +205,7 @@ htrdr_grid_open
   size_t grid_offset;
   size_t pagesize;
   int fd = -1;
+  int is_finalized = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_grid);
 
@@ -216,7 +225,7 @@ htrdr_grid_open
     res = RES_IO_ERR;
     goto error;
   }
-  CHK(grid->fp = fdopen(fd, "rw"));
+  CHK(grid->fp = fdopen(fd, "w+"));
 
   #define READ(Var, N, Name) {                                                 \
     if(fread((Var), sizeof(*(Var)), (N), grid->fp) != (N)) {                   \
@@ -226,6 +235,13 @@ htrdr_grid_open
       goto error;                                                              \
     }                                                                          \
   } (void)0
+  READ(&is_finalized, 1, "is_finalized");
+  if(!is_finalized) {
+    htrdr_log_err(htrdr, "%s:%s: invalid grid.\n", FUNC_NAME, filename);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   READ(&pagesize, 1, "pagesize");
   if(pagesize != grid->pagesize) {
     htrdr_log_err(htrdr, "%s:%s: invalid pagesize `%lu'.\n", FUNC_NAME,
@@ -252,6 +268,7 @@ htrdr_grid_open
     res = RES_BAD_ARG;
     goto error;
   }
+  #undef READ
 
   grid_offset = ALIGN_SIZE((size_t)ftell(grid->fp), grid->pagesize);
   grid_sz =
@@ -270,6 +287,10 @@ htrdr_grid_open
     res = RES_IO_ERR;
     goto error;
   }
+
+  rewind(grid->fp);
+  is_finalized = 0;
+  CHK(fwrite(&is_finalized, sizeof(int), 1, grid->fp) == 1);
 
 exit:
   *out_grid = grid;
