@@ -28,12 +28,17 @@
 #include <fcntl.h>
 #include <unistd.h> /* sysconf */
 
+const int32_t GRID_VERSION = 0;
+const int32_t GRID_VERSION_NONE = -1;
+
 struct htrdr_grid {
   FILE* fp;
   char* data;
-  size_t definition[3];
+  size_t definition[3]; /* Submitted definition */
+  size_t def_adjusted; /* Adjusted definition along the 3 dimensions */
   size_t cell_sz;
   size_t pagesize;
+  size_t data_sz; /* Size in bytes of the overall grid data + padding */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -49,19 +54,12 @@ grid_release(ref_T* ref)
   ASSERT(ref);
   grid = CONTAINER_OF(ref, struct htrdr_grid, ref);
   if(grid->fp) {
-    const int is_finalized = 1;
-    CHK(fwrite(&is_finalized, sizeof(int), 1, grid->fp) == 1);
+    rewind(grid->fp);
+    CHK(fwrite(&GRID_VERSION, sizeof(int), 1, grid->fp) == 1);
     fclose(grid->fp);
   }
   if(grid->data) {
-    size_t grid_sz;
-    grid_sz =
-      grid->definition[0]
-    * grid->definition[1]
-    * grid->definition[2]
-    * grid->cell_sz;
-    grid_sz = ALIGN_SIZE(grid_sz, grid->pagesize);
-    if(munmap(grid->data, grid_sz)) {
+    if(munmap(grid->data, grid->data_sz)) {
       htrdr_log_err(grid->htrdr, "error unmapping the grid data -- %s.\n",
         strerror(errno));
       ASSERT(0);
@@ -84,9 +82,8 @@ htrdr_grid_create
 {
   const char byte = 0;
   struct htrdr_grid* grid = NULL;
-  size_t grid_sz;
+  size_t mcode_max;
   long grid_offset;
-  int is_finalized = 0;
   int n;
   res_T res = RES_OK;
   ASSERT(htrdr && out_grid && filename && definition);
@@ -131,8 +128,7 @@ htrdr_grid_create
       goto error;                                                              \
     }                                                                          \
   } (void)0
-  is_finalized = 0;
-  WRITE(&is_finalized, 1, "is_finalized");
+  WRITE(&GRID_VERSION_NONE, 1, "version");
   WRITE(&grid->pagesize, 1, "pagesize");
   WRITE(&grid->cell_sz, 1, "cell_sz");
   WRITE(grid->definition, 3, "definition");
@@ -149,15 +145,19 @@ htrdr_grid_create
     goto error;
   }
 
+  grid->def_adjusted = MMAX(MMAX(definition[0], definition[1]), definition[2]);
+  grid->def_adjusted = round_up_pow2(grid->def_adjusted);
+  mcode_max = grid->def_adjusted*grid->def_adjusted*grid->def_adjusted;
+
   /* Define the grid size */
-  grid_sz = definition[0] * definition[1] * definition[2] * sizeof_cell;
-  grid_sz = ALIGN_SIZE(grid_sz, grid->pagesize);
+  grid->data_sz = mcode_max * sizeof_cell;
+  grid->data_sz = ALIGN_SIZE(grid->data_sz, grid->pagesize);
 
   /* Save the position of the grid data into the file */
   grid_offset = ftell(grid->fp);
 
   /* Reserve the space for the grid data */
-  n = fseek(grid->fp, (long)grid_sz, SEEK_CUR);
+  n = fseek(grid->fp, (long)grid->data_sz, SEEK_CUR);
   if(n < 0) {
     htrdr_log_err(htrdr,
       "%s:%s: could reserve the space to store the grid -- %s.\n", FUNC_NAME,
@@ -174,7 +174,7 @@ htrdr_grid_create
   /* Avoid to be positionned on the EOF */
   rewind(grid->fp);
 
-  grid->data = mmap(NULL, grid_sz, PROT_READ|PROT_WRITE,
+  grid->data = mmap(NULL, grid->data_sz, PROT_READ|PROT_WRITE,
     MAP_SHARED|MAP_POPULATE, fileno(grid->fp), grid_offset);
   if(grid->data == MAP_FAILED) {
     htrdr_log_err(htrdr, "%s:%s: could not map the grid data -- %s.\n",
@@ -201,11 +201,11 @@ htrdr_grid_open
    struct htrdr_grid** out_grid)
 {
   struct htrdr_grid* grid = NULL;
-  size_t grid_sz;
   size_t grid_offset;
   size_t pagesize;
+  size_t mcode_max;
+  int32_t version;
   int fd = -1;
-  int is_finalized = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_grid);
 
@@ -235,9 +235,11 @@ htrdr_grid_open
       goto error;                                                              \
     }                                                                          \
   } (void)0
-  READ(&is_finalized, 1, "is_finalized");
-  if(!is_finalized) {
-    htrdr_log_err(htrdr, "%s:%s: invalid grid.\n", FUNC_NAME, filename);
+  READ(&version, 1, "version");
+  if(version != GRID_VERSION) {
+    htrdr_log_err(htrdr, "%s:%s: incompatible grid version. Loaded version is "
+      "'%i' while the current version is '%i'.\n",
+      FUNC_NAME, filename, version, GRID_VERSION);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -271,14 +273,16 @@ htrdr_grid_open
   #undef READ
 
   grid_offset = ALIGN_SIZE((size_t)ftell(grid->fp), grid->pagesize);
-  grid_sz =
-    grid->definition[0]
-  * grid->definition[1]
-  * grid->definition[2]
-  * grid->cell_sz;
-  grid_sz = ALIGN_SIZE(grid_sz, grid->pagesize);
+  grid->def_adjusted = MMAX(grid->definition[0], grid->definition[1]);
+  grid->def_adjusted = MMAX(grid->definition[2], grid->def_adjusted);
+  grid->def_adjusted = round_up_pow2(grid->def_adjusted);
+  mcode_max = grid->def_adjusted*grid->def_adjusted*grid->def_adjusted;
 
-  grid->data = mmap(NULL, grid_sz, PROT_READ|PROT_WRITE,
+  /* Define the grid size */
+  grid->data_sz = mcode_max * grid->cell_sz;
+  grid->data_sz = ALIGN_SIZE(grid->data_sz, grid->pagesize);
+
+  grid->data = mmap(NULL, grid->data_sz, PROT_READ|PROT_WRITE,
     MAP_SHARED|MAP_POPULATE, fileno(grid->fp), (off_t)grid_offset);
 
   if(grid->data == MAP_FAILED) {
@@ -289,8 +293,7 @@ htrdr_grid_open
   }
 
   rewind(grid->fp);
-  is_finalized = 0;
-  CHK(fwrite(&is_finalized, sizeof(int), 1, grid->fp) == 1);
+  CHK(fwrite(&GRID_VERSION_NONE, sizeof(int), 1, grid->fp) == 1);
 
 exit:
   *out_grid = grid;
@@ -320,15 +323,25 @@ htrdr_grid_ref_put(struct htrdr_grid* grid)
 void*
 htrdr_grid_at(struct htrdr_grid* grid, const size_t xyz[3])
 {
-  size_t slice;
-  size_t pitch;
+  uint32_t coords[3];
+  uint64_t mcode;
   ASSERT(grid && xyz);
   ASSERT(xyz[0] < grid->definition[0]);
   ASSERT(xyz[1] < grid->definition[1]);
   ASSERT(xyz[2] < grid->definition[2]);
-  pitch = grid->definition[0] * grid->cell_sz;
-  slice = grid->definition[1] * pitch;
-  return grid->data + xyz[2]*slice + xyz[1]*pitch + xyz[0]*grid->cell_sz;
+  coords[0] = (uint32_t)xyz[0];
+  coords[1] = (uint32_t)xyz[1];
+  coords[2] = (uint32_t)xyz[2];
+  mcode = morton_xyz_encode_u21(coords);
+  return htrdr_grid_at_mcode(grid, mcode);
+}
+
+void*
+htrdr_grid_at_mcode(struct htrdr_grid* grid, const uint64_t mcode)
+{
+  ASSERT(grid);
+  ASSERT(mcode < grid->def_adjusted*grid->def_adjusted*grid->def_adjusted);
+  return grid->data + mcode*grid->cell_sz;
 }
 
 void

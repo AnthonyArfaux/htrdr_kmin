@@ -50,6 +50,12 @@ htrdr_grid_at
   (struct htrdr_grid* grid,
    const size_t xyz[3]);
 
+/* Follow the convention of the morton_xyz_encode_u21 function. */
+extern LOCAL_SYM void*
+htrdr_grid_at_mcode
+  (struct htrdr_grid* grid,
+   const uint64_t mcode);
+
 extern LOCAL_SYM void
 htrdr_grid_get_definition
   (struct htrdr_grid* grid,
