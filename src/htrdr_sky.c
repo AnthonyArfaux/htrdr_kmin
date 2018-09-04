@@ -53,6 +53,7 @@ struct split {
 
 struct build_octree_context {
   const struct htrdr_sky* sky;
+  double vxsz[3]; /* Size of a SVX voxel */
   double dst_max; /* Max traversal distance */
   double tau_threshold; /* Threshold criteria for the merge process */
   size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
@@ -62,7 +63,7 @@ struct build_octree_context {
   struct htrdr_grid* grid;
 };
 
-#define BUILD_OCTREE_CONTEXT_NULL__ { NULL, 0, 0, 0, NULL }
+#define BUILD_OCTREE_CONTEXT_NULL__ { NULL, {0,0,0}, 0, 0, 0, NULL }
 static const struct build_octree_context BUILD_OCTREE_CONTEXT_NULL =
   BUILD_OCTREE_CONTEXT_NULL__;
 
@@ -129,6 +130,7 @@ struct htrdr_sky {
 
   /* Map the index in Z from the regular SVX to the irregular HTCP data */
   struct darray_split svx2htcp_z;
+  double lut_cell_sz; /* Size of a svx2htcp_z cell */
 
   /* Ids and optical properties of the short wave spectral bands loaded by
    * HTGOP and that overlap the CIE XYZ color space */
@@ -265,68 +267,66 @@ vox_get_particle
   ASSERT(xyz && particle && ctx);
 
   i = ctx->iband - ctx->sky->sw_bands_range[0];
+
   /* Fetch the optical properties of the spectral band */
   Ca_avg = ctx->sky->sw_bands[i].Ca_avg;
   Cs_avg = ctx->sky->sw_bands[i].Cs_avg;
 
-  if(!ctx->sky->htcp_desc.irregular_z) {
+  if(!ctx->sky->htcp_desc.irregular_z) { /* 1 LES voxel <=> 1 SVX voxel */
     rho_da = cloud_dry_air_density(&ctx->sky->htcp_desc, xyz);
     rct = htcp_desc_RCT_at(&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], 0);
     ka_min = ka_max = ka = Ca_avg * rho_da * rct;
     ks_min = ks_max = ks = Cs_avg * rho_da * rct;
     kext_min = kext_max = kext = ka + ks;
-  } else {
+  } else { /* A SVX voxel can be overlapped by 2 LES voxels */
     double vox_low[3], vox_upp[3];
-    double colsz;
-    double tmp0, tmp1;
     double pos_z;
-    double delta;
     size_t ivox_z_prev;
-    size_t ilow, iupp;
-    size_t n;
+    size_t ilut_low, ilut_upp;
+    size_t ilut;
 
-/** TODO Factorize this with the gas */
-    htcp_desc_get_voxel_aabb
-      (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], vox_low, vox_upp);
+    /* Compute the AABB of the SVX voxel */
+    vox_low[0] = (double)xyz[0] * ctx->vxsz[0] + ctx->sky->htcp_desc.lower[0];
+    vox_low[1] = (double)xyz[1] * ctx->vxsz[1] + ctx->sky->htcp_desc.lower[1];
+    vox_low[2] = (double)xyz[2] * ctx->vxsz[2] + ctx->sky->htcp_desc.lower[2];
+    vox_upp[0] = vox_low[0] + ctx->vxsz[0];
+    vox_upp[1] = vox_low[1] + ctx->vxsz[1];
+    vox_upp[2] = vox_low[2] + ctx->vxsz[2];
 
-    /* Compute the normalized position of the lower/upper Z LES voxel
-     * coordinate along the Z dimension of the LES */
-    colsz = ctx->sky->htcp_desc.upper[2] - ctx->sky->htcp_desc.lower[2];
-    tmp0 = (vox_low[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
-    tmp1 = (vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
-    ASSERT(tmp0 >= 0 && tmp0 <= 1);
-    ASSERT(tmp1 >= 0 && tmp1 <= 1);
-
-    /* Compute the lower/upper *inclusive* bounds of the voxel into the
-     * svx2htcp_z LUT */
-    n = darray_split_size_get(&ctx->sky->svx2htcp_z);
-    ilow = tmp0 == 1 ? n - 1 : (size_t)(tmp0 * (double)n);
-    iupp = tmp1 == 1 ? n - 1 : (size_t)(tmp1 * (double)n);
-    ASSERT(ilow < iupp);
-/** TODO Factorize this with the gas */
-
-    /* Compute the size of a LUT cell along the Z dimension */
-    delta = colsz / (double)n;
+    /* Compute the *inclusive* bounds of the indices of the LUT cells
+     * overlapped by the SVX voxel */
+    ilut_low = (size_t)
+      ((vox_low[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
+    ilut_upp = (size_t)
+      ((vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
+    ASSERT(ilut_low <= ilut_upp);
 
     ivox_z_prev = SIZE_MAX;
     ka_min = ks_min = kext_min = DBL_MAX;
     ka_max = ks_max = kext_max =-DBL_MAX;
+
     pos_z = vox_low[2];
-    ASSERT(pos_z >= (double)ilow*delta && pos_z <= (double)iupp*delta);
+    ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
+    ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
 
     /* Iterate over the LUT cells overlapped by the voxel */
-    FOR_EACH(i, ilow, iupp+1) {
+    FOR_EACH(ilut, ilut_low, ilut_upp+1) {
       size_t ivox[3];
-      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+i;
-      ASSERT(i < darray_split_size_get(&ctx->sky->svx2htcp_z));
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
+      ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
       ivox[0] = xyz[0];
       ivox[1] = xyz[1];
       ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
 
-      pos_z = MMIN((double)(i+1)*delta, vox_upp[2]);
+      /* Compute the upper bound of the *next* LUT cell clamped to the voxel
+       * upper bound. Note that the upper bound of the current LUT cell is
+       * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
+       * upper bound of the next cell is thus the lower bound of the cell
+       * following the next cell, i.e. (ilut+2)*lut_cell_sz */
+      pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
 
-      /* Does the LUT voxel overlap an already handled LES voxel? */
+      /* Does the LUT cell overlap an already handled LES voxel? */
       if(ivox[2] == ivox_z_prev) continue;
       ivox_z_prev = ivox[2];
 
@@ -338,11 +338,11 @@ vox_get_particle
       kext = ka + ks;
 
       /* Update the boundaries of the radiative properties */
-      ka_min = MMIN(ka_min, ka);  
+      ka_min = MMIN(ka_min, ka);
       ka_max = MMAX(ka_max, ka);
-      ks_min = MMIN(ks_min, ks); 
+      ks_min = MMIN(ks_min, ks);
       ks_max = MMAX(ks_max, ks);
-      kext_min = MMIN(kext_min, kext); 
+      kext_min = MMIN(kext_min, kext);
       kext_max = MMAX(kext_max, kext);
     }
   }
@@ -382,67 +382,71 @@ vox_get_gas
   double kext[2] = {DBL_MAX, -DBL_MAX};
   ASSERT(xyz && gas && ctx);
 
-  /* Retrieve the range of atmospheric layers that overlap the SVX voxel */
-  htcp_desc_get_voxel_aabb
-    (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], vox_low, vox_upp);
+  /* Compute the AABB of the SVX voxel */
+  vox_low[0] = (double)xyz[0] * ctx->vxsz[0] + ctx->sky->htcp_desc.lower[0];
+  vox_low[1] = (double)xyz[1] * ctx->vxsz[1] + ctx->sky->htcp_desc.lower[1];
+  vox_low[2] = (double)xyz[2] * ctx->vxsz[2] + ctx->sky->htcp_desc.lower[2];
+  vox_upp[0] = vox_low[0] + ctx->vxsz[0];
+  vox_upp[1] = vox_low[1] + ctx->vxsz[1];
+  vox_upp[2] = vox_low[2] + ctx->vxsz[2];
 
   /* Define the xH2O range from the LES data */
   if(!ctx->sky->htcp_desc.irregular_z) { /* 1 LES voxel <=> 1 SVX voxel */
     double x_h2o;
     x_h2o = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, xyz);
     x_h2o_range[0] = x_h2o_range[1] = x_h2o;
+#ifndef NDEBUG
+    {
+      double low[3], upp[3];
+      htcp_desc_get_voxel_aabb
+        (&ctx->sky->htcp_desc, xyz[0], xyz[1], xyz[2], low, upp);
+      ASSERT(d3_eq_eps(low, vox_low, 1.e-6));
+      ASSERT(d3_eq_eps(upp, vox_upp, 1.e-6));
+    }
+#endif
   } else { /* A SVX voxel can be overlapped by 2 LES voxels */
-    double colsz;
-    double delta;
     double pos_z;
-    double tmp0, tmp1;
-    size_t ilow, iupp;
+    size_t ilut_low, ilut_upp;
     size_t ivox_z_prev;
-    size_t i, n;
+    size_t ilut;
     ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
-/** TODO Factorize this with the particle */
-    /* Compute the normalized position of the lower/upper Z voxel coordinate
-     * along the Z dimension of the LES */
-    colsz = ctx->sky->htcp_desc.upper[2] - ctx->sky->htcp_desc.lower[2];
-    tmp0 = (vox_low[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
-    tmp1 = (vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / colsz;
-    ASSERT(tmp0 >= 0 && tmp0 <= 1);
-    ASSERT(tmp1 >= 0 && tmp1 <= 1);
+    /* Compute the *inclusive* bounds of the indices of the LUT cells
+     * overlapped by the SVX voxel */
+    ilut_low = (size_t)
+      ((vox_low[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
+    ilut_upp = (size_t)
+      ((vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
+    ASSERT(ilut_low <= ilut_upp);
 
-    /* Compute the lower/upper *inclusive* bounds of the voxel into the
-     * svx2htcp_z LUT */
-    n = darray_split_size_get(&ctx->sky->svx2htcp_z);
-    ilow = tmp0 == 1 ? n - 1 : (size_t)(tmp0 * (double)n);
-    iupp = tmp1 == 1 ? n - 1 : (size_t)(tmp1 * (double)n);
-    ASSERT(ilow < iupp);
-/** TODO Factorize this with the particle */
-
-    /* Compute the size of a LUT cell along the Z dimension */
-    delta = colsz / (double)n;
-
-    pos_z = vox_low[2];
     ivox_z_prev = SIZE_MAX;
     x_h2o_range[0] = DBL_MAX;
     x_h2o_range[1] =-DBL_MAX;
 
-    ASSERT(pos_z >= (double)ilow*delta && pos_z <= (double)iupp*delta);
+    pos_z = vox_low[2];
+    ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
+    ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
 
     /* Iterate over the LUT cells overlapped by the voxel */
-    FOR_EACH(i, ilow, iupp+1) {
-      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+i;
+    FOR_EACH(ilut, ilut_low, ilut_upp+1) {
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
       size_t ivox[3];
       double x_h2o;
-      ASSERT(i < darray_split_size_get(&ctx->sky->svx2htcp_z));
+      ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
       ivox[0] = xyz[0];
       ivox[1] = xyz[1];
       ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
 
-      pos_z = MMIN((double)(i+1)*delta, vox_upp[2]);
+      /* Compute the upper bound of the *next* LUT cell clamped to the voxel
+       * upper bound. Note that the upper bound of the current LUT cell is
+       * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
+       * upper bound of the next cell is thus the lower bound of the cell
+       * following the next cell, i.e. (ilut+2)*lut_cell_sz */
+      pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
 
       /* Does the LUT voxel overlap an already handled LES voxel? */
-      if(ivox[2] == ivox_z_prev) continue; 
+      if(ivox[2] == ivox_z_prev) continue;
       ivox_z_prev = ivox[2];
 
       /* Compute the xH2O for the current LES voxel */
@@ -629,7 +633,8 @@ setup_cloud_grid
 
   CHK((size_t)snprintf(buf, sizeof(buf), ".%lu", iband) < sizeof(buf));
 
-  /* Build the grid name */
+  /* Build the grid name FIXME it is not sufficient to use only the filename of
+   * the HTCP file */
   str_init(sky->htrdr->allocator, &str);
   CHK(RES_OK == str_set(&str, htcp_filename));
   CHK(RES_OK == str_set(&str, basename(str_get(&str))));
@@ -675,6 +680,18 @@ setup_cloud_grid
   ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
   ctx.iband = iband;
 
+  /* Compute the size of a SVX voxel */
+  ctx.vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
+  ctx.vxsz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
+  ctx.vxsz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
+  ctx.vxsz[0] = ctx.vxsz[0] / (double)sky->htcp_desc.spatial_definition[0];
+  ctx.vxsz[1] = ctx.vxsz[1] / (double)sky->htcp_desc.spatial_definition[1];
+  ctx.vxsz[2] = ctx.vxsz[2] / (double)sky->htcp_desc.spatial_definition[2];
+  ASSERT(eq_eps(ctx.vxsz[0], sky->htcp_desc.vxsz_x, 1.e-6));
+  ASSERT(eq_eps(ctx.vxsz[1], sky->htcp_desc.vxsz_y, 1.e-6));
+  ASSERT(eq_eps(ctx.vxsz[2], sky->htcp_desc.vxsz_z[0], 1.e-6)
+      || sky->htcp_desc.irregular_z);
+
   mcode_max = MMAX(MMAX(definition[0], definition[1]), definition[2]);
   mcode_max = round_up_pow2(mcode_max);
   mcode_max = mcode_max*mcode_max*mcode_max;
@@ -698,7 +715,7 @@ setup_cloud_grid
 
     n = (size_t)ATOMIC_INCR(&ncells_computed);
     pcent = n * 100 / ncells;
-    #pragma omp critical 
+    #pragma omp critical
     if(pcent > progress) {
       progress = pcent;
       fprintf(stderr, "%c[2K\rGenerating cloud grid %lu: %3u%%",
@@ -760,22 +777,21 @@ setup_clouds
      * the others dimensions */
     upp[2] = low[2] + (double)nvoxs[2] * sky->htcp_desc.vxsz_z[0];
   } else { /* Irregular voxel size along Z */
-    double min_vxsz_z;
     double len_z;
     size_t nsplits;
     size_t iz, iz2;;
 
     /* Find the min voxel size along Z and compute the length of a Z column */
     len_z = 0;
-    min_vxsz_z = DBL_MAX;
+    sky->lut_cell_sz = DBL_MAX;
     FOR_EACH(iz, 0, sky->htcp_desc.spatial_definition[2]) {
       len_z += sky->htcp_desc.vxsz_z[iz];
-      min_vxsz_z = MMIN(min_vxsz_z, sky->htcp_desc.vxsz_z[iz]);
+      sky->lut_cell_sz = MMIN(sky->lut_cell_sz, sky->htcp_desc.vxsz_z[iz]);
     }
     /* Allocate the svx2htcp LUT. This LUT is a regular table whose absolute
-     * size is the size of a Z column in the htcp file. The size of its cells
-     * is the minimal voxel size in Z of the htcp file */
-    nsplits = (size_t)ceil(len_z / min_vxsz_z);
+     * size is greater or equal to a Z column in the htcp file. The size of its
+     * cells is the minimal voxel size in Z of the htcp file */
+    nsplits = (size_t)ceil(len_z / sky->lut_cell_sz);
     res = darray_split_resize(&sky->svx2htcp_z, nsplits);
     if(res != RES_OK) {
       htrdr_log_err(sky->htrdr,
@@ -788,7 +804,7 @@ setup_clouds
     iz2 = 0;
     upp[2] = low[2] + sky->htcp_desc.vxsz_z[iz2];
     FOR_EACH(iz, 0, nsplits) {
-      const double upp_z = (double)(iz + 1) * min_vxsz_z + low[2];
+      const double upp_z = (double)(iz + 1) * sky->lut_cell_sz + low[2];
       darray_split_data_get(&sky->svx2htcp_z)[iz].index = iz2;
       darray_split_data_get(&sky->svx2htcp_z)[iz].height = upp[2];
       if(upp_z >= upp[2]) upp[2] += sky->htcp_desc.vxsz_z[++iz2];
@@ -1144,10 +1160,7 @@ htrdr_sky_fetch_raw_property
      * position in the svx2htcp_z Look Up Table and use the LUT to define the
      * voxel index into the HTCP descripptor */
     const struct split* splits = darray_split_cdata_get(&sky->svx2htcp_z);
-    const size_t n = darray_split_size_get(&sky->svx2htcp_z);
-    const double sz = cloud_desc->upper[2] - cloud_desc->lower[2];
-    const double vxsz_lut = sz / (double)n;
-    const size_t ilut = (size_t)((pos[2] - cloud_desc->lower[2])/vxsz_lut);
+    const size_t ilut = (size_t)((pos[2] - cloud_desc->lower[2]) / sky->lut_cell_sz);
     ivox[2] = splits[ilut].index + (pos[2] > splits[ilut].height);
   }
 
