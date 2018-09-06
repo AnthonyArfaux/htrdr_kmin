@@ -22,13 +22,16 @@
 struct htrdr;
 struct htrdr_grid;
 
+/*******************************************************************************
+ * Out of core regular grid
+ ******************************************************************************/
 extern LOCAL_SYM res_T
 htrdr_grid_create
   (struct htrdr* htrdr,
-   const size_t definition[3],
+   const size_t definition[3], /* #voxels in X, Y and Z */
    const size_t sizeof_cell, /* Size of an cell in Bytes */
-   const char* filename,
-   const int force_overwrite,
+   const char* filename, /* Filename where the grid data are stored */
+   const int force_overwrite, /* Force the overwrite of the grid data */
    struct htrdr_grid** grid);
 
 extern LOCAL_SYM res_T
@@ -45,12 +48,14 @@ extern LOCAL_SYM void
 htrdr_grid_ref_put
   (struct htrdr_grid* grid);
 
+/* Fetch the grid data from its 3D index */
 extern LOCAL_SYM void*
 htrdr_grid_at
   (struct htrdr_grid* grid,
    const size_t xyz[3]);
 
-/* Follow the convention of the morton_xyz_encode_u21 function. */
+/* Retrieve the voxel data from its morton code. The morton code is computed
+ * from the 3D indices following the morton_xyz_encode_u21 convention. */
 extern LOCAL_SYM void*
 htrdr_grid_at_mcode
   (struct htrdr_grid* grid,

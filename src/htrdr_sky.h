@@ -26,10 +26,16 @@ enum htrdr_sky_property {
   HTRDR_PROPERTIES_COUNT__
 };
 
+enum htrdr_sky_component { /* FIXME */
+  HTRDR_GAS__,
+  HTRDR_PARTICLES__,
+  HTRDR_COMPONENTS_COUNT__
+};
+
 /* Component of the sky for which the properties are queried */
 enum htrdr_sky_component_flag {
-  HTRDR_GAS = BIT(0),
-  HTRDR_PARTICLES = BIT(1),
+  HTRDR_GAS = BIT(HTRDR_GAS__),
+  HTRDR_PARTICLES = BIT(HTRDR_PARTICLES__),
   HTRDR_ALL_COMPONENTS = HTRDR_GAS | HTRDR_PARTICLES
 };
 

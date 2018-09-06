@@ -33,11 +33,11 @@ const int32_t GRID_VERSION_NONE = -1;
 
 struct htrdr_grid {
   FILE* fp;
-  char* data;
+  char* data; /* Mapped data */
   size_t definition[3]; /* Submitted definition */
   size_t def_adjusted; /* Adjusted definition along the 3 dimensions */
-  size_t cell_sz;
-  size_t pagesize;
+  size_t cell_sz; /* Size in bytes of a grid cell */
+  size_t pagesize; /* Page size in bytes */
   size_t data_sz; /* Size in bytes of the overall grid data + padding */
 
   ref_T ref;
@@ -145,6 +145,8 @@ htrdr_grid_create
     goto error;
   }
 
+  /* Adjust the grid definition in order to sort its data wrt the morton code
+   * of its voxel */
   grid->def_adjusted = MMAX(MMAX(definition[0], definition[1]), definition[2]);
   grid->def_adjusted = round_up_pow2(grid->def_adjusted);
   mcode_max = grid->def_adjusted*grid->def_adjusted*grid->def_adjusted;
@@ -174,6 +176,7 @@ htrdr_grid_create
   /* Avoid to be positionned on the EOF */
   rewind(grid->fp);
 
+  /* Map the grid data */
   grid->data = mmap(NULL, grid->data_sz, PROT_READ|PROT_WRITE,
     MAP_SHARED|MAP_POPULATE, fileno(grid->fp), grid_offset);
   if(grid->data == MAP_FAILED) {
@@ -341,6 +344,9 @@ htrdr_grid_at_mcode(struct htrdr_grid* grid, const uint64_t mcode)
 {
   ASSERT(grid);
   ASSERT(mcode < grid->def_adjusted*grid->def_adjusted*grid->def_adjusted);
+  ASSERT(morton3D_decode_u21(mcode>>2) < grid->definition[0]);
+  ASSERT(morton3D_decode_u21(mcode>>1) < grid->definition[1]);
+  ASSERT(morton3D_decode_u21(mcode>>0) < grid->definition[2]);
   return grid->data + mcode*grid->cell_sz;
 }
 

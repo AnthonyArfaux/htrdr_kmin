@@ -41,6 +41,7 @@
 #define GAS_CONSTANT 8.3144598 /* In kg.m^2.s^-2.mol^-1.K */
 
 #define NFLOATS_PER_COMPONENT (HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__)
+#define NFLOATS_PER_VOXEL (NFLOATS_PER_COMPONENT * HTRDR_COMPONENTS_COUNT__)
 
 struct split {
   size_t index; /* Index of the current htcp voxel */
@@ -110,7 +111,23 @@ struct sw_band_prop {
 };
 
 /* Encompass the hierarchical data structure of the cloud data and its
- * associated descriptor */
+ * associated descriptor.
+ *
+ * For each SVX voxel, the data of the optical property are stored
+ * linearly as N single precision floating point data, with N computed as
+ * bellow:
+ *
+ *  N = HTRDR_PROPERTIES_COUNT__  #optical properties per voxel
+ *    * HTRDR_SVX_OPS_COUNT__     #supported operations on each properties
+ *    * HTRDR_COMPONENTS_COUNT__; #components on which properties are defined
+ *
+ * In a given voxel, the index `id' in [0, N-1] corresponding to the optical
+ * property `enum htrdr_sky_property P' of the component `enum
+ * htrdr_sky_component C' according to the operation `enum htrdr_svx_op O' is
+ * then computed as bellow:
+ *
+ *  id = C * NFLOATS_PER_COMPONENT + P * HTRDR_SVX_OPS_COUNT__ + O;
+ *  NFLOATS_PER_COMPONENT = HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__; */
 struct cloud {
   struct svx_tree* octree;
   struct svx_tree_desc octree_desc;
@@ -126,9 +143,10 @@ struct htrdr_sky {
   struct htgop* htgop; /* ... Gas optical properties */
   struct htmie* htmie; /* ... Mie's data */
 
-  struct htcp_desc htcp_desc;
+  struct htcp_desc htcp_desc; /* Descriptor of the loaded LES data */
 
-  /* Map the index in Z from the regular SVX to the irregular HTCP data */
+  /* LUT used to map the index of a Z from the regular SVX to the irregular
+   * HTCP data */
   struct darray_split svx2htcp_z;
   double lut_cell_sz; /* Size of a svx2htcp_z cell */
 
@@ -144,6 +162,29 @@ struct htrdr_sky {
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
+static FINLINE float
+voxel_get
+  (const float* data,
+   const enum htrdr_sky_component comp,
+   const enum htrdr_sky_property prop,
+   const enum htrdr_svx_op op)
+{
+  ASSERT(data);
+  return data[comp*NFLOATS_PER_COMPONENT+ prop*HTRDR_SVX_OPS_COUNT__ + op];
+}
+
+static FINLINE void
+voxel_set
+  (float* data,
+   const enum htrdr_sky_component comp,
+   const enum htrdr_sky_property prop,
+   const enum htrdr_svx_op op,
+   const float val)
+{
+  ASSERT(data);
+  data[comp*NFLOATS_PER_COMPONENT+ prop*HTRDR_SVX_OPS_COUNT__ + op] = val;
+}
+
 /* Compute the dry air density in the cloud */
 static FINLINE double
 cloud_dry_air_density
@@ -252,7 +293,7 @@ register_leaf
 static void
 vox_get_particle
   (const size_t xyz[3],
-   float particle[],
+   float vox[],
    const struct build_octree_context* ctx)
 {
   double rct;
@@ -264,7 +305,7 @@ vox_get_particle
   double Ca_avg;
   double Cs_avg;
   size_t i;
-  ASSERT(xyz && particle && ctx);
+  ASSERT(xyz && vox && ctx);
 
   i = ctx->iband - ctx->sky->sw_bands_range[0];
 
@@ -301,10 +342,10 @@ vox_get_particle
       ((vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
     ASSERT(ilut_low <= ilut_upp);
 
+    /* Prepare the iteration over the LES voxels overlapped by the SVX voxel */
     ivox_z_prev = SIZE_MAX;
     ka_min = ks_min = kext_min = DBL_MAX;
     ka_max = ks_max = kext_max =-DBL_MAX;
-
     pos_z = vox_low[2];
     ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
     ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
@@ -356,18 +397,18 @@ vox_get_particle
   if(kext_min != (float)kext_min) kext_min = nextafterf((float)kext_min,-FLT_MAX);
   if(kext_max != (float)kext_max) kext_max = nextafterf((float)kext_max, FLT_MAX);
 
-  particle[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka_min;
-  particle[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka_max;
-  particle[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks_min;
-  particle[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks_max;
-  particle[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext_min;
-  particle[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext_max;
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Ka, HTRDR_SVX_MIN, (float)ka_min);
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Ka, HTRDR_SVX_MAX, (float)ka_max);
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Ks, HTRDR_SVX_MIN, (float)ks_min);
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Ks, HTRDR_SVX_MAX, (float)ks_max);
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Kext, HTRDR_SVX_MIN, (float)kext_min);
+  voxel_set(vox, HTRDR_PARTICLES__, HTRDR_Kext, HTRDR_SVX_MAX, (float)kext_max);
 }
 
 static void
 vox_get_gas
   (const size_t xyz[3],
-   float gas[],
+   float vox[],
    const struct build_octree_context* ctx)
 {
   struct htgop_layer layer;
@@ -377,10 +418,10 @@ vox_get_gas
   size_t quad_range[2];
   double x_h2o_range[2];
   double vox_low[3], vox_upp[3]; /* Voxel AABB */
-  double ka[2] = {DBL_MAX, -DBL_MAX};
-  double ks[2] = {DBL_MAX, -DBL_MAX};
-  double kext[2] = {DBL_MAX, -DBL_MAX};
-  ASSERT(xyz && gas && ctx);
+  double ka_min, ka_max;
+  double ks_min, ks_max;
+  double kext_min, kext_max;
+  ASSERT(xyz && vox && ctx);
 
   /* Compute the AABB of the SVX voxel */
   vox_low[0] = (double)xyz[0] * ctx->vxsz[0] + ctx->sky->htcp_desc.lower[0];
@@ -419,10 +460,10 @@ vox_get_gas
       ((vox_upp[2] - ctx->sky->htcp_desc.lower[2]) / ctx->sky->lut_cell_sz);
     ASSERT(ilut_low <= ilut_upp);
 
+    /* Prepare the iteration over the LES voxels overlapped by the SVX voxel */
     ivox_z_prev = SIZE_MAX;
     x_h2o_range[0] = DBL_MAX;
     x_h2o_range[1] =-DBL_MAX;
-
     pos_z = vox_low[2];
     ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
     ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
@@ -458,8 +499,12 @@ vox_get_gas
     }
   }
 
+  /* Define the atmospheric layers overlapped by the SVX voxel */
   HTGOP(position_to_layer_id(ctx->sky->htgop, vox_low[2], &layer_range[0]));
   HTGOP(position_to_layer_id(ctx->sky->htgop, vox_upp[2], &layer_range[1]));
+
+  ka_min = ks_min = kext_min = DBL_MAX;
+  ka_max = ks_max = kext_max =-DBL_MAX;
 
   /* For each atmospheric layer that overlaps the SVX voxel ... */
   FOR_EACH(ilayer, layer_range[0], layer_range[1]+1) {
@@ -475,33 +520,33 @@ vox_get_gas
     /* ... and compute the radiative properties and upd their bounds */
     HTGOP(layer_sw_spectral_interval_quadpoints_get_ka_bounds
       (&band, quad_range, x_h2o_range, k));
-    ka[0] = MMIN(ka[0], k[0]);
-    ka[1] = MMAX(ka[1], k[1]);
+    ka_min = MMIN(ka_min, k[0]);
+    ka_max = MMAX(ka_max, k[1]);
     HTGOP(layer_sw_spectral_interval_quadpoints_get_ks_bounds
       (&band, quad_range, x_h2o_range, k));
-    ks[0] = MMIN(ks[0], k[0]);
-    ks[1] = MMAX(ks[1], k[1]);
+    ks_min = MMIN(ks_min, k[0]);
+    ks_max = MMAX(ks_max, k[1]);
     HTGOP(layer_sw_spectral_interval_quadpoints_get_kext_bounds
       (&band, quad_range, x_h2o_range, k));
-    kext[0] = MMIN(kext[0], k[0]);
-    kext[1] = MMAX(kext[1], k[1]);
+    kext_min = MMIN(kext_min, k[0]);
+    kext_max = MMAX(kext_max, k[1]);
   }
 
   /* Ensure that the single precision bounds include their double precision
    * version. */
-  if(ka[0] != (float)ka[0]) ka[0] = nextafterf((float)ka[0],-FLT_MAX);
-  if(ka[1] != (float)ka[1]) ka[1] = nextafterf((float)ka[1], FLT_MAX);
-  if(ks[0] != (float)ks[0]) ks[0] = nextafterf((float)ks[0],-FLT_MAX);
-  if(ks[1] != (float)ks[1]) ks[1] = nextafterf((float)ks[1], FLT_MAX);
-  if(kext[0] != (float)kext[0]) kext[0] = nextafterf((float)kext[0],-FLT_MAX);
-  if(kext[1] != (float)kext[1]) kext[1] = nextafterf((float)kext[1], FLT_MAX);
+  if(ka_min != (float)ka_min) ka_min = nextafterf((float)ka_min,-FLT_MAX);
+  if(ka_max != (float)ka_max) ka_max = nextafterf((float)ka_max, FLT_MAX);
+  if(ks_min != (float)ks_min) ks_min = nextafterf((float)ks_min,-FLT_MAX);
+  if(ks_max != (float)ks_max) ks_max = nextafterf((float)ks_max, FLT_MAX);
+  if(kext_min != (float)kext_min) kext_min = nextafterf((float)kext_min,-FLT_MAX);
+  if(kext_max != (float)kext_max) kext_max = nextafterf((float)kext_max, FLT_MAX);
 
-  gas[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ka[0];
-  gas[HTRDR_Ka  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ka[1];
-  gas[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)ks[0];
-  gas[HTRDR_Ks  *HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)ks[1];
-  gas[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = (float)kext[0];
-  gas[HTRDR_Kext*HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = (float)kext[1];
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Ka, HTRDR_SVX_MIN, (float)ka_min);
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Ka, HTRDR_SVX_MAX, (float)ka_max);
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Ks, HTRDR_SVX_MIN, (float)ks_min);
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Ks, HTRDR_SVX_MAX, (float)ks_max);
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Kext, HTRDR_SVX_MIN, (float)kext_min);
+  voxel_set(vox, HTRDR_GAS__, HTRDR_Kext, HTRDR_SVX_MAX, (float)kext_max);
 }
 
 static void
@@ -512,19 +557,20 @@ vox_get(const size_t xyz[3], void* dst, void* context)
 
   if(ctx->grid) { /* Fetch voxel data from precomputed grid */
     const float* vox_data = htrdr_grid_at(ctx->grid, xyz);
-    memcpy(dst, vox_data, NFLOATS_PER_COMPONENT*2*sizeof(float));
+    memcpy(dst, vox_data, NFLOATS_PER_VOXEL * sizeof(float));
   } else {
     /* No precomputed grid. Compute the voxel data at runtime */
-    float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
-    float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
-    vox_get_particle(xyz, par, ctx);
-    vox_get_gas(xyz, gas, ctx);
+    vox_get_particle(xyz, dst, ctx);
+    vox_get_gas(xyz, dst, ctx);
   }
 }
 
 static INLINE void
 vox_merge_component
-  (float* comp, const float* voxels[], const size_t off, const size_t nvoxs)
+  (float* vox_out,
+   const enum htrdr_sky_component comp,
+   const float* voxels[],
+   const size_t nvoxs)
 {
   float ka_min = FLT_MAX;
   float ka_max =-FLT_MAX;
@@ -533,48 +579,41 @@ vox_merge_component
   float kext_min = FLT_MAX;
   float kext_max =-FLT_MAX;
   size_t ivox;
-  ASSERT(comp && voxels && nvoxs);
+  ASSERT(vox_out && voxels && nvoxs);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* ka = voxels[ivox] + off + HTRDR_Ka * HTRDR_SVX_OPS_COUNT__;
-    const float* ks = voxels[ivox] + off + HTRDR_Ks * HTRDR_SVX_OPS_COUNT__;
-    const float* kext = voxels[ivox] + off + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
-    ASSERT(ka[HTRDR_SVX_MIN] <= ka[HTRDR_SVX_MAX]);
-    ASSERT(ks[HTRDR_SVX_MIN] <= ks[HTRDR_SVX_MAX]);
-    ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
+    const float* vox = voxels[ivox];
 
-    ka_min = MMIN(ka_min, ka[HTRDR_SVX_MIN]);
-    ka_max = MMAX(ka_max, ka[HTRDR_SVX_MAX]);
-    ks_min = MMIN(ks_min, ks[HTRDR_SVX_MIN]);
-    ks_max = MMAX(ks_max, ks[HTRDR_SVX_MAX]);
-    kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
-    kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
+    ka_min = MMIN(ka_min, voxel_get(vox, comp, HTRDR_Ka, HTRDR_SVX_MIN));
+    ka_max = MMAX(ka_max, voxel_get(vox, comp, HTRDR_Ka, HTRDR_SVX_MAX));
+    ks_min = MMIN(ks_min, voxel_get(vox, comp, HTRDR_Ks, HTRDR_SVX_MIN));
+    ks_max = MMAX(ks_max, voxel_get(vox, comp, HTRDR_Ks, HTRDR_SVX_MAX));
+    kext_min = MMIN(kext_min, voxel_get(vox, comp, HTRDR_Kext, HTRDR_SVX_MIN));
+    kext_max = MMAX(kext_max, voxel_get(vox, comp, HTRDR_Kext, HTRDR_SVX_MAX));
   }
 
-  comp[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ka_min;
-  comp[HTRDR_Ka   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ka_max;
-  comp[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = ks_min;
-  comp[HTRDR_Ks   * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = ks_max;
-  comp[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MIN] = kext_min;
-  comp[HTRDR_Kext * HTRDR_SVX_OPS_COUNT__ + HTRDR_SVX_MAX] = kext_max;
+  voxel_set(vox_out, comp, HTRDR_Ka, HTRDR_SVX_MIN, ka_min);
+  voxel_set(vox_out, comp, HTRDR_Ka, HTRDR_SVX_MAX, ka_max);
+  voxel_set(vox_out, comp, HTRDR_Ks, HTRDR_SVX_MIN, ks_min);
+  voxel_set(vox_out, comp, HTRDR_Ks, HTRDR_SVX_MAX, ks_max);
+  voxel_set(vox_out, comp, HTRDR_Kext, HTRDR_SVX_MIN, kext_min);
+  voxel_set(vox_out, comp, HTRDR_Kext, HTRDR_SVX_MAX, kext_max);
 }
 
 static void
 vox_merge(void* dst, const void* voxels[], const size_t nvoxs, void* context)
 {
-  float* par = (float*)dst + 0*NFLOATS_PER_COMPONENT; /* Particles properties */
-  float* gas = (float*)dst + 1*NFLOATS_PER_COMPONENT; /* Gas properties */
-  ASSERT(dst && voxels);
-  (void) context;
-  vox_merge_component(par, (const float**)voxels, 0*NFLOATS_PER_COMPONENT, nvoxs);
-  vox_merge_component(gas, (const float**)voxels, 1*NFLOATS_PER_COMPONENT, nvoxs);
+  ASSERT(dst && voxels && nvoxs);
+  (void)context;
+  vox_merge_component(dst, HTRDR_PARTICLES__, (const float**)voxels, nvoxs);
+  vox_merge_component(dst, HTRDR_GAS__, (const float**)voxels, nvoxs);
 }
 
 static INLINE int
 vox_challenge_merge_component
-  (const float* voxels[],
+  (const enum htrdr_sky_component comp,
+   const float* voxels[],
    const size_t nvoxs,
-   const size_t off,
    struct build_octree_context* ctx)
 {
   float kext_min = FLT_MAX;
@@ -583,10 +622,9 @@ vox_challenge_merge_component
   ASSERT(voxels && nvoxs && ctx);
 
   FOR_EACH(ivox, 0, nvoxs) {
-    const float* kext = voxels[ivox] + off + HTRDR_Kext * HTRDR_SVX_OPS_COUNT__;
-    ASSERT(kext[HTRDR_SVX_MIN] <= kext[HTRDR_SVX_MAX]);
-    kext_min = MMIN(kext_min, kext[HTRDR_SVX_MIN]);
-    kext_max = MMAX(kext_max, kext[HTRDR_SVX_MAX]);
+    const float* vox = voxels[ivox];
+    kext_min = MMIN(kext_min, voxel_get(vox, comp, HTRDR_Kext, HTRDR_SVX_MIN));
+    kext_max = MMAX(kext_max, voxel_get(vox, comp, HTRDR_Kext, HTRDR_SVX_MAX));
   }
   return (kext_max - kext_min)*ctx->dst_max <= ctx->tau_threshold;
 }
@@ -595,10 +633,10 @@ static int
 vox_challenge_merge
   (const void* voxels[], const size_t nvoxs, void* ctx)
 {
-  const float** vox = (const float**)voxels;
+  const float** voxs = (const float**)voxels;
   ASSERT(voxels);
-  return vox_challenge_merge_component(vox, nvoxs, 0*NFLOATS_PER_COMPONENT, ctx)
-      && vox_challenge_merge_component(vox, nvoxs, 1*NFLOATS_PER_COMPONENT, ctx);
+  return vox_challenge_merge_component(HTRDR_PARTICLES__, voxs, nvoxs, ctx)
+      && vox_challenge_merge_component(HTRDR_GAS__, voxs, nvoxs, ctx);
 }
 
 /* Create/load a grid of cloud data used by SVX to build the octree. The grid
@@ -643,7 +681,7 @@ setup_cloud_grid
   CHK(RES_OK == str_append(&str, buf));
 
   if(!force_update) {
-    /* Try to open the saved grid */
+    /* Try to open an already saved grid */
     res = htrdr_grid_open(sky->htrdr, str_cget(&str), &grid);
     if(res != RES_OK) {
       htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&str));
@@ -692,27 +730,33 @@ setup_cloud_grid
   ASSERT(eq_eps(ctx.vxsz[2], sky->htcp_desc.vxsz_z[0], 1.e-6)
       || sky->htcp_desc.irregular_z);
 
+  /* Conservatively define the maximum morton code of the htrdr_grid */
   mcode_max = MMAX(MMAX(definition[0], definition[1]), definition[2]);
   mcode_max = round_up_pow2(mcode_max);
   mcode_max = mcode_max*mcode_max*mcode_max;
 
+  /* Compute the overall number of voxels in the htrdr_grid */
   ncells = definition[0] * definition[1] * definition[2];
 
   fprintf(stderr, "Generating cloud grid %lu: %3u%%", iband, 0);
   fflush(stderr);
 
   omp_set_num_threads((int)sky->htrdr->nthreads);
-
   #pragma omp parallel for
   for(mcode=0; mcode<mcode_max; ++mcode) {
     size_t xyz[3];
     size_t pcent;
     size_t n;
+
+    /* Discard out of bound voxels */
     if((xyz[0] = morton3D_decode_u21(mcode >> 2)) >= definition[0]) continue;
     if((xyz[1] = morton3D_decode_u21(mcode >> 1)) >= definition[1]) continue;
     if((xyz[2] = morton3D_decode_u21(mcode >> 0)) >= definition[2]) continue;
+
+    /* Compute the voxel data */
     vox_get(xyz, htrdr_grid_at_mcode(grid, mcode), &ctx);
 
+    /* Update the progress message */
     n = (size_t)ATOMIC_INCR(&ncells_computed);
     pcent = n * 100 / ncells;
     #pragma omp critical
@@ -827,8 +871,7 @@ setup_clouds
   vox_desc.merge = vox_merge;
   vox_desc.challenge_merge = vox_challenge_merge;
   vox_desc.context = &ctx;
-  vox_desc.size = sizeof(float)
-    * HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__ * 2/*Gas & particles*/;
+  vox_desc.size = sizeof(float) * NFLOATS_PER_VOXEL;
 
   /* Create as many cloud data structure than considered SW spectral bands */
   nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
@@ -1359,9 +1402,6 @@ htrdr_sky_fetch_svx_voxel_property
    const size_t iquad, /* Index of the quadrature point in the spectral band */
    const struct svx_voxel* voxel)
 {
-  const float* par_data = NULL;
-  const float* gas_data = NULL;
-  int comp_mask = components_mask;
   double gas = 0;
   double par = 0;
   ASSERT(sky && voxel);
@@ -1369,14 +1409,11 @@ htrdr_sky_fetch_svx_voxel_property
   ASSERT((unsigned)op < HTRDR_SVX_OPS_COUNT__);
   (void)sky, (void)ispectral_band, (void)iquad;
 
-  par_data = (const float*)voxel->data + 0*NFLOATS_PER_COMPONENT;
-  gas_data = (const float*)voxel->data + 1*NFLOATS_PER_COMPONENT;
-
-  if(comp_mask & HTRDR_PARTICLES) {
-    par = par_data[prop * HTRDR_SVX_OPS_COUNT__ + op];
+  if(components_mask & HTRDR_PARTICLES) {
+    par = voxel_get(voxel->data, HTRDR_PARTICLES__, prop, op);
   }
-  if(comp_mask & HTRDR_GAS) {
-    gas = gas_data[prop * HTRDR_SVX_OPS_COUNT__ + op];
+  if(components_mask & HTRDR_GAS) {
+    gas = voxel_get(voxel->data, HTRDR_GAS__, prop, op);
   }
   /* Interval arithmetic to ensure that the returned Min/Max includes the
    * Min/Max of the "gas + particles mixture" */
