@@ -90,5 +90,10 @@ is_file_updated
    const char* filename,
    int* is_upd);
 
+extern LOCAL_SYM res_T
+create_directory
+  (struct htrdr* htrdt,
+   const char* path);
+
 #endif /* HTRDR_C_H */
 

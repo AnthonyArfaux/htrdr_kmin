@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200809L /* stat.st_tim support */
+#define _POSIX_C_SOURCE 200809L /* stat.st_time support */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
@@ -476,6 +476,9 @@ is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
     goto error;
   }
 
+  res = create_directory(htrdr, ".htrdr/");
+  if(res != RES_OK) goto error;
+
   #define CHK_STR(Func, ErrMsg) {                                              \
     res = str_##Func;                                                          \
     if(res != RES_OK) {                                                        \
@@ -485,7 +488,7 @@ is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
   } (void)0
   CHK_STR(set(&str, filename), "could not copy the filename");
   CHK_STR(set(&str, basename(str_get(&str))), "could not setup the basename");
-  CHK_STR(insert(&str, 0, ".htrdr_"), "could not setup the stamp prefix");
+  CHK_STR(insert(&str, 0, ".htrdr/"), "could not setup the stamp directory");
   CHK_STR(append(&str, ".stamp"), "could not setup the stamp extension");
   #undef CHK_STR
 
@@ -531,6 +534,37 @@ exit:
   *out_upd = upd;
   str_release(&str);
   if(fd >= 0) CHK(close(fd) == 0);
+  return res;
+error:
+  goto exit;
+}
+
+res_T
+create_directory(struct htrdr* htrdr, const char* path)
+{
+  res_T res = RES_OK;
+  int err;
+  ASSERT(htrdr && path);
+
+  err = mkdir(path, S_IRWXU);
+  if(!err) goto exit;
+
+  if(errno != EEXIST) {
+    htrdr_log_err(htrdr, "cannot create the `%s' directory -- %s.\n",
+      path, strerror(errno));
+    res = RES_IO_ERR;
+    goto error;
+  } else {
+    const int fd = open(path, O_DIRECTORY);
+    if(fd < -1) {
+      htrdr_log_err(htrdr, "cannot open the `%s' directory -- %s.\n",
+        path, strerror(errno));
+      res = RES_IO_ERR;
+      goto error;
+    }
+    CHK(!close(fd));
+  }
+exit:
   return res;
 error:
   goto exit;

@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* nextafterf support */
+#define _POSIX_C_SOURCE 200809L /* nextafterf & O_DIRECTORY */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
@@ -32,9 +32,14 @@
 #include <rsys/hash_table.h>
 #include <rsys/ref_count.h>
 
+#include <errno.h>
+#include <fcntl.h> /* open */
 #include <libgen.h>
 #include <math.h>
 #include <omp.h>
+#include <string.h>
+#include <sys/stat.h> /* mkdir */
+#include <unistd.h>
 
 #define DRY_AIR_MOLAR_MASS 0.0289644 /* In kg.mol^-1 */
 #define H2O_MOLAR_MASS 0.01801528 /* In kg.mol^-1 */
@@ -639,6 +644,53 @@ vox_challenge_merge
       && vox_challenge_merge_component(HTRDR_GAS__, voxs, nvoxs, ctx);
 }
 
+static res_T
+setup_temp_dir
+  (struct htrdr_sky* sky,
+   const char* htgop_filename,
+   const char* htmie_filename,
+   struct str* out_path)
+{
+  struct str path;
+  struct str htgop;
+  struct str htmie;
+  res_T res = RES_OK;
+  ASSERT(sky && htgop_filename && htmie_filename && out_path);
+
+  str_init(sky->htrdr->allocator, &path);
+  str_init(sky->htrdr->allocator, &htgop);
+  str_init(sky->htrdr->allocator, &htmie);
+
+  CHK(RES_OK == str_set(&htgop, htgop_filename));
+  CHK(RES_OK == str_set(&htmie, htmie_filename));
+  CHK(RES_OK == str_set(&htgop, basename(str_get(&htgop))));
+  CHK(RES_OK == str_set(&htmie, basename(str_get(&htmie))));
+  CHK(RES_OK == str_append_char(&htgop, '/'));
+  CHK(RES_OK == str_append_char(&htmie, '/'));
+
+  CHK(RES_OK == str_set(&path, ".htrdr/"));
+  res = create_directory(sky->htrdr, str_cget(&path));
+  if(res != RES_OK) goto error;
+
+  CHK(RES_OK == str_append(&path, str_cget(&htmie)));
+  res = create_directory(sky->htrdr, str_cget(&path));
+  if(res != RES_OK) goto error;
+
+  CHK(RES_OK == str_append(&path, str_cget(&htgop)));
+  res = create_directory(sky->htrdr, str_cget(&path));
+  if(res != RES_OK) goto error;
+
+  CHK(RES_OK == str_copy_and_release(out_path, &path));
+
+exit:
+  str_release(&htgop);
+  str_release(&htmie);
+  return res;
+error:
+  str_release(&path);
+  goto exit;
+}
+
 /* Create/load a grid of cloud data used by SVX to build the octree. The grid
  * is saved in the directory where htrdr is run with a name generated from the
  * "htcp_filename" path. If a grid with the same name exists, the function
@@ -651,10 +703,13 @@ setup_cloud_grid
    const size_t definition[3],
    const size_t iband,
    const char* htcp_filename,
+   const char* htgop_filename,
+   const char* htmie_filename,
    const int force_update,
    struct htrdr_grid** out_grid)
 {
   struct htrdr_grid* grid = NULL;
+  struct str path;
   struct str str;
   struct build_octree_context ctx = BUILD_OCTREE_CONTEXT_NULL;
   size_t sizeof_cell;
@@ -669,22 +724,26 @@ setup_cloud_grid
   ASSERT(definition[0] && definition[1] && definition[2]);
   ASSERT(iband >= sky->sw_bands_range[0] && iband <= sky->sw_bands_range[1]);
 
+  str_init(sky->htrdr->allocator, &str);
+  str_init(sky->htrdr->allocator, &path);
+
   CHK((size_t)snprintf(buf, sizeof(buf), ".%lu", iband) < sizeof(buf));
 
-  /* Build the grid name FIXME it is not sufficient to use only the filename of
-   * the HTCP file */
-  str_init(sky->htrdr->allocator, &str);
+  res = setup_temp_dir(sky, htgop_filename, htmie_filename, &path);
+  if(res != RES_OK) goto error;
+
+  /* Build the grid path */
   CHK(RES_OK == str_set(&str, htcp_filename));
   CHK(RES_OK == str_set(&str, basename(str_get(&str))));
-  CHK(RES_OK == str_insert(&str, 0, ".htrdr_"));
-  CHK(RES_OK == str_append(&str, ".grid"));
-  CHK(RES_OK == str_append(&str, buf));
-
+  CHK(RES_OK == str_append(&path, str_cget(&str)));
+  CHK(RES_OK == str_append(&path, ".grid"));
+  CHK(RES_OK == str_append(&path, buf));
+ 
   if(!force_update) {
     /* Try to open an already saved grid */
-    res = htrdr_grid_open(sky->htrdr, str_cget(&str), &grid);
+    res = htrdr_grid_open(sky->htrdr, str_cget(&path), &grid);
     if(res != RES_OK) {
-      htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&str));
+      htrdr_log_warn(sky->htrdr, "cannot open the grid `%s'.\n", str_cget(&path));
     } else {
       size_t grid_def[3];
 
@@ -695,7 +754,7 @@ setup_cloud_grid
       && grid_def[1] == definition[1]
       && grid_def[2] == definition[2]) {
         htrdr_log(sky->htrdr,
-          "Use the precomputed grid `%s'.\n", str_cget(&str));
+          "Use the precomputed grid `%s'.\n", str_cget(&path));
         goto exit; /* No more work to do. The loaded data seems valid */
       }
 
@@ -707,10 +766,10 @@ setup_cloud_grid
 
   sizeof_cell = NFLOATS_PER_COMPONENT * 2/*gas & particle*/ * sizeof(float);
 
-  htrdr_log(sky->htrdr, "Compute the grid `%s'.\n", str_cget(&str));
+  htrdr_log(sky->htrdr, "Compute the grid `%s'.\n", str_cget(&path));
 
   res = htrdr_grid_create
-    (sky->htrdr, definition, sizeof_cell, str_cget(&str), 1, &grid);
+    (sky->htrdr, definition, sizeof_cell, str_cget(&path), 1, &grid);
   if(res != RES_OK) goto error;
 
   ctx.sky = sky;
@@ -772,6 +831,8 @@ setup_cloud_grid
 exit:
   *out_grid = grid;
   str_release(&str);
+  str_release(&path);
+  return res;
   return res;
 error:
   if(grid) {
@@ -785,6 +846,8 @@ static res_T
 setup_clouds
   (struct htrdr_sky* sky,
    const char* htcp_filename,
+   const char* htgop_filename,
+   const char* htmie_filename,
    const int force_cache_update)
 {
   struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
@@ -888,7 +951,7 @@ setup_clouds
 
     /* Compute grid of voxels data */
     res = setup_cloud_grid(sky, nvoxs, ctx.iband, htcp_filename,
-      force_cache_update, &ctx.grid);
+      htgop_filename, htmie_filename, force_cache_update, &ctx.grid);
     if(res != RES_OK) goto error;
 
     /* Create the octree */
@@ -1113,7 +1176,8 @@ htrdr_sky_create
   if(res != RES_OK) goto error;
   force_upd = htcp_upd || htmie_upd || htgop_upd;
 
-  res = setup_clouds(sky, htcp_filename, force_upd);
+  res = setup_clouds
+    (sky, htcp_filename, htgop_filename, htmie_filename, force_upd);
   if(res != RES_OK) goto error;
 
 exit:
