@@ -69,7 +69,7 @@ htrdr_buffer_create
     res = RES_BAD_ARG;
     goto error;
   }
-  if(pitch < width) {
+  if(pitch < width*elmtsz) {
     htrdr_log_err(htrdr,
       "invalid buffer pitch `%lu' wrt the buffer width `%lu'. "
       "The buffer pitch cannot be less than the buffer width.\n",

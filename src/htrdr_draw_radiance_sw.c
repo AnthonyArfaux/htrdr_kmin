@@ -64,10 +64,10 @@ draw_tile
   npixels *= npixels;
 
   FOR_EACH(mcode, 0, npixels) {
-    struct htrdr_accum* pix_accum;
+    struct htrdr_accum* pix_accums;
     size_t ipix_tile[2]; /* Pixel coord in the tile */
     size_t ipix[2]; /* Pixel coord in the buffer */
-    size_t i;
+    size_t ichannel;
 
     ipix_tile[0] = morton2D_decode((uint32_t)(mcode>>0));
     if(ipix_tile[0] >= tile_sz[0]) continue; /* Pixel is out of tile */
@@ -79,41 +79,57 @@ draw_tile
     ipix[1] = tile_org[1] + ipix_tile[1];
 
     /* Fetch and reset the pixel accumulator */
-    pix_accum = htrdr_buffer_at(buf, ipix[0], ipix[1]);
-    *pix_accum = HTRDR_ACCUM_NULL;
+    pix_accums = htrdr_buffer_at(buf, ipix[0], ipix[1]);
 
-    FOR_EACH(i, 0, spp) {
-      double pix_samp[2];
-      double ray_org[3];
-      double ray_dir[3];
-      double weight;
-      size_t iband;
-      size_t iquad;
+    FOR_EACH(ichannel, 0, 3) {
+      size_t isamp;
+      pix_accums[ichannel] = HTRDR_ACCUM_NULL;
 
-      /* Sample a position into the pixel, in the normalized image plane */
-      pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
-      pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+      FOR_EACH(isamp, 0, spp) {
+        double pix_samp[2];
+        double ray_org[3];
+        double ray_dir[3];
+        double weight;
+        size_t iband;
+        size_t iquad;
 
-      /* Generate a ray starting from the pinhole camera and passing through the
-       * pixel sample */
-      htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+        /* Sample a position into the pixel, in the normalized image plane */
+        pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+        pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
 
-      /* Sample a spectral band and a quadrature point */
-      htrdr_sky_sample_sw_spectral_data_CIE_1931_X
-        (htrdr->sky, rng, &iband, &iquad);
+        /* Generate a ray starting from the pinhole camera and passing through the
+         * pixel sample */
+        htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
 
-      /* Compute the radiance that reach the pixel through the ray */
-      weight = htrdr_compute_radiance_sw
-        (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-      ASSERT(weight >= 0);
+        /* Sample a spectral band and a quadrature point */
+        switch(ichannel) {
+          case 0:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_X
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          case 1:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          case 2:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          default: FATAL("Unreachable code.\n"); break;
+        }
 
-      /* Update the pixel accumulator */
-      pix_accum->sum_weights += weight;
-      pix_accum->sum_weights_sqr += weight*weight;
-      pix_accum->nweights += 1;
+        /* Compute the radiance that reach the pixel through the ray */
+        weight = htrdr_compute_radiance_sw
+          (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        ASSERT(weight >= 0);
+
+        /* Update the pixel accumulator */
+        pix_accums[ichannel].sum_weights += weight;
+        pix_accums[ichannel].sum_weights_sqr += weight*weight;
+        pix_accums[ichannel].nweights += 1;
+      }
     }
   }
-
   return RES_OK;
 }
 
@@ -142,11 +158,11 @@ htrdr_draw_radiance_sw
   htrdr_buffer_get_layout(buf, &layout);
   ASSERT(layout.width || layout.height || layout.elmt_size);
 
-  if(layout.elmt_size != sizeof(struct htrdr_accum)
-  || layout.alignment < ALIGNOF(struct htrdr_accum)) {
+  if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
+  || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
     htrdr_log_err(htrdr,
       "%s: invalid buffer layout. "
-      "The pixel size must be the size of an accumulator.\n",
+      "The pixel size must be the size of 3 * accumulators.\n",
       FUNC_NAME);
     res = RES_BAD_ARG;
     goto error;

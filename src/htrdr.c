@@ -110,8 +110,8 @@ dump_accum_buffer
   (void)stream_name;
 
   htrdr_buffer_get_layout(buf, &layout);
-  if(layout.elmt_size != sizeof(struct htrdr_accum)
-  || layout.alignment < ALIGNOF(struct htrdr_accum)) {
+  if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
+  || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
     htrdr_log_err(htrdr,
       "%s: invalid buffer layout. "
       "The pixel size must be the size of an accumulator.\n",
@@ -120,12 +120,17 @@ dump_accum_buffer
     goto error;
   }
 
+  fprintf(stream, "%lu %lu\n", layout.width, layout.height);
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
-      const struct htrdr_accum* accum = htrdr_buffer_at(buf, x, y);
-      const double E = accum->nweights
-        ? accum->sum_weights / (double)accum->nweights : 0;
-      fprintf(stream, "%g ", E);
+      const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
+      int i;
+      FOR_EACH(i, 0, 3) {
+        const double E = accums[i].nweights
+          ? accums[i].sum_weights / (double)accums[i].nweights : 0;
+        fprintf(stream, "%g ", E);
+      }
+      fprintf(stream, "\n");
     }
     fprintf(stream, "\n");
   }
@@ -258,9 +263,9 @@ htrdr_init
   res = htrdr_buffer_create(htrdr,
     args->image.definition[0], /* Width */
     args->image.definition[1], /* Height */
-    args->image.definition[0]*sizeof(struct htrdr_accum), /* Pitch */
-    sizeof(struct htrdr_accum), /* Element size */
-    16, /* Alignment */
+    args->image.definition[0]*sizeof(struct htrdr_accum[3]), /* Pitch */
+    sizeof(struct htrdr_accum[3]),
+    ALIGNOF(struct htrdr_accum[3]), /* Alignment */
     &htrdr->buf);
   if(res != RES_OK) goto error;
 
@@ -346,7 +351,7 @@ htrdr_run(struct htrdr* htrdr)
     if(res != RES_OK) goto error;
     time_sub(&t0, time_current(&t1), &t0);
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
-    htrdr_log(htrdr, "Elapsed time: %s\n", buf);
+    htrdr_log(htrdr, "Rendering time: %s\n", buf);
 
     res = dump_accum_buffer
       (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);

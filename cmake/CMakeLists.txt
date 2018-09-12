@@ -93,11 +93,10 @@ target_link_libraries(htrdr HTCP HTGOP HTMIE RSys Star3D Star3DAW StarSF StarSP 
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)
-  set_target_properties(htrdr PROPERTIES LINK_FLAGS ${OpenMP_C_FLAGS})
+  set_target_properties(htrdr PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 endif()
 
 set_target_properties(htrdr PROPERTIES
-  DEFINE_SYMBOL HTRDR_SHARED_BUILD
   COMPILE_FLAGS "${OpenMP_C_FLAGS}"
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})

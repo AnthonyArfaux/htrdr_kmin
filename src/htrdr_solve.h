@@ -48,6 +48,6 @@ htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t spp, /* #samples per pixel, i.e. #realisations */
-   struct htrdr_buffer* buf); /* Buffer of struct htrdr_accum */
+   struct htrdr_buffer* buf); /* Buffer of struct htrdr_accum[3] */
 
 #endif /* HTRDR_SOLVE_H */
