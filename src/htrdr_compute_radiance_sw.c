@@ -246,7 +246,7 @@ transmissivity
 
   /* Compute the transmissivity */
   svx_tree = htrdr_sky_get_svx_tree(htrdr->sky, iband, iquad);
-  SVX(octree_trace_ray(svx_tree, pos, dir, range, NULL,
+  SVX(tree_trace_ray(svx_tree, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, &svx_hit));
 
   if(SVX_HIT_NONE(&svx_hit)) {
@@ -374,7 +374,7 @@ htrdr_compute_radiance_sw
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
-    SVX(octree_trace_ray(svx_tree, pos, dir, range, NULL,
+    SVX(tree_trace_ray(svx_tree, pos, dir, range, NULL,
       scattering_hit_filter, &scattering_ctx, &svx_hit));
 
     /* No scattering and no surface reflection. Stop the radiative random walk */

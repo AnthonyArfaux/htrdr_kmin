@@ -84,8 +84,8 @@ htrdr_sky_fetch_raw_property
    const size_t ispectral_band,
    const size_t iquadrature_pt,
    const double pos[3],
-   double k_min,
-   double k_max);
+   const double k_min, /* For debug only */
+   const double k_max); /* For debug only */
 
 extern LOCAL_SYM struct svx_tree*
 htrdr_sky_get_svx_tree

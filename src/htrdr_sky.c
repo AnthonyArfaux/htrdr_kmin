@@ -1228,8 +1228,8 @@ htrdr_sky_fetch_raw_property
    const size_t iband, /* Index of the spectral band */
    const size_t iquad, /* Index of the quadrature point in the spectral band */
    const double pos[3],
-   double k_min,
-   double k_max)
+   const double k_min,
+   const double k_max)
 {
   size_t ivox[3];
   size_t i;
@@ -1323,6 +1323,7 @@ htrdr_sky_fetch_raw_property
 
   k = k_particle + k_gas;
   ASSERT(k >= k_min && k <= k_max);
+  (void)k_min, (void)k_max;
   return k;
 }
 
