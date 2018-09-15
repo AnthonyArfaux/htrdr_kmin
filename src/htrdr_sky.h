@@ -17,6 +17,7 @@
 #define HTRDR_SKY_H
 
 #include <rsys/rsys.h>
+#include <star/svx.h>
 
 /* Properties of the sky */
 enum htrdr_sky_property {
@@ -26,7 +27,9 @@ enum htrdr_sky_property {
   HTRDR_PROPERTIES_COUNT__
 };
 
-enum htrdr_sky_component { /* FIXME */
+/* FIXME Maybe rename this constant to avoid the confusion with the
+ * htrdr_sky_component_flag enumerate */
+enum htrdr_sky_component {
   HTRDR_GAS__,
   HTRDR_PARTICLES__,
   HTRDR_COMPONENTS_COUNT__
@@ -86,12 +89,6 @@ htrdr_sky_fetch_raw_property
    const double pos[3],
    const double k_min, /* For debug only */
    const double k_max); /* For debug only */
-
-extern LOCAL_SYM struct svx_tree*
-htrdr_sky_get_svx_tree
-  (struct htrdr_sky* sky,
-   const size_t ispectral_band,
-   const size_t iquadrature_pt);
 
 extern LOCAL_SYM double
 htrdr_sky_fetch_svx_property
@@ -156,5 +153,18 @@ htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
    size_t* ispectral_band,
    size_t* iquadrature_pt);
 
+extern LOCAL_SYM res_T
+htrdr_sky_trace_ray
+  (struct htrdr_sky* sky,
+   const double ray_origin[3],
+   const double ray_direction[3], /* Must be normalized */
+   const double ray_range[2],
+   const svx_hit_challenge_T challenge, /* NULL <=> Traversed up to the leaves */
+   const svx_hit_filter_T filter, /* NULL <=> Stop RT at the 1st hit voxel */
+   void* context, /* Data sent to the filter functor */
+   const size_t ispectral_band,
+   const size_t iquadrature_pt,
+   struct svx_hit* hit);
+  
 #endif /* HTRDR_SKY_H */
 

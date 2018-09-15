@@ -138,6 +138,7 @@ transmissivity_hit_filter
    void* context)
 {
   struct transmissivity_context* ctx = context;
+  int comp_mask = HTRDR_ALL_COMPONENTS;
   double vox_dst; /* Distance to traverse into the voxel */
   double k_max;
   double k_min;
@@ -146,9 +147,9 @@ transmissivity_hit_filter
   (void)range;
 
   k_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MIN, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
+    HTRDR_SVX_MIN, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
   k_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
+    HTRDR_SVX_MAX, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
   ASSERT(k_min <= k_max);
 
   /* Compute the distance to traverse into the voxel */
@@ -185,7 +186,7 @@ transmissivity_hit_filter
       x[2] = org[2] + ctx->traversal_dst * dir[2];
 
       k = htrdr_sky_fetch_raw_property(ctx->sky, ctx->prop,
-        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, x, k_min, k_max);
+        comp_mask, ctx->iband, ctx->iquad, x, k_min, k_max);
       ASSERT(k >= k_min && k <= k_max);
 
       /* Handle the case that k_max is not *really* the max */
@@ -218,7 +219,6 @@ transmissivity
 {
   struct s3d_hit s3d_hit;
   struct svx_hit svx_hit;
-  struct svx_tree* svx_tree;
 
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
   struct s3d_hit s3d_hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
@@ -245,9 +245,8 @@ transmissivity
   transmissivity_ctx.prop = prop;
 
   /* Compute the transmissivity */
-  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky, iband, iquad);
-  SVX(tree_trace_ray(svx_tree, pos, dir, range, NULL,
-    transmissivity_hit_filter, &transmissivity_ctx, &svx_hit));
+  HTRDR(sky_trace_ray(htrdr->sky, pos, dir, range, NULL,
+    transmissivity_hit_filter, &transmissivity_ctx, iband, iquad, &svx_hit));
 
   if(SVX_HIT_NONE(&svx_hit)) {
     return transmissivity_ctx.Tmin ? exp(-transmissivity_ctx.Tmin) : 1.0;
@@ -272,7 +271,6 @@ htrdr_compute_radiance_sw
   struct s3d_hit s3d_hit = S3D_HIT_NULL;
   struct svx_hit svx_hit = SVX_HIT_NULL;
   struct s3d_hit s3d_hit_prev = S3D_HIT_NULL;
-  struct svx_tree* svx_tree = NULL;
   struct ssf_phase* phase_hg = NULL;
   struct ssf_phase* phase_rayleigh = NULL;
   struct ssf_bsdf* bsdf = NULL;
@@ -328,8 +326,6 @@ htrdr_compute_radiance_sw
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
 
-  svx_tree = htrdr_sky_get_svx_tree(htrdr->sky, iband, iquad);
-
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
@@ -374,8 +370,8 @@ htrdr_compute_radiance_sw
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
-    SVX(tree_trace_ray(svx_tree, pos, dir, range, NULL,
-      scattering_hit_filter, &scattering_ctx, &svx_hit));
+    HTRDR(sky_trace_ray(htrdr->sky, pos, dir, range, NULL,
+      scattering_hit_filter, &scattering_ctx, iband, iquad, &svx_hit));
 
     /* No scattering and no surface reflection. Stop the radiative random walk */
     if(S3D_HIT_NONE(&s3d_hit) && SVX_HIT_NONE(&svx_hit)) {
