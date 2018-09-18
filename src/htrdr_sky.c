@@ -63,13 +63,15 @@ struct build_tree_context {
   double dst_max; /* Max traversal distance */
   double tau_threshold; /* Threshold criteria for the merge process */
   size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
+  size_t quadrature_range[2]; /* Range of quadrature point indices to handle */
 
   /* Precomputed voxel data of the finest level. May be NULL <=> compute the
-   * voxel data at runtime. */
+   * voxel data at runtime. This structure is not used during the construction
+   * of the binary tree of the atmosphere */
   struct htrdr_grid* grid;
 };
 
-#define BUILD_TREE_CONTEXT_NULL__ { NULL, {0,0,0}, 0, 0, 0, NULL }
+#define BUILD_TREE_CONTEXT_NULL__ { NULL, {0,0,0}, 0, 0, 0, {0,0}, NULL }
 static const struct build_tree_context BUILD_TREE_CONTEXT_NULL =
   BUILD_TREE_CONTEXT_NULL__;
 
@@ -144,7 +146,9 @@ struct atmosphere {
 
 struct htrdr_sky {
   struct cloud* clouds; /* Per sw_band cloud data structure */
-  struct atmosphere* atmosphere; /* Per sw_band atmospheric data structure */
+
+  /* Per sw_band and per quadrature point atmosphere data structure */
+  struct atmosphere** atmosphere;
 
   struct htrdr_sun* sun; /* Sun attached to the sky */
 
@@ -363,10 +367,22 @@ clean_atmosphere(struct htrdr_sky* sky)
 
   nbands =  htrdr_sky_get_sw_spectral_bands_count(sky);
   FOR_EACH(i, 0, nbands) {
-    if(sky->atmosphere[i].bitree) {
-      SVX(tree_ref_put(sky->atmosphere[i].bitree));
-      sky->atmosphere[i].bitree = NULL;
+    struct htgop_spectral_interval band;
+    size_t iband;
+    size_t iquad;
+
+    iband = sky->sw_bands_range[0] + i;
+    HTGOP(get_sw_spectral_interval(sky->htgop, iband, &band));
+
+    if(!sky->atmosphere[i]) continue;
+
+    FOR_EACH(iquad, 0, band.quadrature_length) {
+      if(sky->atmosphere[i][iquad].bitree) {
+        SVX(tree_ref_put(sky->atmosphere[i][iquad].bitree));
+        sky->atmosphere[i][iquad].bitree = NULL;
+      }
     }
+    MEM_RM(sky->htrdr->allocator, sky->atmosphere[i]);
   }
   MEM_RM(sky->htrdr->allocator, sky->atmosphere);
 }
@@ -496,7 +512,6 @@ cloud_vox_get_gas
   struct htgop_layer_sw_spectral_interval band;
   size_t ilayer;
   size_t layer_range[2];
-  size_t quad_range[2];
   double x_h2o_range[2];
   double vox_low[3], vox_upp[3]; /* Voxel AABB */
   double ka_min, ka_max;
@@ -595,20 +610,20 @@ cloud_vox_get_gas
 
     /* ... retrieve the considered spectral interval */
     HTGOP(layer_get_sw_spectral_interval(&layer, ctx->iband, &band));
-    quad_range[0] = 0;
-    quad_range[1] = band.quadrature_length-1;
+    ASSERT(ctx->quadrature_range[0] <= ctx->quadrature_range[1]);
+    ASSERT(ctx->quadrature_range[1] < band.quadrature_length);
 
     /* ... and compute the radiative properties and upd their bounds */
     HTGOP(layer_sw_spectral_interval_quadpoints_get_ka_bounds
-      (&band, quad_range, x_h2o_range, k));
+      (&band, ctx->quadrature_range, x_h2o_range, k));
     ka_min = MMIN(ka_min, k[0]);
     ka_max = MMAX(ka_max, k[1]);
     HTGOP(layer_sw_spectral_interval_quadpoints_get_ks_bounds
-      (&band, quad_range, x_h2o_range, k));
+      (&band, ctx->quadrature_range, x_h2o_range, k));
     ks_min = MMIN(ks_min, k[0]);
     ks_max = MMAX(ks_max, k[1]);
     HTGOP(layer_sw_spectral_interval_quadpoints_get_kext_bounds
-      (&band, quad_range, x_h2o_range, k));
+      (&band, ctx->quadrature_range, x_h2o_range, k));
     kext_min = MMIN(kext_min, k[0]);
     kext_max = MMAX(kext_max, k[1]);
   }
@@ -1029,7 +1044,12 @@ setup_clouds
   }
 
   FOR_EACH(i, 0, nbands) {
+    struct htgop_spectral_interval band;
     ctx.iband = i + sky->sw_bands_range[0];
+
+    HTGOP(get_sw_spectral_interval(sky->htgop, ctx.iband, &band));
+    ctx.quadrature_range[0] = 0;
+    ctx.quadrature_range[1] = band.quadrature_length - 1;
 
     /* Compute grid of voxels data */
     res = setup_cloud_grid(sky, nvoxs, ctx.iband, htcp_filename,
@@ -1076,12 +1096,7 @@ atmosphere_vox_get(const size_t xyz[3], void* dst, void* context)
   double ka_min, ks_min, kext_min;
   double ka_max, ks_max, kext_max;
   size_t ilayer;
-  size_t i;
   ASSERT(xyz && dst && context);
-
-  i = ctx->iband - ctx->sky->sw_bands_range[0];
-  ASSERT(i <= ctx->sky->sw_bands_range[1]);
-
 
   /* Compute the boundaries of the SVX voxel */
   HTGOP(get_level(ctx->sky->htgop, 0, &level));
@@ -1110,7 +1125,9 @@ atmosphere_vox_get(const size_t xyz[3], void* dst, void* context)
 
     /* ... and update the radiative properties bound with the per quadrature
      * point nominal values */
-    FOR_EACH(iquad, 0, band.quadrature_length) {
+    ASSERT(ctx->quadrature_range[0] <= ctx->quadrature_range[1]);
+    ASSERT(ctx->quadrature_range[1] < band.quadrature_length);
+    FOR_EACH(iquad, ctx->quadrature_range[0], ctx->quadrature_range[1]+1) {
       ka_min = MMIN(ka_min, band.ka_nominal[iquad]);
       ka_max = MMAX(ka_max, band.ka_nominal[iquad]);
       ks_min = MMIN(ks_min, band.ks_nominal[iquad]);
@@ -1176,7 +1193,7 @@ setup_atmosphere(struct htrdr_sky* sky)
   HTGOP(get_level(sky->htgop, nlevels-1, &lvl_upp));
   low = lvl_low.height;
   upp = lvl_upp.height;
-  definition = nlayers*10;
+  definition = nlayers;
 
   /* Setup the build context */
   ctx.sky = sky;
@@ -1213,20 +1230,41 @@ setup_atmosphere(struct htrdr_sky* sky)
   }
 
   FOR_EACH(i, 0, nbands) {
+    size_t iquad;
+    struct htgop_spectral_interval band;
     ctx.iband = i + sky->sw_bands_range[0];
 
-    /* Create the atmospheric binary tree */
-    res = svx_bintree_create(sky->htrdr->svx, low, upp, definition, SVX_AXIS_Z,
-      &vox_desc, &sky->atmosphere[i].bitree);
-    if(res != RES_OK) {
-      htrdr_log_err(sky->htrdr, "could not create the binary tree of the "
-        "atmospheric properties for the band %lu.\n", (unsigned long)ctx.iband);
+    HTGOP(get_sw_spectral_interval(sky->htgop, ctx.iband, &band));
+
+    sky->atmosphere[i] = MEM_CALLOC(sky->htrdr->allocator, 
+       band.quadrature_length, sizeof(*sky->atmosphere[i]));
+    if(!sky->atmosphere[i]) {
+      htrdr_log_err(sky->htrdr,
+        "could not create the list of per quadrature point atomospheric data "
+        "for the band %lu.\n", (unsigned long)ctx.iband);
+      res = RES_MEM_ERR;
       goto error;
     }
 
-    /* Fetch the binary tree descriptor for future use */
-    SVX(tree_get_desc
-      (sky->atmosphere[i].bitree, &sky->atmosphere[i].bitree_desc));
+    /* Build an atmospheric binary tree for each quadrature point of the
+     * considered spectral band */
+    FOR_EACH(iquad, 0, band.quadrature_length) {
+      ctx.quadrature_range[0] = iquad;
+      ctx.quadrature_range[1] = iquad;
+
+      /* Create the atmospheric binary tree */
+      res = svx_bintree_create(sky->htrdr->svx, low, upp, definition, SVX_AXIS_Z,
+        &vox_desc, &sky->atmosphere[i][iquad].bitree);
+      if(res != RES_OK) {
+        htrdr_log_err(sky->htrdr, "could not create the binary tree of the "
+          "atmospheric properties for the band %lu.\n", (unsigned long)ctx.iband);
+        goto error;
+      }
+
+      /* Fetch the binary tree descriptor for future use */
+      SVX(tree_get_desc(sky->atmosphere[i][iquad].bitree,
+        &sky->atmosphere[i][iquad].bitree_desc));
+    }
   }
 
 exit:
@@ -1317,13 +1355,13 @@ release_sky(ref_T* ref)
   struct htrdr_sky* sky;
   ASSERT(ref);
   sky = CONTAINER_OF(ref, struct htrdr_sky, ref);
+  clean_clouds(sky);
+  clean_atmosphere(sky);
   if(sky->sun) htrdr_sun_ref_put(sky->sun);
   if(sky->htcp) HTCP(ref_put(sky->htcp));
   if(sky->htgop) HTGOP(ref_put(sky->htgop));
   if(sky->htmie) HTMIE(ref_put(sky->htmie));
   if(sky->sw_bands) MEM_RM(sky->htrdr->allocator, sky->sw_bands);
-  clean_clouds(sky);
-  clean_atmosphere(sky);
   darray_split_release(&sky->svx2htcp_z);
   MEM_RM(sky->htrdr->allocator, sky);
 }
@@ -1488,7 +1526,7 @@ htrdr_sky_fetch_raw_property
 
   i = iband - sky->sw_bands_range[0];
   cloud_desc = &sky->clouds[i].octree_desc;
-  atmosphere_desc = &sky->atmosphere[i].bitree_desc;
+  atmosphere_desc = &sky->atmosphere[i][iquad].bitree_desc;
   ASSERT(atmosphere_desc->frame[0] == SVX_AXIS_Z);
 
   /* Is the position inside the clouds? */
@@ -1702,6 +1740,8 @@ htrdr_sky_fetch_svx_property
    const double pos[3])
 {
   struct svx_voxel voxel = SVX_VOXEL_NULL;
+  struct atmosphere* atmosphere;
+  struct cloud* cloud;
   size_t i;
   int in_clouds; /* Defines if `pos' lies in the clouds */
   int in_atmosphere; /* Defines if `pos' lies in the atmosphere */
@@ -1712,22 +1752,24 @@ htrdr_sky_fetch_svx_property
   ASSERT(iband <= sky->sw_bands_range[1]);
 
   i = iband - sky->sw_bands_range[0];
+  cloud = &sky->clouds[i];
+  atmosphere = &sky->atmosphere[i][iquad];
 
   /* Is the position inside the clouds? */
   in_clouds =
-     pos[0] >= sky->clouds[i].octree_desc.lower[0]
-  && pos[1] >= sky->clouds[i].octree_desc.lower[1]
-  && pos[2] >= sky->clouds[i].octree_desc.lower[2]
-  && pos[0] <= sky->clouds[i].octree_desc.upper[0]
-  && pos[1] <= sky->clouds[i].octree_desc.upper[1]
-  && pos[2] <= sky->clouds[i].octree_desc.upper[2];
+     pos[0] >= cloud->octree_desc.lower[0]
+  && pos[1] >= cloud->octree_desc.lower[1]
+  && pos[2] >= cloud->octree_desc.lower[2]
+  && pos[0] <= cloud->octree_desc.upper[0]
+  && pos[1] <= cloud->octree_desc.upper[1]
+  && pos[2] <= cloud->octree_desc.upper[2];
 
   in_clouds = 0; /* FIXME FIXME FIXME */
 
-  ASSERT(sky->atmosphere[i].bitree_desc.frame[0] = SVX_AXIS_Z);
+  ASSERT(atmosphere->bitree_desc.frame[0] = SVX_AXIS_Z);
   in_atmosphere =
-     pos[2] >= sky->atmosphere[i].bitree_desc.lower[2]
-  && pos[2] <= sky->atmosphere[i].bitree_desc.upper[2];
+     pos[2] >= atmosphere->bitree_desc.lower[2]
+  && pos[2] <= atmosphere->bitree_desc.upper[2];
 
   if(!in_clouds) { /* Not in clouds => No particle */
     comp_mask &= ~HTRDR_PARTICLES;
@@ -1740,10 +1782,10 @@ htrdr_sky_fetch_svx_property
     return 0;
 
   if(in_clouds) {
-    SVX(tree_at(sky->clouds[i].octree, pos, NULL, NULL, &voxel));
+    SVX(tree_at(cloud->octree, pos, NULL, NULL, &voxel));
   } else {
     ASSERT(in_atmosphere);
-    SVX(tree_at(sky->atmosphere[i].bitree, pos, NULL, NULL, &voxel));
+    SVX(tree_at(atmosphere->bitree, pos, NULL, NULL, &voxel));
   }
   return htrdr_sky_fetch_svx_voxel_property
     (sky, prop, op, comp_mask, iband, iquad, &voxel);
@@ -1881,7 +1923,7 @@ htrdr_sky_trace_ray
   /* Fetch the clouds/atmosphere corresponding to the submitted spectral data */
   i = ispectral_band - sky->sw_bands_range[0];
   clouds = sky->clouds[i].octree;
-  atmosphere = sky->atmosphere[i].bitree;
+  atmosphere = sky->atmosphere[i][iquadrature_pt].bitree;
 
   /* Compute the ray range, intersecting the clouds AABB */
   ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
