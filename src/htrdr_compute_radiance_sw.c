@@ -309,7 +309,7 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  SSF(lambertian_reflection_setup(bsdf, 0.02));
+  SSF(lambertian_reflection_setup(bsdf, 0.5));
 
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
@@ -359,7 +359,7 @@ htrdr_compute_radiance_sw
     S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
       &s3d_hit_prev, &s3d_hit));
 
-    /* Sample an optical thicknes */
+    /* Sample an optical thickness */
     scattering_ctx.Ts = ssp_ran_exp(rng, 1);
 
     /* Setup the remaining scattering context fields */
@@ -375,7 +375,6 @@ htrdr_compute_radiance_sw
 
     /* No scattering and no surface reflection. Stop the radiative random walk */
     if(S3D_HIT_NONE(&s3d_hit) && SVX_HIT_NONE(&svx_hit)) {
-      w *= ksi;
       break;
     }
     ASSERT(SVX_HIT_NONE(&svx_hit)

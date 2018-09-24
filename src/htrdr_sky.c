@@ -71,7 +71,7 @@ struct build_tree_context {
   struct htrdr_grid* grid;
 };
 
-#define BUILD_TREE_CONTEXT_NULL__ { NULL, {0,0,0}, 0, 0, 0, {0,0}, NULL }
+#define BUILD_TREE_CONTEXT_NULL__ {NULL,{0,0,0},0,0,0,{SIZE_MAX,SIZE_MAX},NULL}
 static const struct build_tree_context BUILD_TREE_CONTEXT_NULL =
   BUILD_TREE_CONTEXT_NULL__;
 
@@ -803,6 +803,7 @@ setup_cloud_grid
   struct str path;
   struct str str;
   struct build_tree_context ctx = BUILD_TREE_CONTEXT_NULL;
+  struct htgop_spectral_interval band;
   size_t sizeof_cell;
   size_t ncells;
   uint64_t mcode;
@@ -867,6 +868,10 @@ setup_cloud_grid
   ctx.dst_max = DBL_MAX; /* Unused for grid construction */
   ctx.tau_threshold = DBL_MAX; /* Unused for grid construction */
   ctx.iband = iband;
+
+  HTGOP(get_sw_spectral_interval(sky->htgop, ctx.iband, &band));
+  ctx.quadrature_range[0] = 0;
+  ctx.quadrature_range[1] = band.quadrature_length - 1;
 
   /* Compute the size of a SVX voxel */
   ctx.vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
@@ -1018,7 +1023,7 @@ setup_clouds
   /* Setup the build context */
   ctx.sky = sky;
   ctx.dst_max = sz[2];
-  ctx.tau_threshold = 0.1;
+  ctx.tau_threshold = 100;
   ctx.vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
   ctx.vxsz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
   ctx.vxsz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
@@ -1538,8 +1543,6 @@ htrdr_sky_fetch_raw_property
   && pos[1] <= cloud_desc->upper[1]
   && pos[2] <= cloud_desc->upper[2];
 
-  in_clouds = 0; /* FIXME FIXME FIXME */
-
   /* Is the position inside the atmosphere? */
   in_atmosphere =
      pos[2] >= atmosphere_desc->lower[2]
@@ -1764,8 +1767,6 @@ htrdr_sky_fetch_svx_property
   && pos[1] <= cloud->octree_desc.upper[1]
   && pos[2] <= cloud->octree_desc.upper[2];
 
-  in_clouds = 0; /* FIXME FIXME FIXME */
-
   ASSERT(atmosphere->bitree_desc.frame[0] = SVX_AXIS_Z);
   in_atmosphere =
      pos[2] >= atmosphere->bitree_desc.lower[2]
@@ -1925,12 +1926,12 @@ htrdr_sky_trace_ray
   clouds = sky->clouds[i].octree;
   atmosphere = sky->atmosphere[i][iquadrature_pt].bitree;
 
+  cloud_range[0] = DBL_MAX;
+  cloud_range[1] =-DBL_MAX;
+
   /* Compute the ray range, intersecting the clouds AABB */
   ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
     sky->htcp_desc.upper, cloud_range);
-
-  cloud_range[0] = DBL_MAX;
-  cloud_range[1] =-DBL_MAX;
 
   /* Reset the hit */
   *hit = SVX_HIT_NULL;
