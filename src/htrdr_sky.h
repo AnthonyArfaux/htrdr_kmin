@@ -126,6 +126,11 @@ htrdr_sky_get_sw_spectral_band_id
   (const struct htrdr_sky* sky,
    const size_t i); /* in [0, htrdr_sky_get_sw_spectral_bands_count[ */
 
+extern LOCAL_SYM size_t
+htrdr_sky_get_sw_spectral_band_quadrature_length
+  (const struct htrdr_sky* sky,
+   const size_t iband);
+
 extern LOCAL_SYM res_T
 htrdr_sky_get_sw_spectral_band_bounds
   (const struct htrdr_sky* sky,

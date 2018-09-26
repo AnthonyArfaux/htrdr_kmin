@@ -189,7 +189,6 @@ transmissivity_hit_filter
         comp_mask, ctx->iband, ctx->iquad, x, k_min, k_max);
       ASSERT(k >= k_min && k <= k_max);
 
-      /* Handle the case that k_max is not *really* the max */
       proba = (k - k_min) / (k_max - k_min);
 
       if(ssp_rng_canonical(ctx->rng) < proba) { /* Collide */
