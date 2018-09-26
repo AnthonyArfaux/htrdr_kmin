@@ -253,6 +253,9 @@ htrdr_init
     goto error;
   }
 
+  res = setup_geometry(htrdr, args->filename_obj);
+  if(res != RES_OK) goto error;
+
   proj_ratio =
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
@@ -297,10 +300,7 @@ htrdr_init
     }
   }
 
-  res = setup_geometry(htrdr, args->filename_obj);
-  if(res != RES_OK) goto error;
-
-exit:
+  exit:
   return res;
 error:
   htrdr_release(htrdr);
