@@ -63,6 +63,7 @@ htrdr_sky_create
    const char* htcp_filename,
    const char* htgop_filename,
    const char* htmie_filename,
+   const double optical_thickness, /* Threshold used during octree building */
    struct htrdr_sky** sky);
 
 extern LOCAL_SYM void

@@ -27,6 +27,7 @@
 #include <high_tune/htgop.h>
 #include <high_tune/htmie.h>
 
+#include <rsys/clock_time.h>
 #include <rsys/dynamic_array_double.h>
 #include <rsys/dynamic_array_size_t.h>
 #include <rsys/hash_table.h>
@@ -960,6 +961,7 @@ setup_clouds
    const char* htcp_filename,
    const char* htgop_filename,
    const char* htmie_filename,
+   const double optical_thickness_threshold,
    const int force_cache_update)
 {
   struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
@@ -970,7 +972,7 @@ setup_clouds
   size_t nbands;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(sky && sky->sw_bands);
+  ASSERT(sky && sky->sw_bands && optical_thickness_threshold >= 0);
 
   res = htcp_get_desc(sky->htcp, &sky->htcp_desc);
   if(res != RES_OK) {
@@ -1032,7 +1034,7 @@ setup_clouds
 
   /* Setup the build context */
   ctx.sky = sky;
-  ctx.tau_threshold = 1;
+  ctx.tau_threshold = optical_thickness_threshold;
   ctx.vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
   ctx.vxsz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
   ctx.vxsz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
@@ -1203,7 +1205,8 @@ atmosphere_vox_challenge_merge
 }
 
 static res_T
-setup_atmosphere(struct htrdr_sky* sky)
+setup_atmosphere
+  (struct htrdr_sky* sky, const double optical_thickness_threshold)
 {
   struct build_tree_context ctx = BUILD_TREE_CONTEXT_NULL;
   struct htgop_level lvl_low, lvl_upp;
@@ -1214,7 +1217,7 @@ setup_atmosphere(struct htrdr_sky* sky)
   size_t nbands;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(sky);
+  ASSERT(sky && optical_thickness_threshold >= 0);
 
   HTGOP(get_layers_count(sky->htgop, &nlayers));
   HTGOP(get_levels_count(sky->htgop, &nlevels));
@@ -1226,7 +1229,7 @@ setup_atmosphere(struct htrdr_sky* sky)
 
   /* Setup the build context */
   ctx.sky = sky;
-  ctx.tau_threshold = 1;
+  ctx.tau_threshold = optical_thickness_threshold;
   ctx.vxsz[0] = INF;
   ctx.vxsz[1] = INF;
   ctx.vxsz[2] = (upp-low)/(double)definition;
@@ -1404,15 +1407,19 @@ htrdr_sky_create
    const char* htcp_filename,
    const char* htgop_filename,
    const char* htmie_filename,
+   const double optical_thickness_threshold,
    struct htrdr_sky** out_sky)
 {
+  struct time t0, t1;
   struct htrdr_sky* sky = NULL;
+  char buf[128];
   int htcp_upd = 1;
   int htmie_upd = 1;
   int htgop_upd = 1;
   int force_upd = 1;
   res_T res = RES_OK;
   ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
+  ASSERT(optical_thickness_threshold >= 0);
 
   sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
   if(!sky) {
@@ -1479,12 +1486,20 @@ htrdr_sky_create
   if(res != RES_OK) goto error;
   force_upd = htcp_upd || htmie_upd || htgop_upd;
 
-  res = setup_clouds
-    (sky, htcp_filename, htgop_filename, htmie_filename, force_upd);
+  time_current(&t0);
+  res = setup_clouds(sky, htcp_filename, htgop_filename, htmie_filename,
+    optical_thickness_threshold, force_upd);
   if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
+  htrdr_log(htrdr, "Setup clouds in %s\n", buf);
 
-  res = setup_atmosphere(sky);
+  time_current(&t0);
+  res = setup_atmosphere(sky, optical_thickness_threshold);
   if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
+  htrdr_log(htrdr, "Setup atmosphere in %s\n", buf);
 
 exit:
   *out_sky = sky;

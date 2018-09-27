@@ -9,7 +9,7 @@
 <camopt>      ::= <target>
                 | <position>
                 | <up>
-                | <fov>
+                | <fov> # Vertical field of view, in degrees
 <target>      ::= tgt=<float3>
 <position>    ::= pos=<float3>
 <up>          ::= up=<float3>

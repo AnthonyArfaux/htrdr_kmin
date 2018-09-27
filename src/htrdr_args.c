@@ -58,6 +58,10 @@ print_help(const char* cmd)
 "  -t THREADS       hint on the number of threads to use. By default use as\n"
 "                   many threads as CPU cores.\n");
   printf(
+"  -T THRESHOLD     optical thickness used as threshold during the octree\n"
+"                   building. By default its value is `%g'.\n",
+    HTRDR_ARGS_DEFAULT.optical_thickness);
+  printf(
 "  -v               make the program more verbose.\n");
   printf("\n");
   printf(
@@ -211,7 +215,7 @@ parse_camera_parameter(struct htrdr_args* args, const char* str)
   } else if(!strcmp(key, "up")) {
     PARSE("up vector", parse_doubleX(val, args->camera.up, 3));
   } else if(!strcmp(key, "fov")) {
-    PARSE("field-of-view", parse_fov(val, &args->camera.fov_x));
+    PARSE("field-of-view", parse_fov(val, &args->camera.fov_y));
   } else {
     fprintf(stderr, "Invalid camera parameter `%s'.\n", key);
     res = RES_BAD_ARG;
@@ -294,7 +298,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:T:t:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'C':
@@ -317,6 +321,10 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         break;
       case 'm': args->filename_mie = optarg; break;
       case 'o': args->output = optarg; break;
+      case 'T':
+        res = cstr_to_double(optarg, &args->optical_thickness);
+        if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
+        break;
       case 't': /* Submit an hint on the number of threads to use */
         res = cstr_to_uint(optarg, &args->nthreads);
         if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;

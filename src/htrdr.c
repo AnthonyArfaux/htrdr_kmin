@@ -260,7 +260,7 @@ htrdr_init
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
   res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
-    args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_x), &htrdr->cam);
+    args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
   if(res != RES_OK) goto error;
 
   res = htrdr_buffer_create(htrdr,
@@ -277,7 +277,8 @@ htrdr_init
   htrdr_sun_set_direction(htrdr->sun, args->main_dir);
 
   res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
-    args->filename_gas, args->filename_mie, &htrdr->sky);
+    args->filename_gas, args->filename_mie, args->optical_thickness,
+    &htrdr->sky);
   if(res != RES_OK) goto error;
 
   htrdr->lifo_allocators = MEM_CALLOC
