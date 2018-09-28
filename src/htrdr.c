@@ -189,6 +189,76 @@ error:
   goto exit;
 }
 
+static res_T
+open_file_stamp
+  (struct htrdr* htrdr,
+   const char* filename,
+   struct stat* out_stat, /* Stat of the submitted filename */
+   int* out_fd, /* Descriptor of the opened file. Must be closed by the caller */
+   struct str* stamp_filename)
+{
+  struct stat statbuf;
+  struct str str;
+  int err;
+  int fd = -1;
+  res_T res = RES_OK;
+  ASSERT(htrdr && filename && out_fd && out_stat && stamp_filename);
+
+  str_init(htrdr->allocator, &str);
+
+  err = stat(filename, &statbuf);
+  if(err) {
+    htrdr_log_err(htrdr, "%s: could not stat the file -- %s.\n",
+      filename, strerror(errno));
+    res = RES_IO_ERR;
+    goto error;
+  }
+
+  if(!S_ISREG(statbuf.st_mode)) {
+    htrdr_log_err(htrdr, "%s: not a regular file.\n", filename);
+    res = RES_IO_ERR;
+    goto error;
+  }
+
+  res = create_directory(htrdr, ".htrdr/");
+  if(res != RES_OK) goto error;
+
+  #define CHK_STR(Func, ErrMsg) {                                              \
+    res = str_##Func;                                                          \
+    if(res != RES_OK) {                                                        \
+      htrdr_log_err(htrdr, "%s: "ErrMsg"\n", filename);                        \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+  CHK_STR(set(&str, filename), "could not copy the filename");
+  CHK_STR(set(&str, basename(str_get(&str))), "could not setup the basename");
+  CHK_STR(insert(&str, 0, ".htrdr/"), "could not setup the stamp directory");
+  CHK_STR(append(&str, ".stamp"), "could not setup the stamp extension");
+  #undef CHK_STR
+
+  fd = open(str_cget(&str), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+  if(fd < 0) {
+    htrdr_log_err(htrdr, "%s: could not open/create the file -- %s.\n",
+      str_cget(&str), strerror(errno));
+    res = RES_IO_ERR;
+    goto error;
+  }
+
+  CHK(str_copy_and_clear(stamp_filename, &str) == RES_OK);
+
+exit:
+  str_release(&str);
+  *out_fd = fd;
+  *out_stat = statbuf;
+  return res;
+error:
+  if(fd >= 0) {
+    CHK(close(fd) == 0);
+    fd = -1;
+  }
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -402,7 +472,7 @@ htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
-extern LOCAL_SYM  res_T
+extern LOCAL_SYM res_T
 open_output_stream
   (struct htrdr* htrdr,
    const char* filename,
@@ -460,90 +530,94 @@ error:
 res_T
 is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
 {
-  struct str str;
+  struct str stamp_filename;
   struct stat statbuf;
   ssize_t n;
   off_t size;
   struct timespec mtime;
   int fd = -1;
-  int err;
   int upd = 1;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_upd);
 
-  str_init(htrdr->allocator, &str);
+  str_init(htrdr->allocator, &stamp_filename);
 
-  err = stat(filename, &statbuf);
-  if(err) {
-    htrdr_log_err(htrdr, "%s: could not stat the file -- %s.\n",
-      filename, strerror(errno));
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  if(!S_ISREG(statbuf.st_mode)) {
-    htrdr_log_err(htrdr, "%s: not a regular file.\n", filename);
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  res = create_directory(htrdr, ".htrdr/");
+  res = open_file_stamp(htrdr, filename, &statbuf, &fd, &stamp_filename);
   if(res != RES_OK) goto error;
 
-  #define CHK_STR(Func, ErrMsg) {                                              \
-    res = str_##Func;                                                          \
-    if(res != RES_OK) {                                                        \
-      htrdr_log_err(htrdr, "%s: "ErrMsg"\n", filename);                        \
-      goto error;                                                              \
-    }                                                                          \
-  } (void)0
-  CHK_STR(set(&str, filename), "could not copy the filename");
-  CHK_STR(set(&str, basename(str_get(&str))), "could not setup the basename");
-  CHK_STR(insert(&str, 0, ".htrdr/"), "could not setup the stamp directory");
-  CHK_STR(append(&str, ".stamp"), "could not setup the stamp extension");
-  #undef CHK_STR
-
-  #define CHK_IO(Func, ErrMsg) {                                               \
-    if((Func) < 0) {                                                           \
-      htrdr_log_err(htrdr, "%s: "ErrMsg" -- %s.\n",                            \
-        str_cget(&str), strerror(errno));                                      \
-      res = RES_IO_ERR;                                                        \
-      goto error;                                                              \
-    }                                                                          \
-  } (void) 0
-
-  fd = open(str_cget(&str), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
-  CHK_IO(fd, "could not open/create the file");
-
-  CHK_IO(n = read(fd, &mtime, sizeof(mtime)), "could not read the `mtime' data");
+  n = read(fd, &mtime, sizeof(mtime));
+  if(n < 0) {
+    htrdr_log_err(htrdr, "%s: could not read the `mtime' data -- %s.\n",
+      str_cget(&stamp_filename), strerror(errno));
+    res = RES_IO_ERR;
+    goto error;
+  }
 
   upd = (size_t)n != sizeof(mtime)
       ||mtime.tv_nsec != statbuf.st_mtim.tv_nsec
       ||mtime.tv_sec  != statbuf.st_mtim.tv_sec;
 
   if(!upd) {
-    CHK_IO(n = read(fd, &size, sizeof(size)), "could not read the `size' data");
+    n = read(fd, &size, sizeof(size));
+    if(n < 0) {
+      htrdr_log_err(htrdr, "%s: could not read the `size' data -- %s.\n",
+        str_cget(&stamp_filename), strerror(errno));
+      res = RES_IO_ERR;
+      goto error;
+    }
     upd = (size_t)n != sizeof(size) || statbuf.st_size != size;
   }
 
-  if(upd) {
-    CHK_IO(lseek(fd, 0, SEEK_SET), "could not rewind the file descriptor");
-
-    /* NOTE: Ignore n >=0 but != sizeof(DATA). In such case stamp is currupted
-     * and on the next invocation on the same filename, this function will
-     * return 1 */
-    n = write(fd, &statbuf.st_mtim, sizeof(statbuf.st_mtim));
-    CHK_IO(n, "could not update the `mtime' data");
-    n = write(fd, &statbuf.st_size, sizeof(statbuf.st_size));
-    CHK_IO(n, "could not update the `size' data");
-
-    CHK_IO(fsync(fd), "could not sync the file with storage device");
-  }
-
-  #undef CHK_IO
 exit:
   *out_upd = upd;
-  str_release(&str);
+  str_release(&stamp_filename);
+  if(fd >= 0) CHK(close(fd) == 0);
+  return res;
+error:
+  goto exit;
+}
+
+
+res_T
+update_file_stamp(struct htrdr* htrdr, const char* filename)
+{
+  struct str stamp_filename;
+  struct stat statbuf;
+  int fd = -1;
+  ssize_t n;
+  res_T res = RES_OK;
+  ASSERT(htrdr && filename);
+
+  str_init(htrdr->allocator, &stamp_filename);
+
+  res = open_file_stamp(htrdr, filename, &statbuf, &fd, &stamp_filename);
+  if(res != RES_OK) goto error;
+
+  #define CHK_IO(Func, ErrMsg) {                                               \
+    if((Func) < 0) {                                                           \
+      htrdr_log_err(htrdr, "%s: "ErrMsg" -- %s.\n",                            \
+        str_cget(&stamp_filename), strerror(errno));                           \
+      res = RES_IO_ERR;                                                        \
+      goto error;                                                              \
+    }                                                                          \
+  } (void) 0
+
+  CHK_IO(lseek(fd, 0, SEEK_SET), "could not rewind the file descriptor");
+
+  /* NOTE: Ignore n >=0 but != sizeof(DATA). In such case stamp is currupted
+   * and on the next invocation on the same filename, this function will
+   * return 1 */
+  n = write(fd, &statbuf.st_mtim, sizeof(statbuf.st_mtim));
+  CHK_IO(n, "could not update the `mtime' data");
+  n = write(fd, &statbuf.st_size, sizeof(statbuf.st_size));
+  CHK_IO(n, "could not update the `size' data");
+
+  CHK_IO(fsync(fd), "could not sync the file with storage device");
+
+  #undef CHK_IO
+
+exit:
+  str_release(&stamp_filename);
   if(fd >= 0) CHK(close(fd) == 0);
   return res;
 error:

@@ -1494,6 +1494,20 @@ htrdr_sky_create
   time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
   htrdr_log(htrdr, "Setup clouds in %s\n", buf);
 
+  /* Update the file stamps */
+  if(htcp_upd) {
+    res = update_file_stamp(sky->htrdr, htcp_filename);
+    if(res != RES_OK) goto error;
+  }
+  if(htmie_upd) {
+    res = update_file_stamp(sky->htrdr, htmie_filename);
+    if(res != RES_OK) goto error;
+  }
+  if(htgop_upd) {
+    res = update_file_stamp(sky->htrdr, htgop_filename);
+    if(res != RES_OK) goto error;
+  }
+
   time_current(&t0);
   res = setup_atmosphere(sky, optical_thickness_threshold);
   if(res != RES_OK) goto error;

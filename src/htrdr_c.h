@@ -91,6 +91,11 @@ is_file_updated
    int* is_upd);
 
 extern LOCAL_SYM res_T
+update_file_stamp
+  (struct htrdr* htrdr, 
+   const char* filename);
+
+extern LOCAL_SYM res_T
 create_directory
   (struct htrdr* htrdt,
    const char* path);
