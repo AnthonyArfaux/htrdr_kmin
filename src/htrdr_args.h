@@ -36,7 +36,7 @@ struct htrdr_args {
     double pos[3];
     double tgt[3];
     double up[3];
-    double fov_x; /* In degrees */
+    double fov_y; /* In degrees */
   } camera;
 
   struct {
@@ -45,6 +45,7 @@ struct htrdr_args {
   } image;
 
   double main_dir[3];
+  double optical_thickness; /* Threshold used during octree building */
 
   unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
@@ -74,6 +75,7 @@ struct htrdr_args {
     1          /* #samples per pixel */                                        \
   },                                                                           \
   {0, 0, 1}, /* Main direction */                                              \
+  1.0, /* Optical thickness */                                                 \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \

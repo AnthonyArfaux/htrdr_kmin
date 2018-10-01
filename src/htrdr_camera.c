@@ -27,8 +27,6 @@ struct htrdr_camera {
   double axis_z[3];
 
   double position[3];
-  double fov_x; /* Field of view in radians */
-  double rcp_proj_ratio; /* height / width */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -79,14 +77,12 @@ htrdr_camera_create
     res = RES_BAD_ARG;
     goto error;
   }
-  cam->fov_x = fov;
 
   if(proj_ratio <= 0) {
     htrdr_log_err(htrdr, "invalid projection ratio `%g'\n", proj_ratio);
     res = RES_BAD_ARG;
     goto error;
   }
-  cam->rcp_proj_ratio = 1.0 / proj_ratio;
 
   if(d3_normalize(z, d3_sub(z, target, position)) <= 0
   || d3_normalize(x, d3_cross(x, z, up)) <= 0
@@ -101,9 +97,9 @@ htrdr_camera_create
     goto error;
   }
 
-  img_plane_depth = 1.0/tan(fov);
-  d3_set(cam->axis_x, x);
-  d3_muld(cam->axis_y, y, cam->rcp_proj_ratio);
+  img_plane_depth = 1.0/tan(fov*0.5);
+  d3_muld(cam->axis_x, x, proj_ratio);
+  d3_set(cam->axis_y, y);
   d3_muld(cam->axis_z, z, img_plane_depth);
   d3_set(cam->position, position);
 
