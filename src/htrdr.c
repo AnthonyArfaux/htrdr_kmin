@@ -126,9 +126,17 @@ dump_accum_buffer
       const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
       int i;
       FOR_EACH(i, 0, 3) {
-        const double E = accums[i].nweights
-          ? accums[i].sum_weights / (double)accums[i].nweights : 0;
-        fprintf(stream, "%g ", E);
+        const double N = (double)accums[i].nweights;
+        double E = 0;
+        double V = 0;
+        double SE = 0;
+
+        if(accums[i].nweights) {
+          E = accums[i].sum_weights / N;
+          V = MMAX(accums[i].sum_weights_sqr / N - E*E, 0);
+          SE = sqrt(V/N);
+        }
+        fprintf(stream, "%g %g ", E, SE);
       }
       fprintf(stream, "\n");
     }
