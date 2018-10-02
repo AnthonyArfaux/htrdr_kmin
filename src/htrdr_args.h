@@ -44,7 +44,8 @@ struct htrdr_args {
     unsigned spp; /* #samples per pixel */
   } image;
 
-  double main_dir[3];
+  double sun_azimuth; /* In degrees */
+  double sun_elevation; /* In degrees */
   double optical_thickness; /* Threshold used during octree building */
 
   unsigned nthreads; /* Hint on the number of threads to use */
@@ -74,7 +75,8 @@ struct htrdr_args {
     {32, 32},  /* image definition */                                          \
     1          /* #samples per pixel */                                        \
   },                                                                           \
-  {0, 0, 1}, /* Main direction */                                              \
+  0, /* Sun azimuth */                                                         \
+  90, /* Sun elevation */                                                      \
   1.0, /* Optical thickness */                                                 \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \

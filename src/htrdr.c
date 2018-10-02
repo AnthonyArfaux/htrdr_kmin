@@ -267,6 +267,30 @@ error:
   goto exit;
 }
 
+static INLINE void
+spherical_to_cartesian_dir
+  (const double azimuth, /* In radians */
+   const double elevation, /* In radians */
+   double dir[3])
+{
+  double cos_azimuth;
+  double sin_azimuth;
+  double cos_elevation;
+  double sin_elevation;
+  ASSERT(azimuth >= 0 && azimuth < 2*PI);
+  ASSERT(elevation >= 0 && elevation <= PI/2.0);
+  ASSERT(dir);
+
+  cos_azimuth = cos(azimuth);
+  sin_azimuth = sin(azimuth);
+  cos_elevation = cos(elevation);
+  sin_elevation = sin(elevation);
+
+  dir[0] = cos_elevation * cos_azimuth;
+  dir[1] = cos_elevation * sin_azimuth;
+  dir[2] = sin_elevation;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -277,6 +301,7 @@ htrdr_init
    struct htrdr* htrdr)
 {
   double proj_ratio;
+  double sun_dir[3];
   const char* output_name = NULL;
   size_t ithread;
   res_T res = RES_OK;
@@ -352,7 +377,9 @@ htrdr_init
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);
   if(res != RES_OK) goto error;
-  htrdr_sun_set_direction(htrdr->sun, args->main_dir);
+  spherical_to_cartesian_dir
+    (MDEG2RAD(args->sun_azimuth), MDEG2RAD(args->sun_elevation), sun_dir);
+  htrdr_sun_set_direction(htrdr->sun, sun_dir);
 
   res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
     args->filename_gas, args->filename_mie, args->optical_thickness,

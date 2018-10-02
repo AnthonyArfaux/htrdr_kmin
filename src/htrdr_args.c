@@ -40,7 +40,11 @@ print_help(const char* cmd)
   printf(
 "  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
   printf(
-"  -D X,Y,Z         direction toward the sun.\n");
+"  -D AZIMUTH,ELEVATION\n"
+"                   sun direction in degrees. Following the right-handed\n"
+"                   convention, the azimuthal rotation is counter-clockwise\n"
+"                   around the Z axis, with 0 aligned on the X axis. The\n"
+"                   elevation rotation starts from 0 up to 90 at zenith.\n");
   printf(
 "  -f               overwrite the OUTPUT file if it already exists.\n");
   printf(
@@ -263,23 +267,37 @@ error:
 static res_T
 parse_sun_dir(struct htrdr_args* args, const char* str)
 {
-  double norm;
+  double angles[2];
   size_t len;
   res_T res = RES_OK;
   ASSERT(args && str);
 
-  res = cstr_to_list_double(str, ',', args->main_dir, &len, 3);
-  if(res == RES_OK && len != 3) res = RES_BAD_ARG;
+  res = cstr_to_list_double(str, ',', angles, &len, 2);
+  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
   if(res != RES_OK) {
     fprintf(stderr, "Invalid direction `%s'.\n", str);
     goto error;
   }
-  norm = d3_normalize(args->main_dir, args->main_dir);
-  if(eq_eps(norm, 0, 1.e-6)) {
-    fprintf(stderr, "Invalid null direction `%s'.\n", str);
+
+  if(angles[0] < 0 || angles[0] >= 360) {
+    fprintf(stderr, 
+      "Invalid azimuth angle `%g'. Azimuth must be in [0, 360[ degrees.\n",
+      angles[0]);
     res = RES_BAD_ARG;
     goto error;
   }
+
+  if(angles[1] < 0 || angles[1] > 90) {
+    fprintf(stderr,
+      "Invalid elevation angle `%g'. Elevation must be in [0, 90] degrees.\n",
+      angles[1]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  args->sun_azimuth = angles[0];
+  args->sun_elevation = angles[1];
+
 exit:
   return res;
 error:
