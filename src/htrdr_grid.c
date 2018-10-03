@@ -179,9 +179,11 @@ htrdr_grid_create
   /* Map the grid data */
   grid->data = mmap(NULL, grid->data_sz, PROT_READ|PROT_WRITE,
     MAP_SHARED|MAP_POPULATE, fileno(grid->fp), grid_offset);
+
   if(grid->data == MAP_FAILED) {
     htrdr_log_err(htrdr, "%s:%s: could not map the grid data -- %s.\n",
       FUNC_NAME, filename, strerror(errno));
+    grid->data = NULL;
     res = RES_IO_ERR;
     goto error;
   }
@@ -291,6 +293,7 @@ htrdr_grid_open
   if(grid->data == MAP_FAILED) {
     htrdr_log_err(htrdr, "%s:%s: could not map the grid data -- %s.\n",
       FUNC_NAME, filename, strerror(errno));
+    grid->data = NULL;
     res = RES_IO_ERR;
     goto error;
   }

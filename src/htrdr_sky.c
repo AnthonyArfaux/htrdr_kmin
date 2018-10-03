@@ -366,6 +366,7 @@ clean_clouds(struct htrdr_sky* sky)
     MEM_RM(sky->htrdr->allocator, sky->clouds[i]);
   }
   MEM_RM(sky->htrdr->allocator, sky->clouds);
+  sky->clouds = NULL;
 }
 
 static void
@@ -397,6 +398,7 @@ clean_atmosphere(struct htrdr_sky* sky)
     MEM_RM(sky->htrdr->allocator, sky->atmosphere[i]);
   }
   MEM_RM(sky->htrdr->allocator, sky->atmosphere);
+  sky->atmosphere = NULL;
 }
 
 static void
