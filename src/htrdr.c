@@ -164,6 +164,8 @@ setup_geometry(struct htrdr* htrdr, const char* filename)
   }
 
   if(filename) {
+    size_t ishape, nshapes;
+
     res = s3daw_create(&htrdr->logger, htrdr->allocator, NULL, NULL, htrdr->s3d,
       htrdr->verbose, &s3daw);
     if(res != RES_OK) {
@@ -175,11 +177,23 @@ setup_geometry(struct htrdr* htrdr, const char* filename)
       htrdr_log_err(htrdr, "could not load the obj file `%s'.\n", filename);
       goto error;
     }
-    res = s3daw_attach_to_scene(s3daw, scn);
-    if(res != RES_OK) {
-      htrdr_log_err(htrdr,
+
+    S3DAW(get_shapes_count(s3daw, &nshapes));
+    FOR_EACH(ishape, 0, nshapes) {
+      struct s3d_shape* shape;
+      S3DAW(get_shape(s3daw, ishape, &shape));
+      res = s3d_mesh_set_hit_filter_function(shape, htrdr_ground_filter, NULL);
+      if(res != RES_OK) {
+        htrdr_log_err(htrdr, 
+          "could not setup the hit filter function of the ground geometry.\n");
+        goto error;
+      }
+      res = s3d_scene_attach_shape(scn, shape);
+      if(res != RES_OK) {
+        htrdr_log_err(htrdr,
         "could not attach the loaded geometry to the Star-3D scene.\n");
-      goto error;
+        goto error;
+      }
     }
   }
 

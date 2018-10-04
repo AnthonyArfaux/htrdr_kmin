@@ -31,6 +31,7 @@ static const struct htrdr_accum HTRDR_ACCUM_NULL = HTRDR_ACCUM_NULL__;
 /* Forward declarations */
 struct htrdr;
 struct htrdr_camera;
+struct s3d_hit;
 struct ssp_rng;
 
 extern LOCAL_SYM double
@@ -49,5 +50,13 @@ htrdr_draw_radiance_sw
    const struct htrdr_camera* cam,
    const size_t spp, /* #samples per pixel, i.e. #realisations */
    struct htrdr_buffer* buf); /* Buffer of struct htrdr_accum[3] */
+
+extern LOCAL_SYM int
+htrdr_ground_filter
+  (const struct s3d_hit* hit,
+   const float ray_dorg[3],
+   const float ray_dir[3],
+   void* ray_data,
+   void* filter_data);
 
 #endif /* HTRDR_SOLVE_H */

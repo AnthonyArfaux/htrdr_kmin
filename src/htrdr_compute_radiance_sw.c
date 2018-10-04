@@ -60,6 +60,21 @@ static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+int
+htrdr_ground_filter
+  (const struct s3d_hit* hit,
+   const float ray_org[3],
+   const float ray_dir[3],
+   void* ray_data,
+   void* filter_data)
+{
+  const struct s3d_hit* hit_prev = ray_data;
+  (void)ray_org, (void)ray_dir, (void)filter_data;
+
+  if(!hit_prev) return 0;
+  return S3D_PRIMITIVE_EQ(&hit->prim, &hit_prev->prim);
+}
+
 static int
 scattering_hit_filter
   (const struct svx_hit* hit,
@@ -308,7 +323,7 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  SSF(lambertian_reflection_setup(bsdf, 0.5));
+  SSF(lambertian_reflection_setup(bsdf, 0.8));
 
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
@@ -348,6 +363,7 @@ htrdr_compute_radiance_sw
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
+    struct s3d_hit s3d_hit_tmp = S3D_HIT_NULL;
 
     /* Setup the ray to trace */
     f3_set_d3(ray_pos, pos);
@@ -395,11 +411,26 @@ htrdr_compute_radiance_sw
       (htrdr, rng, HTRDR_Ka, iband, iquad, pos, dir, range, &s3d_hit_prev);
     if(Tr_abs <= 0) break;
 
-    /* Define the transmissivity from the new position to the sun */
-    d2(range, 0, FLT_MAX);
+    /* Sample a sun direction */
     htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
-    Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
-      sun_dir, range, &s3d_hit);
+    d2(range, 0, FLT_MAX);
+
+    s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
+
+    /* Check that the sun is visible from the new position */
+    f3_set_d3(ray_pos, pos_next);
+    f3_set_d3(ray_dir, sun_dir);
+    f2(ray_range, 0, FLT_MAX);
+    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
+      &s3d_hit_prev, &s3d_hit_tmp));
+
+    /* Define the transmissivity from the new position to the sun */
+    if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
+      Tr = 0;
+    } else {
+      Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
+        sun_dir, range, &s3d_hit_prev);
+    }
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
@@ -413,7 +444,11 @@ htrdr_compute_radiance_sw
         (bsdf, rng, wo, N, dir_next, &type, &pdf);
       if(ssp_rng_canonical(rng) > reflectivity) break; /* Russian roulette */
 
-      R = ssf_bsdf_eval(bsdf, wo, N, sun_dir);
+      if(d3_dot(N, sun_dir) < 0) { /* Below the ground */
+        R = 0;
+      } else {
+        R = ssf_bsdf_eval(bsdf, wo, N, sun_dir);
+      }
 
     /* Scattering in the medium */
     } else {
@@ -446,8 +481,6 @@ htrdr_compute_radiance_sw
     /* Setup the next random walk state */
     d3_set(pos, pos_next);
     d3_set(dir, dir_next);
-
-    s3d_hit_prev = s3d_hit;
   }
   SSF(bsdf_ref_put(bsdf));
   SSF(phase_ref_put(phase_hg));
