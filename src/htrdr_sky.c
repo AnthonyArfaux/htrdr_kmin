@@ -2173,7 +2173,6 @@ htrdr_sky_trace_ray
       pos[1] = org[1] + cloud_range[0]*dir[1];
       xy[0] = (int)floor((pos[0]-sky->htcp_desc.lower[0])/cloud_sz[0]);
       xy[1] = (int)floor((pos[1]-sky->htcp_desc.lower[1])/cloud_sz[1]);
-      xy[2] = 0;
 
       /* Define the 2D index increment wrt dir sign */
       incr[0] = dir[0] < 0 ? -1 : 1;
@@ -2242,7 +2241,8 @@ htrdr_sky_trace_ray
       filter, context, hit);
     if(res != RES_OK) {
       htrdr_log_err(sky->htrdr,
-        "%s: could not trace the ray part that  in the atmosphere.\n", FUNC_NAME);
+        "%s: could not trace the ray part that ends in the atmosphere.\n",
+        FUNC_NAME);
       goto error;
     }
     if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
