@@ -64,6 +64,7 @@ htrdr_sky_create
    const char* htgop_filename,
    const char* htmie_filename,
    const double optical_thickness, /* Threshold used during octree building */
+   const int repeat_clouds, /* Infinitly repeat the clouds in X and Y */
    struct htrdr_sky** sky);
 
 extern LOCAL_SYM void
@@ -171,6 +172,6 @@ htrdr_sky_trace_ray
    const size_t ispectral_band,
    const size_t iquadrature_pt,
    struct svx_hit* hit);
-  
+
 #endif /* HTRDR_SKY_H */
 

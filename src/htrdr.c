@@ -397,7 +397,7 @@ htrdr_init
 
   res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
     args->filename_gas, args->filename_mie, args->optical_thickness,
-    &htrdr->sky);
+    args->repeat_clouds, &htrdr->sky);
   if(res != RES_OK) goto error;
 
   htrdr->lifo_allocators = MEM_CALLOC

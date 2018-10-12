@@ -52,7 +52,8 @@ struct htrdr_args {
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
   int verbose; /* Verbosity level */
-  int quit;  /* Qui the application */
+  int repeat_clouds; /* Make clouds infinite in X and Y */
+  int quit;  /* Quit the application */
 };
 
 #define HTRDR_ARGS_DEFAULT__ {                                                 \
@@ -82,6 +83,7 @@ struct htrdr_args {
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
   0, /* Verbose flag */                                                        \
+  0, /* Repeat clouds */                                                       \
   0  /* Quit the application */                                                \
 }
 static const struct htrdr_args HTRDR_ARGS_DEFAULT = HTRDR_ARGS_DEFAULT__;

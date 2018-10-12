@@ -49,6 +49,12 @@
 #define NFLOATS_PER_COMPONENT (HTRDR_SVX_OPS_COUNT__ * HTRDR_PROPERTIES_COUNT__)
 #define NFLOATS_PER_VOXEL (NFLOATS_PER_COMPONENT * HTRDR_COMPONENTS_COUNT__)
 
+enum axis_flag {
+  AXIS_X = BIT(0),
+  AXIS_Y = BIT(1),
+  AXIS_Z = BIT(2)
+};
+
 struct split {
   size_t index; /* Index of the current htcp voxel */
   double height; /* Absolute height where the next voxel starts */
@@ -169,6 +175,8 @@ struct htrdr_sky {
   size_t sw_bands_range[2];
   struct sw_band_prop* sw_bands;
 
+  int repeat_clouds; /* Make clouds infinite in X and Y */
+
   ref_T ref;
   struct htrdr* htrdr;
 };
@@ -176,6 +184,56 @@ struct htrdr_sky {
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
+/* Transform pos from world to cloud space */
+static INLINE double*
+world_to_cloud
+  (const struct htrdr_sky* sky,
+   const double pos_ws[3],
+   double out_pos_cs[3])
+{
+  double cloud_sz[2];
+  double pos_cs[3];
+  double pos_cs_n[2];
+  ASSERT(sky && pos_ws && out_pos_cs);
+  ASSERT(pos_ws[2] >= sky->htcp_desc.lower[2]);
+  ASSERT(pos_ws[2] <= sky->htcp_desc.upper[2]);
+
+  if(!sky->repeat_clouds) { /* Nothing to do */
+    return d3_set(out_pos_cs, pos_ws);
+  }
+
+  if(!sky->repeat_clouds /* Nothing to do */
+  || (  pos_ws[0] >= sky->htcp_desc.lower[0]
+     && pos_ws[0] <= sky->htcp_desc.upper[0]
+     && pos_ws[1] >= sky->htcp_desc.lower[1]
+     && pos_ws[1] <= sky->htcp_desc.upper[1])) {
+    return d3_set(out_pos_cs, pos_ws);
+  }
+
+  cloud_sz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
+  cloud_sz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
+
+  /* Transform pos in normalize local cloud space */
+  pos_cs_n[0] = (pos_ws[0] - sky->htcp_desc.lower[0]) / cloud_sz[0];
+  pos_cs_n[1] = (pos_ws[1] - sky->htcp_desc.lower[1]) / cloud_sz[1];
+  pos_cs_n[0] -= (int)pos_cs_n[0]; /* Keep fractional part */
+  pos_cs_n[1] -= (int)pos_cs_n[1]; /* Keep fractional part */
+  if(pos_cs_n[0] < 0) pos_cs_n[0] += 1;
+  if(pos_cs_n[1] < 0) pos_cs_n[1] += 1;
+
+  /* Transform pos in local cloud space */
+  pos_cs[0] = sky->htcp_desc.lower[0] + pos_cs_n[0] * cloud_sz[0];
+  pos_cs[1] = sky->htcp_desc.lower[1] + pos_cs_n[1] * cloud_sz[1];
+  pos_cs[2] = pos_ws[2];
+
+  ASSERT(pos_cs[0] >= sky->htcp_desc.lower[0]);
+  ASSERT(pos_cs[0] <= sky->htcp_desc.upper[0]);
+  ASSERT(pos_cs[1] >= sky->htcp_desc.lower[1]);
+  ASSERT(pos_cs[1] <= sky->htcp_desc.upper[1]);
+
+  return d3_set(out_pos_cs, pos_cs);
+}
+
 static FINLINE float
 voxel_get
   (const float* data,
@@ -233,6 +291,7 @@ ray_intersect_aabb
    const double range[2],
    const double low[3],
    const double upp[3],
+   const int axis_mask,
    double hit_range[2])
 {
   double hit[2];
@@ -247,8 +306,13 @@ ray_intersect_aabb
   hit[0] = range[0];
   hit[1] = range[1];
   FOR_EACH(i, 0, 3) {
-    double t_min = (low[i] - org[i]) / dir[i];
-    double t_max = (upp[i] - org[i]) / dir[i];
+    double t_min, t_max;
+
+    if(!(BIT(i) & axis_mask)) continue;
+
+    t_min = (low[i] - org[i]) / dir[i];
+    t_max = (upp[i] - org[i]) / dir[i];
+
     if(t_min > t_max) SWAP(double, t_min, t_max);
     hit[0] = MMAX(t_min, hit[0]);
     hit[1] = MMIN(t_max, hit[1]);
@@ -1410,6 +1474,7 @@ htrdr_sky_create
    const char* htgop_filename,
    const char* htmie_filename,
    const double optical_thickness_threshold,
+   const int repeat_clouds,
    struct htrdr_sky** out_sky)
 {
   struct time t0, t1;
@@ -1433,6 +1498,7 @@ htrdr_sky_create
   htrdr_sun_ref_get(sun);
   sky->htrdr = htrdr;
   sky->sun = sun;
+  sky->repeat_clouds = repeat_clouds;
   darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
 
   /* Load clouds properties */
@@ -1575,6 +1641,7 @@ htrdr_sky_fetch_raw_property
   int comp_mask = components_mask;
   int in_clouds; /* Defines if `pos' lies in the clouds */
   int in_atmosphere; /* Defines if `pos' lies in the atmosphere */
+  double pos_cs[3]; /* Position in cloud space */
   double k_particle = 0;
   double k_gas = 0;
   double k = 0;
@@ -1589,15 +1656,22 @@ htrdr_sky_fetch_raw_property
   ASSERT(atmosphere_desc->frame[0] == SVX_AXIS_Z);
 
   /* Is the position inside the clouds? */
-  in_clouds =
-     pos[0] >= cloud_desc->lower[0]
-  && pos[1] >= cloud_desc->lower[1]
-  && pos[2] >= cloud_desc->lower[2]
-  && pos[0] <= cloud_desc->upper[0]
-  && pos[1] <= cloud_desc->upper[1]
-  && pos[2] <= cloud_desc->upper[2];
+  if(sky->repeat_clouds) {
+    in_clouds =
+       pos[2] >= cloud_desc->lower[2]
+    && pos[2] <= cloud_desc->upper[2];
+  } else {
+    in_clouds =
+       pos[0] >= cloud_desc->lower[0]
+    && pos[1] >= cloud_desc->lower[1]
+    && pos[2] >= cloud_desc->lower[2]
+    && pos[0] <= cloud_desc->upper[0]
+    && pos[1] <= cloud_desc->upper[1]
+    && pos[2] <= cloud_desc->upper[2];
+  }
 
   /* Is the position inside the atmosphere? */
+  ASSERT(atmosphere_desc->frame[0] == SVX_AXIS_Z);
   in_atmosphere =
      pos[2] >= atmosphere_desc->lower[2]
   && pos[2] <= atmosphere_desc->upper[2];
@@ -1612,20 +1686,22 @@ htrdr_sky_fetch_raw_property
     /* Not in atmopshere => No gas */
     if(!in_atmosphere) comp_mask &= ~HTRDR_GAS;
   } else {
+    world_to_cloud(sky, pos, pos_cs);
+
     /* Compute the index of the voxel to fetch */
-    ivox[0] = (size_t)((pos[0] - cloud_desc->lower[0])/sky->htcp_desc.vxsz_x);
-    ivox[1] = (size_t)((pos[1] - cloud_desc->lower[1])/sky->htcp_desc.vxsz_y);
+    ivox[0] = (size_t)((pos_cs[0] - cloud_desc->lower[0])/sky->htcp_desc.vxsz_x);
+    ivox[1] = (size_t)((pos_cs[1] - cloud_desc->lower[1])/sky->htcp_desc.vxsz_y);
     if(!sky->htcp_desc.irregular_z) {
       /* The voxels along the Z dimension have the same size */
-      ivox[2] = (size_t)((pos[2] - cloud_desc->lower[2])/sky->htcp_desc.vxsz_z[0]);
+      ivox[2] = (size_t)((pos_cs[2] - cloud_desc->lower[2])/sky->htcp_desc.vxsz_z[0]);
     } else {
       /* Irregular voxel size along the Z dimension. Compute the index of the Z
        * position in the svx2htcp_z Look Up Table and use the LUT to define the
        * voxel index into the HTCP descripptor */
       const struct split* splits = darray_split_cdata_get(&sky->svx2htcp_z);
       const size_t ilut = (size_t)
-        ((pos[2] - cloud_desc->lower[2]) / sky->lut_cell_sz);
-      ivox[2] = splits[ilut].index + (pos[2] > splits[ilut].height);
+        ((pos_cs[2] - cloud_desc->lower[2]) / sky->lut_cell_sz);
+      ivox[2] = splits[ilut].index + (pos_cs[2] > splits[ilut].height);
     }
   }
 
@@ -1814,15 +1890,21 @@ htrdr_sky_fetch_svx_property
   atmosphere = &sky->atmosphere[i][iquad];
 
   /* Is the position inside the clouds? */
-  in_clouds =
-     pos[0] >= cloud->octree_desc.lower[0]
-  && pos[1] >= cloud->octree_desc.lower[1]
-  && pos[2] >= cloud->octree_desc.lower[2]
-  && pos[0] <= cloud->octree_desc.upper[0]
-  && pos[1] <= cloud->octree_desc.upper[1]
-  && pos[2] <= cloud->octree_desc.upper[2];
+  if(sky->repeat_clouds) {
+    in_clouds =
+       pos[2] >= cloud->octree_desc.lower[2]
+    && pos[2] <= cloud->octree_desc.upper[2];
+  } else {
+    in_clouds =
+       pos[0] >= cloud->octree_desc.lower[0]
+    && pos[1] >= cloud->octree_desc.lower[1]
+    && pos[2] >= cloud->octree_desc.lower[2]
+    && pos[0] <= cloud->octree_desc.upper[0]
+    && pos[1] <= cloud->octree_desc.upper[1]
+    && pos[2] <= cloud->octree_desc.upper[2];
+  }
 
-  ASSERT(atmosphere->bitree_desc.frame[0] = SVX_AXIS_Z);
+  ASSERT(atmosphere->bitree_desc.frame[0] == SVX_AXIS_Z);
   in_atmosphere =
      pos[2] >= atmosphere->bitree_desc.lower[2]
   && pos[2] <= atmosphere->bitree_desc.upper[2];
@@ -1837,12 +1919,15 @@ htrdr_sky_fetch_svx_property
   if(!in_clouds && !in_atmosphere) /* In vacuum */
     return 0;
 
-  if(in_clouds) {
-    SVX(tree_at(cloud->octree, pos, NULL, NULL, &voxel));
-  } else {
+  if(!in_clouds) {
     ASSERT(in_atmosphere);
     SVX(tree_at(atmosphere->bitree, pos, NULL, NULL, &voxel));
+  } else {
+    double pos_cs[3];
+    world_to_cloud(sky, pos, pos_cs);
+    SVX(tree_at(cloud->octree, pos_cs, NULL, NULL, &voxel));
   }
+
   return htrdr_sky_fetch_svx_voxel_property
     (sky, prop, op, comp_mask, iband, iquad, &voxel);
 }
@@ -1993,17 +2078,22 @@ htrdr_sky_trace_ray
   clouds = sky->clouds[i][iquadrature_pt].octree;
   atmosphere = sky->atmosphere[i][iquadrature_pt].bitree;
 
-  cloud_range[0] = DBL_MAX;
-  cloud_range[1] =-DBL_MAX;
+  cloud_range[0] = INF;
+  cloud_range[1] =-INF;
 
   /* Compute the ray range, intersecting the clouds AABB */
-  ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
-    sky->htcp_desc.upper, cloud_range);
+  if(sky->repeat_clouds) {
+    ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
+      sky->htcp_desc.upper, AXIS_Z, cloud_range);
+  } else {
+    ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
+      sky->htcp_desc.upper, AXIS_X|AXIS_Y|AXIS_Z, cloud_range);
+  }
 
   /* Reset the hit */
   *hit = SVX_HIT_NULL;
 
-  if(cloud_range[0] > cloud_range[1]) { /* The ray does not traverse the clouds */
+  if(cloud_range[0] >= cloud_range[1]) { /* The ray does not traverse the clouds */
     res = svx_tree_trace_ray(atmosphere, org, dir, range, challenge, filter,
       context, hit);
     if(res != RES_OK) {
@@ -2031,15 +2121,101 @@ htrdr_sky_trace_ray
     }
 
     /* Pursue ray traversal into the clouds */
-    res = svx_tree_trace_ray(clouds, org, dir, cloud_range, challenge, filter,
-      context, hit);
-    if(res != RES_OK) {
-      htrdr_log_err(sky->htrdr,
-        "%s: could not trace the ray part that intersects the clouds.\n",
-        FUNC_NAME);
-      goto error;
+    if(!sky->repeat_clouds) {
+      res = svx_tree_trace_ray(clouds, org, dir, cloud_range, challenge, filter,
+        context, hit);
+      if(res != RES_OK) {
+        htrdr_log_err(sky->htrdr,
+          "%s: could not trace the ray part that intersects the clouds.\n",
+          FUNC_NAME);
+        goto error;
+      }
+      if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
+
+    /* Clouds are infinitely repeated along the X and Y axis */
+    } else {
+      double pos[2];
+      double org_cs[3]; /* Origin of the ray transformed in local cloud space */
+      double cloud_low_ws[3]; /* Cloud lower bound in world space */
+      double cloud_upp_ws[3]; /* Cloud upper bound in world space */
+      double cloud_sz[3]; /* Size of the cloud */
+      double t_max[3], t_delta[2];
+      int xy[2]; /* 2D index of the repeated cloud */
+      int incr[2]; /* Index increment */
+      ASSERT(cloud_range[0] < cloud_range[1]);
+
+      /* Compute the size of the cloud */
+      cloud_sz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
+      cloud_sz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
+      cloud_sz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
+
+      /* Define the 2D index of the current cloud. (0,0) is the index of the
+       * non duplicated cloud */
+      pos[0] = org[0] + cloud_range[0]*dir[0];
+      pos[1] = org[1] + cloud_range[0]*dir[1];
+      xy[0] = (int)floor((pos[0]-sky->htcp_desc.lower[0])/cloud_sz[0]);
+      xy[1] = (int)floor((pos[1]-sky->htcp_desc.lower[1])/cloud_sz[1]);
+      xy[2] = 0;
+
+      /* Define the 2D index increment wrt dir sign */
+      incr[0] = dir[0] < 0 ? -1 : 1;
+      incr[1] = dir[1] < 0 ? -1 : 1;
+
+      /* Compute the world space AABB of the repeated cloud currently hit */
+      cloud_low_ws[0] = sky->htcp_desc.lower[0] + (double)xy[0]*cloud_sz[0];
+      cloud_low_ws[1] = sky->htcp_desc.lower[1] + (double)xy[1]*cloud_sz[1];
+      cloud_low_ws[2] = sky->htcp_desc.lower[2];
+      cloud_upp_ws[0] = cloud_low_ws[0] + cloud_sz[0];
+      cloud_upp_ws[1] = cloud_low_ws[1] + cloud_sz[1];
+      cloud_upp_ws[2] = sky->htcp_desc.upper[2];
+
+      /* Compute the max ray intersection with the current cloud AABB */
+      t_max[0] = ((dir[0]<0 ? cloud_low_ws[0] : cloud_upp_ws[0]) - org[0])/dir[0];
+      t_max[1] = ((dir[1]<0 ? cloud_low_ws[1] : cloud_upp_ws[1]) - org[1])/dir[1];
+      t_max[2] = ((dir[2]<0 ? cloud_low_ws[2] : cloud_upp_ws[2]) - org[2])/dir[2];
+      ASSERT(t_max[0] >= 0 && t_max[1] >= 0 && t_max[2] >= 0);
+
+      /* Compute the distance along the ray to traverse in order to move of a
+       * distance equal to the cloud size along the X and Y axis */
+      t_delta[0] = (dir[0]<0 ? -cloud_sz[0]:cloud_sz[0]) / dir[0];
+      t_delta[1] = (dir[1]<0 ? -cloud_sz[1]:cloud_sz[1]) / dir[1];
+      ASSERT(t_delta[0] >= 0 && t_delta[1] >= 0);
+
+      org_cs[2] = org[2];
+
+      for(;;) {
+        int iaxis;
+
+        /* Transform the ray origin in the local cloud space */
+        org_cs[0] = sky->htcp_desc.lower[0] + (org[0]-(double)xy[0]*cloud_sz[0]);
+        org_cs[1] = sky->htcp_desc.lower[1] + (org[1]-(double)xy[1]*cloud_sz[1]);
+
+        /* Trace the ray in the repeated cloud */
+        res = svx_tree_trace_ray(clouds, org_cs, dir, cloud_range, challenge,
+          filter, context, hit);
+        if(res != RES_OK) {
+          htrdr_log_err(sky->htrdr,
+            "%s: could not trace the ray in the repeated clouds.\n",
+            FUNC_NAME);
+          goto error;
+        }
+        if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
+
+        /* Define the next axis to traverse */
+        iaxis = t_max[0] < t_max[1]
+        ? (t_max[0] < t_max[2] ? 0 : 2)
+        : (t_max[1] < t_max[2] ? 1 : 2);
+
+        if(iaxis == 2) break; /* The ray traverse the infinite cloud slice */
+
+        if(t_max[iaxis] >= cloud_range[1]) break; /* Out of bound */
+
+        t_max[iaxis] += t_delta[iaxis];
+
+        /* Define the 2D index of the next traversed cloud */
+        xy[iaxis] += incr[iaxis];
+      }
     }
-    if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
 
     /* Pursue ray traversal into the atmosphere */
     range_adjusted[0] = nextafter(cloud_range[1], DBL_MAX);

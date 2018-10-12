@@ -54,6 +54,8 @@ print_help(const char* cmd)
   printf(
 "  -i <image>       define the image to compute.\n");
   printf(
+"  -r               infinitely repeat the clouds along the X and Y axes.\n");
+  printf(
 "  -m FILENAME      path of the Mie data file.\n");
   printf(
 "  -o OUTPUT        file where data are written. If not defined, data are\n"
@@ -280,7 +282,7 @@ parse_sun_dir(struct htrdr_args* args, const char* str)
   }
 
   if(angles[0] < 0 || angles[0] >= 360) {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Invalid azimuth angle `%g'. Azimuth must be in [0, 360[ degrees.\n",
       angles[0]);
     res = RES_BAD_ARG;
@@ -316,7 +318,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:T:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:rT:t:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'C':
@@ -339,6 +341,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         break;
       case 'm': args->filename_mie = optarg; break;
       case 'o': args->output = optarg; break;
+      case 'r': args->repeat_clouds = 1; break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
         if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
