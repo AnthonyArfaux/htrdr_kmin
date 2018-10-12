@@ -54,7 +54,7 @@ print_help(const char* cmd)
   printf(
 "  -i <image>       define the image to compute.\n");
   printf(
-"  -r               infinitely repeat the clouds along the X and Y axes.\n");
+"  -r               infinitely repeat the clouds along the X and Y axis.\n");
   printf(
 "  -m FILENAME      path of the Mie data file.\n");
   printf(
@@ -364,12 +364,6 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
   if(!args->filename_gas) {
     fprintf(stderr,
       "Missing the path of the gas optical properties file -- option '-a'\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  if(!args->filename_les) {
-    fprintf(stderr,
-      "Missing the path of the cloud properties file -- option '-c'\n");
     res = RES_BAD_ARG;
     goto error;
   }

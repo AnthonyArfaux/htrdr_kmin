@@ -176,6 +176,7 @@ struct htrdr_sky {
   struct sw_band_prop* sw_bands;
 
   int repeat_clouds; /* Make clouds infinite in X and Y */
+  int is_cloudy; /* The sky has clouds */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -1379,6 +1380,7 @@ setup_sw_bands_properties(struct htrdr_sky* sky)
   size_t i;
   ASSERT(sky);
 
+  /* Fetch short wave bands range */
   res = htgop_get_sw_spectral_intervals_CIE_XYZ(sky->htgop, sky->sw_bands_range);
   if(res != RES_OK) goto error;
 
@@ -1485,7 +1487,7 @@ htrdr_sky_create
   int htgop_upd = 1;
   int force_upd = 1;
   res_T res = RES_OK;
-  ASSERT(htrdr && sun && htcp_filename && htmie_filename && out_sky);
+  ASSERT(htrdr && sun && htgop_filename && htmie_filename && out_sky);
   ASSERT(optical_thickness_threshold >= 0);
 
   sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
@@ -1499,33 +1501,8 @@ htrdr_sky_create
   sky->htrdr = htrdr;
   sky->sun = sun;
   sky->repeat_clouds = repeat_clouds;
+  sky->is_cloudy = htcp_filename != NULL;
   darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
-
-  /* Load clouds properties */
-  res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the loader of cloud properties.\n");
-    goto error;
-  }
-  res = htcp_load(sky->htcp, htcp_filename);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "error loading the cloud properties -- `%s'.\n",
-      htcp_filename);
-    goto error;
-  }
-
-  /* Load MIE data */
-  res = htmie_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htmie);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the loader of Mie's data.\n");
-    goto error;
-  }
-  res = htmie_load(sky->htmie, htmie_filename);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "error loading the Mie's data -- `%s'.\n",
-      htmie_filename);
-    goto error;
-  }
 
   /* Load the gas optical properties */
   res = htgop_create
@@ -1542,8 +1519,45 @@ htrdr_sky_create
     goto error;
   }
 
+  /* Load MIE data */
+  res = htmie_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htmie);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the loader of Mie's data.\n");
+    goto error;
+  }
+  res = htmie_load(sky->htmie, htmie_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "error loading the Mie's data -- `%s'.\n",
+      htmie_filename);
+    goto error;
+  }
+
   res = setup_sw_bands_properties(sky);
   if(res != RES_OK) goto error;
+
+  /* Setup the atmopshere */
+  time_current(&t0);
+  res = setup_atmosphere(sky, optical_thickness_threshold);
+  if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
+  htrdr_log(htrdr, "Setup atmosphere in %s\n", buf);
+
+  /* Nothing more to do */
+  if(!sky->is_cloudy) goto exit;
+
+  /* Load clouds properties */
+  res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the loader of cloud properties.\n");
+    goto error;
+  }
+  res = htcp_load(sky->htcp, htcp_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "error loading the cloud properties -- `%s'.\n",
+      htcp_filename);
+    goto error;
+  }
 
   /* Define if the cached grid data must be updated */
   res = is_file_updated(sky->htrdr, htcp_filename, &htcp_upd);
@@ -1575,13 +1589,6 @@ htrdr_sky_create
     res = update_file_stamp(sky->htrdr, htgop_filename);
     if(res != RES_OK) goto error;
   }
-
-  time_current(&t0);
-  res = setup_atmosphere(sky, optical_thickness_threshold);
-  if(res != RES_OK) goto error;
-  time_sub(&t0, time_current(&t1), &t0);
-  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
-  htrdr_log(htrdr, "Setup atmosphere in %s\n", buf);
 
 exit:
   *out_sky = sky;
@@ -1651,12 +1658,14 @@ htrdr_sky_fetch_raw_property
   ASSERT(comp_mask & HTRDR_ALL_COMPONENTS);
 
   i = iband - sky->sw_bands_range[0];
-  cloud_desc = &sky->clouds[i][iquad].octree_desc;
+  cloud_desc = sky->is_cloudy ? &sky->clouds[i][iquad].octree_desc : NULL;
   atmosphere_desc = &sky->atmosphere[i][iquad].bitree_desc;
   ASSERT(atmosphere_desc->frame[0] == SVX_AXIS_Z);
 
   /* Is the position inside the clouds? */
-  if(sky->repeat_clouds) {
+  if(!sky->is_cloudy) {
+    in_clouds = 0;
+  } else if(sky->repeat_clouds) {
     in_clouds =
        pos[2] >= cloud_desc->lower[2]
     && pos[2] <= cloud_desc->upper[2];
@@ -1800,6 +1809,11 @@ htrdr_sky_dump_clouds_vtk
   ASSERT(iband >= sky->sw_bands_range[0]);
   ASSERT(iband <= sky->sw_bands_range[1]);
 
+  if(!sky->is_cloudy) {
+    htrdr_log_warn(sky->htrdr, "%s: the sky has no cloud.\n", FUNC_NAME);
+    return RES_OK;
+  }
+
   i = iband - sky->sw_bands_range[0];
 
   octree_data_init(sky, iband, iquad, &data);
@@ -1886,11 +1900,13 @@ htrdr_sky_fetch_svx_property
   ASSERT(iband <= sky->sw_bands_range[1]);
 
   i = iband - sky->sw_bands_range[0];
-  cloud = &sky->clouds[i][iquad];
+  cloud = sky->is_cloudy ? &sky->clouds[i][iquad] : NULL;
   atmosphere = &sky->atmosphere[i][iquad];
 
   /* Is the position inside the clouds? */
-  if(sky->repeat_clouds) {
+  if(sky->is_cloudy) {
+    in_clouds = 0;
+  } else if(sky->repeat_clouds) {
     in_clouds =
        pos[2] >= cloud->octree_desc.lower[2]
     && pos[2] <= cloud->octree_desc.upper[2];
@@ -2075,19 +2091,21 @@ htrdr_sky_trace_ray
 
   /* Fetch the clouds/atmosphere corresponding to the submitted spectral data */
   i = ispectral_band - sky->sw_bands_range[0];
-  clouds = sky->clouds[i][iquadrature_pt].octree;
+  clouds = sky->is_cloudy ? sky->clouds[i][iquadrature_pt].octree : NULL;
   atmosphere = sky->atmosphere[i][iquadrature_pt].bitree;
 
   cloud_range[0] = INF;
   cloud_range[1] =-INF;
 
-  /* Compute the ray range, intersecting the clouds AABB */
-  if(sky->repeat_clouds) {
-    ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
-      sky->htcp_desc.upper, AXIS_Z, cloud_range);
-  } else {
-    ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
-      sky->htcp_desc.upper, AXIS_X|AXIS_Y|AXIS_Z, cloud_range);
+  if(sky->is_cloudy) {
+    /* Compute the ray range, intersecting the clouds AABB */
+    if(sky->repeat_clouds) {
+      ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
+        sky->htcp_desc.upper, AXIS_Z, cloud_range);
+    } else {
+      ray_intersect_aabb(org, dir, range, sky->htcp_desc.lower,
+        sky->htcp_desc.upper, AXIS_X|AXIS_Y|AXIS_Z, cloud_range);
+    }
   }
 
   /* Reset the hit */
