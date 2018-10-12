@@ -28,6 +28,14 @@
 #include <rsys/float2.h>
 #include <rsys/float3.h>
 
+struct ray_context {
+  float range[2];
+  struct s3d_hit hit_prev;
+};
+static const struct ray_context RAY_CONTEXT_NULL = {
+  {0, INF}, S3D_HIT_NULL__
+};
+
 struct scattering_context {
   struct ssp_rng* rng;
   const struct htrdr_sky* sky;
@@ -60,19 +68,22 @@ static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-int
-htrdr_ground_filter
-  (const struct s3d_hit* hit,
-   const float ray_org[3],
-   const float ray_dir[3],
-   void* ray_data,
-   void* filter_data)
+/* Check that `hit' roughly lies on an edge. For triangular primitives, a
+ * simple but approximative way is to test that its position have at least one
+ * barycentric coordinate roughly equal to 0 or 1. */
+static FINLINE int
+hit_on_edge(const struct s3d_hit* hit)
 {
-  const struct s3d_hit* hit_prev = ray_data;
-  (void)ray_org, (void)ray_dir, (void)filter_data;
-
-  if(!hit_prev) return 0;
-  return S3D_PRIMITIVE_EQ(&hit->prim, &hit_prev->prim);
+  const float on_edge_eps = 1.e-4f;
+  float w;
+  ASSERT(hit && !S3D_HIT_NONE(hit));
+  w = 1.f - hit->uv[0] - hit->uv[1];
+  return eq_epsf(hit->uv[0], 0.f, on_edge_eps)
+      || eq_epsf(hit->uv[0], 1.f, on_edge_eps)
+      || eq_epsf(hit->uv[1], 0.f, on_edge_eps)
+      || eq_epsf(hit->uv[1], 1.f, on_edge_eps)
+      || eq_epsf(w, 0.f, on_edge_eps)
+      || eq_epsf(w, 1.f, on_edge_eps);
 }
 
 static int
@@ -233,23 +244,24 @@ transmissivity
 {
   struct s3d_hit s3d_hit;
   struct svx_hit svx_hit;
-
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
-  struct s3d_hit s3d_hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
+  struct ray_context rctx = RAY_CONTEXT_NULL;
   float ray_pos[3];
   float ray_dir[3];
-  float ray_range[2];
 
   ASSERT(htrdr && rng && pos && dir && range);
 
   /* Find the first intersection with a surface */
   f3_set_d3(ray_pos, pos);
   f3_set_d3(ray_dir, dir);
-  f2_set_d2(ray_range, range);
-  S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
-    &s3d_hit_prev, &s3d_hit));
+  f2_set_d2(rctx.range, range);
+  rctx.hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
+  S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, rctx.range,
+    &rctx, &s3d_hit));
 
-  if(!S3D_HIT_NONE(&s3d_hit)) return 0;
+  if(!S3D_HIT_NONE(&s3d_hit)) {
+    return 0;
+  }
 
   transmissivity_ctx.rng = rng;
   transmissivity_ctx.sky = htrdr->sky;
@@ -312,7 +324,6 @@ htrdr_compute_radiance_sw
 
   float ray_pos[3];
   float ray_dir[3];
-  float ray_range[2];
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
 
@@ -323,7 +334,7 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  SSF(lambertian_reflection_setup(bsdf, 0.8));
+  SSF(lambertian_reflection_setup(bsdf, 0.5));
 
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
@@ -345,34 +356,27 @@ htrdr_compute_radiance_sw
 
   /* Add the directly contribution of the sun  */
   if(htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
-    f3_set_d3(ray_pos, pos);
-    f3_set_d3(ray_dir, dir);
-    f2(ray_range, 0, FLT_MAX);
-    S3D(scene_view_trace_ray
-      (htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range, NULL, &s3d_hit));
-
     /* Add the direct contribution of the sun */
-    if(S3D_HIT_NONE(&s3d_hit)) {
-      d2(range, 0, FLT_MAX);
-      Tr = transmissivity
-        (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range, NULL);
-      w = L_sun * Tr;
-    }
+    d2(range, 0, FLT_MAX);
+    Tr = transmissivity
+      (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range, NULL);
+    w = L_sun * Tr;
   }
 
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
-    struct s3d_hit s3d_hit_tmp = S3D_HIT_NULL;
+    struct ray_context rctx = RAY_CONTEXT_NULL;
 
     /* Setup the ray to trace */
     f3_set_d3(ray_pos, pos);
     f3_set_d3(ray_dir, dir);
-    f2(ray_range, 0, FLT_MAX);
+    f2(rctx.range, 0, FLT_MAX);
+    rctx.hit_prev = s3d_hit_prev;
 
     /* Find the first intersection with a surface */
-    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
-      &s3d_hit_prev, &s3d_hit));
+    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, rctx.range,
+      &rctx, &s3d_hit));
 
     /* Sample an optical thickness */
     scattering_ctx.Ts = ssp_ran_exp(rng, 1);
@@ -418,19 +422,8 @@ htrdr_compute_radiance_sw
     s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
 
     /* Check that the sun is visible from the new position */
-    f3_set_d3(ray_pos, pos_next);
-    f3_set_d3(ray_dir, sun_dir);
-    f2(ray_range, 0, FLT_MAX);
-    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, ray_range,
-      &s3d_hit_prev, &s3d_hit_tmp));
-
-    /* Define the transmissivity from the new position to the sun */
-    if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
-      Tr = 0;
-    } else {
-      Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
-        sun_dir, range, &s3d_hit_prev);
-    }
+    Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
+      sun_dir, range, &s3d_hit_prev);
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
@@ -457,10 +450,10 @@ htrdr_compute_radiance_sw
       double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
 
-      ks_gas = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_GAS, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
-      ks_particle = htrdr_sky_fetch_raw_property
-        (htrdr->sky, HTRDR_Ks, HTRDR_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
+      ks_gas = htrdr_sky_fetch_raw_property(htrdr->sky, HTRDR_Ks, HTRDR_GAS,
+        iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
+      ks_particle = htrdr_sky_fetch_raw_property(htrdr->sky, HTRDR_Ks,
+        HTRDR_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);
@@ -486,5 +479,30 @@ htrdr_compute_radiance_sw
   SSF(phase_ref_put(phase_hg));
   SSF(phase_ref_put(phase_rayleigh));
   return w;
+}
+
+int
+htrdr_ground_filter
+  (const struct s3d_hit* hit,
+   const float ray_org[3],
+   const float ray_dir[3],
+   void* ray_data,
+   void* filter_data)
+{
+  const struct ray_context* ray_ctx = ray_data;
+  (void)ray_org, (void)ray_dir, (void)filter_data;
+
+  if(!ray_ctx) return 0;
+
+  if(S3D_PRIMITIVE_EQ(&hit->prim, &ray_ctx->hit_prev.prim)) return 1;
+
+  if(!S3D_HIT_NONE(&ray_ctx->hit_prev) && eq_epsf(hit->distance, 0, 1.e-1f)) {
+    /* If the targeted point is near of the origin, check that it lies on an
+     * edge/vertex shared by the 2 primitives. */
+    return hit_on_edge(&ray_ctx->hit_prev) && hit_on_edge(hit);
+  }
+
+  return hit->distance <= ray_ctx->range[0]
+      || hit->distance >= ray_ctx->range[1];
 }
 
