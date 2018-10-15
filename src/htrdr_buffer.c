@@ -105,7 +105,7 @@ htrdr_buffer_create
   buf->align = align;
   buf->htrdr = htrdr;
 
-  memsz = buf->pitch * buf->height * buf->elmtsz;
+  memsz = buf->pitch * buf->height;
   buf->mem = MEM_ALLOC_ALIGNED(htrdr->allocator, memsz, align);
   if(!buf->mem) {
     res = RES_MEM_ERR;
