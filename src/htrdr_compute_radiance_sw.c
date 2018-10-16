@@ -15,6 +15,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
+#include "htrdr_ground.h"
 #include "htrdr_solve.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
@@ -27,14 +28,6 @@
 #include <rsys/double2.h>
 #include <rsys/float2.h>
 #include <rsys/float3.h>
-
-struct ray_context {
-  float range[2];
-  struct s3d_hit hit_prev;
-};
-static const struct ray_context RAY_CONTEXT_NULL = {
-  {0, INF}, S3D_HIT_NULL__
-};
 
 struct scattering_context {
   struct ssp_rng* rng;
@@ -68,24 +61,6 @@ static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-/* Check that `hit' roughly lies on an edge. For triangular primitives, a
- * simple but approximative way is to test that its position have at least one
- * barycentric coordinate roughly equal to 0 or 1. */
-static FINLINE int
-hit_on_edge(const struct s3d_hit* hit)
-{
-  const float on_edge_eps = 1.e-4f;
-  float w;
-  ASSERT(hit && !S3D_HIT_NONE(hit));
-  w = 1.f - hit->uv[0] - hit->uv[1];
-  return eq_epsf(hit->uv[0], 0.f, on_edge_eps)
-      || eq_epsf(hit->uv[0], 1.f, on_edge_eps)
-      || eq_epsf(hit->uv[1], 0.f, on_edge_eps)
-      || eq_epsf(hit->uv[1], 1.f, on_edge_eps)
-      || eq_epsf(w, 0.f, on_edge_eps)
-      || eq_epsf(w, 1.f, on_edge_eps);
-}
-
 static int
 scattering_hit_filter
   (const struct svx_hit* hit,
@@ -245,23 +220,12 @@ transmissivity
   struct s3d_hit s3d_hit;
   struct svx_hit svx_hit;
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
-  struct ray_context rctx = RAY_CONTEXT_NULL;
-  float ray_pos[3];
-  float ray_dir[3];
 
   ASSERT(htrdr && rng && pos && dir && range);
 
-  /* Find the first intersection with a surface */
-  f3_set_d3(ray_pos, pos);
-  f3_set_d3(ray_dir, dir);
-  f2_set_d2(rctx.range, range);
-  rctx.hit_prev = hit_prev ? *hit_prev : S3D_HIT_NULL;
-  S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, rctx.range,
-    &rctx, &s3d_hit));
-
-  if(!S3D_HIT_NONE(&s3d_hit)) {
-    return 0;
-  }
+  /* Check that the ray is not occlude along the submitted range */
+  HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, hit_prev, &s3d_hit));
+  if(!S3D_HIT_NONE(&s3d_hit)) return 0;
 
   transmissivity_ctx.rng = rng;
   transmissivity_ctx.sky = htrdr->sky;
@@ -322,9 +286,6 @@ htrdr_compute_radiance_sw
   double w = 0; /* MC weight */
   double g = 0; /* Asymmetry parameter of the HG phase function */
 
-  float ray_pos[3];
-  float ray_dir[3];
-
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
 
   CHK(RES_OK == ssf_bsdf_create
@@ -366,17 +327,11 @@ htrdr_compute_radiance_sw
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
-    struct ray_context rctx = RAY_CONTEXT_NULL;
-
-    /* Setup the ray to trace */
-    f3_set_d3(ray_pos, pos);
-    f3_set_d3(ray_dir, dir);
-    f2(rctx.range, 0, FLT_MAX);
-    rctx.hit_prev = s3d_hit_prev;
 
     /* Find the first intersection with a surface */
-    S3D(scene_view_trace_ray(htrdr->s3d_scn_view, ray_pos, ray_dir, rctx.range,
-      &rctx, &s3d_hit));
+    d2(range, 0, DBL_MAX);
+    HTRDR(ground_trace_ray
+      (htrdr->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
 
     /* Sample an optical thickness */
     scattering_ctx.Ts = ssp_ran_exp(rng, 1);
@@ -479,30 +434,5 @@ htrdr_compute_radiance_sw
   SSF(phase_ref_put(phase_hg));
   SSF(phase_ref_put(phase_rayleigh));
   return w;
-}
-
-int
-htrdr_ground_filter
-  (const struct s3d_hit* hit,
-   const float ray_org[3],
-   const float ray_dir[3],
-   void* ray_data,
-   void* filter_data)
-{
-  const struct ray_context* ray_ctx = ray_data;
-  (void)ray_org, (void)ray_dir, (void)filter_data;
-
-  if(!ray_ctx) return 0;
-
-  if(S3D_PRIMITIVE_EQ(&hit->prim, &ray_ctx->hit_prev.prim)) return 1;
-
-  if(!S3D_HIT_NONE(&ray_ctx->hit_prev) && eq_epsf(hit->distance, 0, 1.e-1f)) {
-    /* If the targeted point is near of the origin, check that it lies on an
-     * edge/vertex shared by the 2 primitives. */
-    return hit_on_edge(&ray_ctx->hit_prev) && hit_on_edge(hit);
-  }
-
-  return hit->distance <= ray_ctx->range[0]
-      || hit->distance >= ray_ctx->range[1];
 }
 

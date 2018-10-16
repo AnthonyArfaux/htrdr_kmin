@@ -24,7 +24,7 @@ option(NO_TEST "Do not build the tests" OFF)
 # Check dependencies
 ################################################################################
 find_package(RCMake 0.3 REQUIRED)
-find_package(RSys 0.6 REQUIRED)
+find_package(RSys 0.7 REQUIRED)
 find_package(Star3D 0.5 REQUIRED)
 find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
@@ -66,6 +66,7 @@ set(HTRDR_FILES_SRC
   htrdr_compute_radiance_sw.c
   htrdr_draw_radiance_sw.c
   htrdr_grid.c
+  htrdr_ground.c
   htrdr_main.c
   htrdr_rectangle.c
   htrdr_sky.c
@@ -77,6 +78,7 @@ set(HTRDR_FILES_INC
   htrdr_buffer.h
   htrdr_camera.h
   htrdr_grid.h
+  htrdr_ground.h
   htrdr_rectangle.h
   htrdr_sky.h
   htrdr_sun.h
