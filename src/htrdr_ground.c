@@ -33,8 +33,11 @@ static const struct ray_context RAY_CONTEXT_NULL = {
 
 struct htrdr_ground {
   struct s3d_scene_view* view;
-  struct htrdr* htrdr;
+  float lower[3]; /* Ground lower bound */
+  float upper[3]; /* Ground upper bound */
   int repeat; /* Make the ground infinite in X and Y */
+
+  struct htrdr* htrdr;
   ref_T ref;
 };
 
@@ -173,6 +176,14 @@ htrdr_ground_create
     htrdr_log_err(htrdr,
       "%s: could not create the Star-3D scene view of the ground geometry "
       "-- %s.\n", FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+  res = s3d_scene_view_get_aabb(ground->view, ground->lower, ground->upper);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "%s: could not get the ground bounding box -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 

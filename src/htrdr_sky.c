@@ -18,6 +18,7 @@
 #include "htrdr.h"
 #include "htrdr_c.h"
 #include "htrdr_grid.h"
+#include "htrdr_slab.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 
@@ -111,6 +112,17 @@ struct octree_data {
   size_t iband; /* Index of the band that overlaps the CIE XYZ color space */
   size_t iquad; /* Index of the quadrature point into the band */
   const struct htrdr_sky* sky;
+};
+
+struct trace_cloud_context {
+  struct svx_tree* clouds;
+  struct svx_hit* hit;
+  svx_hit_challenge_T challenge;
+  svx_hit_filter_T filter;
+  void* context;
+};
+static const struct trace_cloud_context TRACE_CLOUD_CONTEXT_NULL = {
+  NULL, NULL, NULL, NULL, NULL
 };
 
 /* Properties of a short wave spectral band */
@@ -233,6 +245,23 @@ world_to_cloud
   ASSERT(pos_cs[1] <= sky->htcp_desc.upper[1]);
 
   return d3_set(out_pos_cs, pos_cs);
+}
+
+static INLINE res_T
+trace_cloud
+  (const double org[3],
+   const double dir[3],
+   const double range[2],
+   void* context,
+   int* hit)
+{
+  struct trace_cloud_context* ctx = context;
+  res_T res = RES_OK;
+  ASSERT(org && dir && range && context && hit && ctx->hit);
+  res = svx_tree_trace_ray(ctx->clouds, org, dir, range, ctx->challenge,
+    ctx->filter, ctx->context, ctx->hit);
+  *hit = !SVX_HIT_NONE(ctx->hit);
+  return res;
 }
 
 static FINLINE float
@@ -2152,86 +2181,19 @@ htrdr_sky_trace_ray
 
     /* Clouds are infinitely repeated along the X and Y axis */
     } else {
-      double pos[2];
-      double org_cs[3]; /* Origin of the ray transformed in local cloud space */
-      double cloud_low_ws[3]; /* Cloud lower bound in world space */
-      double cloud_upp_ws[3]; /* Cloud upper bound in world space */
-      double cloud_sz[3]; /* Size of the cloud */
-      double t_max[3], t_delta[2];
-      int xy[2]; /* 2D index of the repeated cloud */
-      int incr[2]; /* Index increment */
-      ASSERT(cloud_range[0] < cloud_range[1]);
+      struct trace_cloud_context slab_ctx = TRACE_CLOUD_CONTEXT_NULL;
 
-      /* Compute the size of the cloud */
-      cloud_sz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
-      cloud_sz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
-      cloud_sz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
+      slab_ctx.clouds = clouds;
+      slab_ctx.challenge = challenge;
+      slab_ctx.filter = filter;
+      slab_ctx.context = context;
+      slab_ctx.hit = hit;
 
-      /* Define the 2D index of the current cloud. (0,0) is the index of the
-       * non duplicated cloud */
-      pos[0] = org[0] + cloud_range[0]*dir[0];
-      pos[1] = org[1] + cloud_range[0]*dir[1];
-      xy[0] = (int)floor((pos[0]-sky->htcp_desc.lower[0])/cloud_sz[0]);
-      xy[1] = (int)floor((pos[1]-sky->htcp_desc.lower[1])/cloud_sz[1]);
+      res = htrdr_slab_trace_ray(sky->htrdr, org, dir, cloud_range,
+        sky->htcp_desc.lower, sky->htcp_desc.upper, trace_cloud, &slab_ctx);
+      if(res != RES_OK) goto error;
 
-      /* Define the 2D index increment wrt dir sign */
-      incr[0] = dir[0] < 0 ? -1 : 1;
-      incr[1] = dir[1] < 0 ? -1 : 1;
-
-      /* Compute the world space AABB of the repeated cloud currently hit */
-      cloud_low_ws[0] = sky->htcp_desc.lower[0] + (double)xy[0]*cloud_sz[0];
-      cloud_low_ws[1] = sky->htcp_desc.lower[1] + (double)xy[1]*cloud_sz[1];
-      cloud_low_ws[2] = sky->htcp_desc.lower[2];
-      cloud_upp_ws[0] = cloud_low_ws[0] + cloud_sz[0];
-      cloud_upp_ws[1] = cloud_low_ws[1] + cloud_sz[1];
-      cloud_upp_ws[2] = sky->htcp_desc.upper[2];
-
-      /* Compute the max ray intersection with the current cloud AABB */
-      t_max[0] = ((dir[0]<0 ? cloud_low_ws[0] : cloud_upp_ws[0]) - org[0])/dir[0];
-      t_max[1] = ((dir[1]<0 ? cloud_low_ws[1] : cloud_upp_ws[1]) - org[1])/dir[1];
-      t_max[2] = ((dir[2]<0 ? cloud_low_ws[2] : cloud_upp_ws[2]) - org[2])/dir[2];
-      ASSERT(t_max[0] >= 0 && t_max[1] >= 0 && t_max[2] >= 0);
-
-      /* Compute the distance along the ray to traverse in order to move of a
-       * distance equal to the cloud size along the X and Y axis */
-      t_delta[0] = (dir[0]<0 ? -cloud_sz[0]:cloud_sz[0]) / dir[0];
-      t_delta[1] = (dir[1]<0 ? -cloud_sz[1]:cloud_sz[1]) / dir[1];
-      ASSERT(t_delta[0] >= 0 && t_delta[1] >= 0);
-
-      org_cs[2] = org[2];
-
-      for(;;) {
-        int iaxis;
-
-        /* Transform the ray origin in the local cloud space */
-        org_cs[0] = sky->htcp_desc.lower[0] + (org[0]-(double)xy[0]*cloud_sz[0]);
-        org_cs[1] = sky->htcp_desc.lower[1] + (org[1]-(double)xy[1]*cloud_sz[1]);
-
-        /* Trace the ray in the repeated cloud */
-        res = svx_tree_trace_ray(clouds, org_cs, dir, cloud_range, challenge,
-          filter, context, hit);
-        if(res != RES_OK) {
-          htrdr_log_err(sky->htrdr,
-            "%s: could not trace the ray in the repeated clouds.\n",
-            FUNC_NAME);
-          goto error;
-        }
-        if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
-
-        /* Define the next axis to traverse */
-        iaxis = t_max[0] < t_max[1]
-        ? (t_max[0] < t_max[2] ? 0 : 2)
-        : (t_max[1] < t_max[2] ? 1 : 2);
-
-        if(iaxis == 2) break; /* The ray traverse the infinite cloud slice */
-
-        if(t_max[iaxis] >= cloud_range[1]) break; /* Out of bound */
-
-        t_max[iaxis] += t_delta[iaxis];
-
-        /* Define the 2D index of the next traversed cloud */
-        xy[iaxis] += incr[iaxis];
-      }
+      if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
     }
 
     /* Pursue ray traversal into the atmosphere */

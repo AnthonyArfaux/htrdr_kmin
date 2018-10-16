@@ -69,6 +69,7 @@ set(HTRDR_FILES_SRC
   htrdr_ground.c
   htrdr_main.c
   htrdr_rectangle.c
+  htrdr_slab.c
   htrdr_sky.c
   htrdr_sun.c)
 set(HTRDR_FILES_INC
@@ -80,6 +81,7 @@ set(HTRDR_FILES_INC
   htrdr_grid.h
   htrdr_ground.h
   htrdr_rectangle.h
+  htrdr_slab.h
   htrdr_sky.h
   htrdr_sun.h
   htrdr_solve.h)
