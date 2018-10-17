@@ -38,12 +38,20 @@ htrdr_slab_trace_ray
   double cell_low_ws[3]; /* Cell lower bound in world space */
   double cell_upp_ws[3]; /* Cell upper bound in world space */
   double cell_sz[3]; /* Size of a cell */
-  double t_max[3], t_delta[2];
+  double t_max[3], t_delta[2], t_min_z;
   int xy[2]; /* 2D index of the repeated cell */
   int incr[2]; /* Index increment */
   res_T res = RES_OK;
   ASSERT(htrdr && org && dir && range && cell_low && cell_upp && trace_cell);
   ASSERT(range[0] < range[1]);
+
+  /* Check that the ray intersects the slab */
+  t_min_z  = (cell_low[2] - org[2]) / dir[2];
+  t_max[2] = (cell_upp[2] - org[2]) / dir[2];
+  if(t_min_z > t_max[2]) SWAP(double, t_min_z, t_max[2]);
+  t_min_z  = MMAX(t_min_z,  range[0]);
+  t_max[2] = MMIN(t_max[2], range[1]);
+  if(t_min_z > t_max[2]) return RES_OK;
 
   /* Compute the size of a cell */
   cell_sz[0] = cell_upp[0] - cell_low[0];
@@ -52,8 +60,8 @@ htrdr_slab_trace_ray
 
   /* Define the 2D index of the current cell. (0,0) is the index of the
    * non duplicated cell */
-  pos[0] = org[0] + range[0]*dir[0];
-  pos[1] = org[1] + range[0]*dir[1];
+  pos[0] = org[0] + t_min_z*dir[0];
+  pos[1] = org[1] + t_min_z*dir[1];
   xy[0] = (int)floor((pos[0] - cell_low[0]) / cell_sz[0]);
   xy[1] = (int)floor((pos[1] - cell_low[1]) / cell_sz[1]);
 
@@ -72,7 +80,7 @@ htrdr_slab_trace_ray
   /* Compute the max ray intersection with the current cell */
   t_max[0] = ((dir[0]<0 ? cell_low_ws[0] : cell_upp_ws[0]) - org[0]) / dir[0];
   t_max[1] = ((dir[1]<0 ? cell_low_ws[1] : cell_upp_ws[1]) - org[1]) / dir[1];
-  t_max[2] = ((dir[2]<0 ? cell_low_ws[2] : cell_upp_ws[2]) - org[2]) / dir[2];
+  /*t_max[2] = ((dir[2]<0 ? cell_low_ws[2] : cell_upp_ws[2]) - org[2]) / dir[2];*/
   ASSERT(t_max[0] >= 0 && t_max[1] >= 0 && t_max[2] >= 0);
 
   /* Compute the distance along the ray to traverse in order to move of a
@@ -87,8 +95,8 @@ htrdr_slab_trace_ray
     int hit;
 
     /* Transform the ray origin in the local cell space */
-    org_cs[0] = cell_low[0] + (org[0] - (double)xy[0]*cell_sz[0]);
-    org_cs[1] = cell_low[1] + (org[1] - (double)xy[1]*cell_sz[1]);
+    org_cs[0] = org[0] - (double)xy[0]*cell_sz[0];
+    org_cs[1] = org[1] - (double)xy[1]*cell_sz[1];
 
     res = trace_cell(org_cs, dir, range, trace_cell_context, &hit);
     if(res != RES_OK) {
