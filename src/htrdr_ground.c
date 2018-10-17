@@ -15,8 +15,11 @@
 
 #include "htrdr.h"
 #include "htrdr_ground.h"
+#include "htrdr_slab.h"
 
 #include <rsys/cstr.h>
+#include <rsys/double2.h>
+#include <rsys/double3.h>
 #include <rsys/float2.h>
 #include <rsys/float3.h>
 
@@ -26,9 +29,18 @@
 struct ray_context {
   float range[2];
   struct s3d_hit hit_prev;
+  int id[2];
 };
-static const struct ray_context RAY_CONTEXT_NULL = {
-  {0, INF}, S3D_HIT_NULL__
+#define RAY_CONTEXT_NULL__ {{0,INF}, S3D_HIT_NULL__, {0,0}}
+static const struct ray_context RAY_CONTEXT_NULL = RAY_CONTEXT_NULL__;
+
+struct trace_ground_context {
+  struct s3d_scene_view* view;
+  struct ray_context context;
+  struct s3d_hit* hit;
+};
+static const struct trace_ground_context TRACE_GROUND_CONTEXT_NULL = {
+  NULL, RAY_CONTEXT_NULL__, NULL
 };
 
 struct htrdr_ground {
@@ -85,6 +97,33 @@ ground_filter
 
   return hit->distance <= ray_ctx->range[0]
       || hit->distance >= ray_ctx->range[1];
+}
+
+static INLINE res_T
+trace_ground
+  (const double org[3],
+   const double dir[3],
+   const double range[2],
+   void* context,
+   int* hit)
+{
+  struct trace_ground_context* ctx = context;
+  float ray_org[3];
+  float ray_dir[3];
+  float ray_range[2];
+  res_T res = RES_OK;
+  ASSERT(org && dir && range && context && hit);
+
+  f3_set_d3(ray_org, org);
+  f3_set_d3(ray_dir, dir);
+  f2_set_d2(ray_range, range);
+
+  res = s3d_scene_view_trace_ray
+    (ctx->view, ray_org, ray_dir, ray_range, &ctx->context, ctx->hit);
+  if(res != RES_OK) return res;
+
+  *hit = !S3D_HIT_NONE(ctx->hit);
+  return RES_OK;
 }
 
 static void
@@ -223,24 +262,44 @@ htrdr_ground_trace_ray
    const struct s3d_hit* prev_hit,
    struct s3d_hit* hit)
 {
-  struct ray_context ctx = RAY_CONTEXT_NULL;
-  float ray_org[3];
-  float ray_dir[3];
   res_T res = RES_OK;
   ASSERT(ground && org && dir && range && hit);
 
-  f3_set_d3(ray_org, org);
-  f3_set_d3(ray_dir, dir);
-  f2_set_d2(ctx.range, range);
-  ctx.hit_prev = prev_hit ? *prev_hit : S3D_HIT_NULL;
+  if(!ground->repeat) {
+    struct ray_context ray_ctx = RAY_CONTEXT_NULL;
+    float ray_org[3];
+    float ray_dir[3];
 
-  res = s3d_scene_view_trace_ray
-    (ground->view, ray_org, ray_dir, ctx.range, &ctx, hit);
-  if(res != RES_OK) {
-    htrdr_log_err(ground->htrdr,
-      "%s: could not trace the ray against the ground geometry -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
-    goto error;
+    f3_set_d3(ray_org, org);
+    f3_set_d3(ray_dir, dir);
+    f2_set_d2(ray_ctx.range, range);
+    ray_ctx.hit_prev = prev_hit ? *prev_hit : S3D_HIT_NULL;
+
+    res = s3d_scene_view_trace_ray
+      (ground->view, ray_org, ray_dir, ray_ctx.range, &ray_ctx, hit);
+    if(res != RES_OK) {
+      htrdr_log_err(ground->htrdr,
+        "%s: could not trace the ray against the ground geometry -- %s.\n",
+        FUNC_NAME, res_to_cstr(res));
+      goto error;
+    }
+  } else {
+    struct trace_ground_context slab_ctx = TRACE_GROUND_CONTEXT_NULL;
+    double low[3], upp[3];
+
+    *hit = S3D_HIT_NULL;
+    slab_ctx.view = ground->view;
+    slab_ctx.context.range[0] = (float)range[0];
+    slab_ctx.context.range[1] = (float)range[1];
+    slab_ctx.context.hit_prev = prev_hit ? *prev_hit : S3D_HIT_NULL;
+    slab_ctx.hit = hit;
+
+    d3_set_f3(low, ground->lower);
+    d3_set_f3(upp, ground->upper);
+
+    res = htrdr_slab_trace_ray(ground->htrdr, org, dir, range, low, upp,
+      trace_ground, &slab_ctx);
+    if(res != RES_OK) goto error;
   }
 
 exit:

@@ -257,11 +257,14 @@ trace_cloud
 {
   struct trace_cloud_context* ctx = context;
   res_T res = RES_OK;
-  ASSERT(org && dir && range && context && hit && ctx->hit);
+  ASSERT(org && dir && range && context && hit);
+
   res = svx_tree_trace_ray(ctx->clouds, org, dir, range, ctx->challenge,
     ctx->filter, ctx->context, ctx->hit);
+  if(res != RES_OK) return res;
+
   *hit = !SVX_HIT_NONE(ctx->hit);
-  return res;
+  return RES_OK;
 }
 
 static FINLINE float
