@@ -209,18 +209,12 @@ transmissivity
    const size_t iquad,
    const double pos[3],
    const double dir[3],
-   const double range[2],
-   const struct s3d_hit* hit_prev) /* May be NULL */
+   const double range[2])
 {
-  struct s3d_hit s3d_hit;
   struct svx_hit svx_hit;
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
 
   ASSERT(htrdr && rng && pos && dir && range);
-
-  /* Check that the ray is not occlude along the submitted range */
-  HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, hit_prev, &s3d_hit));
-  if(!S3D_HIT_NONE(&s3d_hit)) return 0;
 
   transmissivity_ctx.rng = rng;
   transmissivity_ctx.sky = htrdr->sky;
@@ -254,8 +248,9 @@ htrdr_compute_radiance_sw
    const size_t iquad)
 {
   struct s3d_hit s3d_hit = S3D_HIT_NULL;
-  struct svx_hit svx_hit = SVX_HIT_NULL;
+  struct s3d_hit s3d_hit_tmp = S3D_HIT_NULL;
   struct s3d_hit s3d_hit_prev = S3D_HIT_NULL;
+  struct svx_hit svx_hit = SVX_HIT_NULL;
   struct ssf_phase* phase_hg = NULL;
   struct ssf_phase* phase_rayleigh = NULL;
   struct ssf_bsdf* bsdf = NULL;
@@ -314,9 +309,16 @@ htrdr_compute_radiance_sw
   if(htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
     /* Add the direct contribution of the sun */
     d2(range, 0, FLT_MAX);
-    Tr = transmissivity
-      (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range, NULL);
-    w = L_sun * Tr;
+
+    /* Check that the ray is not occlude along the submitted range */
+    HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, NULL, &s3d_hit_tmp));
+    if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
+      Tr = 0;
+    } else {
+      Tr = transmissivity
+        (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range);
+      w = L_sun * Tr;
+    }
   }
 
   /* Radiative random walk */
@@ -350,7 +352,7 @@ htrdr_compute_radiance_sw
         || (  svx_hit.distance[0] <= scattering_ctx.traversal_dst
            && svx_hit.distance[1] >= scattering_ctx.traversal_dst));
 
-    /* Negative the incoming dir to match the convention of the SSF library */
+    /* Negate the incoming dir to match the convention of the SSF library */
     d3_minus(wo, dir);
 
     /* Compute the new position */
@@ -362,7 +364,7 @@ htrdr_compute_radiance_sw
      * next position */
     d2(range, 0, scattering_ctx.traversal_dst);
     Tr_abs = transmissivity
-      (htrdr, rng, HTRDR_Ka, iband, iquad, pos, dir, range, &s3d_hit_prev);
+      (htrdr, rng, HTRDR_Ka, iband, iquad, pos, dir, range);
     if(Tr_abs <= 0) break;
 
     /* Sample a sun direction */
@@ -372,8 +374,16 @@ htrdr_compute_radiance_sw
     s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
 
     /* Check that the sun is visible from the new position */
-    Tr = transmissivity(htrdr, rng, HTRDR_Kext, iband, iquad, pos_next,
-      sun_dir, range, &s3d_hit_prev);
+    HTRDR(ground_trace_ray
+      (htrdr->ground, pos_next, sun_dir, range, &s3d_hit_prev, &s3d_hit_tmp));
+
+    /* Compute the sun transmissivity */
+    if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
+      Tr = 0;
+    } else {
+      Tr = transmissivity
+        (htrdr, rng, HTRDR_Kext, iband, iquad, pos_next, sun_dir, range);
+    }
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
