@@ -70,7 +70,6 @@ scattering_hit_filter
    void* context)
 {
   struct scattering_context* ctx = context;
-  double vox_dst; /* Distance to traverse into the voxel */
   double ks_max;
   int pursue_traversal = 1;
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
@@ -79,13 +78,14 @@ scattering_hit_filter
   ks_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Ks,
     HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
 
-  /* Compute the distance to traverse into the voxel */
-  vox_dst = hit->distance[1] - hit->distance[0];
+  ctx->traversal_dst = hit->distance[0];
 
   /* Iterate until a collision occurs into the voxel or until the ray
    * does not collide the voxel */
   for(;;) {
-    const double T = vox_dst * ks_max; /* Compute tau for the current leaf */
+    /* Compute tau for the current leaf */
+    const double vox_dst = hit->distance[1] - ctx->traversal_dst;
+    const double T = vox_dst * ks_max;
 
     /* A collision occurs behind `vox_dst' */
     if(ctx->Ts > T) {
@@ -102,7 +102,7 @@ scattering_hit_filter
       const double collision_dst = ctx->Ts / ks_max;
 
       /* Compute the traversed distance up to the challenged collision */
-      ctx->traversal_dst = hit->distance[0] + collision_dst;
+      ctx->traversal_dst += collision_dst;
       ASSERT(ctx->traversal_dst >= hit->distance[0]);
       ASSERT(ctx->traversal_dst <= hit->distance[1]);
 
@@ -122,8 +122,6 @@ scattering_hit_filter
         break;
       } else { /* Null collision */
         ctx->Ts = ssp_ran_exp(ctx->rng, 1); /* Sample a new optical thickness */
-        /* Compute the remaining distance to traverse into the voxel */
-        vox_dst = hit->distance[1] - ctx->traversal_dst;
       }
     }
   }
@@ -140,7 +138,6 @@ transmissivity_hit_filter
 {
   struct transmissivity_context* ctx = context;
   int comp_mask = HTRDR_ALL_COMPONENTS;
-  double vox_dst; /* Distance to traverse into the voxel */
   double k_max;
   double k_min;
   int pursue_traversal = 1;
@@ -153,13 +150,13 @@ transmissivity_hit_filter
     HTRDR_SVX_MAX, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
   ASSERT(k_min <= k_max);
 
-  /* Compute the distance to traverse into the voxel */
-  vox_dst = hit->distance[1] - hit->distance[0];
-  ctx->Tmin += vox_dst * k_min;
+  ctx->Tmin += (hit->distance[1] - hit->distance[0]) * k_min;
+  ctx->traversal_dst = hit->distance[0];
 
   /* Iterate until a collision occurs into the voxel or until the ray
    * does not collide the voxel */
   for(;;) {
+    const double vox_dst = hit->distance[1] - ctx->traversal_dst;
     const double Tdif = vox_dst * (k_max-k_min);
 
     /* A collision occurs behind `vox_dst' */
@@ -177,7 +174,7 @@ transmissivity_hit_filter
       double collision_dst = ctx->Ts / (k_max - k_min);
 
       /* Compute the traversed distance up to the challenged collision */
-      ctx->traversal_dst = hit->distance[0] + collision_dst;
+      ctx->traversal_dst += collision_dst;
       ASSERT(ctx->traversal_dst >= hit->distance[0]);
       ASSERT(ctx->traversal_dst <= hit->distance[1]);
 
@@ -197,8 +194,6 @@ transmissivity_hit_filter
         break;
       } else { /* Null collision */
         ctx->Ts = ssp_ran_exp(ctx->rng, 1); /* Sample a new optical thickness */
-        /* Compute the remaining distance to traverse into the voxel */
-        vox_dst = hit->distance[1] - ctx->traversal_dst;
       }
     }
   }
