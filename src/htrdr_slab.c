@@ -31,6 +31,7 @@ htrdr_slab_trace_ray
    const double cell_low[2],
    const double cell_upp[2],
    htrdr_trace_cell_T trace_cell,
+   const size_t max_steps,
    void* trace_cell_context)
 {
   double pos[2];
@@ -39,6 +40,7 @@ htrdr_slab_trace_ray
   double cell_upp_ws[3]; /* Cell upper bound in world space */
   double cell_sz[3]; /* Size of a cell */
   double t_max[3], t_delta[2], t_min_z;
+  size_t istep;
   int xy[2]; /* 2D index of the repeated cell */
   int incr[2]; /* Index increment */
   res_T res = RES_OK;
@@ -90,7 +92,7 @@ htrdr_slab_trace_ray
   ASSERT(t_delta[0] >= 0 && t_delta[1] >= 0);
 
   org_cs[2] = org[2];
-  for(;;) {
+  FOR_EACH(istep, 0, max_steps) {
     int iaxis;
     int hit;
 

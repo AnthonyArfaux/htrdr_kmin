@@ -298,7 +298,7 @@ htrdr_ground_trace_ray
     d3_set_f3(upp, ground->upper);
 
     res = htrdr_slab_trace_ray(ground->htrdr, org, dir, range, low, upp,
-      trace_ground, &slab_ctx);
+      trace_ground, 32, &slab_ctx);
     if(res != RES_OK) goto error;
   }
 

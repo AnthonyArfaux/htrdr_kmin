@@ -2193,7 +2193,8 @@ htrdr_sky_trace_ray
       slab_ctx.hit = hit;
 
       res = htrdr_slab_trace_ray(sky->htrdr, org, dir, cloud_range,
-        sky->htcp_desc.lower, sky->htcp_desc.upper, trace_cloud, &slab_ctx);
+        sky->htcp_desc.lower, sky->htcp_desc.upper, trace_cloud, SIZE_MAX,
+        &slab_ctx);
       if(res != RES_OK) goto error;
 
       if(!SVX_HIT_NONE(hit)) goto exit; /* Collision */
