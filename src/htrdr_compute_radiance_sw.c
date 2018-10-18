@@ -395,7 +395,7 @@ htrdr_compute_radiance_sw
       if(d3_dot(N, sun_dir) < 0) { /* Below the ground */
         R = 0;
       } else {
-        R = ssf_bsdf_eval(bsdf, wo, N, sun_dir);
+        R = ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
       }
 
     /* Scattering in the medium */
