@@ -17,6 +17,7 @@
 #include "htrdr_ground.h"
 #include "htrdr_slab.h"
 
+#include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
@@ -126,6 +127,85 @@ trace_ground
   return RES_OK;
 }
 
+static res_T
+setup_ground(struct htrdr_ground* ground, const char* obj_filename)
+{
+  struct s3d_scene* scn = NULL;
+  struct s3daw* s3daw = NULL;
+  size_t nshapes;
+  size_t ishape;
+  res_T res = RES_OK;
+  ASSERT(ground && obj_filename);
+
+  res = s3daw_create(&ground->htrdr->logger, ground->htrdr->allocator, NULL,
+    NULL, ground->htrdr->s3d, ground->htrdr->verbose, &s3daw);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not create the Star-3DAW device -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+  res = s3daw_load(s3daw, obj_filename);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not load the obj file `%s' -- %s.\n",
+      FUNC_NAME, obj_filename, res_to_cstr(res));
+    goto error;
+  }
+
+  res = s3d_scene_create(ground->htrdr->s3d, &scn);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not create the Star-3D scene of the ground -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+  S3DAW(get_shapes_count(s3daw, &nshapes));
+  FOR_EACH(ishape, 0, nshapes) {
+    struct s3d_shape* shape;
+    S3DAW(get_shape(s3daw, ishape, &shape));
+    res = s3d_mesh_set_hit_filter_function(shape, ground_filter, NULL);
+    if(res != RES_OK) {
+      htrdr_log_err(ground->htrdr,
+        "%s: could not setup the hit filter function of the ground geometry "
+        "-- %s.\n", FUNC_NAME, res_to_cstr(res));
+      goto error;
+    }
+    res = s3d_scene_attach_shape(scn, shape);
+    if(res != RES_OK) {
+      htrdr_log_err(ground->htrdr,
+        "%s: could not attach the ground geometry to its Star-3D scene -- %s.\n",
+        FUNC_NAME, res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  res = s3d_scene_view_create(scn, S3D_TRACE, &ground->view);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not create the Star-3D scene view of the ground geometry "
+      "-- %s.\n", FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+  res = s3d_scene_view_get_aabb(ground->view, ground->lower, ground->upper);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not get the ground bounding box -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  if(s3daw) S3DAW(ref_put(s3daw));
+  if(scn) S3D(scene_ref_put(scn));
+  return res;
+error:
+  goto exit;
+}
+
 static void
 release_ground(ref_T* ref)
 {
@@ -146,11 +226,9 @@ htrdr_ground_create
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** out_ground)
 {
-  struct s3d_scene* scn = NULL;
-  struct s3daw* s3daw = NULL;
+  char buf[128];
   struct htrdr_ground* ground = NULL;
-  size_t ishape;
-  size_t nshapes;
+  struct time t0, t1;
   res_T res = RES_OK;
   ASSERT(htrdr && obj_filename && out_ground);
 
@@ -166,69 +244,14 @@ htrdr_ground_create
   ground->htrdr = htrdr;
   ground->repeat = repeat_ground;
 
-  res = s3daw_create(&htrdr->logger, htrdr->allocator, NULL, NULL, htrdr->s3d,
-    htrdr->verbose, &s3daw);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not create the Star-3DAW device -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
-    goto error;
-  }
-
-  res = s3daw_load(s3daw, obj_filename);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "%s: could not load the obj file `%s' -- %s.\n",
-      FUNC_NAME, obj_filename, res_to_cstr(res));
-    goto error;
-  }
-
-  res = s3d_scene_create(htrdr->s3d, &scn);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not create the Star-3D scene of the ground -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
-    goto error;
-  }
-
-  S3DAW(get_shapes_count(s3daw, &nshapes));
-  FOR_EACH(ishape, 0, nshapes) {
-    struct s3d_shape* shape;
-    S3DAW(get_shape(s3daw, ishape, &shape));
-    res = s3d_mesh_set_hit_filter_function(shape, ground_filter, NULL);
-    if(res != RES_OK) {
-      htrdr_log_err(htrdr,
-        "%s: could not setup the hit filter function of the ground geometry "
-        "-- %s.\n", FUNC_NAME, res_to_cstr(res));
-      goto error;
-    }
-    res = s3d_scene_attach_shape(scn, shape);
-    if(res != RES_OK) {
-      htrdr_log_err(htrdr,
-        "%s: could not attach the ground geometry to its Star-3D scene -- %s.\n",
-        FUNC_NAME, res_to_cstr(res));
-      goto error;
-    }
-  }
-
-  res = s3d_scene_view_create(scn, S3D_TRACE, &ground->view);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not create the Star-3D scene view of the ground geometry "
-      "-- %s.\n", FUNC_NAME, res_to_cstr(res));
-    goto error;
-  }
-
-  res = s3d_scene_view_get_aabb(ground->view, ground->lower, ground->upper);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not get the ground bounding box -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
-    goto error;
-  }
+  time_current(&t0);
+  res = setup_ground(ground, obj_filename);
+  if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
+  htrdr_log(ground->htrdr, "Setup ground in %s\n", buf);
 
 exit:
-  if(s3daw) S3DAW(ref_put(s3daw));
-  if(scn) S3D(scene_ref_put(scn));
   *out_ground = ground;
   return res;
 error:
