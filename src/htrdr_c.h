@@ -16,6 +16,10 @@
 #ifndef HTRDR_C_H
 #define HTRDR_C_H
 
+#include <rsys/rsys.h>
+
+struct htrdr;
+
 #define SW_WAVELENGTH_MIN 380 /* In nanometer */
 #define SW_WAVELENGTH_MAX 780 /* In nanometer */
 

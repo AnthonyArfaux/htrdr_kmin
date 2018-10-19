@@ -20,6 +20,7 @@
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
+#include "htrdr_ground.h"
 #include "htrdr_sky.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
@@ -29,7 +30,6 @@
 #include <rsys/str.h>
 
 #include <star/s3d.h>
-#include <star/s3daw.h>
 #include <star/ssf.h>
 #include <star/svx.h>
 
@@ -149,6 +149,7 @@ error:
   goto exit;
 }
 
+#if 0
 static res_T
 setup_geometry(struct htrdr* htrdr, const char* filename)
 {
@@ -210,6 +211,7 @@ exit:
 error:
   goto exit;
 }
+#endif
 
 static res_T
 open_file_stamp
@@ -370,7 +372,8 @@ htrdr_init
     goto error;
   }
 
-  res = setup_geometry(htrdr, args->filename_obj);
+  res = htrdr_ground_create
+    (htrdr, args->filename_obj, args->repeat_ground, &htrdr->ground);
   if(res != RES_OK) goto error;
 
   proj_ratio =
@@ -431,9 +434,9 @@ void
 htrdr_release(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
-  if(htrdr->s3d_scn_view) S3D(scene_view_ref_put(htrdr->s3d_scn_view));
   if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
+  if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
   if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);

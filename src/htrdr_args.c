@@ -38,21 +38,23 @@ print_help(const char* cmd)
   printf(
 "  -C <camera>      define the rendering point of view.\n");
   printf(
-"  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
-  printf(
 "  -D AZIMUTH,ELEVATION\n"
 "                   sun direction in degrees. Following the right-handed\n"
 "                   convention, the azimuthal rotation is counter-clockwise\n"
 "                   around the Z axis, with 0 aligned on the X axis. The\n"
 "                   elevation rotation starts from 0 up to 90 at zenith.\n");
   printf(
+"  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
+  printf(
 "  -f               overwrite the OUTPUT file if it already exists.\n");
   printf(
-"  -g FILENAME      path of the OBJ geometry file.\n");
+"  -g FILENAME      path of an OBJ file representing the ground geometry.\n");
   printf(
 "  -h               display this help and exit.\n");
   printf(
 "  -i <image>       define the image to compute.\n");
+  printf(
+"  -R               infinitely repeat the ground along the X and Y axis.\n");
   printf(
 "  -r               infinitely repeat the clouds along the X and Y axis.\n");
   printf(
@@ -61,12 +63,12 @@ print_help(const char* cmd)
 "  -o OUTPUT        file where data are written. If not defined, data are\n"
 "                   written to standard output.\n");
   printf(
-"  -t THREADS       hint on the number of threads to use. By default use as\n"
-"                   many threads as CPU cores.\n");
-  printf(
 "  -T THRESHOLD     optical thickness used as threshold during the octree\n"
 "                   building. By default its value is `%g'.\n",
     HTRDR_ARGS_DEFAULT.optical_thickness);
+  printf(
+"  -t THREADS       hint on the number of threads to use. By default use as\n"
+"                   many threads as CPU cores.\n");
   printf(
 "  -v               make the program more verbose.\n");
   printf("\n");
@@ -318,7 +320,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:rT:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:RrT:t:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'C':
@@ -342,6 +344,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       case 'm': args->filename_mie = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r': args->repeat_clouds = 1; break;
+      case 'R': args->repeat_ground = 1; break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
         if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;

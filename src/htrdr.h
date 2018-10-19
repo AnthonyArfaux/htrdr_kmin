@@ -45,8 +45,7 @@ struct htrdr {
   struct svx_device* svx;
   struct s3d_device* s3d;
 
-  struct s3d_scene_view* s3d_scn_view;
-
+  struct htrdr_ground* ground;
   struct htrdr_sky* sky;
   struct htrdr_sun* sun;
 
