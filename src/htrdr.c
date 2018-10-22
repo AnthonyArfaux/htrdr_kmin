@@ -26,6 +26,7 @@
 #include "htrdr_solve.h"
 
 #include <rsys/clock_time.h>
+#include <rsys/cstr.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/str.h>
 
@@ -43,6 +44,7 @@
 #include <sys/stat.h> /* S_IRUSR & S_IWUSR */
 
 #include <omp.h>
+#include <mpi.h>
 
 /*******************************************************************************
  * Helper functions
@@ -91,7 +93,7 @@ log_msg
    va_list vargs)
 {
   ASSERT(htrdr && msg);
-  if(htrdr->verbose) {
+  if(htrdr->verbose && htrdr->mpi_rank == 0) {
     CHK(logger_vprint(&htrdr->logger, stream, msg, vargs) == RES_OK);
   }
 }
@@ -243,6 +245,51 @@ spherical_to_cartesian_dir
   dir[2] = sin_elevation;
 }
 
+static res_T
+init_mpi(struct htrdr* htrdr)
+{
+  int err;
+  res_T res = RES_OK;
+  ASSERT(htrdr);
+
+  htrdr->mpi_err_str = MEM_CALLOC
+    (htrdr->allocator, htrdr->nthreads, MPI_MAX_ERROR_STRING);
+  if(!htrdr->mpi_err_str) {
+    res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "could not allocate the MPI error strings -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  err = MPI_Comm_rank(MPI_COMM_WORLD, &htrdr->mpi_rank);
+  if(err != MPI_SUCCESS) {
+    htrdr_log_err(htrdr,
+      "could not determine the MPI rank of the calling process -- %s.\n",
+      htrdr_mpi_error_string(htrdr, err));
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+  err = MPI_Comm_size(MPI_COMM_WORLD, &htrdr->mpi_nprocs);
+  if(err != MPI_SUCCESS) {
+    htrdr_log_err(htrdr,
+      "could retrieve the size of the MPI group -- %s.\n",
+      htrdr_mpi_error_string(htrdr, err));
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  if(htrdr->mpi_err_str) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
+    htrdr->mpi_err_str = NULL;
+  }
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -275,6 +322,20 @@ htrdr_init
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
   htrdr->spp = args->image.spp;
 
+  res = init_mpi(htrdr);
+  if(res != RES_OK) goto error;
+
+  if((size_t)htrdr->mpi_nprocs > htrdr->spp) {
+    htrdr_log_err(htrdr,
+      "%s: insufficient number samples per pixel `%lu': it must be greater or "
+      "equal to the number of running processes, i.e. `%lu'.\n",
+      FUNC_NAME,
+      (unsigned long)htrdr->spp,
+      (unsigned long)htrdr->mpi_nprocs);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   if(!args->output) {
     htrdr->output = stdout;
     output_name = "<stdout>";
@@ -287,14 +348,17 @@ htrdr_init
   res = str_set(&htrdr->output_name, output_name);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
-      "could not store the name of the output stream `%s'.\n", output_name);
+      "%s: could not store the name of the output stream `%s' -- %s.\n",
+      FUNC_NAME, output_name, res_to_cstr(res));
     goto error;
   }
 
   res = svx_device_create
     (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->svx);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the Star-VoXel device.\n");
+    htrdr_log_err(htrdr,
+      "%s: could not create the Star-VoXel device -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 
@@ -304,7 +368,9 @@ htrdr_init
   res = s3d_device_create
     (&htrdr->logger, htrdr->allocator, 0, &htrdr->s3d);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the Star-3D device.\n");
+    htrdr_log_err(htrdr,
+      "%s: could not create the Star-3D device -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 
@@ -342,9 +408,10 @@ htrdr_init
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
   if(!htrdr->lifo_allocators) {
-    htrdr_log_err(htrdr,
-      "could not allocate the list of per thread LIFO allocator.\n");
     res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "%s: could not allocate the list of per thread LIFO allocator -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 
@@ -353,13 +420,13 @@ htrdr_init
       (&htrdr->lifo_allocators[ithread], htrdr->allocator, 4096);
     if(res != RES_OK) {
       htrdr_log_err(htrdr,
-        "could not initialise the LIFO allocator of the thread %lu.\n",
-        (unsigned long)ithread);
+        "%s: could not initialise the LIFO allocator of the thread %lu -- %s.\n",
+        FUNC_NAME, (unsigned long)ithread, res_to_cstr(res));
       goto error;
     }
   }
 
-  exit:
+exit:
   return res;
 error:
   htrdr_release(htrdr);
@@ -377,6 +444,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
+  if(htrdr->mpi_err_str) MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
   if(htrdr->lifo_allocators) {
     size_t i;
     FOR_EACH(i, 0, htrdr->nthreads) {
@@ -395,6 +463,10 @@ htrdr_run(struct htrdr* htrdr)
   if(htrdr->dump_vtk) {
     const size_t nbands = htrdr_sky_get_sw_spectral_bands_count(htrdr->sky);
     size_t i;
+
+    /* Nothing to do */
+    if(htrdr->mpi_rank != 0) goto exit;
+
     FOR_EACH(i, 0, nbands) {
       const size_t iband = htrdr_sky_get_sw_spectral_band_id(htrdr->sky, i);
       const size_t nquads = htrdr_sky_get_sw_spectral_band_quadrature_length
@@ -417,9 +489,11 @@ htrdr_run(struct htrdr* htrdr)
     time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
     htrdr_log(htrdr, "Rendering time: %s\n", buf);
 
-    res = dump_accum_buffer
-      (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);
-    if(res != RES_OK) goto error;
+    if(htrdr->mpi_rank == 0) {
+      res = dump_accum_buffer
+        (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);
+      if(res != RES_OK) goto error;
+    }
   }
 exit:
   return res;
@@ -455,6 +529,40 @@ htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
   va_start(vargs_list, msg);
   log_msg(htrdr, LOG_WARNING, msg, vargs_list);
   va_end(vargs_list);
+}
+
+const char*
+htrdr_mpi_error_string(struct htrdr* htrdr, const int mpi_err)
+{
+  const int ithread = omp_get_thread_num();
+  char* str;
+  int strlen_err;
+  int err;
+  ASSERT(htrdr && (size_t)ithread < htrdr->nthreads);
+  str = htrdr->mpi_err_str + ithread*MPI_MAX_ERROR_STRING;
+  err = MPI_Error_string(mpi_err, str, &strlen_err);
+  return err == MPI_SUCCESS ? str : "Invalid MPI error";
+}
+
+void
+htrdr_fprintf(struct htrdr* htrdr, FILE* stream, const char* msg, ...)
+{
+  ASSERT(htrdr && msg);
+  if(htrdr->mpi_rank == 0) {
+    va_list vargs_list;
+    va_start(vargs_list, msg);
+    vfprintf(stream, msg, vargs_list);
+    va_end(vargs_list);
+  }
+}
+
+void
+htrdr_fflush(struct htrdr* htrdr, FILE* stream)
+{
+  ASSERT(htrdr);
+  if(htrdr->mpi_rank == 0) {
+    fflush(stream);
+  }
 }
 
 /*******************************************************************************

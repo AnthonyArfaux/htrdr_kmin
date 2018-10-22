@@ -1009,8 +1009,9 @@ setup_cloud_grid
   /* Compute the overall number of voxels in the htrdr_grid */
   ncells = definition[0] * definition[1] * definition[2];
 
-  fprintf(stderr, "Generating cloud grid %lu.%lu: %3u%%", iband, iquad, 0);
-  fflush(stderr);
+  htrdr_fprintf(sky->htrdr, stderr,
+    "Generating cloud grid %lu.%lu: %3u%%", iband, iquad, 0);
+  htrdr_fflush(sky->htrdr, stderr);
 
   omp_set_num_threads((int)sky->htrdr->nthreads);
   #pragma omp parallel for
@@ -1033,12 +1034,13 @@ setup_cloud_grid
     #pragma omp critical
     if(pcent > progress) {
       progress = pcent;
-      fprintf(stderr, "%c[2K\rGenerating cloud grid %lu.%lu: %3u%%",
+      htrdr_fprintf(sky->htrdr, stderr,
+        "%c[2K\rGenerating cloud grid %lu.%lu: %3u%%",
         27, iband, iquad, (unsigned)pcent);
-      fflush(stderr);
+      htrdr_fflush(sky->htrdr, stderr);
     }
   }
-  fprintf(stderr, "\n");
+  htrdr_fprintf(sky->htrdr, stderr, "\n");
 
 exit:
   *out_grid = grid;

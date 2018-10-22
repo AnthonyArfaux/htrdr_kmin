@@ -16,6 +16,7 @@
 #include "htrdr.h"
 #include "htrdr_args.h"
 
+#include <mpi.h>
 #include <rsys/mem_allocator.h>
 
 /*******************************************************************************
@@ -31,6 +32,15 @@ main(int argc, char** argv)
   int is_htrdr_init = 0;
   res_T res = RES_OK;
 
+  err = MPI_Init(&argc, &argv);
+  if(err != MPI_SUCCESS) {
+    char str[MPI_MAX_ERROR_STRING];
+    int i;
+    CHK(MPI_Error_string(err, str, &i) == MPI_SUCCESS);
+    fprintf(stderr, "Error initializing MPI -- %s.\n", str);
+    goto error;
+  }
+
   res = htrdr_args_init(&args, argc, argv);
   if(res != RES_OK) goto error;
   if(args.quit) goto exit;
@@ -43,6 +53,7 @@ main(int argc, char** argv)
   if(res != RES_OK) goto error;
 
 exit:
+  MPI_Finalize();
   if(is_htrdr_init) htrdr_release(&htrdr);
   htrdr_args_release(&args);
   if((memsz = mem_allocated_size()) != 0) {

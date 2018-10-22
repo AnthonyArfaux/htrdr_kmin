@@ -60,6 +60,10 @@ struct htrdr {
   int dump_vtk;
   int verbose;
 
+  int mpi_rank;
+  int mpi_nprocs;
+  char* mpi_err_str;
+
   struct logger logger;
   struct mem_allocator* allocator;
   struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */
@@ -108,6 +112,27 @@ htrdr_log_warn
   __attribute((format(printf, 2, 3)))
 #endif
   ;
+
+extern LOCAL_SYM const char*
+htrdr_mpi_error_string
+  (struct htrdr* htrdr,
+   const int mpi_err);
+
+extern LOCAL_SYM void
+htrdr_fprintf
+  (struct htrdr* htrdr,
+   FILE* stream,
+   const char* msg,
+   ...)
+#ifdef COMPILER_GCC
+  __attribute((format(printf, 3, 4)))
+#endif
+  ;
+
+extern LOCAL_SYM void
+htrdr_fflush
+  (struct htrdr* htrdr,
+   FILE* stream);
 
 #endif /* HTRDR_H */
 

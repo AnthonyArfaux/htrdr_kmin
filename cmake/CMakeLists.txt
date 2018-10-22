@@ -34,10 +34,13 @@ find_package(HTCP REQUIRED)
 find_package(HTGOP REQUIRED)
 find_package(HTMIE REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
+find_package(MPI REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
+
+set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
 
 include_directories(
   ${RSys_INCLUDE_DIR}
@@ -48,7 +51,8 @@ include_directories(
   ${StarVX_INCLUDE_DIR}
   ${HTCP_INCLUDE_DIR}
   ${HTGOP_INCLUDE_DIR}
-  ${HTMIE_INCLUDE_DIR})
+  ${HTMIE_INCLUDE_DIR}
+  ${MPI_INCLUDE_PATH})
 
 ################################################################################
 # Configure and define targets

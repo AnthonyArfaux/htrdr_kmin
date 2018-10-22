@@ -20,12 +20,16 @@
 #include "htrdr_sky.h"
 #include "htrdr_solve.h"
 
+#include <rsys/cstr.h>
+#include <rsys/math.h>
 #include <star/ssp.h>
 
 #include <omp.h>
-#include <rsys/math.h>
+#include <mpi.h>
 
-#define TILE_SIZE 32 /* definition in X & Y of a tile */
+#define RNG_SEQUENCE_SIZE 1000000
+
+#define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
 /*******************************************************************************
@@ -40,6 +44,76 @@ morton2D_decode(const uint32_t u32)
   x = (x | (x >> 4)) & 0x00FF00FF;
   x = (x | (x >> 8)) & 0x0000FFFF;
   return (uint16_t)x;
+}
+
+static res_T
+gather_buffer
+  (struct htrdr* htrdr,
+   struct htrdr_buffer* buf)
+{
+  struct htrdr_buffer_layout layout;
+  struct htrdr_accum* gathered_accums = NULL;
+  size_t x, y;
+  int iproc;
+  res_T res = RES_OK;
+  ASSERT(htrdr && buf);
+
+  /* Fetch the memory layout of the submitted buffer */
+  htrdr_buffer_get_layout(buf, &layout);
+  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum) * 3/*#channels*/);
+  ASSERT(layout.alignment <= ALIGNOF(struct htrdr_accum));
+
+  /* The process 0 allocates the memory used to store the gathered buffer lines
+   * of the MPI processes */
+  if(htrdr->mpi_rank == 0) {
+    gathered_accums = MEM_ALLOC
+      (htrdr->allocator, layout.pitch * (size_t)htrdr->mpi_nprocs);
+    if(!gathered_accums) {
+      res = RES_MEM_ERR;
+      htrdr_log_err(htrdr,
+        "could not allocate the temporary memory for MPI gathering -- %s.\n",
+        res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  FOR_EACH(y, 0, layout.height) {
+    struct htrdr_accum* buf_row_accums = (struct htrdr_accum*)
+      ((char*)htrdr_buffer_get_data(buf) + y * layout.pitch);
+    int err; /* MPI error */
+
+    /* Gather the buffer lines */
+    err = MPI_Gather(buf_row_accums, (int)layout.pitch, MPI_CHAR, gathered_accums,
+      (int)layout.pitch, MPI_CHAR, 0, MPI_COMM_WORLD);
+    if(err != MPI_SUCCESS) {
+      htrdr_log_err(htrdr,
+"could not gather the buffer line `%lu' from the group of processes -- %s.\n",
+        (unsigned long)y, htrdr_mpi_error_string(htrdr, err));
+      res = RES_UNKNOWN_ERR;
+      goto error;
+    }
+
+    /* Accumulates the gathered lines into the buffer of the process 0 */
+    if(htrdr->mpi_rank == 0) {
+      memset(buf_row_accums, 0, layout.pitch);
+      FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+        struct htrdr_accum* proc_accums = (struct htrdr_accum*)
+          ((char*)gathered_accums + (size_t)iproc * layout.pitch);
+        FOR_EACH(x, 0, layout.width * 3/*#channels*/) {
+          buf_row_accums[x].sum_weights += proc_accums[x].sum_weights;
+          buf_row_accums[x].sum_weights_sqr += proc_accums[x].sum_weights_sqr;
+          buf_row_accums[x].nweights += proc_accums[x].nweights;
+          buf_row_accums[x].nfailures += proc_accums[x].nfailures;
+        }
+      }
+    }
+  }
+
+exit:
+  if(gathered_accums) MEM_RM(htrdr->allocator, gathered_accums);
+  return res;
+error:
+  goto exit;
 }
 
 static res_T
@@ -140,7 +214,7 @@ res_T
 htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
-   const size_t spp,
+   const size_t total_spp,
    struct htrdr_buffer* buf)
 {
   struct ssp_rng_proxy* rng_proxy = NULL;
@@ -151,12 +225,20 @@ htrdr_draw_radiance_sw
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
+  size_t spp;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
 
   htrdr_buffer_get_layout(buf, &layout);
   ASSERT(layout.width || layout.height || layout.elmt_size);
+
+  spp = total_spp / (size_t)htrdr->mpi_nprocs;
+
+  /* Add the remaining realisations to the 1st process */
+  if(htrdr->mpi_rank == 0) {
+    spp += total_spp - (spp*(size_t)htrdr->mpi_nprocs);
+  }
 
   if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
   || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
@@ -168,8 +250,13 @@ htrdr_draw_radiance_sw
     goto error;
   }
 
-  res = ssp_rng_proxy_create
-    (htrdr->allocator, &ssp_rng_mt19937_64, htrdr->nthreads, &rng_proxy);
+  res = ssp_rng_proxy_create2
+    (htrdr->allocator,
+     &ssp_rng_mt19937_64,
+     RNG_SEQUENCE_SIZE * (size_t)htrdr->mpi_rank, /* Offset */
+     RNG_SEQUENCE_SIZE, /* Size */
+     RNG_SEQUENCE_SIZE * (size_t)htrdr->mpi_nprocs, /* Pitch */
+     htrdr->nthreads, &rng_proxy);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "%s: could not create the RNG proxy.\n", FUNC_NAME);
     goto error;
@@ -199,8 +286,8 @@ htrdr_draw_radiance_sw
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
-  fprintf(stderr, "Rendering: %3i%%", 0);
-  fflush(stderr);
+  htrdr_fprintf(htrdr, stderr, "Rendering: %3i%%", 0);
+  htrdr_fflush(htrdr, stderr);
 
   omp_set_num_threads((int)htrdr->nthreads);
 
@@ -241,14 +328,18 @@ htrdr_draw_radiance_sw
     #pragma omp critical
     if(pcent > progress) {
       progress = pcent;
-      fprintf(stderr, "%c[2K\rRendering: %3lu%%",
+      htrdr_fprintf(htrdr, stderr, "%c[2K\rRendering: %3lu%%",
         27, (unsigned long)pcent);
-      fflush(stderr);
+      htrdr_fflush(htrdr, stderr);
     }
 
     if(ATOMIC_GET(&res) != RES_OK) continue;
   }
-  fprintf(stderr, "\n");
+  htrdr_fprintf(htrdr, stderr, "\n");
+
+  /* Gather accum buffers from the group of processes */
+  res = gather_buffer(htrdr, buf);
+  if(res != RES_OK) goto error;
 
 exit:
   if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
