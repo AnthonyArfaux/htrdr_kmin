@@ -326,6 +326,11 @@ htrdr_init
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
 
+  if(htrdr->cache_grids && htrdr->mpi_nprocs != 1) {
+    htrdr_log_warn(htrdr, "cached grids are not supported in a MPI execution.\n");
+    htrdr->cache_grids = 0;
+  }
+
   if((size_t)htrdr->mpi_nprocs > htrdr->spp) {
     htrdr_log_err(htrdr,
       "%s: insufficient number samples per pixel `%lu': it must be greater or "
@@ -751,3 +756,4 @@ exit:
 error:
   goto exit;
 }
+
