@@ -318,6 +318,7 @@ htrdr_init
   str_init(htrdr->allocator, &htrdr->output_name);
 
   htrdr->dump_vtk = args->dump_vtk;
+  htrdr->cache_grids = args->cache_grids;
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
   htrdr->spp = args->image.spp;

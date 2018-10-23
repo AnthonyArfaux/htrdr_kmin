@@ -50,6 +50,12 @@ print_help(const char* cmd)
   printf(
 "  -g FILENAME      path of an OBJ file representing the ground geometry.\n");
   printf(
+"  -G               precompute/use grids of raw cloud opitical properties built\n"
+"                   from the HTCP file, the atmospheric profile and the Mie's\n"
+"                   data. If the corresponding grids were generated in a\n"
+"                   previous run, reuse them as far as it is possible, i.e. if\n"
+"                   the HTCP, Mie and atmospheric files were not updated.\n");
+  printf(
 "  -h               display this help and exit.\n");
   printf(
 "  -i <image>       define the image to compute.\n");
@@ -320,7 +326,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 
   *args = HTRDR_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:m:o:RrT:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfGg:hi:m:o:RrT:t:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'C':
@@ -331,6 +337,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
       case 'f': args->force_overwriting = 1; break;
+      case 'G': args->cache_grids = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
         print_help(argv[0]);

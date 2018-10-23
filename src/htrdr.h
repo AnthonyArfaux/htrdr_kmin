@@ -56,13 +56,14 @@ struct htrdr {
   FILE* output;
   struct str output_name;
 
-  unsigned nthreads;
-  int dump_vtk;
-  int verbose;
+  unsigned nthreads; /* #threads of the process */
+  int dump_vtk; /* Dump octree VTK */
+  int cache_grids; /* Use/Precompute grid caches */
+  int verbose; /* Verbosity level */
 
-  int mpi_rank;
-  int mpi_nprocs;
-  char* mpi_err_str;
+  int mpi_rank; /* Rank of the process in the MPI group */
+  int mpi_nprocs; /* Overall #processes in the MPI group */
+  char* mpi_err_str; /* Temp buffer used to store MPI error string */
 
   struct logger logger;
   struct mem_allocator* allocator;

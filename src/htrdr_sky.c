@@ -65,6 +65,15 @@ struct split {
 #define DARRAY_DATA struct split
 #include <rsys/dynamic_array.h>
 
+struct spectral_data {
+  size_t iband; /* Index of the spectral band */
+  size_t iquad; /* Quadrature point into the band */
+};
+
+#define DARRAY_NAME specdata
+#define DARRAY_DATA struct spectral_data
+#include <rsys/dynamic_array.h>
+
 struct build_tree_context {
   const struct htrdr_sky* sky;
   double vxsz[3];
@@ -1065,15 +1074,20 @@ setup_clouds
    const double optical_thickness_threshold,
    const int force_cache_update)
 {
-  struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
-  struct build_tree_context ctx = BUILD_TREE_CONTEXT_NULL;
+  struct darray_specdata specdata;
   size_t nvoxs[3];
+  size_t progress = 0;
+  double vxsz[3];
   double low[3];
   double upp[3];
+  int64_t ispecdata;
   size_t nbands;
   size_t i;
-  res_T res = RES_OK;
+  ATOMIC nbuilt_octrees = 0;
+  ATOMIC res = RES_OK;
   ASSERT(sky && sky->sw_bands && optical_thickness_threshold >= 0);
+
+  darray_specdata_init(sky->htrdr->allocator, &specdata);
 
   res = htcp_get_desc(sky->htcp, &sky->htcp_desc);
   if(res != RES_OK) {
@@ -1134,21 +1148,12 @@ setup_clouds
   }
 
   /* Setup the build context */
-  ctx.sky = sky;
-  ctx.tau_threshold = optical_thickness_threshold;
-  ctx.vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
-  ctx.vxsz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
-  ctx.vxsz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
-  ctx.vxsz[0] = ctx.vxsz[0] / (double)sky->htcp_desc.spatial_definition[0];
-  ctx.vxsz[1] = ctx.vxsz[1] / (double)sky->htcp_desc.spatial_definition[1];
-  ctx.vxsz[2] = ctx.vxsz[2] / (double)sky->htcp_desc.spatial_definition[2];
-
-  /* Setup the voxel descriptor */
-  vox_desc.get = cloud_vox_get;
-  vox_desc.merge = cloud_vox_merge;
-  vox_desc.challenge_merge = cloud_vox_challenge_merge;
-  vox_desc.context = &ctx;
-  vox_desc.size = sizeof(float) * NFLOATS_PER_VOXEL;
+  vxsz[0] = sky->htcp_desc.upper[0] - sky->htcp_desc.lower[0];
+  vxsz[1] = sky->htcp_desc.upper[1] - sky->htcp_desc.lower[1];
+  vxsz[2] = sky->htcp_desc.upper[2] - sky->htcp_desc.lower[2];
+  vxsz[0] = vxsz[0] / (double)sky->htcp_desc.spatial_definition[0];
+  vxsz[1] = vxsz[1] / (double)sky->htcp_desc.spatial_definition[1];
+  vxsz[2] = vxsz[2] / (double)sky->htcp_desc.spatial_definition[2];
 
   /* Create as many cloud data structure than considered SW spectral bands */
   nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
@@ -1160,58 +1165,124 @@ setup_clouds
     goto error;
   }
 
+  /* Compute how many octree are going to be built */
   FOR_EACH(i, 0, nbands) {
-    size_t iquad;
     struct htgop_spectral_interval band;
-    ctx.iband = i + sky->sw_bands_range[0];
+    const size_t iband = i + sky->sw_bands_range[0];
+    size_t iquad;
 
-    HTGOP(get_sw_spectral_interval(sky->htgop, ctx.iband, &band));
+    HTGOP(get_sw_spectral_interval(sky->htgop, iband, &band));
 
     sky->clouds[i] = MEM_CALLOC(sky->htrdr->allocator,
       band.quadrature_length, sizeof(*sky->clouds[i]));
     if(!sky->clouds[i]) {
       htrdr_log_err(sky->htrdr,
         "could not create the list of per quadrature point cloud data "
-        "for the band %lu.\n", (unsigned long)ctx.iband);
+        "for the band %lu.\n", (unsigned long)iband);
       res = RES_MEM_ERR;
       goto error;
     }
 
-    /* Build a cloud octree for each quadrature point of the considered
-     * spectral band */
     FOR_EACH(iquad, 0, band.quadrature_length) {
-      ctx.quadrature_range[0] = iquad;
-      ctx.quadrature_range[1] = iquad;
-
-      /* Compute grid of voxels data */
-      res = setup_cloud_grid(sky, nvoxs, ctx.iband, iquad, htcp_filename,
-        htgop_filename, htmie_filename, force_cache_update, &ctx.grid);
-      if(res != RES_OK) goto error;
-
-      /* Create the octree */
-      res = svx_octree_create(sky->htrdr->svx, low, upp, nvoxs, &vox_desc,
-        &sky->clouds[i][iquad].octree);
+      struct spectral_data spectral_data;
+      spectral_data.iband = iband;
+      spectral_data.iquad = iquad;
+      res = darray_specdata_push_back(&specdata, &spectral_data);
       if(res != RES_OK) {
-        htrdr_log_err(sky->htrdr, "could not create the octree of the cloud "
-          "properties for the band %lu.\n", (unsigned long)ctx.iband);
+        htrdr_log_err(sky->htrdr,
+          "could not register the quadrature point %lu of the spectral band "
+          "%lu .\n", (unsigned long)iband, (unsigned long)iquad);
         goto error;
-      }
-
-      /* Fetch the octree descriptor for future use */
-      SVX(tree_get_desc
-        (sky->clouds[i][iquad].octree, &sky->clouds[i][iquad].octree_desc));
-
-      if(ctx.grid) {
-        htrdr_grid_ref_put(ctx.grid);
-        ctx.grid = NULL;
       }
     }
   }
 
+  /* Make the generation of the octrees parallel or sequential whether the
+   * cache is disabled or not respectively: when the cache is enabled, we
+   * parallelize the generation of the cached grids, not the building of the
+   * octrees. */
+  if(sky->htrdr->cache_grids) {
+    omp_set_num_threads(1);
+  } else {
+    omp_set_num_threads((int)sky->htrdr->nthreads);
+    htrdr_fprintf(sky->htrdr, stderr, "Building octrees: %3u%%", 0);
+    htrdr_fflush(sky->htrdr, stderr);
+  }
+  #pragma omp parallel for
+  for(ispecdata=0;
+      (size_t)ispecdata<darray_specdata_size_get(&specdata);
+      ++ispecdata) {
+    struct svx_voxel_desc vox_desc = SVX_VOXEL_DESC_NULL;
+    struct build_tree_context ctx = BUILD_TREE_CONTEXT_NULL;
+    const size_t iband = darray_specdata_data_get(&specdata)[ispecdata].iband;
+    const size_t iquad = darray_specdata_data_get(&specdata)[ispecdata].iquad;
+    const size_t id = iband - sky->sw_bands_range[0];
+    size_t pcent;
+    size_t n;
+    res_T res_local = RES_OK;
+
+    if(ATOMIC_GET(&res) != RES_OK) continue;
+
+    /* Setup the build context */
+    ctx.sky = sky;
+    ctx.vxsz[0] = vxsz[0];
+    ctx.vxsz[1] = vxsz[1];
+    ctx.vxsz[2] = vxsz[2];
+    ctx.tau_threshold = optical_thickness_threshold;
+    ctx.iband = iband;
+    ctx.quadrature_range[0] = iquad;
+    ctx.quadrature_range[1] = iquad;
+
+    /* Setup the voxel descriptor */
+    vox_desc.get = cloud_vox_get;
+    vox_desc.get = cloud_vox_get;
+    vox_desc.merge = cloud_vox_merge;
+    vox_desc.challenge_merge = cloud_vox_challenge_merge;
+    vox_desc.context = &ctx;
+    vox_desc.size = sizeof(float) * NFLOATS_PER_VOXEL;
+
+    /* Compute grid of voxels data */
+    if(sky->htrdr->cache_grids) {
+      res_local = setup_cloud_grid(sky, nvoxs, iband, iquad, htcp_filename,
+        htgop_filename, htmie_filename, force_cache_update, &ctx.grid);
+      if(res_local != RES_OK) continue;
+    }
+
+    /* Create the octree */
+    res_local = svx_octree_create(sky->htrdr->svx, low, upp, nvoxs, &vox_desc,
+      &sky->clouds[id][iquad].octree);
+    if(ctx.grid) htrdr_grid_ref_put(ctx.grid);
+    if(res_local != RES_OK) {
+      htrdr_log_err(sky->htrdr, "could not create the octree of the cloud "
+        "properties for the band %lu.\n", (unsigned long)ctx.iband);
+      ATOMIC_SET(&res, res_local);
+      continue;
+    }
+
+    /* Fetch the octree descriptor for future use */
+    SVX(tree_get_desc
+      (sky->clouds[id][iquad].octree, &sky->clouds[id][iquad].octree_desc));
+
+    if(!sky->htrdr->cache_grids) {
+      /* Update the progress message */
+      n = (size_t)ATOMIC_INCR(&nbuilt_octrees);
+      pcent = n * 100 / darray_specdata_size_get(&specdata);
+
+      #pragma omp critical
+      if(pcent > progress) {
+        progress = pcent;
+        htrdr_fprintf(sky->htrdr, stderr,
+          "%c[2K\rBuilding octrees: %3u%%", 27, (unsigned)pcent);
+        htrdr_fflush(sky->htrdr, stderr);
+      }
+    }
+  }
+  if(!sky->htrdr->cache_grids) htrdr_fprintf(sky->htrdr, stderr, "\n");
+
 exit:
-  return res;
+  darray_specdata_release(&specdata);
+  return (res_T)res;
 error:
-  if(ctx.grid) htrdr_grid_ref_put(ctx.grid);
   clean_clouds(sky);
   darray_split_clear(&sky->svx2htcp_z);
   goto exit;
