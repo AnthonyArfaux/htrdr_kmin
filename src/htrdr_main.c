@@ -34,16 +34,19 @@ main(int argc, char** argv)
 
   err = MPI_Init(&argc, &argv);
   if(err != MPI_SUCCESS) {
-    char str[MPI_MAX_ERROR_STRING];
-    int i;
-    CHK(MPI_Error_string(err, str, &i) == MPI_SUCCESS);
-    fprintf(stderr, "Error initializing MPI -- %s.\n", str);
+    fprintf(stderr, "Error initializing MPI.\n");
     goto error;
   }
 
   res = htrdr_args_init(&args, argc, argv);
   if(res != RES_OK) goto error;
   if(args.quit) goto exit;
+
+  if(args.dump_vtk) {
+    int rank;
+    CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+    if(rank != 0) goto exit; /* Nothing to do except for the master process */
+  }
 
   res = htrdr_init(NULL, &args, &htrdr);
   if(res != RES_OK) goto error;
