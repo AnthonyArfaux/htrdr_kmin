@@ -18,7 +18,8 @@ on the
 [Star-SF](https://gitlab.com/meso-star/star-sf/),
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
 [Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on the
-[OpenMP](http://www.openmp.org) 1.2 specification to parallelize its
+[OpenMP](http://www.openmp.org) 1.2 specification and the
+[MPI](https://www.mpi-forum.org/) 1.0 specification to parallelize its
 computations.
 
 First ensure that CMake is installed on your system. Then install the RCMake
