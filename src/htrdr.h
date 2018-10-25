@@ -65,6 +65,10 @@ struct htrdr {
   int mpi_nprocs; /* Overall #processes in the MPI group */
   char* mpi_err_str; /* Temp buffer used to store MPI error string */
 
+  /* Process progress percentage */
+  int8_t* mpi_progress_octree;
+  int8_t* mpi_progress_render;
+
   struct logger logger;
   struct mem_allocator* allocator;
   struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */

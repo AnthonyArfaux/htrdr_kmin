@@ -38,6 +38,7 @@
 #include <fcntl.h> /* open */
 #include <libgen.h>
 #include <math.h>
+#include <mpi.h>
 #include <omp.h>
 #include <string.h>
 #include <sys/stat.h> /* mkdir */
@@ -1076,7 +1077,6 @@ setup_clouds
 {
   struct darray_specdata specdata;
   size_t nvoxs[3];
-  size_t progress = 0;
   double vxsz[3];
   double low[3];
   double upp[3];
@@ -1205,8 +1205,10 @@ setup_clouds
     omp_set_num_threads(1);
   } else {
     omp_set_num_threads((int)sky->htrdr->nthreads);
-    htrdr_fprintf(sky->htrdr, stderr, "Building octrees: %3u%%", 0);
-    htrdr_fflush(sky->htrdr, stderr);
+    if(sky->htrdr->mpi_rank == 0) {
+      fetch_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+      print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+    }
   }
   #pragma omp parallel for
   for(ispecdata=0;
@@ -1217,7 +1219,7 @@ setup_clouds
     const size_t iband = darray_specdata_data_get(&specdata)[ispecdata].iband;
     const size_t iquad = darray_specdata_data_get(&specdata)[ispecdata].iquad;
     const size_t id = iband - sky->sw_bands_range[0];
-    size_t pcent;
+    int8_t pcent;
     size_t n;
     res_T res_local = RES_OK;
 
@@ -1266,18 +1268,32 @@ setup_clouds
     if(!sky->htrdr->cache_grids) {
       /* Update the progress message */
       n = (size_t)ATOMIC_INCR(&nbuilt_octrees);
-      pcent = n * 100 / darray_specdata_size_get(&specdata);
+      pcent = (int8_t)(n * 100 / darray_specdata_size_get(&specdata));
 
       #pragma omp critical
-      if(pcent > progress) {
-        progress = pcent;
-        htrdr_fprintf(sky->htrdr, stderr,
-          "%c[2K\rBuilding octrees: %3u%%", 27, (unsigned)pcent);
-        htrdr_fflush(sky->htrdr, stderr);
+      if(pcent > sky->htrdr->mpi_progress_octree[0]) {
+        sky->htrdr->mpi_progress_octree[0] = pcent;
+        if(sky->htrdr->mpi_rank != 0) {
+          /* Send the progress percentage of the process to the master process */
+          CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
+            HTRDR_MPI_PROGRESS_BUILD_OCTREE, MPI_COMM_WORLD) == MPI_SUCCESS);
+        } else {
+          fetch_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+          htrdr_fprintf(sky->htrdr, stderr, "\033[%dA", sky->htrdr->mpi_nprocs);
+          print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+        }
       }
     }
   }
-  if(!sky->htrdr->cache_grids) htrdr_fprintf(sky->htrdr, stderr, "\n");
+
+  if(!sky->htrdr->cache_grids && sky->htrdr->mpi_rank == 0) {
+    while(total_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE) != 100) {
+      fetch_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+      htrdr_fprintf(sky->htrdr, stderr, "\033[%dA", sky->htrdr->mpi_nprocs);
+      print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+      sleep(1);
+    }
+  }
 
 exit:
   darray_specdata_release(&specdata);

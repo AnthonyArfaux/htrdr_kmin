@@ -18,6 +18,11 @@
 
 #include <rsys/rsys.h>
 
+enum htrdr_mpi_progress {
+  HTRDR_MPI_PROGRESS_BUILD_OCTREE,
+  HTRDR_MPI_PROGRESS_RENDERING
+};
+
 struct htrdr;
 
 #define SW_WAVELENGTH_MIN 380 /* In nanometer */
@@ -96,13 +101,28 @@ is_file_updated
 
 extern LOCAL_SYM res_T
 update_file_stamp
-  (struct htrdr* htrdr, 
+  (struct htrdr* htrdr,
    const char* filename);
 
 extern LOCAL_SYM res_T
 create_directory
   (struct htrdr* htrdt,
    const char* path);
+
+extern LOCAL_SYM void
+fetch_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_progress progress);
+
+extern LOCAL_SYM void
+print_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_progress progress);
+
+extern int8_t
+total_mpi_progress
+  (const struct htrdr* htrdr,
+   const enum htrdr_mpi_progress progress);
 
 #endif /* HTRDR_C_H */
 

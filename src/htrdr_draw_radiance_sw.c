@@ -208,36 +208,6 @@ draw_tile
   return RES_OK;
 }
 
-/* Return the overall percentage */
-static size_t
-fetch_process_progress(struct htrdr* htrdr, size_t* progress)
-{
-  size_t overall_pcent;
-  int iproc;
-  ASSERT(htrdr && progress && htrdr->mpi_rank == 0);
-
-  overall_pcent = progress[0];
-  FOR_EACH(iproc, 1, htrdr->mpi_nprocs) {
-    size_t proc_pcent = progress[iproc];
-
-    /* Flush the last sent percentage of the process `iproc' */
-    for(;;) {
-      int flag;
-
-      CHK(MPI_Iprobe(iproc, 0/*tag*/, MPI_COMM_WORLD, &flag,
-        MPI_STATUS_IGNORE) == MPI_SUCCESS);
-      if(flag == 0) break; /* No more message */
-
-      CHK(MPI_Recv(&proc_pcent, sizeof(size_t), MPI_CHAR, iproc, 0/*tag*/,
-        MPI_COMM_WORLD, MPI_STATUS_IGNORE) == MPI_SUCCESS);
-    }
-
-    progress[iproc] = proc_pcent;
-    overall_pcent += progress[iproc];
-  }
-  return overall_pcent / (size_t)htrdr->mpi_nprocs;
-}
-
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -251,13 +221,11 @@ htrdr_draw_radiance_sw
   struct ssp_rng_proxy* rng_proxy = NULL;
   struct ssp_rng** rngs = NULL;
   size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
-  size_t* progress = NULL;
   size_t i;
   int32_t mcode; /* Morton code of the tile */
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
   size_t spp;
-  size_t overall_pcent = 0;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
@@ -311,20 +279,6 @@ htrdr_draw_radiance_sw
     }
   }
 
-  if(htrdr->mpi_rank == 0) {
-    progress = MEM_CALLOC
-      (htrdr->allocator, (size_t)htrdr->mpi_nprocs, sizeof(size_t));
-  } else {
-    progress = MEM_CALLOC
-      (htrdr->allocator, 1, sizeof(size_t));
-  }
-  if(!progress) {
-    htrdr_log_err(htrdr,
-      "%s: could not allocate the process progress counter.\n", FUNC_NAME);
-    res = RES_MEM_ERR;
-    goto error;
-  }
-
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
@@ -334,8 +288,10 @@ htrdr_draw_radiance_sw
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
-  htrdr_fprintf(htrdr, stderr, "Rendering: %3i%%", 0);
-  htrdr_fflush(htrdr, stderr);
+  if(htrdr->mpi_rank == 0) {
+    fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+    print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+  }
 
   omp_set_num_threads((int)htrdr->nthreads);
   #pragma omp parallel for schedule(static, 1/*chunck size*/)
@@ -344,9 +300,9 @@ htrdr_draw_radiance_sw
     struct ssp_rng* rng = rngs[ithread];
     size_t tile_org[2];
     size_t tile_sz[2];
-    size_t pcent;
     size_t n;
     res_T res_local = RES_OK;
+    int8_t pcent;
 
     /* Decode the morton code to retrieve the tile index  */
     tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
@@ -370,21 +326,19 @@ htrdr_draw_radiance_sw
     }
 
     n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-    pcent = n * 100 / ntiles;
+    pcent = (int8_t)(n * 100 / ntiles);
 
     #pragma omp critical
-    if((size_t)pcent > progress[0]) {
-      progress[0] = pcent;
-
+    if(pcent > htrdr->mpi_progress_render[0]) {
+      htrdr->mpi_progress_render[0] = pcent;
       if(htrdr->mpi_rank != 0) {
         /* Send the progress percentage of the process to the master process */
-        CHK(MPI_Send(&pcent, sizeof(size_t), MPI_CHAR, 0/*dst*/, 0/*tag*/,
-          MPI_COMM_WORLD) == MPI_SUCCESS);
+        CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
+          HTRDR_MPI_PROGRESS_RENDERING/*tag*/, MPI_COMM_WORLD) == MPI_SUCCESS);
       } else {
-        overall_pcent = fetch_process_progress(htrdr, progress);
-        htrdr_fprintf(htrdr, stderr, "%c[2K\rRendering: %3lu%%",
-          27, (unsigned long)overall_pcent);
-        htrdr_fflush(htrdr, stderr);
+        fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+        htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs);
+        print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
       }
     }
 
@@ -392,14 +346,12 @@ htrdr_draw_radiance_sw
   }
 
   if(htrdr->mpi_rank == 0) {
-    while(overall_pcent != 100) {
-      overall_pcent = fetch_process_progress(htrdr, progress);
-      htrdr_fprintf(htrdr, stderr, "%c[2K\rRendering: %3lu%%",
-        27, (unsigned long)overall_pcent);
-      htrdr_fflush(htrdr, stderr);
+    while(total_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING) != 100) {
+      fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+      htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs);
+      print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
       sleep(1);
     }
-    htrdr_fprintf(htrdr, stderr, "\n");
   }
 
   /* Gather accum buffers from the group of processes */
@@ -408,7 +360,6 @@ htrdr_draw_radiance_sw
 
 exit:
   if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
-  if(progress) MEM_RM(htrdr->allocator, progress);
   if(rngs) {
     FOR_EACH(i, 0, htrdr->nthreads) {
       if(rngs[i]) SSP(rng_ref_put(rngs[i]));

@@ -248,6 +248,7 @@ spherical_to_cartesian_dir
 static res_T
 init_mpi(struct htrdr* htrdr)
 {
+  size_t n;
   int err;
   res_T res = RES_OK;
   ASSERT(htrdr);
@@ -277,6 +278,29 @@ init_mpi(struct htrdr* htrdr)
       "could retrieve the size of the MPI group -- %s.\n",
       htrdr_mpi_error_string(htrdr, err));
     res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+  /* Allocate #processes progress statuses on the master process and only 1
+   * progress status on the other ones: the master process will gather the
+   * status of the other processes to report their progression. */
+  n = (size_t)(htrdr->mpi_rank == 0 ? htrdr->mpi_nprocs : 1);
+
+  htrdr->mpi_progress_octree = MEM_CALLOC
+    (htrdr->allocator, n, sizeof(*htrdr->mpi_progress_octree));
+  if(!htrdr->mpi_progress_octree) {
+    htrdr_log_err(htrdr,
+      "could not allocate the progress state of the octree building.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  htrdr->mpi_progress_render = MEM_CALLOC
+    (htrdr->allocator, n, sizeof(*htrdr->mpi_progress_render));
+  if(!htrdr->mpi_progress_render) {
+    htrdr_log_err(htrdr,
+      "could not allocate the progress state of the scene rendering.\n");
+    res = RES_MEM_ERR;
     goto error;
   }
 
@@ -451,6 +475,12 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mpi_err_str) MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
+  if(htrdr->mpi_progress_octree) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_progress_octree);
+  }
+  if(htrdr->mpi_progress_render) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_progress_render);
+  }
   if(htrdr->lifo_allocators) {
     size_t i;
     FOR_EACH(i, 0, htrdr->nthreads) {
@@ -755,5 +785,86 @@ exit:
   return res;
 error:
   goto exit;
+}
+
+void
+fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+{
+  int8_t* progress = NULL;
+  int iproc;
+  ASSERT(htrdr && progress && htrdr->mpi_rank == 0);
+
+  switch(tag) {
+    case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 
+      progress = htrdr->mpi_progress_octree;
+      break;
+    case HTRDR_MPI_PROGRESS_RENDERING:
+      progress = htrdr->mpi_progress_render;
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+
+  FOR_EACH(iproc, 1, htrdr->mpi_nprocs) {
+
+    /* Flush the last sent percentage of the process `iproc' */
+    for(;;) {
+      int flag;
+
+      CHK(MPI_Iprobe
+        (iproc, tag, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE) == MPI_SUCCESS);
+      if(flag == 0) break; /* No more message */
+
+      CHK(MPI_Recv(&progress[iproc], sizeof(size_t), MPI_CHAR, iproc, tag,
+        MPI_COMM_WORLD, MPI_STATUS_IGNORE) == MPI_SUCCESS);
+    }
+  }
+}
+
+void
+print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+{
+  int iproc;
+  ASSERT(htrdr && htrdr->mpi_rank == 0);
+  FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+    switch(tag) {
+      case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
+        htrdr_fprintf(htrdr, stderr,
+          "\033[2K\rProcess %d -- building octree: %3d%%\n",
+          iproc, htrdr->mpi_progress_octree[iproc]);
+        break;
+      case HTRDR_MPI_PROGRESS_RENDERING:
+        htrdr_fprintf(htrdr, stderr,
+          "\033[2K\rProcess %d -- rendering: %3d%%\n",
+          iproc, htrdr->mpi_progress_render[iproc]);
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
+  }
+}
+
+int8_t
+total_mpi_progress(const struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+{
+  const int8_t* progress = NULL;
+  int total = 0;
+  int iproc;
+  ASSERT(htrdr && progress && htrdr->mpi_rank == 0);
+
+  switch(tag) {
+    case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 
+      progress = htrdr->mpi_progress_octree;
+      break;
+    case HTRDR_MPI_PROGRESS_RENDERING:
+      progress = htrdr->mpi_progress_render;
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+
+  FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+     total += progress[iproc];
+  }
+  total = total / htrdr->mpi_nprocs;
+  ASSERT(total <= 100);
+  return (int8_t)total;
 }
 
