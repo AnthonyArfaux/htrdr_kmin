@@ -41,7 +41,7 @@ htrdr_slab_trace_ray
   double cell_sz[3]; /* Size of a cell */
   double t_max[3], t_delta[2], t_min_z;
   size_t istep;
-  int xy[2]; /* 2D index of the repeated cell */
+  int64_t xy[2]; /* 2D index of the repeated cell */
   int incr[2]; /* Index increment */
   res_T res = RES_OK;
   ASSERT(htrdr && org && dir && range && cell_low && cell_upp && trace_cell);
@@ -64,8 +64,8 @@ htrdr_slab_trace_ray
    * non duplicated cell */
   pos[0] = org[0] + t_min_z*dir[0];
   pos[1] = org[1] + t_min_z*dir[1];
-  xy[0] = (int)floor((pos[0] - cell_low[0]) / cell_sz[0]);
-  xy[1] = (int)floor((pos[1] - cell_low[1]) / cell_sz[1]);
+  xy[0] = (int64_t)floor((pos[0] - cell_low[0]) / cell_sz[0]);
+  xy[1] = (int64_t)floor((pos[1] - cell_low[1]) / cell_sz[1]);
 
   /* Define the 2D index increment wrt dir sign */
   incr[0] = dir[0] < 0 ? -1 : 1;
