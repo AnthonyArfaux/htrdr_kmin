@@ -215,30 +215,25 @@ res_T
 htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
-   const size_t total_spp,
+   const size_t spp,
    struct htrdr_buffer* buf)
 {
   struct ssp_rng_proxy* rng_proxy = NULL;
   struct ssp_rng** rngs = NULL;
-  size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
+  size_t ntiles_x, ntiles_y, ntiles_adjusted;
   size_t i;
-  int32_t mcode; /* Morton code of the tile */
+  int64_t* proc_tiles = NULL;
+  int64_t itile;
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
-  size_t spp;
+  size_t proc_ntiles;
+  size_t proc_ntiles_adjusted;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
 
   htrdr_buffer_get_layout(buf, &layout);
   ASSERT(layout.width || layout.height || layout.elmt_size);
-
-  spp = total_spp / (size_t)htrdr->mpi_nprocs;
-
-  /* Add the remaining realisations to the 1st process */
-  if(htrdr->mpi_rank == 0) {
-    spp += total_spp - (spp*(size_t)htrdr->mpi_nprocs);
-  }
 
   if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
   || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
@@ -283,10 +278,42 @@ htrdr_draw_radiance_sw
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
   ntiles_adjusted *= ntiles_adjusted;
-  ntiles = ntiles_x * ntiles_y;
 
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
+
+  /* Define the initial number of tiles of the current process */
+  proc_ntiles = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
+  if(htrdr->mpi_rank == 0) {/* Affect the remaining tiles to the master proc */
+    ASSERT(ntiles_adjusted >= proc_ntiles * (size_t)htrdr->mpi_nprocs);
+    proc_ntiles += ntiles_adjusted - proc_ntiles*(size_t)htrdr->mpi_nprocs;
+  }
+
+  /* Allocate the per process list of tiles */
+  proc_tiles = MEM_CALLOC(htrdr->allocator, proc_ntiles, sizeof(*proc_tiles));
+  if(!proc_tiles) {
+    res = RES_MEM_ERR;
+    htrdr_log_err(htrdr, 
+      "%s: could not allocate the per process list of tiles -- %s.\n",
+      FUNC_NAME, res_to_cstr((res_T)res));
+    goto error;
+  }
+
+    /* Define the initial list of tiles of the process */
+  proc_ntiles_adjusted = 0;
+  FOR_EACH(itile, 0, proc_ntiles) {
+    size_t tile_org[2];
+    int64_t mcode = htrdr->mpi_rank + (itile*htrdr->mpi_nprocs);
+
+    /* Decode the morton code to retrieve the tile index  */
+    tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
+    if(tile_org[0] >= ntiles_x) continue; /* Skip border tile */
+    tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
+    if(tile_org[1] >= ntiles_y) continue; /* Skip border tile */
+
+    proc_tiles[proc_ntiles_adjusted] = mcode;
+    proc_ntiles_adjusted++;
+  }
 
   if(htrdr->mpi_rank == 0) {
     fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
@@ -295,9 +322,10 @@ htrdr_draw_radiance_sw
 
   omp_set_num_threads((int)htrdr->nthreads);
   #pragma omp parallel for schedule(static, 1/*chunck size*/)
-  for(mcode=0; mcode<(int64_t)ntiles_adjusted; ++mcode) {
+  for(itile=0; itile<(int64_t)proc_ntiles_adjusted; ++itile) {
     const int ithread = omp_get_thread_num();
     struct ssp_rng* rng = rngs[ithread];
+    int64_t mcode = proc_tiles[itile];
     size_t tile_org[2];
     size_t tile_sz[2];
     size_t n;
@@ -306,9 +334,8 @@ htrdr_draw_radiance_sw
 
     /* Decode the morton code to retrieve the tile index  */
     tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
-    if(tile_org[0] >= ntiles_x) continue; /* Skip border tile */
     tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
-    if(tile_org[1] >= ntiles_y) continue; /* Skip border tile */
+    ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
 
     /* Define the tile origin in pixel space */
     tile_org[0] *= TILE_SIZE;
@@ -326,19 +353,17 @@ htrdr_draw_radiance_sw
     }
 
     n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-    pcent = (int8_t)(n * 100 / ntiles);
+    pcent = (int8_t)(n * 100 / proc_ntiles_adjusted);
 
     #pragma omp critical
     if(pcent > htrdr->mpi_progress_render[0]) {
       htrdr->mpi_progress_render[0] = pcent;
-      if(htrdr->mpi_rank != 0) {
+      if(htrdr->mpi_rank == 0) {
+        update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+      } else {
         /* Send the progress percentage of the process to the master process */
         CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
           HTRDR_MPI_PROGRESS_RENDERING/*tag*/, MPI_COMM_WORLD) == MPI_SUCCESS);
-      } else {
-        fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-        htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs);
-        print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
       }
     }
 
@@ -347,11 +372,10 @@ htrdr_draw_radiance_sw
 
   if(htrdr->mpi_rank == 0) {
     while(total_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING) != 100) {
-      fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-      htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs);
-      print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+      update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
       sleep(1);
     }
+    fprintf(stderr, "\n");
   }
 
   /* Gather accum buffers from the group of processes */
@@ -360,6 +384,7 @@ htrdr_draw_radiance_sw
 
 exit:
   if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
+  if(proc_tiles) MEM_RM(htrdr->allocator, proc_tiles);
   if(rngs) {
     FOR_EACH(i, 0, htrdr->nthreads) {
       if(rngs[i]) SSP(rng_ref_put(rngs[i]));

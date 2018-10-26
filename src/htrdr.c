@@ -355,17 +355,6 @@ htrdr_init
     htrdr->cache_grids = 0;
   }
 
-  if((size_t)htrdr->mpi_nprocs > htrdr->spp) {
-    htrdr_log_err(htrdr,
-      "%s: insufficient number samples per pixel `%lu': it must be greater or "
-      "equal to the number of running processes, i.e. `%lu'.\n",
-      FUNC_NAME,
-      (unsigned long)htrdr->spp,
-      (unsigned long)htrdr->mpi_nprocs);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-
   if(!args->output) {
     htrdr->output = stdout;
     output_name = "<stdout>";
@@ -792,7 +781,7 @@ fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
 {
   int8_t* progress = NULL;
   int iproc;
-  ASSERT(htrdr && progress && htrdr->mpi_rank == 0);
+  ASSERT(htrdr && htrdr->mpi_rank == 0);
 
   switch(tag) {
     case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 
@@ -823,22 +812,50 @@ fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
 void
 print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
 {
-  int iproc;
   ASSERT(htrdr && htrdr->mpi_rank == 0);
-  FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+
+  if(htrdr->mpi_nprocs == 1) {
     switch(tag) {
       case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
-        htrdr_fprintf(htrdr, stderr,
-          "\033[2K\rProcess %d -- building octree: %3d%%\n",
-          iproc, htrdr->mpi_progress_octree[iproc]);
+        htrdr_fprintf(htrdr, stderr, "\033[2K\rBuilding octree: %3d%%",
+          htrdr->mpi_progress_octree[0]);
         break;
       case HTRDR_MPI_PROGRESS_RENDERING:
-        htrdr_fprintf(htrdr, stderr,
-          "\033[2K\rProcess %d -- rendering: %3d%%\n",
-          iproc, htrdr->mpi_progress_render[iproc]);
+        htrdr_fprintf(htrdr, stderr, "\033[2K\rRendering: %3d%%",
+          htrdr->mpi_progress_render[0]);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
+    htrdr_fflush(htrdr, stderr);
+  } else {
+    int iproc;
+    FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+      switch(tag) {
+        case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
+          htrdr_fprintf(htrdr, stderr,
+            "\033[2K\rProcess %d -- building octree: %3d%%%c",
+            iproc, htrdr->mpi_progress_octree[iproc],
+            iproc == htrdr->mpi_nprocs - 1 ? '\r' : '\n');
+          break;
+        case HTRDR_MPI_PROGRESS_RENDERING:
+          htrdr_fprintf(htrdr, stderr,
+            "\033[2K\rProcess %d -- rendering: %3d%%%c",
+            iproc, htrdr->mpi_progress_render[iproc],
+            iproc == htrdr->mpi_nprocs - 1 ? '\r' : '\n');
+          break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+    }
+  }
+}
+
+void
+clear_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+{
+  ASSERT(htrdr);
+  (void)tag;
+  if(htrdr->mpi_nprocs > 1) {
+    htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs-1);
   }
 }
 
@@ -848,7 +865,7 @@ total_mpi_progress(const struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
   const int8_t* progress = NULL;
   int total = 0;
   int iproc;
-  ASSERT(htrdr && progress && htrdr->mpi_rank == 0);
+  ASSERT(htrdr && htrdr->mpi_rank == 0);
 
   switch(tag) {
     case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 

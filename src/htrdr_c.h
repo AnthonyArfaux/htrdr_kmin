@@ -119,10 +119,24 @@ print_mpi_progress
   (struct htrdr* htrdr,
    const enum htrdr_mpi_progress progress);
 
+extern LOCAL_SYM void
+clear_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_progress progress);
+
 extern int8_t
 total_mpi_progress
   (const struct htrdr* htrdr,
    const enum htrdr_mpi_progress progress);
+
+static INLINE void
+update_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress progress)
+{
+  ASSERT(htrdr);
+  fetch_mpi_progress(htrdr, progress);
+  clear_mpi_progress(htrdr, progress);
+  print_mpi_progress(htrdr, progress);
+}
 
 #endif /* HTRDR_C_H */
 

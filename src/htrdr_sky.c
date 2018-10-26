@@ -1273,14 +1273,12 @@ setup_clouds
       #pragma omp critical
       if(pcent > sky->htrdr->mpi_progress_octree[0]) {
         sky->htrdr->mpi_progress_octree[0] = pcent;
-        if(sky->htrdr->mpi_rank != 0) {
+        if(sky->htrdr->mpi_rank == 0) {
+          update_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+        } else {
           /* Send the progress percentage of the process to the master process */
           CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
             HTRDR_MPI_PROGRESS_BUILD_OCTREE, MPI_COMM_WORLD) == MPI_SUCCESS);
-        } else {
-          fetch_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
-          htrdr_fprintf(sky->htrdr, stderr, "\033[%dA", sky->htrdr->mpi_nprocs);
-          print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
         }
       }
     }
@@ -1288,9 +1286,7 @@ setup_clouds
 
   if(!sky->htrdr->cache_grids && sky->htrdr->mpi_rank == 0) {
     while(total_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE) != 100) {
-      fetch_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
-      htrdr_fprintf(sky->htrdr, stderr, "\033[%dA", sky->htrdr->mpi_nprocs);
-      print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+      update_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
       sleep(1);
     }
   }
