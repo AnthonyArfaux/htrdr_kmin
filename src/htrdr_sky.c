@@ -1219,7 +1219,7 @@ setup_clouds
     const size_t iband = darray_specdata_data_get(&specdata)[ispecdata].iband;
     const size_t iquad = darray_specdata_data_get(&specdata)[ispecdata].iquad;
     const size_t id = iband - sky->sw_bands_range[0];
-    int8_t pcent;
+    int32_t pcent;
     size_t n;
     res_T res_local = RES_OK;
 
@@ -1268,17 +1268,15 @@ setup_clouds
     if(!sky->htrdr->cache_grids) {
       /* Update the progress message */
       n = (size_t)ATOMIC_INCR(&nbuilt_octrees);
-      pcent = (int8_t)(n * 100 / darray_specdata_size_get(&specdata));
+      pcent = (int32_t)(n * 100 / darray_specdata_size_get(&specdata));
 
       #pragma omp critical
       if(pcent > sky->htrdr->mpi_progress_octree[0]) {
         sky->htrdr->mpi_progress_octree[0] = pcent;
         if(sky->htrdr->mpi_rank == 0) {
           update_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
-        } else {
-          /* Send the progress percentage of the process to the master process */
-          CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
-            HTRDR_MPI_PROGRESS_BUILD_OCTREE, MPI_COMM_WORLD) == MPI_SUCCESS);
+        } else { /* Send the progress percentage to the master process */
+          send_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE, pcent);
         }
       }
     }
@@ -1289,6 +1287,7 @@ setup_clouds
       update_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
       sleep(1);
     }
+    fprintf(stderr, "\n"); /* Add a new line after the progress statuses */
   }
 
 exit:

@@ -21,17 +21,27 @@
 #include "htrdr_solve.h"
 
 #include <rsys/cstr.h>
+#include <rsys/dynamic_array_size_t.h>
 #include <rsys/math.h>
 #include <star/ssp.h>
 
 #include <omp.h>
 #include <mpi.h>
+#include <time.h>
 #include <unistd.h>
 
-#define RNG_SEQUENCE_SIZE 1000000
+#define RNG_SEQUENCE_SIZE 100000
 
 #define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
+
+/* Overall work of a process */
+struct proc_work {
+  struct darray_size_t tiles; /* #tiles to render */
+  size_t itile; /* Next tile to render in the above list of tiles */
+};
+
+#define TILE_MCODE_NULL INT64_MAX
 
 /*******************************************************************************
  * Helper functions
@@ -47,74 +57,54 @@ morton2D_decode(const uint32_t u32)
   return (uint16_t)x;
 }
 
-static res_T
-gather_buffer
-  (struct htrdr* htrdr,
-   struct htrdr_buffer* buf)
+static INLINE void
+proc_work_init(struct mem_allocator* allocator, struct proc_work* work)
 {
-  struct htrdr_buffer_layout layout;
-  struct htrdr_accum* gathered_accums = NULL;
-  size_t x, y;
-  int iproc;
-  res_T res = RES_OK;
-  ASSERT(htrdr && buf);
+  ASSERT(work);
+  darray_size_t_init(allocator, &work->tiles);
+  work->itile = 0;
+}
 
-  /* Fetch the memory layout of the submitted buffer */
-  htrdr_buffer_get_layout(buf, &layout);
-  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum) * 3/*#channels*/);
-  ASSERT(layout.alignment <= ALIGNOF(struct htrdr_accum));
+static INLINE void
+proc_work_release(struct proc_work* work)
+{
+  darray_size_t_release(&work->tiles);
+}
 
-  /* The process 0 allocates the memory used to store the gathered buffer lines
-   * of the MPI processes */
-  if(htrdr->mpi_rank == 0) {
-    gathered_accums = MEM_ALLOC
-      (htrdr->allocator, layout.pitch * (size_t)htrdr->mpi_nprocs);
-    if(!gathered_accums) {
-      res = RES_MEM_ERR;
-      htrdr_log_err(htrdr,
-        "could not allocate the temporary memory for MPI gathering -- %s.\n",
-        res_to_cstr(res));
-      goto error;
+static INLINE void
+proc_work_reset(struct proc_work* work)
+{
+  ASSERT(work);
+  #pragma omp critical
+  {
+    darray_size_t_clear(&work->tiles);
+    work->itile = 0;
+  }
+}
+
+static INLINE void
+proc_work_add_tile(struct proc_work* work, const int64_t mcode)
+{
+  size_t st = (size_t)mcode;
+  ASSERT(mcode >= 0);
+  #pragma omp critical
+  CHK(darray_size_t_push_back(&work->tiles, &st) == RES_OK);
+}
+
+static INLINE int64_t
+proc_work_get_tile(struct proc_work* work)
+{
+  int64_t mcode;
+  #pragma omp critical
+  {
+    if(work->itile >= darray_size_t_size_get(&work->tiles)) {
+      mcode = TILE_MCODE_NULL;
+    } else {
+      mcode = (int64_t)darray_size_t_cdata_get(&work->tiles)[work->itile];
+      ++work->itile;
     }
   }
-
-  FOR_EACH(y, 0, layout.height) {
-    struct htrdr_accum* buf_row_accums = (struct htrdr_accum*)
-      ((char*)htrdr_buffer_get_data(buf) + y * layout.pitch);
-    int err; /* MPI error */
-
-    /* Gather the buffer lines */
-    err = MPI_Gather(buf_row_accums, (int)layout.pitch, MPI_CHAR, gathered_accums,
-      (int)layout.pitch, MPI_CHAR, 0, MPI_COMM_WORLD);
-    if(err != MPI_SUCCESS) {
-      htrdr_log_err(htrdr,
-"could not gather the buffer line `%lu' from the group of processes -- %s.\n",
-        (unsigned long)y, htrdr_mpi_error_string(htrdr, err));
-      res = RES_UNKNOWN_ERR;
-      goto error;
-    }
-
-    /* Accumulates the gathered lines into the buffer of the process 0 */
-    if(htrdr->mpi_rank == 0) {
-      memset(buf_row_accums, 0, layout.pitch);
-      FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
-        struct htrdr_accum* proc_accums = (struct htrdr_accum*)
-          ((char*)gathered_accums + (size_t)iproc * layout.pitch);
-        FOR_EACH(x, 0, layout.width * 3/*#channels*/) {
-          buf_row_accums[x].sum_weights += proc_accums[x].sum_weights;
-          buf_row_accums[x].sum_weights_sqr += proc_accums[x].sum_weights_sqr;
-          buf_row_accums[x].nweights += proc_accums[x].nweights;
-          buf_row_accums[x].nfailures += proc_accums[x].nfailures;
-        }
-      }
-    }
-  }
-
-exit:
-  if(gathered_accums) MEM_RM(htrdr->allocator, gathered_accums);
-  return res;
-error:
-  goto exit;
+  return mcode;
 }
 
 static res_T
@@ -208,6 +198,225 @@ draw_tile
   return RES_OK;
 }
 
+static void
+mpi_wait_for_request(struct htrdr* htrdr, MPI_Request* req)
+{
+  ASSERT(htrdr && req);
+
+  /* Wait for process synchronisation */
+  for(;;) {
+    struct timespec t;
+    int complete;
+    t.tv_sec = 0;
+    t.tv_nsec = 10000000; /* 10ms */
+
+    mutex_lock(htrdr->mpi_mutex);
+    MPI(Test(req, &complete, MPI_STATUS_IGNORE));
+    mutex_unlock(htrdr->mpi_mutex);
+    if(complete) break;
+
+    nanosleep(&t, NULL);
+  }
+}
+
+static void
+mpi_probe_thieves
+  (struct htrdr* htrdr,
+   struct proc_work* work,
+   ATOMIC* probe_thieves)
+{
+  struct timespec t;
+  ASSERT(htrdr && work && probe_thieves);
+
+  if(htrdr->mpi_nprocs == 1) /* The process is alone. No thief is possible */
+    return;
+
+  t.tv_sec = 0;
+
+  /* Protect MPI calls of multiple invocations from concurrent threads */
+  #define P_MPI(Func) {                                                        \
+    mutex_lock(htrdr->mpi_mutex);                                              \
+    MPI(Func);                                                                 \
+    mutex_unlock(htrdr->mpi_mutex);                                            \
+  } (void)0
+
+  while(ATOMIC_GET(probe_thieves)) {
+    MPI_Status status;
+    int msg;
+    int64_t tile;
+
+    /* Probe if a steal request was submitted by any processes */
+    P_MPI(Iprobe(MPI_ANY_SOURCE, HTRDR_MPI_STEAL_REQUEST, MPI_COMM_WORLD, &msg,
+      &status));
+
+    if(msg) { /* A steal request was posted */
+      MPI_Request req;
+      int8_t dummy;
+
+      /* Asynchronously receive the steal request */
+      P_MPI(Irecv(&dummy, 1, MPI_INT8_T, status.MPI_SOURCE,
+        HTRDR_MPI_STEAL_REQUEST, MPI_COMM_WORLD, &req));
+
+      /* Wait for the completion of the steal request */
+      mpi_wait_for_request(htrdr, &req);
+
+      /* Thief a tile */
+      tile = proc_work_get_tile(work);
+      P_MPI(Send(&tile, 1, MPI_INT64_T, status.MPI_SOURCE,
+        HTRDR_MPI_WORK_STEALING, MPI_COMM_WORLD));
+    }
+    t.tv_nsec = 500000000; /* 500ms */
+    nanosleep(&t, NULL);
+  }
+  #undef P_MPI
+}
+
+static int
+mpi_sample_working_process(struct htrdr* htrdr, struct ssp_rng* rng)
+{
+  int iproc, i;
+  int dst_rank;
+  ASSERT(htrdr && rng && htrdr->mpi_nworking_procs);
+
+  /* Sample the index of the 1st active process */
+  iproc = (int)(ssp_rng_canonical(rng) * (double)htrdr->mpi_nworking_procs);
+
+  /* Find the rank of the sampled active process. Use a simple linear search
+   * since the overall number of process should be quite low; at most few
+   * dozens.  */
+  i = 0;
+  FOR_EACH(dst_rank, 0, htrdr->mpi_nprocs) {
+    if(htrdr->mpi_working_procs[dst_rank] == 0) continue; /* Inactive process */
+    if(i == iproc) break; /* The rank of the sampled process is found */
+    ++i;
+  }
+  ASSERT(dst_rank < htrdr->mpi_nprocs);
+  return dst_rank;
+}
+
+/* Return the number of stolen tiles */
+static size_t
+mpi_steal_work
+  (struct htrdr* htrdr,
+   struct ssp_rng* rng,
+   struct proc_work* work)
+{
+  size_t ntiles_to_steal = (size_t)htrdr->nthreads;
+  size_t nthieves = 0;
+  ASSERT(htrdr && rng && work);
+
+  /* Protect MPI calls of multiple invocations from concurrent threads */
+  #define P_MPI(Func) {                                                        \
+    mutex_lock(htrdr->mpi_mutex);                                              \
+    MPI(Func);                                                                 \
+    mutex_unlock(htrdr->mpi_mutex);                                            \
+  } (void)0
+
+  while(nthieves < ntiles_to_steal && htrdr->mpi_nworking_procs) {
+    MPI_Request req;
+    const int8_t dummy = 1;
+    int64_t tile; /* Morton code of the stolen tile */
+    int proc_to_steal; /* Process to steal */
+
+    /* Sample a process to steal */
+    proc_to_steal = mpi_sample_working_process(htrdr, rng);
+
+    /* Send a steal request to the sampled process and wait for a response */
+    P_MPI(Send(&dummy, 1, MPI_INT8_T, proc_to_steal, HTRDR_MPI_STEAL_REQUEST,
+      MPI_COMM_WORLD));
+
+    /* Receive the stolen tile from the sampled process */
+    P_MPI(Irecv(&tile, 1, MPI_INT64_T, proc_to_steal,
+      HTRDR_MPI_WORK_STEALING, MPI_COMM_WORLD, &req));
+
+    mpi_wait_for_request(htrdr, &req);
+
+    if(tile != TILE_MCODE_NULL) {
+      proc_work_add_tile(work, tile);
+      ++nthieves;
+    } else {
+      ASSERT(htrdr->mpi_working_procs[proc_to_steal] != 0);
+      htrdr->mpi_working_procs[proc_to_steal] = 0;
+      htrdr->mpi_nworking_procs--;
+    }
+  }
+  #undef P_MPI
+  return nthieves;
+}
+
+static res_T
+mpi_gather_buffer
+  (struct htrdr* htrdr,
+   struct htrdr_buffer* buf)
+{
+  struct htrdr_buffer_layout layout;
+  struct htrdr_accum* gathered_accums = NULL;
+  size_t x, y;
+  int iproc;
+  res_T res = RES_OK;
+  ASSERT(htrdr && buf);
+
+  /* Fetch the memory layout of the submitted buffer */
+  htrdr_buffer_get_layout(buf, &layout);
+  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum) * 3/*#channels*/);
+  ASSERT(layout.alignment <= ALIGNOF(struct htrdr_accum));
+
+  /* The process 0 allocates the memory used to store the gathered buffer lines
+   * of the MPI processes */
+  if(htrdr->mpi_rank == 0) {
+    gathered_accums = MEM_ALLOC
+      (htrdr->allocator, layout.pitch * (size_t)htrdr->mpi_nprocs);
+    if(!gathered_accums) {
+      res = RES_MEM_ERR;
+      htrdr_log_err(htrdr,
+        "could not allocate the temporary memory for MPI gathering -- %s.\n",
+        res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  FOR_EACH(y, 0, layout.height) {
+    struct htrdr_accum* buf_row_accums = (struct htrdr_accum*)
+      ((char*)htrdr_buffer_get_data(buf) + y * layout.pitch);
+    int err; /* MPI error */
+
+    /* Gather the buffer lines */
+    mutex_lock(htrdr->mpi_mutex);
+    err = MPI_Gather(buf_row_accums, (int)layout.pitch, MPI_CHAR, gathered_accums,
+      (int)layout.pitch, MPI_CHAR, 0, MPI_COMM_WORLD);
+    mutex_unlock(htrdr->mpi_mutex);
+    if(err != MPI_SUCCESS) {
+      htrdr_log_err(htrdr,
+        "could not gather the buffer line `%lu' from the group of processes -- "
+        "%s.\n",
+        (unsigned long)y, htrdr_mpi_error_string(htrdr, err));
+      res = RES_UNKNOWN_ERR;
+      goto error;
+    }
+
+    /* Accumulates the gathered lines into the buffer of the process 0 */
+    if(htrdr->mpi_rank == 0) {
+      memset(buf_row_accums, 0, layout.pitch);
+      FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+        struct htrdr_accum* proc_accums = (struct htrdr_accum*)
+          ((char*)gathered_accums + (size_t)iproc * layout.pitch);
+        FOR_EACH(x, 0, layout.width * 3/*#channels*/) {
+          buf_row_accums[x].sum_weights += proc_accums[x].sum_weights;
+          buf_row_accums[x].sum_weights_sqr += proc_accums[x].sum_weights_sqr;
+          buf_row_accums[x].nweights += proc_accums[x].nweights;
+          buf_row_accums[x].nfailures += proc_accums[x].nfailures;
+        }
+      }
+    }
+  }
+
+exit:
+  if(gathered_accums) MEM_RM(htrdr->allocator, gathered_accums);
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -218,19 +427,20 @@ htrdr_draw_radiance_sw
    const size_t spp,
    struct htrdr_buffer* buf)
 {
-  struct ssp_rng_proxy* rng_proxy = NULL;
-  struct ssp_rng** rngs = NULL;
-  size_t ntiles_x, ntiles_y, ntiles_adjusted;
-  size_t i;
-  int64_t* proc_tiles = NULL;
+  struct ssp_rng* rng_main = NULL;
+  size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
+  struct proc_work work;
   int64_t itile;
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
   size_t proc_ntiles;
   size_t proc_ntiles_adjusted;
   ATOMIC nsolved_tiles = 0;
+  ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
+
+  proc_work_init(htrdr->allocator, &work);
 
   htrdr_buffer_get_layout(buf, &layout);
   ASSERT(layout.width || layout.height || layout.elmt_size);
@@ -245,63 +455,37 @@ htrdr_draw_radiance_sw
     goto error;
   }
 
-  res = ssp_rng_proxy_create2
-    (htrdr->allocator,
-     &ssp_rng_mt19937_64,
-     RNG_SEQUENCE_SIZE * (size_t)htrdr->mpi_rank, /* Offset */
-     RNG_SEQUENCE_SIZE, /* Size */
-     RNG_SEQUENCE_SIZE * (size_t)htrdr->mpi_nprocs, /* Pitch */
-     htrdr->nthreads, &rng_proxy);
+  res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_main);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "%s: could not create the RNG proxy -- %s.\n",
+    htrdr_log_err(htrdr, "%s: could not create the main RNG -- %s.\n",
       FUNC_NAME, res_to_cstr((res_T)res));
     goto error;
   }
 
-  rngs = MEM_CALLOC(htrdr->allocator, htrdr->nthreads, sizeof(*rngs));
-  if(!rngs) {
-    htrdr_log_err(htrdr, "%s: could not allocate the RNGs list.\n", FUNC_NAME);
-    res = RES_MEM_ERR;
-    goto error;
-  }
-
-  FOR_EACH(i, 0, htrdr->nthreads) {
-    res = ssp_rng_proxy_create_rng(rng_proxy, i, &rngs[i]);
-    if(res != RES_OK) {
-      htrdr_log_err(htrdr,"%s: could not create the per thread RNG -- %s.\n",
-        FUNC_NAME, res_to_cstr((res_T)res));
-      goto error;
-    }
-  }
-
+  /* Compute the overall number of tiles */
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles = ntiles_x * ntiles_y;
+
+  /* Adjust the #tiles for the morton-encoding procedure */
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
   ntiles_adjusted *= ntiles_adjusted;
 
+  /* Compute the size of a pixel in the normalized image plane */
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
   /* Define the initial number of tiles of the current process */
-  proc_ntiles = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
+  proc_ntiles = ntiles / (size_t)htrdr->mpi_nprocs;
+  proc_ntiles_adjusted = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
   if(htrdr->mpi_rank == 0) {/* Affect the remaining tiles to the master proc */
-    ASSERT(ntiles_adjusted >= proc_ntiles * (size_t)htrdr->mpi_nprocs);
-    proc_ntiles += ntiles_adjusted - proc_ntiles*(size_t)htrdr->mpi_nprocs;
+    proc_ntiles += ntiles - proc_ntiles*(size_t)htrdr->mpi_nprocs;
+    proc_ntiles_adjusted +=
+      ntiles_adjusted - proc_ntiles*(size_t)htrdr->mpi_nprocs;
   }
 
-  /* Allocate the per process list of tiles */
-  proc_tiles = MEM_CALLOC(htrdr->allocator, proc_ntiles, sizeof(*proc_tiles));
-  if(!proc_tiles) {
-    res = RES_MEM_ERR;
-    htrdr_log_err(htrdr, 
-      "%s: could not allocate the per process list of tiles -- %s.\n",
-      FUNC_NAME, res_to_cstr((res_T)res));
-    goto error;
-  }
-
-    /* Define the initial list of tiles of the process */
-  proc_ntiles_adjusted = 0;
-  FOR_EACH(itile, 0, proc_ntiles) {
+  /* Define the initial list of tiles of the process */
+  FOR_EACH(itile, 0, proc_ntiles_adjusted) {
     size_t tile_org[2];
     int64_t mcode = htrdr->mpi_rank + (itile*htrdr->mpi_nprocs);
 
@@ -311,8 +495,7 @@ htrdr_draw_radiance_sw
     tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
     if(tile_org[1] >= ntiles_y) continue; /* Skip border tile */
 
-    proc_tiles[proc_ntiles_adjusted] = mcode;
-    proc_ntiles_adjusted++;
+    proc_work_add_tile(&work, mcode);
   }
 
   if(htrdr->mpi_rank == 0) {
@@ -320,77 +503,118 @@ htrdr_draw_radiance_sw
     print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
   }
 
-  omp_set_num_threads((int)htrdr->nthreads);
-  #pragma omp parallel for schedule(static, 1/*chunck size*/)
-  for(itile=0; itile<(int64_t)proc_ntiles_adjusted; ++itile) {
-    const int ithread = omp_get_thread_num();
-    struct ssp_rng* rng = rngs[ithread];
-    int64_t mcode = proc_tiles[itile];
-    size_t tile_org[2];
-    size_t tile_sz[2];
-    size_t n;
-    res_T res_local = RES_OK;
-    int8_t pcent;
+  omp_set_nested(1);
+  #pragma omp parallel sections num_threads(2)
+  {
+    #pragma omp section
+    mpi_probe_thieves(htrdr, &work, &probe_thieves);
 
-    /* Decode the morton code to retrieve the tile index  */
-    tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
-    tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
-    ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
+    #pragma omp section
+    {
+      MPI_Request req;
+      size_t nthreads = htrdr->nthreads;
+      size_t nthieves = 0;
 
-    /* Define the tile origin in pixel space */
-    tile_org[0] *= TILE_SIZE;
-    tile_org[1] *= TILE_SIZE;
+      /* The process is not considered as a working process for himself */
+      htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
+      --htrdr->mpi_nworking_procs;
 
-    /* Compute the size of the tile clamped by the borders of the buffer */
-    tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
-    tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
+      do {
+        omp_set_num_threads((int)nthreads);
+        #pragma omp parallel
+        for(;;) {
+          const int ithread = omp_get_thread_num();
+          struct ssp_rng_proxy* rng_proxy = NULL;
+          struct ssp_rng* rng;
+          int64_t mcode;
+          size_t tile_org[2];
+          size_t tile_sz[2];
+          size_t n;
+          res_T res_local = RES_OK;
+          int32_t pcent;
 
-    res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
-      pix_sz, cam, spp, rng, buf);
-    if(res_local != RES_OK) {
-      ATOMIC_SET(&res, res_local);
-      continue;
+          if(ATOMIC_GET(&res) != RES_OK) continue;
+
+          mcode = proc_work_get_tile(&work);
+          if(mcode == TILE_MCODE_NULL) break;
+
+          /* Decode the morton code to retrieve the tile index  */
+          tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
+          tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
+          ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
+
+          /* Define the tile origin in pixel space */
+          tile_org[0] *= TILE_SIZE;
+          tile_org[1] *= TILE_SIZE;
+
+          /* Compute the size of the tile clamped by the borders of the buffer */
+          tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
+          tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
+
+          SSP(rng_proxy_create2
+            (&htrdr->lifo_allocators[ithread],
+             &ssp_rng_threefry,
+             RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
+             RNG_SEQUENCE_SIZE, /* Size */
+             RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
+             1, &rng_proxy));
+          SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
+
+          res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
+            pix_sz, cam, spp, rng, buf);
+
+          SSP(rng_proxy_ref_put(rng_proxy));
+          SSP(rng_ref_put(rng));
+
+          if(res_local != RES_OK) {
+            ATOMIC_SET(&res, res_local);
+            continue;
+          }
+
+          n = (size_t)ATOMIC_INCR(&nsolved_tiles);
+          pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
+
+          #pragma omp critical
+          if(pcent > htrdr->mpi_progress_render[0]) {
+            htrdr->mpi_progress_render[0] = pcent;
+            if(htrdr->mpi_rank == 0) {
+              update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+            } else { /* Send the progress percentage to the master process */
+              send_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING, pcent);
+            }
+          }
+          if(ATOMIC_GET(&res) != RES_OK) continue;
+        }
+
+        proc_work_reset(&work);
+        nthieves = mpi_steal_work(htrdr, rng_main, &work);
+      } while(nthieves);
+
+      /* Synchronize the process */
+      mutex_lock(htrdr->mpi_mutex);
+      MPI(Ibarrier(MPI_COMM_WORLD, &req));
+      mutex_unlock(htrdr->mpi_mutex);
+
+      /* Wait for synchronization */
+      mpi_wait_for_request(htrdr, &req);
+
+      /* The processes have no more work to do. Stop probing for thieves */
+      ATOMIC_SET(&probe_thieves, 0);
     }
-
-    n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-    pcent = (int8_t)(n * 100 / proc_ntiles_adjusted);
-
-    #pragma omp critical
-    if(pcent > htrdr->mpi_progress_render[0]) {
-      htrdr->mpi_progress_render[0] = pcent;
-      if(htrdr->mpi_rank == 0) {
-        update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-      } else {
-        /* Send the progress percentage of the process to the master process */
-        CHK(MPI_Send(&pcent, sizeof(pcent), MPI_CHAR, 0/*dst*/,
-          HTRDR_MPI_PROGRESS_RENDERING/*tag*/, MPI_COMM_WORLD) == MPI_SUCCESS);
-      }
-    }
-
-    if(ATOMIC_GET(&res) != RES_OK) continue;
   }
 
   if(htrdr->mpi_rank == 0) {
-    while(total_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING) != 100) {
-      update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-      sleep(1);
-    }
-    fprintf(stderr, "\n");
+    update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+    fprintf(stderr, "\n"); /* Add a new line after the progress statuses */
   }
 
   /* Gather accum buffers from the group of processes */
-  res = gather_buffer(htrdr, buf);
+  res = mpi_gather_buffer(htrdr, buf);
   if(res != RES_OK) goto error;
 
 exit:
-  if(rng_proxy) SSP(rng_proxy_ref_put(rng_proxy));
-  if(proc_tiles) MEM_RM(htrdr->allocator, proc_tiles);
-  if(rngs) {
-    FOR_EACH(i, 0, htrdr->nthreads) {
-      if(rngs[i]) SSP(rng_ref_put(rngs[i]));
-    }
-    MEM_RM(htrdr->allocator, rngs);
-  }
+  proc_work_release(&work);
+  if(rng_main) SSP(rng_ref_put(rng_main));
   return (res_T)res;
 error:
   goto exit;

@@ -18,9 +18,17 @@
 
 #include <rsys/rsys.h>
 
-enum htrdr_mpi_progress {
+#ifndef NDEBUG
+  #define MPI(Func) ASSERT(MPI_##Func == MPI_SUCCESS)
+#else
+  #define MPI(Func) MPI_##Func
+#endif
+
+enum htrdr_mpi_message {
   HTRDR_MPI_PROGRESS_BUILD_OCTREE,
-  HTRDR_MPI_PROGRESS_RENDERING
+  HTRDR_MPI_PROGRESS_RENDERING,
+  HTRDR_MPI_STEAL_REQUEST,
+  HTRDR_MPI_WORK_STEALING
 };
 
 struct htrdr;
@@ -110,27 +118,33 @@ create_directory
    const char* path);
 
 extern LOCAL_SYM void
+send_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress,
+   const int32_t percent);
+
+extern LOCAL_SYM void
 fetch_mpi_progress
   (struct htrdr* htrdr,
-   const enum htrdr_mpi_progress progress);
+   const enum htrdr_mpi_message progress);
 
 extern LOCAL_SYM void
 print_mpi_progress
   (struct htrdr* htrdr,
-   const enum htrdr_mpi_progress progress);
+   const enum htrdr_mpi_message progress);
 
 extern LOCAL_SYM void
 clear_mpi_progress
   (struct htrdr* htrdr,
-   const enum htrdr_mpi_progress progress);
+   const enum htrdr_mpi_message progress);
 
-extern int8_t
+extern int32_t
 total_mpi_progress
   (const struct htrdr* htrdr,
-   const enum htrdr_mpi_progress progress);
+   const enum htrdr_mpi_message progress);
 
 static INLINE void
-update_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress progress)
+update_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message progress)
 {
   ASSERT(htrdr);
   fetch_mpi_progress(htrdr, progress);

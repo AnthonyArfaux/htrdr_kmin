@@ -40,6 +40,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/time.h> /* timespec */
 #include <sys/stat.h> /* S_IRUSR & S_IWUSR */
 
@@ -93,7 +94,7 @@ log_msg
    va_list vargs)
 {
   ASSERT(htrdr && msg);
-  if(htrdr->verbose && htrdr->mpi_rank == 0) {
+  if(htrdr->verbose) {
     CHK(logger_vprint(&htrdr->logger, stream, msg, vargs) == RES_OK);
   }
 }
@@ -245,6 +246,32 @@ spherical_to_cartesian_dir
   dir[2] = sin_elevation;
 }
 
+static void
+release_mpi(struct htrdr* htrdr)
+{
+  ASSERT(htrdr);
+  if(htrdr->mpi_working_procs) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_working_procs);
+    htrdr->mpi_working_procs = NULL;
+  }
+  if(htrdr->mpi_progress_octree) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_progress_octree);
+    htrdr->mpi_progress_octree = NULL;
+  }
+  if(htrdr->mpi_progress_render) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_progress_render);
+    htrdr->mpi_progress_render = NULL;
+  }
+  if(htrdr->mpi_err_str) {
+    MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
+    htrdr->mpi_err_str = NULL;
+  }
+  if(htrdr->mpi_mutex) {
+    mutex_destroy(htrdr->mpi_mutex);
+    htrdr->mpi_mutex = NULL;
+  }
+}
+
 static res_T
 init_mpi(struct htrdr* htrdr)
 {
@@ -281,6 +308,20 @@ init_mpi(struct htrdr* htrdr)
     goto error;
   }
 
+  htrdr->mpi_working_procs = MEM_CALLOC(htrdr->allocator,
+    (size_t)htrdr->mpi_nprocs, sizeof(*htrdr->mpi_working_procs));
+  if(!htrdr->mpi_working_procs) {
+    htrdr_log_err(htrdr,
+      "could not allocate the list of working processes.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  /* Initialy, all the processes are working */
+  htrdr->mpi_nworking_procs = (size_t)htrdr->mpi_nprocs;
+  memset(htrdr->mpi_working_procs, 0xFF,
+    htrdr->mpi_nworking_procs*sizeof(*htrdr->mpi_working_procs));
+
   /* Allocate #processes progress statuses on the master process and only 1
    * progress status on the other ones: the master process will gather the
    * status of the other processes to report their progression. */
@@ -289,28 +330,36 @@ init_mpi(struct htrdr* htrdr)
   htrdr->mpi_progress_octree = MEM_CALLOC
     (htrdr->allocator, n, sizeof(*htrdr->mpi_progress_octree));
   if(!htrdr->mpi_progress_octree) {
-    htrdr_log_err(htrdr,
-      "could not allocate the progress state of the octree building.\n");
     res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "could not allocate the progress state of the octree building -- %s.\n",
+      res_to_cstr(res));
     goto error;
   }
 
   htrdr->mpi_progress_render = MEM_CALLOC
     (htrdr->allocator, n, sizeof(*htrdr->mpi_progress_render));
   if(!htrdr->mpi_progress_render) {
-    htrdr_log_err(htrdr,
-      "could not allocate the progress state of the scene rendering.\n");
     res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "could not allocate the progress state of the scene rendering -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  htrdr->mpi_mutex = mutex_create();
+  if(!htrdr->mpi_mutex) {
+    res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "could not create the mutex to protect MPI calls from concurrent "
+      "threads -- %s.\n", res_to_cstr(res));
     goto error;
   }
 
 exit:
   return res;
 error:
-  if(htrdr->mpi_err_str) {
-    MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
-    htrdr->mpi_err_str = NULL;
-  }
+  release_mpi(htrdr);
   goto exit;
 }
 
@@ -436,7 +485,7 @@ htrdr_init
 
   FOR_EACH(ithread, 0, htrdr->nthreads) {
     res = mem_init_lifo_allocator
-      (&htrdr->lifo_allocators[ithread], htrdr->allocator, 4096);
+      (&htrdr->lifo_allocators[ithread], htrdr->allocator, 16384);
     if(res != RES_OK) {
       htrdr_log_err(htrdr,
         "%s: could not initialise the LIFO allocator of the thread %lu -- %s.\n",
@@ -456,6 +505,7 @@ void
 htrdr_release(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
+  release_mpi(htrdr);
   if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
   if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
@@ -463,13 +513,6 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
-  if(htrdr->mpi_err_str) MEM_RM(htrdr->allocator, htrdr->mpi_err_str);
-  if(htrdr->mpi_progress_octree) {
-    MEM_RM(htrdr->allocator, htrdr->mpi_progress_octree);
-  }
-  if(htrdr->mpi_progress_render) {
-    MEM_RM(htrdr->allocator, htrdr->mpi_progress_render);
-  }
   if(htrdr->lifo_allocators) {
     size_t i;
     FOR_EACH(i, 0, htrdr->nthreads) {
@@ -529,11 +572,14 @@ error:
 void
 htrdr_log(struct htrdr* htrdr, const char* msg, ...)
 {
-  va_list vargs_list;
   ASSERT(htrdr && msg);
-  va_start(vargs_list, msg);
-  log_msg(htrdr, LOG_OUTPUT, msg, vargs_list);
-  va_end(vargs_list);
+  /* Log standard message only on master process */
+  if(htrdr->mpi_rank == 0) {
+    va_list vargs_list;
+    va_start(vargs_list, msg);
+    log_msg(htrdr, LOG_OUTPUT, msg, vargs_list);
+    va_end(vargs_list);
+  }
 }
 
 void
@@ -541,6 +587,7 @@ htrdr_log_err(struct htrdr* htrdr, const char* msg, ...)
 {
   va_list vargs_list;
   ASSERT(htrdr && msg);
+  /* Log errors on all processes */
   va_start(vargs_list, msg);
   log_msg(htrdr, LOG_ERROR, msg, vargs_list);
   va_end(vargs_list);
@@ -549,11 +596,14 @@ htrdr_log_err(struct htrdr* htrdr, const char* msg, ...)
 void
 htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
 {
-  va_list vargs_list;
   ASSERT(htrdr && msg);
-  va_start(vargs_list, msg);
-  log_msg(htrdr, LOG_WARNING, msg, vargs_list);
-  va_end(vargs_list);
+  /* Log warnings only on master process */
+  if(htrdr->mpi_rank == 0) {
+    va_list vargs_list;
+    va_start(vargs_list, msg);
+    log_msg(htrdr, LOG_WARNING, msg, vargs_list);
+    va_end(vargs_list);
+  }
 }
 
 const char*
@@ -777,45 +827,73 @@ error:
 }
 
 void
-fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+send_mpi_progress
+  (struct htrdr* htrdr, const enum htrdr_mpi_message msg, const int32_t percent)
 {
-  int8_t* progress = NULL;
+  ASSERT(htrdr);
+  ASSERT(msg == HTRDR_MPI_PROGRESS_RENDERING
+      || msg == HTRDR_MPI_PROGRESS_BUILD_OCTREE);
+  (void)htrdr;
+  mutex_lock(htrdr->mpi_mutex);
+  MPI(Send(&percent, 1, MPI_INT32_T, 0, msg, MPI_COMM_WORLD));
+  mutex_unlock(htrdr->mpi_mutex);
+}
+
+void
+fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
+{
+  struct timespec t;
+  int32_t* progress = NULL;
   int iproc;
   ASSERT(htrdr && htrdr->mpi_rank == 0);
 
-  switch(tag) {
-    case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 
+  t.tv_sec = 0;
+  t.tv_nsec = 10000000; /* 10ms */
+
+  switch(msg) {
+    case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
       progress = htrdr->mpi_progress_octree;
       break;
     case HTRDR_MPI_PROGRESS_RENDERING:
       progress = htrdr->mpi_progress_render;
-      break;
+     break;
     default: FATAL("Unreachable code.\n"); break;
   }
 
   FOR_EACH(iproc, 1, htrdr->mpi_nprocs) {
-
     /* Flush the last sent percentage of the process `iproc' */
     for(;;) {
+      MPI_Request req;
       int flag;
+      int complete;
 
-      CHK(MPI_Iprobe
-        (iproc, tag, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE) == MPI_SUCCESS);
+      mutex_lock(htrdr->mpi_mutex);
+      MPI(Iprobe(iproc, msg, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE));
+      mutex_unlock(htrdr->mpi_mutex);
+
       if(flag == 0) break; /* No more message */
 
-      CHK(MPI_Recv(&progress[iproc], sizeof(size_t), MPI_CHAR, iproc, tag,
-        MPI_COMM_WORLD, MPI_STATUS_IGNORE) == MPI_SUCCESS);
+      mutex_lock(htrdr->mpi_mutex);
+      MPI(Irecv(&progress[iproc], 1, MPI_INT32_T, iproc, msg, MPI_COMM_WORLD, &req));
+      mutex_unlock(htrdr->mpi_mutex);
+      for(;;) { 
+        mutex_lock(htrdr->mpi_mutex);
+        MPI(Test(&req, &complete, MPI_STATUS_IGNORE));
+        mutex_unlock(htrdr->mpi_mutex);
+        if(complete) break;
+        nanosleep(&t, NULL);
+      }
     }
   }
 }
 
 void
-print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
 {
   ASSERT(htrdr && htrdr->mpi_rank == 0);
 
   if(htrdr->mpi_nprocs == 1) {
-    switch(tag) {
+    switch(msg) {
       case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
         htrdr_fprintf(htrdr, stderr, "\033[2K\rBuilding octree: %3d%%",
           htrdr->mpi_progress_octree[0]);
@@ -830,7 +908,7 @@ print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
   } else {
     int iproc;
     FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
-      switch(tag) {
+      switch(msg) {
         case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
           htrdr_fprintf(htrdr, stderr,
             "\033[2K\rProcess %d -- building octree: %3d%%%c",
@@ -850,25 +928,25 @@ print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
 }
 
 void
-clear_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+clear_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
 {
   ASSERT(htrdr);
-  (void)tag;
+  (void)msg;
   if(htrdr->mpi_nprocs > 1) {
     htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs-1);
   }
 }
 
-int8_t
-total_mpi_progress(const struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
+int
+total_mpi_progress(const struct htrdr* htrdr, const enum htrdr_mpi_message msg)
 {
-  const int8_t* progress = NULL;
+  const int* progress = NULL;
   int total = 0;
   int iproc;
   ASSERT(htrdr && htrdr->mpi_rank == 0);
 
-  switch(tag) {
-    case HTRDR_MPI_PROGRESS_BUILD_OCTREE: 
+  switch(msg) {
+    case HTRDR_MPI_PROGRESS_BUILD_OCTREE:
       progress = htrdr->mpi_progress_octree;
       break;
     case HTRDR_MPI_PROGRESS_RENDERING:
@@ -878,10 +956,9 @@ total_mpi_progress(const struct htrdr* htrdr, const enum htrdr_mpi_progress tag)
   }
 
   FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
-     total += progress[iproc];
+    total += progress[iproc];
   }
   total = total / htrdr->mpi_nprocs;
-  ASSERT(total <= 100);
-  return (int8_t)total;
+  return total;
 }
 
