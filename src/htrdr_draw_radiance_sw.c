@@ -21,7 +21,7 @@
 #include "htrdr_solve.h"
 
 #include <rsys/cstr.h>
-#include <rsys/dynamic_array_size_t.h>
+#include <rsys/dynamic_array_u32.h>
 #include <rsys/math.h>
 #include <star/ssp.h>
 
@@ -37,11 +37,11 @@ STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
 /* Overall work of a process */
 struct proc_work {
-  struct darray_size_t tiles; /* #tiles to render */
+  struct darray_u32 tiles; /* #tiles to render */
   size_t itile; /* Next tile to render in the above list of tiles */
 };
 
-#define TILE_MCODE_NULL INT64_MAX
+#define TILE_MCODE_NULL UINT32_MAX
 
 /*******************************************************************************
  * Helper functions
@@ -57,18 +57,29 @@ morton2D_decode(const uint32_t u32)
   return (uint16_t)x;
 }
 
+static FINLINE uint32_t
+morton2D_encode(const uint16_t u16)
+{
+  uint32_t u32 = u16;
+  u32 = (u32 | (u32 << 8)) & 0x00FF00FF;
+  u32 = (u32 | (u32 << 4)) & 0X0F0F0F0F;
+  u32 = (u32 | (u32 << 2)) & 0x33333333;
+  u32 = (u32 | (u32 << 1)) & 0x55555555;
+  return u32;
+}
+
 static INLINE void
 proc_work_init(struct mem_allocator* allocator, struct proc_work* work)
 {
   ASSERT(work);
-  darray_size_t_init(allocator, &work->tiles);
+  darray_u32_init(allocator, &work->tiles);
   work->itile = 0;
 }
 
 static INLINE void
 proc_work_release(struct proc_work* work)
 {
-  darray_size_t_release(&work->tiles);
+  darray_u32_release(&work->tiles);
 }
 
 static INLINE void
@@ -77,34 +88,39 @@ proc_work_reset(struct proc_work* work)
   ASSERT(work);
   #pragma omp critical
   {
-    darray_size_t_clear(&work->tiles);
+    darray_u32_clear(&work->tiles);
     work->itile = 0;
   }
 }
 
 static INLINE void
-proc_work_add_tile(struct proc_work* work, const int64_t mcode)
+proc_work_add_tile(struct proc_work* work, const uint32_t mcode)
 {
-  size_t st = (size_t)mcode;
-  ASSERT(mcode >= 0);
   #pragma omp critical
-  CHK(darray_size_t_push_back(&work->tiles, &st) == RES_OK);
+  CHK(darray_u32_push_back(&work->tiles, &mcode) == RES_OK);
 }
 
-static INLINE int64_t
+static INLINE uint32_t
 proc_work_get_tile(struct proc_work* work)
 {
-  int64_t mcode;
+  uint32_t mcode;
   #pragma omp critical
   {
-    if(work->itile >= darray_size_t_size_get(&work->tiles)) {
+    if(work->itile >= darray_u32_size_get(&work->tiles)) {
       mcode = TILE_MCODE_NULL;
     } else {
-      mcode = (int64_t)darray_size_t_cdata_get(&work->tiles)[work->itile];
+      mcode = darray_u32_cdata_get(&work->tiles)[work->itile];
       ++work->itile;
     }
   }
   return mcode;
+}
+
+static INLINE size_t
+proc_work_get_ntiles(struct proc_work* work)
+{
+  ASSERT(work);
+  return darray_u32_size_get(&work->tiles);
 }
 
 static res_T
@@ -225,6 +241,7 @@ mpi_probe_thieves
    struct proc_work* work,
    ATOMIC* probe_thieves)
 {
+  uint32_t tiles[UINT8_MAX];
   struct timespec t;
   ASSERT(htrdr && work && probe_thieves);
 
@@ -242,8 +259,8 @@ mpi_probe_thieves
 
   while(ATOMIC_GET(probe_thieves)) {
     MPI_Status status;
+    size_t itile;
     int msg;
-    int64_t tile;
 
     /* Probe if a steal request was submitted by any processes */
     P_MPI(Iprobe(MPI_ANY_SOURCE, HTRDR_MPI_STEAL_REQUEST, MPI_COMM_WORLD, &msg,
@@ -251,18 +268,20 @@ mpi_probe_thieves
 
     if(msg) { /* A steal request was posted */
       MPI_Request req;
-      int8_t dummy;
+      uint8_t ntiles_to_steal;
 
       /* Asynchronously receive the steal request */
-      P_MPI(Irecv(&dummy, 1, MPI_INT8_T, status.MPI_SOURCE,
+      P_MPI(Irecv(&ntiles_to_steal, 1, MPI_UINT8_T, status.MPI_SOURCE,
         HTRDR_MPI_STEAL_REQUEST, MPI_COMM_WORLD, &req));
 
       /* Wait for the completion of the steal request */
       mpi_wait_for_request(htrdr, &req);
 
-      /* Thief a tile */
-      tile = proc_work_get_tile(work);
-      P_MPI(Send(&tile, 1, MPI_INT64_T, status.MPI_SOURCE,
+      /* Thief some tiles */
+      FOR_EACH(itile, 0, ntiles_to_steal) {
+        tiles[itile] = proc_work_get_tile(work);
+      }
+      P_MPI(Send(&tiles, ntiles_to_steal, MPI_UINT32_T, status.MPI_SOURCE,
         HTRDR_MPI_WORK_STEALING, MPI_COMM_WORLD));
     }
     t.tv_nsec = 500000000; /* 500ms */
@@ -301,9 +320,13 @@ mpi_steal_work
    struct ssp_rng* rng,
    struct proc_work* work)
 {
-  size_t ntiles_to_steal = (size_t)htrdr->nthreads;
+  MPI_Request req;
+  size_t itile;
   size_t nthieves = 0;
-  ASSERT(htrdr && rng && work);
+  uint32_t tiles[UINT8_MAX]; /* Morton code of the stolen tile */
+  int proc_to_steal; /* Process to steal */
+  uint8_t ntiles_to_steal = (uint8_t)(htrdr->nthreads*2);
+  ASSERT(htrdr && rng && work && htrdr->nthreads < UINT8_MAX);
 
   /* Protect MPI calls of multiple invocations from concurrent threads */
   #define P_MPI(Func) {                                                        \
@@ -312,33 +335,31 @@ mpi_steal_work
     mutex_unlock(htrdr->mpi_mutex);                                            \
   } (void)0
 
-  while(nthieves < ntiles_to_steal && htrdr->mpi_nworking_procs) {
-    MPI_Request req;
-    const int8_t dummy = 1;
-    int64_t tile; /* Morton code of the stolen tile */
-    int proc_to_steal; /* Process to steal */
+  /* No more working process => nohting to steal */
+  if(!htrdr->mpi_nworking_procs) return 0;
 
-    /* Sample a process to steal */
-    proc_to_steal = mpi_sample_working_process(htrdr, rng);
+  /* Sample a process to steal */
+  proc_to_steal = mpi_sample_working_process(htrdr, rng);
 
-    /* Send a steal request to the sampled process and wait for a response */
-    P_MPI(Send(&dummy, 1, MPI_INT8_T, proc_to_steal, HTRDR_MPI_STEAL_REQUEST,
-      MPI_COMM_WORLD));
+  /* Send a steal request to the sampled process and wait for a response */
+  P_MPI(Send(&ntiles_to_steal, 1, MPI_UINT8_T, proc_to_steal,
+    HTRDR_MPI_STEAL_REQUEST, MPI_COMM_WORLD));
 
-    /* Receive the stolen tile from the sampled process */
-    P_MPI(Irecv(&tile, 1, MPI_INT64_T, proc_to_steal,
-      HTRDR_MPI_WORK_STEALING, MPI_COMM_WORLD, &req));
+  /* Receive the stolen tile from the sampled process */
+  P_MPI(Irecv(tiles, ntiles_to_steal, MPI_UINT32_T, proc_to_steal,
+    HTRDR_MPI_WORK_STEALING, MPI_COMM_WORLD, &req));
 
-    mpi_wait_for_request(htrdr, &req);
+  mpi_wait_for_request(htrdr, &req);
 
-    if(tile != TILE_MCODE_NULL) {
-      proc_work_add_tile(work, tile);
-      ++nthieves;
-    } else {
+  FOR_EACH(itile, 0, ntiles_to_steal) {
+    if(tiles[itile] == TILE_MCODE_NULL) {
       ASSERT(htrdr->mpi_working_procs[proc_to_steal] != 0);
       htrdr->mpi_working_procs[proc_to_steal] = 0;
       htrdr->mpi_nworking_procs--;
+      break;
     }
+    proc_work_add_tile(work, tiles[itile]);
+    ++nthieves;
   }
   #undef P_MPI
   return nthieves;
@@ -428,9 +449,9 @@ htrdr_draw_radiance_sw
    struct htrdr_buffer* buf)
 {
   struct ssp_rng* rng_main = NULL;
-  size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
+  size_t ntiles_x, ntiles_y, ntiles_adjusted;
+  size_t itile;
   struct proc_work work;
-  int64_t itile;
   struct htrdr_buffer_layout layout;
   double pix_sz[2]; /* Pixel size in the normalized image plane */
   size_t proc_ntiles;
@@ -465,7 +486,6 @@ htrdr_draw_radiance_sw
   /* Compute the overall number of tiles */
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
-  ntiles = ntiles_x * ntiles_y;
 
   /* Adjust the #tiles for the morton-encoding procedure */
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
@@ -476,27 +496,27 @@ htrdr_draw_radiance_sw
   pix_sz[1] = 1.0 / (double)layout.height;
 
   /* Define the initial number of tiles of the current process */
-  proc_ntiles = ntiles / (size_t)htrdr->mpi_nprocs;
   proc_ntiles_adjusted = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
-  if(htrdr->mpi_rank == 0) {/* Affect the remaining tiles to the master proc */
-    proc_ntiles += ntiles - proc_ntiles*(size_t)htrdr->mpi_nprocs;
+  if(htrdr->mpi_rank == 0) { /* Affect the remaining tiles to the master proc */
     proc_ntiles_adjusted +=
-      ntiles_adjusted - proc_ntiles*(size_t)htrdr->mpi_nprocs;
+      ntiles_adjusted - proc_ntiles_adjusted*(size_t)htrdr->mpi_nprocs;
   }
 
   /* Define the initial list of tiles of the process */
   FOR_EACH(itile, 0, proc_ntiles_adjusted) {
-    size_t tile_org[2];
-    int64_t mcode = htrdr->mpi_rank + (itile*htrdr->mpi_nprocs);
+    uint32_t mcode;
+    uint16_t tile_org[2];
 
-    /* Decode the morton code to retrieve the tile index  */
-    tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
-    if(tile_org[0] >= ntiles_x) continue; /* Skip border tile */
-    tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
-    if(tile_org[1] >= ntiles_y) continue; /* Skip border tile */
+    mcode = (uint32_t)itile*(uint32_t)htrdr->mpi_nprocs
+          + (uint32_t)htrdr->mpi_rank;
 
+    tile_org[0] = morton2D_decode(mcode>>0);
+    if(tile_org[0] >= ntiles_x) continue;
+    tile_org[1] = morton2D_decode(mcode>>1);
+    if(tile_org[1] >= ntiles_y) continue;
     proc_work_add_tile(&work, mcode);
   }
+  proc_ntiles = proc_work_get_ntiles(&work);
 
   if(htrdr->mpi_rank == 0) {
     fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
@@ -588,6 +608,7 @@ htrdr_draw_radiance_sw
 
         proc_work_reset(&work);
         nthieves = mpi_steal_work(htrdr, rng_main, &work);
+        nthreads = MMIN(nthieves, htrdr->nthreads);
       } while(nthieves);
 
       /* Synchronize the process */
