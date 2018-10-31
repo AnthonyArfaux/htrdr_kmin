@@ -1210,7 +1210,7 @@ setup_clouds
       print_mpi_progress(sky->htrdr, HTRDR_MPI_PROGRESS_BUILD_OCTREE);
     }
   }
-  #pragma omp parallel for
+  #pragma omp parallel for schedule(dynamic, 1/*chunksize*/)
   for(ispecdata=0;
       (size_t)ispecdata<darray_specdata_size_get(&specdata);
       ++ispecdata) {
