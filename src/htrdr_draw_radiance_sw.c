@@ -33,8 +33,20 @@
 
 #define RNG_SEQUENCE_SIZE 100000
 
+#define TILE_MCODE_NULL UINT32_MAX
 #define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
+
+struct tile {
+  struct list_node node;
+  struct mem_allocator* allocator;
+  ref_T ref;
+
+  struct tile_data {
+    uint16_t x, y; /* 2D coordinates of the tile in tile space */
+    struct htrdr_accum accums[1/*dummy element*/]; /* Row ordered */
+  } data;
+};
 
 /* Overall work of a process */
 struct proc_work {
@@ -42,8 +54,6 @@ struct proc_work {
   struct darray_u32 tiles; /* #tiles to render */
   size_t itile; /* Next tile to render in the above list of tiles */
 };
-
-#define TILE_MCODE_NULL UINT32_MAX
 
 /*******************************************************************************
  * Helper functions
@@ -68,6 +78,89 @@ morton2D_encode(const uint16_t u16)
   u32 = (u32 | (u32 << 2)) & 0x33333333;
   u32 = (u32 | (u32 << 1)) & 0x55555555;
   return u32;
+}
+
+static FINLINE struct tile*
+tile_create(struct mem_allocator* allocator)
+{
+  struct tile* tile;
+  const size_t tile_sz =
+    sizeof(struct tile) - sizeof(struct htrdr_accum)/*rm dummy accum*/;
+  const size_t buf_sz =
+    TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
+  ASSERT(allocator);
+
+  tile = MEM_ALLOC(allocator, tile_sz+buf_sz);
+  if(!tile) return NULL;
+
+  ref_init(&tile->ref);
+  list_init(&tile->node);
+  tile->allocator = allocator;
+  ASSERT(IS_ALIGNED(&tile->data.accums, ALIGNOF(struct htrdr_accum)));
+
+  return tile;
+}
+
+static INLINE void
+tile_ref_get(struct tile* tile)
+{
+  ASSERT(tile);
+  tile_ref_get(tile);
+}
+
+static INLINE void
+release_tile(ref_T* ref)
+{
+  struct tile* tile = CONTAINER_OF(ref, struct tile, ref);
+  ASSERT(ref);
+  MEM_RM(tile->allocator, tile);
+}
+
+static INLINE void
+tile_ref_put(struct tile* tile)
+{
+  ASSERT(tile);
+  ref_put(&tile->ref, release_tile);
+}
+
+static FINLINE struct htrdr_accum*
+tile_at
+  (struct tile* tile,
+   const size_t x, /* In tile space */
+   const size_t y) /* In tile space */
+{
+  ASSERT(tile && x < TILE_SIZE && y < TILE_SIZE);
+  return tile->data.accums + (y*TILE_SIZE + x)*3/*#channels*/;
+}
+
+static void
+write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
+{
+  struct htrdr_buffer_layout layout = HTRDR_BUFFER_LAYOUT_NULL;
+  size_t icol, irow;
+  size_t irow_tile;
+  size_t ncols_tile, nrows_tile;
+  char* buf_mem;
+  ASSERT(buf && tile_data);
+
+  htrdr_buffer_get_layout(buf, &layout);
+  buf_mem = htrdr_buffer_get_data(buf);
+
+  icol = tile_data->x * (size_t)TILE_SIZE;
+  irow = tile_data->y * (size_t)TILE_SIZE;
+  ncols_tile = MMIN(icol + TILE_SIZE, layout.width)  - icol;
+  nrows_tile = MMIN(irow + TILE_SIZE, layout.height) - irow;
+
+  FOR_EACH(irow_tile, 0, nrows_tile) {
+    char* buf_row = buf_mem + (irow + irow_tile) * layout.pitch;
+    const struct htrdr_accum* tile_row =
+      tile_data->accums + irow_tile*TILE_SIZE*3/*#channels*/;
+
+    memcpy
+      (buf_row + icol*sizeof(struct htrdr_accum)*3,
+       tile_row,
+       ncols_tile*sizeof(struct htrdr_accum)*3/*#channels*/);
+  }
 }
 
 static INLINE void
@@ -283,78 +376,54 @@ mpi_steal_work
 }
 
 static res_T
-mpi_gather_buffer
+mpi_gather_tiles
   (struct htrdr* htrdr,
-   struct htrdr_buffer* buf)
+   struct htrdr_buffer* buf,
+   const size_t ntiles,
+   struct list_node* tiles)
 {
-  struct htrdr_buffer_layout layout;
-  struct htrdr_accum* gathered_accums = NULL;
-  size_t x, y;
-  int iproc;
+  const size_t msg_sz =
+    sizeof(struct tile_data) - sizeof(struct htrdr_accum)/*dummy*/
+  + TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
+  struct list_node* node;
+  struct tile* tile = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && buf);
+  ASSERT(htrdr && buf && tiles);
+  (void)ntiles;
 
-  /* The process is alone. There is nothing to gather since all work was done
-   * by it */
-  if(htrdr->mpi_nprocs == 1)
-    goto exit;
+  if(htrdr->mpi_rank != 0) {
+    LIST_FOR_EACH(node, tiles) {
+      struct tile* t = CONTAINER_OF(node, struct tile, node);
+      MPI(Send(&t->data, (int)msg_sz, MPI_CHAR, 0,
+        HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD));
+    }
+  } else {
+    size_t itile = 0;
 
-  /* Fetch the memory layout of the submitted buffer */
-  htrdr_buffer_get_layout(buf, &layout);
-  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum) * 3/*#channels*/);
-  ASSERT(layout.alignment <= ALIGNOF(struct htrdr_accum));
-
-  /* The process 0 allocates the memory used to store the gathered buffer lines
-   * of the MPI processes */
-  if(htrdr->mpi_rank == 0) {
-    gathered_accums = MEM_ALLOC
-      (htrdr->allocator, layout.pitch * (size_t)htrdr->mpi_nprocs);
-    if(!gathered_accums) {
+    tile = tile_create(htrdr->allocator);
+    if(!tile) {
       res = RES_MEM_ERR;
       htrdr_log_err(htrdr,
-        "could not allocate the temporary memory for MPI gathering -- %s.\n",
-        res_to_cstr(res));
+        "could not allocate the temporary tile used to gather the process "
+        "output data -- %s.\n", res_to_cstr(res));
       goto error;
+
     }
-  }
-
-  FOR_EACH(y, 0, layout.height) {
-    struct htrdr_accum* buf_row_accums = (struct htrdr_accum*)
-      ((char*)htrdr_buffer_get_data(buf) + y * layout.pitch);
-    int err; /* MPI error */
-
-    /* Gather the buffer lines */
-    mutex_lock(htrdr->mpi_mutex);
-    err = MPI_Gather(buf_row_accums, (int)layout.pitch, MPI_CHAR, gathered_accums,
-      (int)layout.pitch, MPI_CHAR, 0, MPI_COMM_WORLD);
-    mutex_unlock(htrdr->mpi_mutex);
-    if(err != MPI_SUCCESS) {
-      htrdr_log_err(htrdr,
-        "could not gather the buffer line `%lu' from the group of processes -- "
-        "%s.\n",
-        (unsigned long)y, htrdr_mpi_error_string(htrdr, err));
-      res = RES_UNKNOWN_ERR;
-      goto error;
+    LIST_FOR_EACH(node, tiles) {
+      struct tile* t = CONTAINER_OF(node, struct tile, node);
+      write_tile_data(buf, &t->data);
+      ++itile;
     }
 
-    /* Accumulates the gathered lines into the buffer of the process 0 */
-    if(htrdr->mpi_rank == 0) {
-      memset(buf_row_accums, 0, layout.pitch);
-      FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
-        struct htrdr_accum* proc_accums = (struct htrdr_accum*)
-          ((char*)gathered_accums + (size_t)iproc * layout.pitch);
-        FOR_EACH(x, 0, layout.width * 3/*#channels*/) {
-          buf_row_accums[x].sum_weights += proc_accums[x].sum_weights;
-          buf_row_accums[x].sum_weights_sqr += proc_accums[x].sum_weights_sqr;
-          buf_row_accums[x].nweights += proc_accums[x].nweights;
-          buf_row_accums[x].nfailures += proc_accums[x].nfailures;
-        }
-      }
+    FOR_EACH(itile, itile, ntiles) {
+      MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
+        HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+      write_tile_data(buf, &tile->data);
     }
   }
 
 exit:
-  if(gathered_accums) MEM_RM(htrdr->allocator, gathered_accums);
+  if(tile) tile_ref_put(tile);
   return res;
 error:
   goto exit;
@@ -371,11 +440,11 @@ draw_tile
    const struct htrdr_camera* cam,
    const size_t spp, /* #samples per pixel */
    struct ssp_rng* rng,
-   struct htrdr_buffer* buf)
+   struct tile* tile)
 {
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
-  ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && buf);
+  ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && tile);
   (void)tile_mcode;
   /* Adjust the #pixels to process them wrt a morton order */
   npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
@@ -392,12 +461,12 @@ draw_tile
     ipix_tile[1] = morton2D_decode((uint32_t)(mcode>>1));
     if(ipix_tile[1] >= tile_sz[1]) continue; /* Pixel is out of tile */
 
+    /* Fetch and reset the pixel accumulator */
+    pix_accums = tile_at(tile, ipix_tile[0], ipix_tile[1]);
+
     /* Compute the pixel coordinate */
     ipix[0] = tile_org[0] + ipix_tile[0];
     ipix[1] = tile_org[1] + ipix_tile[1];
-
-    /* Fetch and reset the pixel accumulator */
-    pix_accums = htrdr_buffer_at(buf, ipix[0], ipix[1]);
 
     FOR_EACH(ichannel, 0, 3) {
       size_t isamp;
@@ -459,19 +528,20 @@ draw_image
    const size_t ntiles_x,
    const size_t ntiles_y,
    const size_t ntiles_adjusted,
+   const double pix_sz[2], /* Pixel size in the normalized image plane */
    struct proc_work* work,
-   struct htrdr_buffer* buf)
+   const struct htrdr_buffer_layout* layout,
+   struct list_node* tiles)
 {
-  struct htrdr_buffer_layout layout;
   struct ssp_rng* rng_proc = NULL;
   MPI_Request req;
-  double pix_sz[2];
   size_t nthreads = 0;
   size_t nthieves = 0;
   size_t proc_ntiles = 0;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && cam && spp && ntiles_adjusted && work && buf);
+  ASSERT(htrdr && cam && spp && ntiles_adjusted && work && tiles);
+  ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
   (void)ntiles_x, (void)ntiles_y;
 
   res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
@@ -480,11 +550,6 @@ draw_image
       "to steal -- %s.\n", res_to_cstr((res_T)res));
     goto error;
   }
-
-  /* Compute the size of a pixel in the normalized image plane */
-  htrdr_buffer_get_layout(buf, &layout);
-  pix_sz[0] = 1.0 / (double)layout.width;
-  pix_sz[1] = 1.0 / (double)layout.height;
 
   proc_ntiles = proc_work_get_ntiles(work);
   nthreads = MMIN(htrdr->nthreads, proc_ntiles);
@@ -499,7 +564,8 @@ draw_image
     const int ithread = omp_get_thread_num();
     struct ssp_rng_proxy* rng_proxy = NULL;
     struct ssp_rng* rng;
-    uint32_t mcode;
+    struct tile* tile;
+    uint32_t mcode = TILE_MCODE_NULL;
     size_t tile_org[2];
     size_t tile_sz[2];
     size_t n;
@@ -526,13 +592,31 @@ draw_image
     tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
     ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
 
+    /* Create the tile */
+    tile = tile_create(htrdr->allocator);
+    if(!tile) {
+      ATOMIC_SET(&res, RES_MEM_ERR);
+      htrdr_log_err(htrdr,
+        "could not allocate the memory space of the tile (%lu, %lu) -- %s.\n",
+        (unsigned long)tile_org[0], (unsigned long)tile_org[1],
+         res_to_cstr((res_T)ATOMIC_GET(&res)));
+      break;
+    }
+
+    /* Register the tile */
+    #pragma omp critical
+    list_add_tail(tiles, &tile->node);
+
+    tile->data.x = (uint16_t)tile_org[0];
+    tile->data.y = (uint16_t)tile_org[1];
+
     /* Define the tile origin in pixel space */
     tile_org[0] *= TILE_SIZE;
     tile_org[1] *= TILE_SIZE;
 
     /* Compute the size of the tile clamped by the borders of the buffer */
-    tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
-    tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
+    tile_sz[0] = MMIN(TILE_SIZE, layout->width - tile_org[0]);
+    tile_sz[1] = MMIN(TILE_SIZE, layout->height - tile_org[1]);
 
     SSP(rng_proxy_create2
       (&htrdr->lifo_allocators[ithread],
@@ -544,7 +628,7 @@ draw_image
     SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
 
     res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
-      pix_sz, cam, spp, rng, buf);
+      pix_sz, cam, spp, rng, tile);
 
     SSP(rng_proxy_ref_put(rng_proxy));
     SSP(rng_ref_put(rng));
@@ -595,15 +679,18 @@ htrdr_draw_radiance_sw
    const size_t spp,
    struct htrdr_buffer* buf)
 {
-  size_t ntiles_x, ntiles_y, ntiles_adjusted;
+  struct list_node tiles;
+  size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
   size_t itile;
   struct proc_work work;
   struct htrdr_buffer_layout layout;
   size_t proc_ntiles_adjusted;
+  double pix_sz[2];
   ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
 
+  list_init(&tiles);
   proc_work_init(htrdr->allocator, &work);
 
   htrdr_buffer_get_layout(buf, &layout);
@@ -622,6 +709,11 @@ htrdr_draw_radiance_sw
   /* Compute the overall number of tiles */
   ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles = ntiles_x * ntiles_y;
+
+  /* Compute the pixel size in the normalized image plane */
+  pix_sz[0] = 1.0 / (double)layout.width;
+  pix_sz[1] = 1.0 / (double)layout.height;
 
   /* Adjust the #tiles for the morton-encoding procedure */
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
@@ -662,8 +754,8 @@ htrdr_draw_radiance_sw
 
     #pragma omp section
     {
-      draw_image(htrdr, cam, spp, ntiles_x, ntiles_y, ntiles_adjusted, &work,
-        buf);
+      draw_image(htrdr, cam, spp, ntiles_x, ntiles_y, ntiles_adjusted, pix_sz,
+        &work, &layout, &tiles);
       /* The processes have no more work to do. Stop probing for thieves */
       ATOMIC_SET(&probe_thieves, 0);
     }
@@ -675,10 +767,19 @@ htrdr_draw_radiance_sw
   }
 
   /* Gather accum buffers from the group of processes */
-  res = mpi_gather_buffer(htrdr, buf);
+  res = mpi_gather_tiles(htrdr, buf, ntiles, &tiles);
   if(res != RES_OK) goto error;
 
 exit:
+  { /* Free allocated tiles */
+    struct list_node* node;
+    struct list_node* tmp;
+    LIST_FOR_EACH_SAFE(node, tmp, &tiles) {
+      struct tile* tile = CONTAINER_OF(node, struct tile, node);
+      list_del(node);
+      tile_ref_put(tile);
+    }
+  }
   proc_work_release(&work);
   return (res_T)res;
 error:
