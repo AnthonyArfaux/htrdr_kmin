@@ -131,97 +131,6 @@ proc_work_get_ntiles(struct proc_work* work)
   return sz;
 }
 
-static res_T
-draw_tile
-  (struct htrdr* htrdr,
-   const size_t ithread,
-   const int64_t tile_mcode, /* For debug only */
-   const size_t tile_org[2], /* Origin of the tile in pixel space */
-   const size_t tile_sz[2], /* Definition of the tile */
-   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
-   const struct htrdr_camera* cam,
-   const size_t spp, /* #samples per pixel */
-   struct ssp_rng* rng,
-   struct htrdr_buffer* buf)
-{
-  size_t npixels;
-  size_t mcode; /* Morton code of tile pixel */
-  ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && buf);
-  (void)tile_mcode;
-  /* Adjust the #pixels to process them wrt a morton order */
-  npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
-  npixels *= npixels;
-
-  FOR_EACH(mcode, 0, npixels) {
-    struct htrdr_accum* pix_accums;
-    size_t ipix_tile[2]; /* Pixel coord in the tile */
-    size_t ipix[2]; /* Pixel coord in the buffer */
-    size_t ichannel;
-
-    ipix_tile[0] = morton2D_decode((uint32_t)(mcode>>0));
-    if(ipix_tile[0] >= tile_sz[0]) continue; /* Pixel is out of tile */
-    ipix_tile[1] = morton2D_decode((uint32_t)(mcode>>1));
-    if(ipix_tile[1] >= tile_sz[1]) continue; /* Pixel is out of tile */
-
-    /* Compute the pixel coordinate */
-    ipix[0] = tile_org[0] + ipix_tile[0];
-    ipix[1] = tile_org[1] + ipix_tile[1];
-
-    /* Fetch and reset the pixel accumulator */
-    pix_accums = htrdr_buffer_at(buf, ipix[0], ipix[1]);
-
-    FOR_EACH(ichannel, 0, 3) {
-      size_t isamp;
-      pix_accums[ichannel] = HTRDR_ACCUM_NULL;
-
-      FOR_EACH(isamp, 0, spp) {
-        double pix_samp[2];
-        double ray_org[3];
-        double ray_dir[3];
-        double weight;
-        size_t iband;
-        size_t iquad;
-
-        /* Sample a position into the pixel, in the normalized image plane */
-        pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
-        pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
-
-        /* Generate a ray starting from the pinhole camera and passing through the
-         * pixel sample */
-        htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
-
-        /* Sample a spectral band and a quadrature point */
-        switch(ichannel) {
-          case 0:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_X
-              (htrdr->sky, rng, &iband, &iquad);
-            break;
-          case 1:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
-              (htrdr->sky, rng, &iband, &iquad);
-            break;
-          case 2:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
-              (htrdr->sky, rng, &iband, &iquad);
-            break;
-          default: FATAL("Unreachable code.\n"); break;
-        }
-
-        /* Compute the radiance that reach the pixel through the ray */
-        weight = htrdr_compute_radiance_sw
-          (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-        ASSERT(weight >= 0);
-
-        /* Update the pixel accumulator */
-        pix_accums[ichannel].sum_weights += weight;
-        pix_accums[ichannel].sum_weights_sqr += weight*weight;
-        pix_accums[ichannel].nweights += 1;
-      }
-    }
-  }
-  return RES_OK;
-}
-
 static void
 mpi_wait_for_request(struct htrdr* htrdr, MPI_Request* req)
 {
@@ -446,6 +355,220 @@ error:
   goto exit;
 }
 
+static res_T
+draw_tile
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const int64_t tile_mcode, /* For debug only */
+   const size_t tile_org[2], /* Origin of the tile in pixel space */
+   const size_t tile_sz[2], /* Definition of the tile */
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_camera* cam,
+   const size_t spp, /* #samples per pixel */
+   struct ssp_rng* rng,
+   struct htrdr_buffer* buf)
+{
+  size_t npixels;
+  size_t mcode; /* Morton code of tile pixel */
+  ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && buf);
+  (void)tile_mcode;
+  /* Adjust the #pixels to process them wrt a morton order */
+  npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
+  npixels *= npixels;
+
+  FOR_EACH(mcode, 0, npixels) {
+    struct htrdr_accum* pix_accums;
+    size_t ipix_tile[2]; /* Pixel coord in the tile */
+    size_t ipix[2]; /* Pixel coord in the buffer */
+    size_t ichannel;
+
+    ipix_tile[0] = morton2D_decode((uint32_t)(mcode>>0));
+    if(ipix_tile[0] >= tile_sz[0]) continue; /* Pixel is out of tile */
+    ipix_tile[1] = morton2D_decode((uint32_t)(mcode>>1));
+    if(ipix_tile[1] >= tile_sz[1]) continue; /* Pixel is out of tile */
+
+    /* Compute the pixel coordinate */
+    ipix[0] = tile_org[0] + ipix_tile[0];
+    ipix[1] = tile_org[1] + ipix_tile[1];
+
+    /* Fetch and reset the pixel accumulator */
+    pix_accums = htrdr_buffer_at(buf, ipix[0], ipix[1]);
+
+    FOR_EACH(ichannel, 0, 3) {
+      size_t isamp;
+      pix_accums[ichannel] = HTRDR_ACCUM_NULL;
+
+      FOR_EACH(isamp, 0, spp) {
+        double pix_samp[2];
+        double ray_org[3];
+        double ray_dir[3];
+        double weight;
+        size_t iband;
+        size_t iquad;
+
+        /* Sample a position into the pixel, in the normalized image plane */
+        pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+        pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+
+        /* Generate a ray starting from the pinhole camera and passing through the
+         * pixel sample */
+        htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+
+        /* Sample a spectral band and a quadrature point */
+        switch(ichannel) {
+          case 0:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_X
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          case 1:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          case 2:
+            htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
+              (htrdr->sky, rng, &iband, &iquad);
+            break;
+          default: FATAL("Unreachable code.\n"); break;
+        }
+
+        /* Compute the radiance that reach the pixel through the ray */
+        weight = htrdr_compute_radiance_sw
+          (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        ASSERT(weight >= 0);
+
+        /* Update the pixel accumulator */
+        pix_accums[ichannel].sum_weights += weight;
+        pix_accums[ichannel].sum_weights_sqr += weight*weight;
+        pix_accums[ichannel].nweights += 1;
+      }
+    }
+  }
+  return RES_OK;
+}
+
+static res_T
+draw_image
+  (struct htrdr* htrdr,
+   const struct htrdr_camera* cam,
+   const size_t spp,
+   struct ssp_rng* rng_main,
+   const size_t ntiles_x,
+   const size_t ntiles_y,
+   const size_t ntiles_adjusted,
+   struct proc_work* work,
+   struct htrdr_buffer* buf)
+{
+  struct htrdr_buffer_layout layout;
+  MPI_Request req;
+  double pix_sz[2];
+  size_t nthreads = 0;
+  size_t nthieves = 0;
+  size_t proc_ntiles = 0;
+  ATOMIC nsolved_tiles = 0;
+  ATOMIC res = RES_OK;
+  ASSERT(htrdr && cam && spp && rng_main && ntiles_adjusted && work && buf);
+  (void)ntiles_x, (void)ntiles_y;
+
+  /* Compute the size of a pixel in the normalized image plane */
+  htrdr_buffer_get_layout(buf, &layout);
+  pix_sz[0] = 1.0 / (double)layout.width;
+  pix_sz[1] = 1.0 / (double)layout.height;
+
+  nthreads = htrdr->nthreads;
+  proc_ntiles = proc_work_get_ntiles(work);
+
+  /* The process is not considered as a working process for himself */
+  htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
+  --htrdr->mpi_nworking_procs;
+
+  do {
+    omp_set_num_threads((int)nthreads);
+
+    #pragma omp parallel
+    for(;;) {
+      const int ithread = omp_get_thread_num();
+      struct ssp_rng_proxy* rng_proxy = NULL;
+      struct ssp_rng* rng;
+      uint32_t mcode;
+      size_t tile_org[2];
+      size_t tile_sz[2];
+      size_t n;
+      res_T res_local = RES_OK;
+      int32_t pcent;
+
+      if(ATOMIC_GET(&res) != RES_OK) continue;
+
+      mcode = proc_work_get_tile(work);
+      if(mcode == TILE_MCODE_NULL) break;
+
+      /* Decode the morton code to retrieve the tile index  */
+      tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
+      tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
+      ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
+
+      /* Define the tile origin in pixel space */
+      tile_org[0] *= TILE_SIZE;
+      tile_org[1] *= TILE_SIZE;
+
+      /* Compute the size of the tile clamped by the borders of the buffer */
+      tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
+      tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
+
+      SSP(rng_proxy_create2
+        (&htrdr->lifo_allocators[ithread],
+         &ssp_rng_threefry,
+         RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
+         RNG_SEQUENCE_SIZE, /* Size */
+         RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
+         1, &rng_proxy));
+      SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
+
+      res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
+        pix_sz, cam, spp, rng, buf);
+
+      SSP(rng_proxy_ref_put(rng_proxy));
+      SSP(rng_ref_put(rng));
+
+      if(res_local != RES_OK) {
+        ATOMIC_SET(&res, res_local);
+        continue;
+      }
+
+      n = (size_t)ATOMIC_INCR(&nsolved_tiles);
+      pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
+
+      #pragma omp critical
+      if(pcent > htrdr->mpi_progress_render[0]) {
+        htrdr->mpi_progress_render[0] = pcent;
+        if(htrdr->mpi_rank == 0) {
+          update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+        } else { /* Send the progress percentage to the master process */
+          send_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING, pcent);
+        }
+      }
+    }
+
+    if(ATOMIC_GET(&res) != RES_OK) goto error;
+
+    proc_work_reset(work);
+    nthieves = mpi_steal_work(htrdr, rng_main, work);
+    nthreads = MMIN(nthieves, htrdr->nthreads);
+  } while(nthieves);
+
+  /* Synchronize the process */
+  mutex_lock(htrdr->mpi_mutex);
+  MPI(Ibarrier(MPI_COMM_WORLD, &req));
+  mutex_unlock(htrdr->mpi_mutex);
+
+  /* Wait for synchronization */
+  mpi_wait_for_request(htrdr, &req);
+
+exit:
+  return (res_T)res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -461,10 +584,7 @@ htrdr_draw_radiance_sw
   size_t itile;
   struct proc_work work;
   struct htrdr_buffer_layout layout;
-  double pix_sz[2]; /* Pixel size in the normalized image plane */
-  size_t proc_ntiles;
   size_t proc_ntiles_adjusted;
-  ATOMIC nsolved_tiles = 0;
   ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && buf);
@@ -499,10 +619,6 @@ htrdr_draw_radiance_sw
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
   ntiles_adjusted *= ntiles_adjusted;
 
-  /* Compute the size of a pixel in the normalized image plane */
-  pix_sz[0] = 1.0 / (double)layout.width;
-  pix_sz[1] = 1.0 / (double)layout.height;
-
   /* Define the initial number of tiles of the current process */
   proc_ntiles_adjusted = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
   if(htrdr->mpi_rank == 0) { /* Affect the remaining tiles to the master proc */
@@ -524,14 +640,13 @@ htrdr_draw_radiance_sw
     if(tile_org[1] >= ntiles_y) continue;
     proc_work_add_tile(&work, mcode);
   }
-  proc_ntiles = proc_work_get_ntiles(&work);
 
   if(htrdr->mpi_rank == 0) {
     fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
     print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
   }
 
-  omp_set_nested(1);
+  omp_set_nested(1); /* Enable nested threads for draw_image */
   #pragma omp parallel sections num_threads(2)
   {
     #pragma omp section
@@ -539,94 +654,8 @@ htrdr_draw_radiance_sw
 
     #pragma omp section
     {
-      MPI_Request req;
-      size_t nthreads = htrdr->nthreads;
-      size_t nthieves = 0;
-
-      /* The process is not considered as a working process for himself */
-      htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
-      --htrdr->mpi_nworking_procs;
-
-      do {
-        omp_set_num_threads((int)nthreads);
-        #pragma omp parallel
-        for(;;) {
-          const int ithread = omp_get_thread_num();
-          struct ssp_rng_proxy* rng_proxy = NULL;
-          struct ssp_rng* rng;
-          int64_t mcode;
-          size_t tile_org[2];
-          size_t tile_sz[2];
-          size_t n;
-          res_T res_local = RES_OK;
-          int32_t pcent;
-
-          if(ATOMIC_GET(&res) != RES_OK) continue;
-
-          mcode = proc_work_get_tile(&work);
-          if(mcode == TILE_MCODE_NULL) break;
-
-          /* Decode the morton code to retrieve the tile index  */
-          tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
-          tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
-          ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
-
-          /* Define the tile origin in pixel space */
-          tile_org[0] *= TILE_SIZE;
-          tile_org[1] *= TILE_SIZE;
-
-          /* Compute the size of the tile clamped by the borders of the buffer */
-          tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
-          tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
-
-          SSP(rng_proxy_create2
-            (&htrdr->lifo_allocators[ithread],
-             &ssp_rng_threefry,
-             RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
-             RNG_SEQUENCE_SIZE, /* Size */
-             RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
-             1, &rng_proxy));
-          SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
-
-          res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
-            pix_sz, cam, spp, rng, buf);
-
-          SSP(rng_proxy_ref_put(rng_proxy));
-          SSP(rng_ref_put(rng));
-
-          if(res_local != RES_OK) {
-            ATOMIC_SET(&res, res_local);
-            continue;
-          }
-
-          n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-          pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
-
-          #pragma omp critical
-          if(pcent > htrdr->mpi_progress_render[0]) {
-            htrdr->mpi_progress_render[0] = pcent;
-            if(htrdr->mpi_rank == 0) {
-              update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-            } else { /* Send the progress percentage to the master process */
-              send_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING, pcent);
-            }
-          }
-          if(ATOMIC_GET(&res) != RES_OK) continue;
-        }
-
-        proc_work_reset(&work);
-        nthieves = mpi_steal_work(htrdr, rng_main, &work);
-        nthreads = MMIN(nthieves, htrdr->nthreads);
-      } while(nthieves);
-
-      /* Synchronize the process */
-      mutex_lock(htrdr->mpi_mutex);
-      MPI(Ibarrier(MPI_COMM_WORLD, &req));
-      mutex_unlock(htrdr->mpi_mutex);
-
-      /* Wait for synchronization */
-      mpi_wait_for_request(htrdr, &req);
-
+      draw_image(htrdr, cam, spp, rng_main, ntiles_x, ntiles_y,
+        ntiles_adjusted, &work, buf);
       /* The processes have no more work to do. Stop probing for thieves */
       ATOMIC_SET(&probe_thieves, 0);
     }
