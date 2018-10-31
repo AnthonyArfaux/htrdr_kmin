@@ -273,6 +273,65 @@ release_mpi(struct htrdr* htrdr)
 }
 
 static res_T
+mpi_print_proc_info(struct htrdr* htrdr)
+{
+  char proc_name[MPI_MAX_PROCESSOR_NAME];
+  int proc_name_len;
+  char* proc_names = NULL;
+  uint32_t* proc_nthreads = NULL;
+  uint32_t nthreads = 0;
+  int iproc;
+  res_T res = RES_OK;
+  ASSERT(htrdr);
+
+  if(htrdr->mpi_rank == 0) {
+    proc_names = MEM_CALLOC(htrdr->allocator, (size_t)htrdr->mpi_nprocs,
+      MPI_MAX_PROCESSOR_NAME*sizeof(*proc_names));
+    if(!proc_names) {
+      res = RES_MEM_ERR;
+      htrdr_log_err(htrdr,
+        "could not allocate the temporary memory for MPI process names -- "
+        "%s.\n", res_to_cstr(res));
+      goto error;
+    }
+
+    proc_nthreads = MEM_CALLOC(htrdr->allocator, (size_t)htrdr->mpi_nprocs,
+      sizeof(*proc_nthreads));
+    if(!proc_nthreads) {
+      res = RES_MEM_ERR;
+      htrdr_log_err(htrdr,
+        "could not allocate the temporary memory for the #threads of the MPI "
+        "processes -- %s.\n", res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  /* Gather process name */
+  MPI(Get_processor_name(proc_name, &proc_name_len));
+  MPI(Gather(proc_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, proc_names,
+    MPI_MAX_PROCESSOR_NAME, MPI_CHAR, 0, MPI_COMM_WORLD));
+
+  /* Gather process #threads */
+  nthreads = (uint32_t)htrdr->nthreads;
+  MPI(Gather(&nthreads, 1, MPI_UINT32_T, proc_nthreads, 1, MPI_UINT32_T, 0,
+    MPI_COMM_WORLD));
+
+  if(htrdr->mpi_rank == 0) {
+    FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+      htrdr_log(htrdr, "Process %d -- %s; #threads: %u\n",
+        iproc, proc_names + iproc*MPI_MAX_PROCESSOR_NAME, proc_nthreads[iproc]);
+    }
+  }
+
+exit:
+  if(proc_names) MEM_RM(htrdr->allocator, proc_names);
+  if(proc_nthreads) MEM_RM(htrdr->allocator, proc_nthreads);
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
 init_mpi(struct htrdr* htrdr)
 {
   size_t n;
@@ -355,6 +414,9 @@ init_mpi(struct htrdr* htrdr)
       "threads -- %s.\n", res_to_cstr(res));
     goto error;
   }
+
+  if(htrdr->mpi_nprocs != 1)
+    mpi_print_proc_info(htrdr);
 
 exit:
   return res;
@@ -876,7 +938,7 @@ fetch_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
       mutex_lock(htrdr->mpi_mutex);
       MPI(Irecv(&progress[iproc], 1, MPI_INT32_T, iproc, msg, MPI_COMM_WORLD, &req));
       mutex_unlock(htrdr->mpi_mutex);
-      for(;;) { 
+      for(;;) {
         mutex_lock(htrdr->mpi_mutex);
         MPI(Test(&req, &complete, MPI_STATUS_IGNORE));
         mutex_unlock(htrdr->mpi_mutex);
