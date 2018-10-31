@@ -242,7 +242,7 @@ mpi_steal_work
   size_t nthieves = 0;
   uint32_t tiles[UINT8_MAX]; /* Morton code of the stolen tile */
   int proc_to_steal; /* Process to steal */
-  uint8_t ntiles_to_steal = (uint8_t)(htrdr->nthreads*2);
+  uint8_t ntiles_to_steal = MMIN((uint8_t)(htrdr->nthreads*2), 16);
   ASSERT(htrdr && rng && work && htrdr->nthreads < UINT8_MAX);
 
   /* Protect MPI calls of multiple invocations from concurrent threads */
@@ -293,6 +293,11 @@ mpi_gather_buffer
   int iproc;
   res_T res = RES_OK;
   ASSERT(htrdr && buf);
+
+  /* The process is alone. There is nothing to gather since all work was done
+   * by it */
+  if(htrdr->mpi_nprocs == 1)
+    goto exit;
 
   /* Fetch the memory layout of the submitted buffer */
   htrdr_buffer_get_layout(buf, &layout);
@@ -474,86 +479,89 @@ draw_image
   pix_sz[0] = 1.0 / (double)layout.width;
   pix_sz[1] = 1.0 / (double)layout.height;
 
-  nthreads = htrdr->nthreads;
   proc_ntiles = proc_work_get_ntiles(work);
+  nthreads = MMIN(htrdr->nthreads, proc_ntiles);
 
   /* The process is not considered as a working process for himself */
   htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
   --htrdr->mpi_nworking_procs;
 
-  do {
-    omp_set_num_threads((int)nthreads);
+  omp_set_num_threads((int)nthreads);
+  #pragma omp parallel
+  for(;;) {
+    const int ithread = omp_get_thread_num();
+    struct ssp_rng_proxy* rng_proxy = NULL;
+    struct ssp_rng* rng;
+    uint32_t mcode;
+    size_t tile_org[2];
+    size_t tile_sz[2];
+    size_t n;
+    res_T res_local = RES_OK;
+    int32_t pcent;
 
-    #pragma omp parallel
-    for(;;) {
-      const int ithread = omp_get_thread_num();
-      struct ssp_rng_proxy* rng_proxy = NULL;
-      struct ssp_rng* rng;
-      uint32_t mcode;
-      size_t tile_org[2];
-      size_t tile_sz[2];
-      size_t n;
-      res_T res_local = RES_OK;
-      int32_t pcent;
-
-      if(ATOMIC_GET(&res) != RES_OK) continue;
-
+    /* Get a tile to draw */
+    #pragma omp critical 
+    { 
       mcode = proc_work_get_tile(work);
-      if(mcode == TILE_MCODE_NULL) break;
-
-      /* Decode the morton code to retrieve the tile index  */
-      tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
-      tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
-      ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
-
-      /* Define the tile origin in pixel space */
-      tile_org[0] *= TILE_SIZE;
-      tile_org[1] *= TILE_SIZE;
-
-      /* Compute the size of the tile clamped by the borders of the buffer */
-      tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
-      tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
-
-      SSP(rng_proxy_create2
-        (&htrdr->lifo_allocators[ithread],
-         &ssp_rng_threefry,
-         RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
-         RNG_SEQUENCE_SIZE, /* Size */
-         RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
-         1, &rng_proxy));
-      SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
-
-      res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
-        pix_sz, cam, spp, rng, buf);
-
-      SSP(rng_proxy_ref_put(rng_proxy));
-      SSP(rng_ref_put(rng));
-
-      if(res_local != RES_OK) {
-        ATOMIC_SET(&res, res_local);
-        continue;
-      }
-
-      n = (size_t)ATOMIC_INCR(&nsolved_tiles);
-      pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
-
-      #pragma omp critical
-      if(pcent > htrdr->mpi_progress_render[0]) {
-        htrdr->mpi_progress_render[0] = pcent;
-        if(htrdr->mpi_rank == 0) {
-          update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-        } else { /* Send the progress percentage to the master process */
-          send_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING, pcent);
+      if(mcode == TILE_MCODE_NULL) { /* No more work on this process */
+        /* Try to steal works to concurrent processes */
+        proc_work_reset(work);
+        nthieves = mpi_steal_work(htrdr, rng_main, work);
+        if(nthieves != 0) {
+          mcode = proc_work_get_tile(work);
         }
       }
     }
+    if(mcode == TILE_MCODE_NULL) break; /* No more work */
 
-    if(ATOMIC_GET(&res) != RES_OK) goto error;
+    /* Decode the morton code to retrieve the tile index  */
+    tile_org[0] = morton2D_decode((uint32_t)(mcode>>0));
+    tile_org[1] = morton2D_decode((uint32_t)(mcode>>1));
+    ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
 
-    proc_work_reset(work);
-    nthieves = mpi_steal_work(htrdr, rng_main, work);
-    nthreads = MMIN(nthieves, htrdr->nthreads);
-  } while(nthieves);
+    /* Define the tile origin in pixel space */
+    tile_org[0] *= TILE_SIZE;
+    tile_org[1] *= TILE_SIZE;
+
+    /* Compute the size of the tile clamped by the borders of the buffer */
+    tile_sz[0] = MMIN(TILE_SIZE, layout.width - tile_org[0]);
+    tile_sz[1] = MMIN(TILE_SIZE, layout.height - tile_org[1]);
+
+    SSP(rng_proxy_create2
+      (&htrdr->lifo_allocators[ithread],
+       &ssp_rng_threefry,
+       RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
+       RNG_SEQUENCE_SIZE, /* Size */
+       RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
+       1, &rng_proxy));
+    SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
+
+    res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
+      pix_sz, cam, spp, rng, buf);
+
+    SSP(rng_proxy_ref_put(rng_proxy));
+    SSP(rng_ref_put(rng));
+
+    if(res_local != RES_OK) {
+      ATOMIC_SET(&res, res_local);
+      break;
+    }
+
+    n = (size_t)ATOMIC_INCR(&nsolved_tiles);
+    pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
+
+    #pragma omp critical
+    if(pcent > htrdr->mpi_progress_render[0]) {
+      htrdr->mpi_progress_render[0] = pcent;
+      if(htrdr->mpi_rank == 0) {
+        update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
+      } else { /* Send the progress percentage to the master process */
+        send_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING, pcent);
+      }
+    }
+  }
+
+  if(ATOMIC_GET(&res) != RES_OK) goto error;
 
   /* Synchronize the process */
   mutex_lock(htrdr->mpi_mutex);
