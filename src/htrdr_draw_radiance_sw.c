@@ -456,7 +456,6 @@ draw_image
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t spp,
-   struct ssp_rng* rng_main,
    const size_t ntiles_x,
    const size_t ntiles_y,
    const size_t ntiles_adjusted,
@@ -464,6 +463,7 @@ draw_image
    struct htrdr_buffer* buf)
 {
   struct htrdr_buffer_layout layout;
+  struct ssp_rng* rng_proc = NULL;
   MPI_Request req;
   double pix_sz[2];
   size_t nthreads = 0;
@@ -471,8 +471,15 @@ draw_image
   size_t proc_ntiles = 0;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && cam && spp && rng_main && ntiles_adjusted && work && buf);
+  ASSERT(htrdr && cam && spp && ntiles_adjusted && work && buf);
   (void)ntiles_x, (void)ntiles_y;
+
+  res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "could not create the RNG used to sample a process "
+      "to steal -- %s.\n", res_to_cstr((res_T)res));
+    goto error;
+  }
 
   /* Compute the size of a pixel in the normalized image plane */
   htrdr_buffer_get_layout(buf, &layout);
@@ -500,13 +507,13 @@ draw_image
     int32_t pcent;
 
     /* Get a tile to draw */
-    #pragma omp critical 
-    { 
+    #pragma omp critical
+    {
       mcode = proc_work_get_tile(work);
       if(mcode == TILE_MCODE_NULL) { /* No more work on this process */
         /* Try to steal works to concurrent processes */
         proc_work_reset(work);
-        nthieves = mpi_steal_work(htrdr, rng_main, work);
+        nthieves = mpi_steal_work(htrdr, rng_proc, work);
         if(nthieves != 0) {
           mcode = proc_work_get_tile(work);
         }
@@ -572,6 +579,7 @@ draw_image
   mpi_wait_for_request(htrdr, &req);
 
 exit:
+  if(rng_proc) SSP(rng_ref_put(rng_proc));
   return (res_T)res;
 error:
   goto exit;
@@ -587,7 +595,6 @@ htrdr_draw_radiance_sw
    const size_t spp,
    struct htrdr_buffer* buf)
 {
-  struct ssp_rng* rng_main = NULL;
   size_t ntiles_x, ntiles_y, ntiles_adjusted;
   size_t itile;
   struct proc_work work;
@@ -609,13 +616,6 @@ htrdr_draw_radiance_sw
       "The pixel size must be the size of 3 * accumulators.\n",
       FUNC_NAME);
     res = RES_BAD_ARG;
-    goto error;
-  }
-
-  res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_main);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr, "%s: could not create the main RNG -- %s.\n",
-      FUNC_NAME, res_to_cstr((res_T)res));
     goto error;
   }
 
@@ -662,8 +662,8 @@ htrdr_draw_radiance_sw
 
     #pragma omp section
     {
-      draw_image(htrdr, cam, spp, rng_main, ntiles_x, ntiles_y,
-        ntiles_adjusted, &work, buf);
+      draw_image(htrdr, cam, spp, ntiles_x, ntiles_y, ntiles_adjusted, &work,
+        buf);
       /* The processes have no more work to do. Stop probing for thieves */
       ATOMIC_SET(&probe_thieves, 0);
     }
@@ -680,7 +680,6 @@ htrdr_draw_radiance_sw
 
 exit:
   proc_work_release(&work);
-  if(rng_main) SSP(rng_ref_put(rng_main));
   return (res_T)res;
 error:
   goto exit;
