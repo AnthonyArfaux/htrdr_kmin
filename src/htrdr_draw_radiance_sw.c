@@ -23,6 +23,7 @@
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_u32.h>
 #include <rsys/math.h>
+#include <rsys/mutex.h>
 #include <star/ssp.h>
 
 #include <omp.h>
@@ -37,6 +38,7 @@ STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
 /* Overall work of a process */
 struct proc_work {
+  struct mutex* mutex;
   struct darray_u32 tiles; /* #tiles to render */
   size_t itile; /* Next tile to render in the above list of tiles */
 };
@@ -74,53 +76,59 @@ proc_work_init(struct mem_allocator* allocator, struct proc_work* work)
   ASSERT(work);
   darray_u32_init(allocator, &work->tiles);
   work->itile = 0;
+  CHK(work->mutex = mutex_create());
 }
 
 static INLINE void
 proc_work_release(struct proc_work* work)
 {
   darray_u32_release(&work->tiles);
+  mutex_destroy(work->mutex);
 }
 
 static INLINE void
 proc_work_reset(struct proc_work* work)
 {
   ASSERT(work);
-  #pragma omp critical
-  {
-    darray_u32_clear(&work->tiles);
-    work->itile = 0;
-  }
+  mutex_lock(work->mutex);
+  darray_u32_clear(&work->tiles);
+  work->itile = 0;
+  mutex_unlock(work->mutex);
 }
 
 static INLINE void
 proc_work_add_tile(struct proc_work* work, const uint32_t mcode)
 {
-  #pragma omp critical
+  mutex_lock(work->mutex);
   CHK(darray_u32_push_back(&work->tiles, &mcode) == RES_OK);
+  mutex_unlock(work->mutex);
 }
 
 static INLINE uint32_t
 proc_work_get_tile(struct proc_work* work)
 {
   uint32_t mcode;
-  #pragma omp critical
-  {
-    if(work->itile >= darray_u32_size_get(&work->tiles)) {
-      mcode = TILE_MCODE_NULL;
-    } else {
-      mcode = darray_u32_cdata_get(&work->tiles)[work->itile];
-      ++work->itile;
-    }
+  ASSERT(work);
+  mutex_lock(work->mutex);
+  if(work->itile >= darray_u32_size_get(&work->tiles)) {
+    mcode = TILE_MCODE_NULL;
+  } else {
+    mcode = darray_u32_cdata_get(&work->tiles)[work->itile];
+    ++work->itile;
   }
+  mutex_unlock(work->mutex);
   return mcode;
 }
 
 static INLINE size_t
 proc_work_get_ntiles(struct proc_work* work)
 {
+  size_t sz = 0;
   ASSERT(work);
-  return darray_u32_size_get(&work->tiles);
+  mutex_lock(work->mutex);
+  sz = darray_u32_size_get(&work->tiles);
+  mutex_unlock(work->mutex);
+  return sz;
 }
 
 static res_T
