@@ -53,6 +53,8 @@ struct htrdr {
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
   size_t spp; /* #samples per pixel */
+  size_t width; /* Image width */
+  size_t height; /* Image height */
 
   FILE* output;
   struct str output_name;

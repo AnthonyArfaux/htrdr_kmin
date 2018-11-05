@@ -20,6 +20,7 @@
 #include "htrdr_sky.h"
 #include "htrdr_solve.h"
 
+#include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_u32.h>
 #include <rsys/math.h>
@@ -31,12 +32,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#define RNG_SEQUENCE_SIZE 100000
+#define RNG_SEQUENCE_SIZE 10000
 
 #define TILE_MCODE_NULL UINT32_MAX
 #define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
+/* Tile of row ordered image pixels */
 struct tile {
   struct list_node node;
   struct mem_allocator* allocator;
@@ -44,11 +46,12 @@ struct tile {
 
   struct tile_data {
     uint16_t x, y; /* 2D coordinates of the tile in tile space */
-    struct htrdr_accum accums[1/*dummy element*/]; /* Row ordered */
+    /* Simulate the flexible array member of the C99 standard. */
+    struct htrdr_accum accums[1/*dummy element*/];
   } data;
 };
 
-/* Overall work of a process */
+/* List of tile to compute onto the MPI process. */
 struct proc_work {
   struct mutex* mutex;
   struct darray_u32 tiles; /* #tiles to render */
@@ -86,7 +89,7 @@ tile_create(struct mem_allocator* allocator)
   struct tile* tile;
   const size_t tile_sz =
     sizeof(struct tile) - sizeof(struct htrdr_accum)/*rm dummy accum*/;
-  const size_t buf_sz =
+  const size_t buf_sz = /* Flexiblbe array element */
     TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
   ASSERT(allocator);
 
@@ -146,20 +149,21 @@ write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
 
+  /* Compute the row/column of the tile origin into the buffer */
   icol = tile_data->x * (size_t)TILE_SIZE;
   irow = tile_data->y * (size_t)TILE_SIZE;
+
+  /* Define the number of tile row/columns to write into the buffer */
   ncols_tile = MMIN(icol + TILE_SIZE, layout.width)  - icol;
   nrows_tile = MMIN(irow + TILE_SIZE, layout.height) - irow;
 
+  /* Copy the tile data, row by row */
   FOR_EACH(irow_tile, 0, nrows_tile) {
     char* buf_row = buf_mem + (irow + irow_tile) * layout.pitch;
     const struct htrdr_accum* tile_row =
       tile_data->accums + irow_tile*TILE_SIZE*3/*#channels*/;
-
-    memcpy
-      (buf_row + icol*sizeof(struct htrdr_accum)*3,
-       tile_row,
-       ncols_tile*sizeof(struct htrdr_accum)*3/*#channels*/);
+    memcpy(buf_row + icol*sizeof(struct htrdr_accum)*3, tile_row,
+      ncols_tile*sizeof(struct htrdr_accum)*3/*#channels*/);
   }
 }
 
@@ -311,7 +315,7 @@ mpi_sample_working_process(struct htrdr* htrdr, struct ssp_rng* rng)
   iproc = (int)(ssp_rng_canonical(rng) * (double)htrdr->mpi_nworking_procs);
 
   /* Find the rank of the sampled active process. Use a simple linear search
-   * since the overall number of process should be quite low; at most few
+   * since the overall number of processes should be quite low; at most few
    * dozens.  */
   i = 0;
   FOR_EACH(dst_rank, 0, htrdr->mpi_nprocs) {
@@ -382,43 +386,54 @@ mpi_gather_tiles
    const size_t ntiles,
    struct list_node* tiles)
 {
+  /* Compute the size of the tile_data */
   const size_t msg_sz =
     sizeof(struct tile_data) - sizeof(struct htrdr_accum)/*dummy*/
   + TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
-  struct list_node* node;
+
+  struct list_node* node = NULL;
   struct tile* tile = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && buf && tiles);
+  ASSERT(htrdr && tiles);
+  ASSERT(htrdr->mpi_rank != 0 || buf);
   (void)ntiles;
 
-  if(htrdr->mpi_rank != 0) {
+  if(htrdr->mpi_rank != 0) { /* Non master process */
+    /* Send the computed tile to the master process */
     LIST_FOR_EACH(node, tiles) {
       struct tile* t = CONTAINER_OF(node, struct tile, node);
       MPI(Send(&t->data, (int)msg_sz, MPI_CHAR, 0,
         HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD));
     }
-  } else {
+  } else { /* Master process */
     size_t itile = 0;
 
-    tile = tile_create(htrdr->allocator);
-    if(!tile) {
-      res = RES_MEM_ERR;
-      htrdr_log_err(htrdr,
-        "could not allocate the temporary tile used to gather the process "
-        "output data -- %s.\n", res_to_cstr(res));
-      goto error;
-
-    }
     LIST_FOR_EACH(node, tiles) {
       struct tile* t = CONTAINER_OF(node, struct tile, node);
       write_tile_data(buf, &t->data);
       ++itile;
     }
 
-    FOR_EACH(itile, itile, ntiles) {
-      MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
-        HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
-      write_tile_data(buf, &tile->data);
+    if(itile != ntiles) {
+      ASSERT(htrdr->mpi_nprocs > 1);
+
+      /* Create a temporary tile to receive the tile data computed by the
+       * concurrent MPI processes */
+      tile = tile_create(htrdr->allocator);
+      if(!tile) {
+        res = RES_MEM_ERR;
+        htrdr_log_err(htrdr,
+          "could not allocate the temporary tile used to gather the process "
+          "output data -- %s.\n", res_to_cstr(res));
+        goto error;
+      }
+
+      /* Receive the tile data of the concurret MPI processes */
+      FOR_EACH(itile, itile, ntiles) {
+        MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
+          HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+        write_tile_data(buf, &tile->data);
+      }
     }
   }
 
@@ -524,13 +539,14 @@ static res_T
 draw_image
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
+   const size_t width, /* Image width */
+   const size_t height, /* Image height */
    const size_t spp,
    const size_t ntiles_x,
    const size_t ntiles_y,
    const size_t ntiles_adjusted,
    const double pix_sz[2], /* Pixel size in the normalized image plane */
    struct proc_work* work,
-   const struct htrdr_buffer_layout* layout,
    struct list_node* tiles)
 {
   struct ssp_rng* rng_proc = NULL;
@@ -542,6 +558,7 @@ draw_image
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && spp && ntiles_adjusted && work && tiles);
   ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
+  ASSERT(width && height);
   (void)ntiles_x, (void)ntiles_y;
 
   res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
@@ -615,9 +632,13 @@ draw_image
     tile_org[1] *= TILE_SIZE;
 
     /* Compute the size of the tile clamped by the borders of the buffer */
-    tile_sz[0] = MMIN(TILE_SIZE, layout->width - tile_org[0]);
-    tile_sz[1] = MMIN(TILE_SIZE, layout->height - tile_org[1]);
+    tile_sz[0] = MMIN(TILE_SIZE, width - tile_org[0]);
+    tile_sz[1] = MMIN(TILE_SIZE, height - tile_org[1]);
 
+    /* Create a proxy RNG for the current tile. This proxy is used for the
+     * current thread only and thus it has to manage only one RNG. This proxy
+     * is initialised in order to ensure that a unique and predictable set of
+     * random numbers is used for the current tile. */
     SSP(rng_proxy_create2
       (&htrdr->lifo_allocators[ithread],
        &ssp_rng_threefry,
@@ -627,6 +648,7 @@ draw_image
        1, &rng_proxy));
     SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
 
+    /* Launch the tile rendering */
     res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
       pix_sz, cam, spp, rng, tile);
 
@@ -638,6 +660,7 @@ draw_image
       break;
     }
 
+    /* Update the progress status */
     n = (size_t)ATOMIC_INCR(&nsolved_tiles);
     pcent = (int32_t)((double)n * 100.0 / (double)proc_ntiles + 0.5/*round*/);
 
@@ -659,7 +682,7 @@ draw_image
   MPI(Ibarrier(MPI_COMM_WORLD, &req));
   mutex_unlock(htrdr->mpi_mutex);
 
-  /* Wait for synchronization */
+  /* Wait for processes synchronization */
   mpi_wait_for_request(htrdr, &req);
 
 exit:
@@ -676,44 +699,52 @@ res_T
 htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
+   const size_t width,
+   const size_t height,
    const size_t spp,
    struct htrdr_buffer* buf)
 {
+  char strbuf[128];
+  struct time t0, t1;
   struct list_node tiles;
   size_t ntiles_x, ntiles_y, ntiles, ntiles_adjusted;
   size_t itile;
   struct proc_work work;
-  struct htrdr_buffer_layout layout;
+  struct htrdr_buffer_layout layout = HTRDR_BUFFER_LAYOUT_NULL;
   size_t proc_ntiles_adjusted;
   double pix_sz[2];
   ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && cam && buf);
+  ASSERT(htrdr && cam && width && height);
+  ASSERT(htrdr->mpi_rank != 0 || buf);
 
   list_init(&tiles);
   proc_work_init(htrdr->allocator, &work);
 
-  htrdr_buffer_get_layout(buf, &layout);
-  ASSERT(layout.width || layout.height || layout.elmt_size);
+  if(htrdr->mpi_rank == 0) {
+    htrdr_buffer_get_layout(buf, &layout);
+    ASSERT(layout.width || layout.height || layout.elmt_size);
+    ASSERT(layout.width == width && layout.height == height);
 
-  if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
-  || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
-    htrdr_log_err(htrdr,
-      "%s: invalid buffer layout. "
-      "The pixel size must be the size of 3 * accumulators.\n",
-      FUNC_NAME);
-    res = RES_BAD_ARG;
-    goto error;
+    if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
+    || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
+      htrdr_log_err(htrdr,
+        "%s: invalid buffer layout. "
+        "The pixel size must be the size of 3 * accumulators.\n",
+        FUNC_NAME);
+      res = RES_BAD_ARG;
+      goto error;
+    }
   }
 
   /* Compute the overall number of tiles */
-  ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
-  ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles_x = (width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles_y = (height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles = ntiles_x * ntiles_y;
 
   /* Compute the pixel size in the normalized image plane */
-  pix_sz[0] = 1.0 / (double)layout.width;
-  pix_sz[1] = 1.0 / (double)layout.height;
+  pix_sz[0] = 1.0 / (double)width;
+  pix_sz[1] = 1.0 / (double)height;
 
   /* Adjust the #tiles for the morton-encoding procedure */
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
@@ -746,6 +777,8 @@ htrdr_draw_radiance_sw
     print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
   }
 
+  time_current(&t0);
+
   omp_set_nested(1); /* Enable nested threads for draw_image */
   #pragma omp parallel sections num_threads(2)
   {
@@ -754,8 +787,8 @@ htrdr_draw_radiance_sw
 
     #pragma omp section
     {
-      draw_image(htrdr, cam, spp, ntiles_x, ntiles_y, ntiles_adjusted, pix_sz,
-        &work, &layout, &tiles);
+      draw_image(htrdr, cam, width, height, spp, ntiles_x, ntiles_y,
+        ntiles_adjusted, pix_sz, &work, &tiles);
       /* The processes have no more work to do. Stop probing for thieves */
       ATOMIC_SET(&probe_thieves, 0);
     }
@@ -766,9 +799,17 @@ htrdr_draw_radiance_sw
     fprintf(stderr, "\n"); /* Add a new line after the progress statuses */
   }
 
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, strbuf, sizeof(strbuf));
+  htrdr_log(htrdr, "Rendering time: %s\n", strbuf);
+
   /* Gather accum buffers from the group of processes */
+  time_current(&t0);
   res = mpi_gather_tiles(htrdr, buf, ntiles, &tiles);
   if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, strbuf, sizeof(strbuf));
+  htrdr_log(htrdr, "Image gathering time: %s\n", strbuf);
 
 exit:
   { /* Free allocated tiles */

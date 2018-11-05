@@ -25,7 +25,6 @@
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
-#include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/str.h>
@@ -457,6 +456,8 @@ htrdr_init
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
   htrdr->spp = args->image.spp;
+  htrdr->width = args->image.definition[0];
+  htrdr->height = args->image.definition[1];
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
@@ -515,14 +516,18 @@ htrdr_init
     args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
   if(res != RES_OK) goto error;
 
-  res = htrdr_buffer_create(htrdr,
-    args->image.definition[0], /* Width */
-    args->image.definition[1], /* Height */
-    args->image.definition[0]*sizeof(struct htrdr_accum[3]), /* Pitch */
-    sizeof(struct htrdr_accum[3]),
-    ALIGNOF(struct htrdr_accum[3]), /* Alignment */
-    &htrdr->buf);
-  if(res != RES_OK) goto error;
+  /* Create the image buffer only on the master process; the image parts
+   * rendered by the processes are gathered onto the master process. */
+  if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
+    res = htrdr_buffer_create(htrdr,
+      args->image.definition[0], /* Width */
+      args->image.definition[1], /* Height */
+      args->image.definition[0]*sizeof(struct htrdr_accum[3]), /* Pitch */
+      sizeof(struct htrdr_accum[3]),
+      ALIGNOF(struct htrdr_accum[3]), /* Alignment */
+      &htrdr->buf);
+    if(res != RES_OK) goto error;
+  }
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);
   if(res != RES_OK) goto error;
@@ -609,16 +614,9 @@ htrdr_run(struct htrdr* htrdr)
       }
     }
   } else {
-    struct time t0, t1;
-    char buf[128];
-
-    time_current(&t0);
-    res = htrdr_draw_radiance_sw(htrdr, htrdr->cam, htrdr->spp, htrdr->buf);
+    res = htrdr_draw_radiance_sw(htrdr, htrdr->cam, htrdr->width,
+      htrdr->height, htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
-    time_sub(&t0, time_current(&t1), &t0);
-    time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
-    htrdr_log(htrdr, "Rendering time: %s\n", buf);
-
     if(htrdr->mpi_rank == 0) {
       res = dump_accum_buffer
         (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);

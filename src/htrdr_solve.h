@@ -48,8 +48,11 @@ extern LOCAL_SYM res_T
 htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
+   const size_t width, /* Image width */
+   const size_t height, /* Image height */
    const size_t spp, /* #samples per pixel, i.e. #realisations */
-   struct htrdr_buffer* buf); /* Buffer of struct htrdr_accum[3] */
+   /* Buffer of struct htrdr_accum[3]. May be NULL on on non master processes */
+   struct htrdr_buffer* buf); 
 
 extern LOCAL_SYM int
 htrdr_ground_filter
