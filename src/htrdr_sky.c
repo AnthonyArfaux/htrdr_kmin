@@ -1142,7 +1142,10 @@ setup_clouds
       const double upp_z = (double)(iz + 1) * sky->lut_cell_sz + low[2];
       darray_split_data_get(&sky->svx2htcp_z)[iz].index = iz2;
       darray_split_data_get(&sky->svx2htcp_z)[iz].height = upp[2];
-      if(upp_z >= upp[2]) upp[2] += sky->htcp_desc.vxsz_z[++iz2];
+      if(upp_z >= upp[2] && iz + 1 < nsplits) {
+        ASSERT(iz2 + 1 < sky->htcp_desc.spatial_definition[2]);
+        upp[2] += sky->htcp_desc.vxsz_z[++iz2];
+      }
     }
     ASSERT(eq_eps(upp[2] - low[2], len_z, 1.e-6));
   }
