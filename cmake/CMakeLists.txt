@@ -34,7 +34,7 @@ find_package(HTCP REQUIRED)
 find_package(HTGOP REQUIRED)
 find_package(HTMIE REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
-find_package(MPI REQUIRED)
+find_package(MPI 2 REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
