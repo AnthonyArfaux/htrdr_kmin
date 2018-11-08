@@ -505,8 +505,8 @@ htrdr_init
     goto error;
   }
 
-  res = htrdr_ground_create
-    (htrdr, args->filename_obj, args->repeat_ground, &htrdr->ground);
+  res = htrdr_ground_create(htrdr, args->filename_obj,
+    args->ground_reflectivity, args->repeat_ground, &htrdr->ground);
   if(res != RES_OK) goto error;
 
   proj_ratio =

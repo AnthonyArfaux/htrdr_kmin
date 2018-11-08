@@ -27,6 +27,7 @@ extern LOCAL_SYM res_T
 htrdr_ground_create
   (struct htrdr* htrdr,
    const char* obj_filename,
+   const double reflectivity, /* In [0, 1] */
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** ground);
 
@@ -37,6 +38,10 @@ htrdr_ground_ref_get
 extern LOCAL_SYM void
 htrdr_ground_ref_put
   (struct htrdr_ground* ground);
+
+extern LOCAL_SYM double
+htrdr_ground_get_reflectivity
+  (const struct htrdr_ground* ground);
 
 extern LOCAL_SYM res_T
 htrdr_ground_trace_ray

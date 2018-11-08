@@ -48,6 +48,7 @@ struct htrdr_ground {
   struct s3d_scene_view* view;
   float lower[3]; /* Ground lower bound */
   float upper[3]; /* Ground upper bound */
+  double reflectivity;
   int repeat; /* Make the ground infinite in X and Y */
 
   struct htrdr* htrdr;
@@ -223,6 +224,7 @@ res_T
 htrdr_ground_create
   (struct htrdr* htrdr,
    const char* obj_filename,
+   const double reflectivity,
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** out_ground)
 {
@@ -231,6 +233,7 @@ htrdr_ground_create
   struct time t0, t1;
   res_T res = RES_OK;
   ASSERT(htrdr && obj_filename && out_ground);
+  ASSERT(reflectivity >= 0 || reflectivity <= 1);
 
   ground = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ground));
   if(!ground) {
@@ -243,6 +246,7 @@ htrdr_ground_create
   ref_init(&ground->ref);
   ground->htrdr = htrdr;
   ground->repeat = repeat_ground;
+  ground->reflectivity = reflectivity;
 
   time_current(&t0);
   res = setup_ground(ground, obj_filename);
@@ -274,6 +278,13 @@ htrdr_ground_ref_put(struct htrdr_ground* ground)
 {
   ASSERT(ground);
   ref_put(&ground->ref, release_ground);
+}
+
+double
+htrdr_ground_get_reflectivity(const struct htrdr_ground* ground)
+{
+  ASSERT(ground);
+  return ground->reflectivity;
 }
 
 res_T

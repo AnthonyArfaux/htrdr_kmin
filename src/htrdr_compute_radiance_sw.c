@@ -285,7 +285,8 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  SSF(lambertian_reflection_setup(bsdf, 0.5));
+  SSF(lambertian_reflection_setup
+    (bsdf, htrdr_ground_get_reflectivity(htrdr->ground)));
 
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter

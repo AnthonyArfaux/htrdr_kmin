@@ -47,6 +47,7 @@ struct htrdr_args {
   double sun_azimuth; /* In degrees */
   double sun_elevation; /* In degrees */
   double optical_thickness; /* Threshold used during octree building */
+  double ground_reflectivity; /* Reflectivity of the ground */
 
   unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
@@ -81,6 +82,7 @@ struct htrdr_args {
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
   1.0, /* Optical thickness */                                                 \
+  0.5, /* Ground reflectivity */                                               \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
