@@ -1,7 +1,22 @@
 # High-Tune: RenDeRer
 
-This programs is used to test the implementation of radiative transfer
-Monte-Carlo algorithms in cloudy atmopsheres.
+This program is a part of the [High-Tune](http://www.umr-cnrm.fr/high-tune/)
+project: it illustrates the implementation of efficient radiative transfer
+Monte-Carlo algorithms in cloudy atmospheres.
+
+This program implements a rendering algorithm that computes the radiance in the
+spectral interval [380, 780] nanometres that reaches an image through a pinhole
+camera. The rendered scene is at least composed of an infinite 1D atmosphere
+along the Z axis. Optionally, one can add 3D data describing the cloud
+properties and/or a geometry describing the ground with a lambertian
+reflectivity. The clouds and the ground, can be both infinitely repeated along
+the X and Y axis.
+
+In addition of shared memory parallelism, htrdr supports the [*M*essage
+*P*assing *I*nterface](https://www.mpi-forum.org/) specification to
+parallelise its computations in a distribute memory environment; the HTRDR
+binary can be run either directly or through a MPI process launcher like
+`mpirun`.
 
 ## How to build
 
@@ -17,8 +32,9 @@ on the
 [Star-3DAW](https://gitlab.com/meso-star/star-3daw/),
 [Star-SF](https://gitlab.com/meso-star/star-sf/),
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
-[Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on the
-[OpenMP](http://www.openmp.org) 1.2 specification to parallelize its
+[Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on
+[OpenMP](http://www.openmp.org) 1.2 and the
+[MPI](https://www.mpi-forum.org/) 2.0 specification to parallelize its
 computations.
 
 First ensure that CMake is installed on your system. Then install the RCMake

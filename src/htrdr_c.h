@@ -18,6 +18,20 @@
 
 #include <rsys/rsys.h>
 
+#ifndef NDEBUG
+  #define MPI(Func) ASSERT(MPI_##Func == MPI_SUCCESS)
+#else
+  #define MPI(Func) MPI_##Func
+#endif
+
+enum htrdr_mpi_message {
+  HTRDR_MPI_PROGRESS_BUILD_OCTREE,
+  HTRDR_MPI_PROGRESS_RENDERING,
+  HTRDR_MPI_STEAL_REQUEST,
+  HTRDR_MPI_WORK_STEALING,
+  HTRDR_MPI_TILE_DATA
+};
+
 struct htrdr;
 
 #define SW_WAVELENGTH_MIN 380 /* In nanometer */
@@ -96,13 +110,48 @@ is_file_updated
 
 extern LOCAL_SYM res_T
 update_file_stamp
-  (struct htrdr* htrdr, 
+  (struct htrdr* htrdr,
    const char* filename);
 
 extern LOCAL_SYM res_T
 create_directory
   (struct htrdr* htrdt,
    const char* path);
+
+extern LOCAL_SYM void
+send_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress,
+   const int32_t percent);
+
+extern LOCAL_SYM void
+fetch_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress);
+
+extern LOCAL_SYM void
+print_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress);
+
+extern LOCAL_SYM void
+clear_mpi_progress
+  (struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress);
+
+extern int32_t
+total_mpi_progress
+  (const struct htrdr* htrdr,
+   const enum htrdr_mpi_message progress);
+
+static INLINE void
+update_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message progress)
+{
+  ASSERT(htrdr);
+  fetch_mpi_progress(htrdr, progress);
+  clear_mpi_progress(htrdr, progress);
+  print_mpi_progress(htrdr, progress);
+}
 
 #endif /* HTRDR_C_H */
 

@@ -16,7 +16,20 @@
 #include "htrdr.h"
 #include "htrdr_args.h"
 
+#include <mpi.h>
 #include <rsys/mem_allocator.h>
+
+static const char*
+thread_support_string(const int val)
+{
+  switch(val) {
+    case MPI_THREAD_SINGLE: return "MPI_THREAD_SINGLE";
+    case MPI_THREAD_FUNNELED: return "MPI_THREAD_FUNNELED";
+    case MPI_THREAD_SERIALIZED: return "MPI_THREAD_SERIALIZED";
+    case MPI_THREAD_MULTIPLE: return "MPI_THREAD_MULTIPLE";
+    default: FATAL("Unreachable code.\n"); break;
+  }
+}
 
 /*******************************************************************************
  * Program
@@ -29,11 +42,31 @@ main(int argc, char** argv)
   size_t memsz = 0;
   int err = 0;
   int is_htrdr_init = 0;
+  int thread_support = 0;
   res_T res = RES_OK;
+
+  err = MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &thread_support);
+  if(err != MPI_SUCCESS) {
+    fprintf(stderr, "Error initializing MPI.\n");
+    goto error;
+  }
+
+  if(thread_support != MPI_THREAD_SERIALIZED) {
+    fprintf(stderr, "The provided MPI implementation does not support "
+      "serialized API calls from multiple threads. Provided thread support: "
+      "%s.\n", thread_support_string(thread_support));
+    goto error;
+  }
 
   res = htrdr_args_init(&args, argc, argv);
   if(res != RES_OK) goto error;
   if(args.quit) goto exit;
+
+  if(args.dump_vtk) {
+    int rank;
+    CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+    if(rank != 0) goto exit; /* Nothing to do except for the master process */
+  }
 
   res = htrdr_init(NULL, &args, &htrdr);
   if(res != RES_OK) goto error;
@@ -43,6 +76,7 @@ main(int argc, char** argv)
   if(res != RES_OK) goto error;
 
 exit:
+  MPI_Finalize();
   if(is_htrdr_init) htrdr_release(&htrdr);
   htrdr_args_release(&args);
   if((memsz = mem_allocated_size()) != 0) {

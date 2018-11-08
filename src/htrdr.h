@@ -35,6 +35,7 @@ struct htrdr_buffer;
 struct htrdr_sky;
 struct htrdr_rectangle;
 struct mem_allocator;
+struct mutext;
 struct s3d_device;
 struct s3d_scene;
 struct ssf_bsdf;
@@ -52,13 +53,28 @@ struct htrdr {
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
   size_t spp; /* #samples per pixel */
+  size_t width; /* Image width */
+  size_t height; /* Image height */
 
   FILE* output;
   struct str output_name;
 
-  unsigned nthreads;
-  int dump_vtk;
-  int verbose;
+  unsigned nthreads; /* #threads of the process */
+  int dump_vtk; /* Dump octree VTK */
+  int cache_grids; /* Use/Precompute grid caches */
+  int verbose; /* Verbosity level */
+
+  int mpi_rank; /* Rank of the process in the MPI group */
+  int mpi_nprocs; /* Overall #processes in the MPI group */
+  char* mpi_err_str; /* Temp buffer used to store MPI error string */
+  int8_t* mpi_working_procs; /* Define the rank of active processes */
+  size_t mpi_nworking_procs;
+
+  /* Process progress percentage */
+  int32_t* mpi_progress_octree;
+  int32_t* mpi_progress_render;
+
+  struct mutex* mpi_mutex; /* Protect MPI calls from concurrent threads */
 
   struct logger logger;
   struct mem_allocator* allocator;
@@ -108,6 +124,27 @@ htrdr_log_warn
   __attribute((format(printf, 2, 3)))
 #endif
   ;
+
+extern LOCAL_SYM const char*
+htrdr_mpi_error_string
+  (struct htrdr* htrdr,
+   const int mpi_err);
+
+extern LOCAL_SYM void
+htrdr_fprintf
+  (struct htrdr* htrdr,
+   FILE* stream,
+   const char* msg,
+   ...)
+#ifdef COMPILER_GCC
+  __attribute((format(printf, 3, 4)))
+#endif
+  ;
+
+extern LOCAL_SYM void
+htrdr_fflush
+  (struct htrdr* htrdr,
+   FILE* stream);
 
 #endif /* HTRDR_H */
 

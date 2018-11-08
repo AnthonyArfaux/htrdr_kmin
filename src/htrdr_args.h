@@ -47,10 +47,12 @@ struct htrdr_args {
   double sun_azimuth; /* In degrees */
   double sun_elevation; /* In degrees */
   double optical_thickness; /* Threshold used during octree building */
+  double ground_reflectivity; /* Reflectivity of the ground */
 
   unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
+  int cache_grids; /* Use grid caching mechanism */
   int verbose; /* Verbosity level */
   int repeat_clouds; /* Make the clouds infinite in X and Y */
   int repeat_ground; /* Make the ground infinite in X and Y */
@@ -80,9 +82,11 @@ struct htrdr_args {
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
   1.0, /* Optical thickness */                                                 \
+  0.5, /* Ground reflectivity */                                               \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
+  0, /* Grid cache */                                                          \
   0, /* Verbose flag */                                                        \
   0, /* Repeat clouds */                                                       \
   0, /* Repeat ground */                                                       \

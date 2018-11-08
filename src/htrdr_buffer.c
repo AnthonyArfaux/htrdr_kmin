@@ -163,3 +163,4 @@ htrdr_buffer_at(struct htrdr_buffer* buf, const size_t x, const size_t y)
   ASSERT(buf && x < buf->width && y < buf->height);
   return buf->mem + y*buf->pitch + x*buf->elmtsz;
 }
+
