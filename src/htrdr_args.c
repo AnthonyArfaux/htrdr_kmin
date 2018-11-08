@@ -30,7 +30,10 @@ static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s -i INPUT [OPIONS]\n\n", cmd);
+  printf("Usage: %s -i INPUT [OPIONS]\n", cmd);
+  printf(
+"Estimates the radiance in the spectral interval [380, 780] nanometres that\n"
+"reaches an image through a pinhole camera.\n\n");
   printf(
 "  -a FILENAME      path of gas optical properties file.\n");
   printf(
@@ -42,7 +45,11 @@ print_help(const char* cmd)
 "                   sun direction in degrees. Following the right-handed\n"
 "                   convention, the azimuthal rotation is counter-clockwise\n"
 "                   around the Z axis, with 0 aligned on the X axis. The\n"
-"                   elevation rotation starts from 0 up to 90 at zenith.\n");
+"                   elevation rotation starts from 0 up to 90 at zenith. By\n"
+"                   default, the AZIMUTH angle is set to %g and the ELEVATION is\n"
+"                   set to %g.\n",
+    HTRDR_ARGS_DEFAULT.sun_azimuth,
+    HTRDR_ARGS_DEFAULT.sun_elevation);
   printf(
 "  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
   printf(
