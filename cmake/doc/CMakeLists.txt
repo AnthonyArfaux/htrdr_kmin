@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+set(HTRDR_DOC_DIR ${PROJECT_SOURCE_DIR}/../doc)
+
 ################################################################################
 # Look for the a2x program
 ################################################################################
@@ -27,11 +29,24 @@ endif()
 ################################################################################
 # Copy doc files
 ################################################################################
+set(MAN_NAMES htrdr-image.5)
+
+set(MAN_FILES)
+foreach(_name IN LISTS MAN_NAMES)
+  set(_src ${HTRDR_DOC_DIR}/${_name}.txt)
+  set(_dst ${CMAKE_CURRENT_BINARY_DIR}/${_name}.txt)
+  add_custom_command(
+    OUTPUT ${_dst}
+    COMMAND ${CMAKE_COMMAND} -E copy ${_src} ${_dst}
+    DEPENDS ${_src}
+    COMMENT "Copy the asciidoc ${_src}"
+    VERBATIM)
+  list(APPEND MAN_FILES ${_dst})
+endforeach()
+add_custom_target(man-copy ALL DEPENDS ${MAN_FILES})
+
 configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/htrdr.1.txt @ONLY)
-
-add_custom_target(man-copy ALL) # TODO
-
 list(APPEND MAN_NAMES htrdr.1)
 
 ################################################################################

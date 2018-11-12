@@ -255,5 +255,5 @@ NO WARRANTY, to the extent permitted by law.
 
 SEE ALSO
 --------
-*csplit*(1), *htpp*(1), *mpirun*(1), *htcp*(5), *htmie*(5), *htrdr-image*(5)
+*csplit*(1), *mpirun*(1), *htcp*(5), *htmie*(5), *htrdr-image*(5)
 
