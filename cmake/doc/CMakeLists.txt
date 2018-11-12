@@ -20,10 +20,10 @@ set(HTRDR_DOC_DIR ${PROJECT_SOURCE_DIR}/../doc)
 ################################################################################
 find_program(A2X NAMES a2x a2x.py)
 if(NOT A2X)
-  unset(_roff)
   message(WARNING
     "The `a2x' program is missing. "
     "The htrdr man pages cannot be generated.")
+  return()
 endif()
 
 ################################################################################
