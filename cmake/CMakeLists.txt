@@ -20,9 +20,6 @@ enable_testing()
 set(HTRDR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 option(NO_TEST "Do not build the tests" OFF)
 
-set(HTRDR_DOC "TROFF & HTML" CACHE STRING
-  "Type of the documentation to generate install.")
-
 ################################################################################
 # Check dependencies
 ################################################################################
@@ -127,8 +124,6 @@ rcmake_prepend_path(HTRDR_FILES_SRC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_INC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
-
-message(STATUS ${HTRDR_FILES_INC2})
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
 target_link_libraries(htrdr HTCP HTGOP HTMIE RSys Star3D Star3DAW StarSF StarSP StarVX)
