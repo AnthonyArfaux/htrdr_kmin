@@ -1,0 +1,259 @@
+// Copyright (C) 2018 CNRS, Université Paul Sabatier, |Meso|Star>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+:toc:
+
+htrdr(1)
+========
+
+NAME
+----
+htrdr - render the image of a cloudy atmosphere
+
+SYNOPSIS
+--------
+[verse]
+*htrdr* [_option_]... -a _atmosphere_ -m _mie_
+
+DESCRIPTION
+-----------
+*htrdr* is an image renderer in the visible part of the spectrum, for scenes
+composed of an atmospheric gaz mixture, clouds, and a ground. It uses spectral
+data that should be provided for the pressure and temperature atmospheric
+vertical profile [1] (*-a* _atmosphere_), the liquid water content
+in suspension within the clouds that is a result of Large Eddy Simulation
+computations stored in a *htcp*(5) file (*-c* _clouds_), and the optical
+properties of water droplets that have been obtained from a Mie code and
+formatted according to the *htmie*(5) file format (*-m* _mie_). The user
+also has to provide: the characteristics of the simulated camera (*-C*
+_camera_), the sensor definition (*-i* _image_), and the position of the sun
+(*-D* _azimuth_,_elevation_). It is also possible to provide an OBJ [2]
+representing the ground geometry (*-g* _ground_). Both, the clouds and the
+ground, can be infinitely repeated along the X and Y axis by setting the *-r*
+and the *-R* options, respectively.
+
+*htrdr* evaluates the intensity incoming on each pixel of the sensor
+array. The underlying algorithm is based on a Monte-Carlo method: it consists
+in simulating a given number of optical paths originating from the camera,
+directed into the atmosphere, taking into account light absorption and
+scattering phenomena. The computation is performed over the whole visible part
+of the spectrum, for the three components of the CIE 1931 XYZ colorimetric
+space that are subsequently recombined in order to obtain the final color for
+each pixel, and finally the whole image of the scene as seen from the required
+observation position.
+
+In *htrdr* the spatial unit 1.0 corresponds to one meter. The estimated
+radiance of each pixel component is given in W.sr^-1.m^-2. The pixels are
+written into the _output_ file or to the standard output whether the *-o*
+option is defined or not, respectively.  The output image is al ist of raw
+ASCII data formatted with respect to the *htrdr-image*(5) file format. Since
+*htrdr* relies on the Monte-Carlo method, the estimated radiance of a pixel
+component is provided with its numerical accuracy.
+
+*htrdr* supports the shared memory parallelism and relies on the Message
+Passing Interface specification [5] to parallelise its computations in a
+distribute memory environment. *htrdr* can thus be run either directly or
+through a MPI process launcher like *mpirun*(1).
+
+OPTIONS
+-------
+*-a* _atmosphere_::
+  Path toward the file containing the gas optical properties of the atmosphere.
+  Data must be formatted according to the fileformat described in [1].
+
+*-c* _clouds_::
+  Submit a *htcp*(5) file describing the properties of the clouds. If not
+  defined, only the atmopshere properties submitted through the *-a* option
+  are taken into account.
+
+*-C* <__camera-parameter__:...>::
+  Define the rendering point of view. Available camera parameters are:
+
+  **fov**=**_angle_**;;
+    Vertical field of view of the camera in [30, 120] degrees. By default
+    _angle_ is set to @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Position of the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
+
+*-D* <__azimuth__,__elevation__>::
+  Direction toward the sun center. The direction is defined by two angles in
+  degrees: the __azimuth__ angle in [0, 360[ and the __elevation__ angle in [0,
+  90].  Following the right-handed convention, the azimuthal rotation is
+  counter-clockwise, with 0 degree on the X axis. The elevation starts from 0
+  degree for a direction in the XY plane, up to 90 degrees at zenith. Thus
+  -D0,0 -D0,90 -D0,180 and -D0,270 will produce solar vectors {-1,0,0} {0,-1,0}
+  {+1,0,0} and {0,+1,0} respectively, while -D__azimuth__,90 will produce
+  {0,0,-1} regardless of _azimuth value.
+
+*-d*::
+  Write in _output_ the data structure used to speed up the radiative transfer
+  computations in the clouds. The written data are 3D grids saved in the VTK
+  file format [4]. Each grid are separated of the previous one by a line with
+  three minus character, i.e. '---'.
+
+*-e* _reflectivity_::
+  Reflectivity of the ground geometry in [0, 1]. By default it is set to
+  @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@.
+
+*-f*::
+  Force overwrite of the _output_ file.
+
+*-g* _ground_::
+  Path toward an OBJ file [3] representing the ground geometry.
+
+*-G*::
+  Pre-compute or use cached grids of the cloud properties built from the
+  _clouds_, the _atmosphere_ and the _mie_ files. If the corresponding grids
+  were generated in a previous run, reuse them as far as it is possible, i.e.
+  if the _clouds_, the _atmosphere_ and the _mie_ files were not updated.  The
+  cached data, are written in a hidden directory named *.htrdr* located in the
+  directory where *htrdr* is run. On platforms with an efficient hard-drive and
+  plenty of random access memory, this cache mechanism can speed-up the
+  pre-computation step on _clouds_ data.  Note that this option is incompatible
+  with a MPI execution and is thus forced to off if *htrdr* is run through a
+  process launcher.
+
+*-h*::
+  List short help and exit.
+
+*-i* <__image-parameter__:>::
+  Define the image to render. Available image parameters are:
+
+  **def**=**_width_**,**_height_**;;
+    Definition of the image. By default the image definition is
+    @HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+
+  **spp**=**_samples-count_**;;
+    Number of samples per pixel and per component. i.e. the estimation of a
+    pixel will use "3 * _samples-count_" Monte-Carlo realisations, one set of
+    _samples-count_ realisations for each X, Y and Z component of the CIE 1931
+    XYZ color space. By default, *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+
+*-R*::
+  Infinitely repeat the _ground_ along the X and Y axis.
+
+*-r*::
+  Infinitely repeat the _clouds_ along the X and Y axis.
+
+*-m* _mie_::
+  Path toward a *htmie*(5) file defining the optical properties of water
+  droplets.
+
+*-o* _output_::
+  File where *htrdr* write its _output_ data. If not defined, write results to
+  standard output.
+
+*-T* _threshold_::
+  Optical thickness used as threshold criteria to partition the properties of
+  the clouds. By default its value is @HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+
+*-t* _threads-count_::
+  Hint on the number of threads to use. By default use as many threads as CPU
+  cores.
+
+*-v*::
+  Make *htrdr* verbose.
+
+*--version*::
+  Display version information and exit.
+
+EXAMPLES
+--------
+
+Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
+zenith. The vertical atmospheric gaz mixture along the Z axis is described in
+the *gas.txt* file. The Mie data are provided through the *Mie.nc* file and
+the ground geometry is a quad repeated to the infinity. The camera is
+positioned at 400 meters high and looks toward the positive Y axis. The
+definition of the rendered image is *800* by *600* pixels and the radiance of
+each pixel component is estimated with *64* Monte-Carlo realisations. The
+resulting image is written to *output* excepted if the file already exists; in
+this case an error is notified, the program stops and the *output* file
+remains unchanged:
+
+    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
+      -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+      -i def=800x600:spp=64 \
+      -o output
+
+Add clouds to the previous scene and use a more complex geometry to represent
+the ground. The ground geometry was carefully designed to be cyclic and can be
+thus repeated to the infinity without visual glitches. Use the *-f* option to
+write the rendered image to *output* even though the file already exists:
+
+    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp \
+      -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+      -i def=800x600:spp=64 \
+      -f -o output
+
+Move the sun by setting its azimuthal and elevation angles to *120* and *40*
+degrees respectively. Use the *-G* option to enable the cache mechanism on
+clouds data. Increase the image definition to *1280* by *720* and set the
+number of samples per pixel component to *1024*. Write results on standard
+output and redirect it to the *output* file:
+
+    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -G \
+      -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+      -i def=1280x720:spp=1024 > output
+
+Write into *output* the data structures used to partition the clouds
+properties. Use the *csplit*(1) Unix command to extract from *output* the list
+of the generated grids and save each of them in a specific VTK file whose name
+is *cloud_grid_*<__NUM__>*.vtk with __NUM__ in [0, N-1] where N is the number
+of grids written into *output*:
+
+    $ htrdr -a gas.txt -m Mie.nc -c clouds.htcp -d -f -o output
+    $ csplit -f cloud_grid_ -b %02d.vtk -z --suppress-matched output /^---$/ {*}
+
+Use *mpirun*(1) to launch *htrdr* on several hosts defined in the *my_hosts*
+file. Make the clouds infinite along the X and Y axis:
+
+  $ mpirun --hostfile my_hosts htrdr \
+      -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -r \
+      -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+      -i def=1280x720:spp=1024 \
+      -f -o output
+
+NOTES
+-----
+1. High-Tune: Gas Optical Properties file format -
+  <https://www.meso-star.com/projects/dowloads/htgop.pdf>
+2. Network Common Data Form - <https://www.unidata.ucar.edu/software/netcdf/>
+3. OBJ file format -
+  <http://www.martinreddy.net/gfx/3d/OBJ.spec>
+4. VTK file format -
+  <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
+
+COPYRIGHT
+---------
+*htrdr* is copyright &copy; 2018 CNRS, Université Paul Sabatier
+<contact-edstar@laplace.univ-tlse.fr>, |Meso|Star> <contact@meso-star.com>.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is a free software. You are free to change and redistribute it. There is
+NO WARRANTY, to the extent permitted by law.
+
+SEE ALSO
+--------
+*csplit*(1), *htpp*(1), *mpirun*(1), *htcp*(5), *htmie*(5), *htrdr-image*(5)
+

@@ -16,6 +16,7 @@
 #define _POSIX_C_SOURCE 2 /* strtok_r support */
 
 #include "htrdr_args.h"
+#include "htrdr_version.h"
 
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
@@ -30,63 +31,57 @@ static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s -i INPUT [OPIONS]\n", cmd);
+  printf("Usage: %s [OPION]... -a ATMOSPHERE -m MIE\n", cmd);
   printf(
-"Estimates the radiance in the spectral interval [380, 780] nanometres that\n"
-"reaches an image through a pinhole camera.\n\n");
+"Render an image in the visible part of the spectrum, for scenes composed of an\n"
+"atmospheric gaz mixture, clouds and a ground.\n\n");
   printf(
-"  -a FILENAME      path of gas optical properties file.\n");
+"  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
-"  -c FILENAME      path of the HTCP cloud properties file.\n");
+"  -c CLOUDS      properties of the clouds.\n");
   printf(
-"  -C <camera>      define the rendering point of view.\n");
+"  -C <camera>    define the rendering point of view.\n");
   printf(
 "  -D AZIMUTH,ELEVATION\n"
-"                   sun direction in degrees. Following the right-handed\n"
-"                   convention, the azimuthal rotation is counter-clockwise\n"
-"                   around the Z axis, with 0 aligned on the X axis. The\n"
-"                   elevation rotation starts from 0 up to 90 at zenith. By\n"
-"                   default, the AZIMUTH angle is set to %g and the ELEVATION is\n"
-"                   set to %g.\n",
+"                 direction in degrees toward the sun center. By default\n"
+"                 AZIMUTH is %g and ELEVATION is %g.\n",
     HTRDR_ARGS_DEFAULT.sun_azimuth,
     HTRDR_ARGS_DEFAULT.sun_elevation);
   printf(
-"  -d               dump octree data to OUTPUT wrt the VTK ASCII file format.\n");
+"  -d             dump octrees data to OUTPUT and exit.\n");
   printf(
-"  -e               ground reflectivity in [0, 1]. By default its value is `%g'.\n",
+"  -e REFLECT     ground reflectivity in [0, 1]. Default value is %g.\n",
     HTRDR_ARGS_DEFAULT.ground_reflectivity);
   printf(
-"  -f               overwrite the OUTPUT file if it already exists.\n");
+"  -f             overwrite the OUTPUT file if it already exists.\n");
   printf(
-"  -g FILENAME      path of an OBJ file representing the ground geometry.\n");
+"  -g GROUND      ground geometry.\n");
   printf(
-"  -G               precompute/use grids of raw cloud opitical properties built\n"
-"                   from the HTCP file, the atmospheric profile and the Mie's\n"
-"                   data. If the corresponding grids were generated in a\n"
-"                   previous run, reuse them as far as it is possible, i.e. if\n"
-"                   the HTCP, Mie and atmospheric files were not updated.\n");
+"  -G             precompute/use cached grids of cloud properties.\n");
   printf(
-"  -h               display this help and exit.\n");
+"  -h             display this help and exit.\n");
   printf(
-"  -i <image>       define the image to compute.\n");
+"  -i <image>     define the image to compute.\n");
   printf(
-"  -R               infinitely repeat the ground along the X and Y axis.\n");
+"  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
-"  -r               infinitely repeat the clouds along the X and Y axis.\n");
+"  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
-"  -m FILENAME      path of the Mie data file.\n");
+"  -m MIE         file of Mie's data.\n");
   printf(
-"  -o OUTPUT        file where data are written. If not defined, data are\n"
-"                   written to standard output.\n");
+"  -o OUTPUT      file where data are written. If not defined, data are\n"
+"                 written to standard output.\n");
   printf(
-"  -T THRESHOLD     optical thickness used as threshold during the octree\n"
-"                   building. By default its value is `%g'.\n",
+"  -T THRESHOLD   optical thickness used as threshold during the octree\n"
+"                 building. By default its value is `%g'.\n",
     HTRDR_ARGS_DEFAULT.optical_thickness);
   printf(
-"  -t THREADS       hint on the number of threads to use. By default use as\n"
-"                   many threads as CPU cores.\n");
+"  -t THREADS     hint on the number of threads to use. By default use as\n"
+"                 many threads as CPU cores.\n");
   printf(
-"  -v               make the program more verbose.\n");
+"  -v             make the program verbose.\n");
+  printf(
+"  --version      display version information and exit.\n");
   printf("\n");
   printf(
 "%s (C) 2018 CNRS, Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>,\n"
@@ -332,10 +327,22 @@ res_T
 htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
 {
   int opt;
+  int i;
   res_T res = RES_OK;
   ASSERT(args && argc && argv);
 
   *args = HTRDR_ARGS_DEFAULT;
+
+  FOR_EACH(i, 1, argc) {
+    if(!strcmp(argv[i], "--version")) {
+      printf("High-Tune: RenDeRer %d.%d.%d\n",
+        HTRDR_VERSION_MAJOR,
+        HTRDR_VERSION_MINOR,
+        HTRDR_VERSION_PATCH);
+      args->quit = 1;
+      goto exit;
+    }
+  }
 
   while((opt = getopt(argc, argv, "a:C:c:D:de:fGg:hi:m:o:RrT:t:v")) != -1) {
     switch(opt) {

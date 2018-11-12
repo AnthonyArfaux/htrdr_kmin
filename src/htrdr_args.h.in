@@ -71,18 +71,18 @@ struct htrdr_args {
     {0, 1, 0}, /* plane up */                                                  \
     {1, 1},    /* plane size */                                                \
   }, {                                                                         \
-    {0, 0, 0}, /* Camera position */                                           \
-    {0, 0, 1}, /* Camera target */                                             \
-    {0, 1, 0}, /* Camera up */                                                 \
-    70, /* Horizontal field of view */                                         \
+    {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}, /* Camera position */                   \
+    {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}, /* Camera target */                     \
+    {@HTRDR_ARGS_DEFAULT_CAMERA_UP@}, /* Camera up */                          \
+    @HTRDR_ARGS_DEFAULT_CAMERA_FOV@, /* Horizontal field of view */            \
   }, {                                                                         \
-    {32, 32},  /* image definition */                                          \
-    1          /* #samples per pixel */                                        \
+    {@HTRDR_ARGS_DEFAULT_IMG_WIDTH@, @HTRDR_ARGS_DEFAULT_IMG_HEIGHT@},         \
+    @HTRDR_ARGS_DEFAULT_IMG_SPP@                                               \
   },                                                                           \
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
   1.0, /* Optical thickness */                                                 \
-  0.5, /* Ground reflectivity */                                               \
+  @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@, /* Ground reflectivity */          \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \

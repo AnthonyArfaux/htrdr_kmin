@@ -6,11 +6,10 @@ Monte-Carlo algorithms in cloudy atmospheres.
 
 This program implements a rendering algorithm that computes the radiance in the
 spectral interval [380, 780] nanometres that reaches an image through a pinhole
-camera. The rendered scene is at least composed of an infinite 1D atmosphere
-along the Z axis. Optionally, one can add 3D data describing the cloud
-properties and/or a geometry describing the ground with a lambertian
-reflectivity. The clouds and the ground, can be both infinitely repeated along
-the X and Y axis.
+camera. The rendered scene is at least composed of an 1D atmosphere along the Z
+axis. Optionally, one can add 3D data describing the cloud properties and/or a
+geometry describing the ground with a lambertian reflectivity. The clouds and
+the ground, can be both infinitely repeated along the X and Y axis.
 
 In addition of shared memory parallelism, htrdr supports the [*M*essage
 *P*assing *I*nterface](https://www.mpi-forum.org/) specification to

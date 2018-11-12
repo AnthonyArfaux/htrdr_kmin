@@ -20,6 +20,9 @@ enable_testing()
 set(HTRDR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 option(NO_TEST "Do not build the tests" OFF)
 
+set(HTRDR_DOC "TROFF & HTML" CACHE STRING
+  "Type of the documentation to generate install.")
+
 ################################################################################
 # Check dependencies
 ################################################################################
@@ -52,15 +55,40 @@ include_directories(
   ${HTCP_INCLUDE_DIR}
   ${HTGOP_INCLUDE_DIR}
   ${HTMIE_INCLUDE_DIR}
-  ${MPI_INCLUDE_PATH})
+  ${MPI_INCLUDE_PATH}
+  ${CMAKE_CURRENT_BINARY_DIR})
 
 ################################################################################
-# Configure and define targets
+# Generate files
 ################################################################################
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+
+set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0")
+set(HTRDR_ARGS_DEFAULT_CAMERA_TGT "0,1,0")
+set(HTRDR_ARGS_DEFAULT_CAMERA_UP  "0,0,1")
+set(HTRDR_ARGS_DEFAULT_CAMERA_FOV "70")
+set(HTRDR_ARGS_DEFAULT_IMG_WIDTH "320")
+set(HTRDR_ARGS_DEFAULT_IMG_HEIGHT "240")
+set(HTRDR_ARGS_DEFAULT_IMG_SPP "1")
+set(HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY "0.5")
+
+configure_file(${HTRDR_SOURCE_DIR}/htrdr_version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/htrdr_version.h @ONLY)
+
+configure_file(${HTRDR_SOURCE_DIR}/htrdr_args.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/htrdr_args.h @ONLY)
+
+################################################################################
+# Add sub projects
+################################################################################
+add_subdirectory(doc)
+
+################################################################################
+# Configure and define targets
+################################################################################
 
 set(HTRDR_FILES_SRC
   htrdr.c
@@ -79,7 +107,6 @@ set(HTRDR_FILES_SRC
 set(HTRDR_FILES_INC
   htrdr.h
   htrdr_c.h
-  htrdr_args.h
   htrdr_buffer.h
   htrdr_camera.h
   htrdr_grid.h
@@ -89,14 +116,21 @@ set(HTRDR_FILES_INC
   htrdr_sky.h
   htrdr_sun.h
   htrdr_solve.h)
+set(HTRDR_FILES_INC2 # Generated files
+  htrdr_args.h
+  htrdr_version.h)
+
 set(HTDRD_FILES_DOC COPYING README.md)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_FILES_SRC ${HTRDR_SOURCE_DIR})
 rcmake_prepend_path(HTRDR_FILES_INC ${HTRDR_SOURCE_DIR})
+rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
-add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC})
+message(STATUS ${HTRDR_FILES_INC2})
+
+add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
 target_link_libraries(htrdr HTCP HTGOP HTMIE RSys Star3D Star3DAW StarSF StarSP StarVX)
 
 if(CMAKE_COMPILER_IS_GNUCC)
