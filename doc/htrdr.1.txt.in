@@ -202,22 +202,26 @@ remains unchanged:
 Add clouds to the previous scene and use a more complex geometry to represent
 the ground. The ground geometry was carefully designed to be cyclic and can be
 thus repeated to the infinity without visual glitches. Use the *-f* option to
-write the rendered image to *output* even though the file already exists:
+write the rendered image to *output* even though the file already exists.
+Fianlly, use the *htpp*(1) command to convert the *htrdr-image*(5) saved in
+output in a regular PPM image [5]:
 
     $ htrdr -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
       -f -o output
+    $ htpp output -o image.ppm
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*
 degrees respectively. Use the *-G* option to enable the cache mechanism on
 clouds data. Increase the image definition to *1280* by *720* and set the
 number of samples per pixel component to *1024*. Write results on standard
-output and redirect it to the *output* file:
+output and convert the resulting image in PPM before visualising it through the
+*feh*(1) image viewer:
 
     $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -G \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
-      -i def=1280x720:spp=1024 > output
+      -i def=1280x720:spp=1024 | htpp | feh -
 
 Write into *output* the data structures used to partition the clouds
 properties. Use the *csplit*(1) Unix command to extract from *output* the list
@@ -246,6 +250,7 @@ NOTES
 3. VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 4. MPI specifications - <https://www.mpi-forum.org/docs/>
+5. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
 
 COPYRIGHT
 ---------
@@ -258,7 +263,9 @@ NO WARRANTY, to the extent permitted by law.
 SEE ALSO
 --------
 *csplit*(1),
+*feh*(1),
 *mpirun*(1),
 *htcp*(5),
 *htmie*(5),
+*htpp*(1),
 *htrdr-image*(5)

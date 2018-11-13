@@ -40,6 +40,9 @@ pixels per line and M the overall number of lines in the image, the first N
 pixels correspond to the pixels of the top line of the image, the following N
 pixels are the pixels of the second line and so on.
 
+Note that the *htpp*(1) program can be used to convert an *htrdr-image* in a
+regular PPM image [1].
+
 GRAMMAR
 -------
 
@@ -104,6 +107,10 @@ respectively.
 0.0003078 2.61915e-05 0.0004609 0.000113663 0.0002699 4.29776e-05 # (800,600)
 ------
 
+NOTES
+-----
+1. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+
 SEE ALSO
 --------
-*htrdr*(1)
+*htpp*(1), *htrdr*(1)
