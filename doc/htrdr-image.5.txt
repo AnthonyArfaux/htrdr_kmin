@@ -73,7 +73,7 @@ The following output is emitted by *htrdr*(1) invoked to render an image of
 not necessarily written as it by *htrdr*(1); they are are used here only to
 help in understanding the data layout. The comment after each pixel gives the
 two dimensional index of the pixel in the image: the first and second integer
-is the index of the line and the column of the pixel into the image,
+is the index of the line and the column of the pixel in the image,
 respectively.
 
 [verse]

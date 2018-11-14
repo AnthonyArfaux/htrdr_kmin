@@ -235,7 +235,7 @@ of grids written into *output*:
 Use *mpirun*(1) to launch *htrdr* on several hosts defined in the *my_hosts*
 file. Make the clouds infinite along the X and Y axis:
 
-  $ mpirun --hostfile my_hosts htrdr \
+    $ mpirun --hostfile my_hosts htrdr \
       -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -r \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=1280x720:spp=1024 \
