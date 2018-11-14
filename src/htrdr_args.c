@@ -84,11 +84,10 @@ print_help(const char* cmd)
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"%s (C) 2018 CNRS, Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>,\n"
-"|Meso|Star> <contact@meso-star.com>. This is free software released under the\n"
-"GNU GPL license, version 3 or later. You are free to change or redistribute it\n"
-"under certain conditions <http://gnu.org/licenses/gpl.html>.\n",
-    cmd);
+"htrdr (C) 2018 CNRS, |Meso|Star> <contact@meso-star.com>, Université Paul\n"
+"Sabatier <contact-edstar@laplace.univ-tlse.fr>. This is free software released\n"
+"under the GNU GPL license, version 3 or later.  You are free to change or\n"
+"redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");
 }
 
 static INLINE res_T

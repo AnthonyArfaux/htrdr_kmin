@@ -1,4 +1,4 @@
-// Copyright (C) 2018 CNRS, Université Paul Sabatier, |Meso|Star>
+// Copyright (C) 2018 CNRS, |Meso|Star>, Université Paul Sabatier
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -254,11 +254,11 @@ NOTES
 
 COPYRIGHT
 ---------
-*htrdr* is copyright &copy; 2018 CNRS, Université Paul Sabatier
-<contact-edstar@laplace.univ-tlse.fr>, |Meso|Star> <contact@meso-star.com>.
-License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
-This is a free software. You are free to change and redistribute it. There is
-NO WARRANTY, to the extent permitted by law.
+*htrdr* is copyright &copy; 2018 CNRS, |Meso|Star> <contact@meso-star.com>,
+Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>. License
+GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.  This
+is a free software. You are free to change and redistribute it. There is NO
+WARRANTY, to the extent permitted by law.
 
 SEE ALSO
 --------
