@@ -70,11 +70,10 @@ EXAMPLE
 -------
 The following output is emitted by *htrdr*(1) invoked to render an image of
 *800* by *600* pixels. Note that actually the comments or the blank lines are
-not necessarily written as it by *htrdr*(1); they are are used here only to
-help in understanding the data layout. The comment after each pixel gives the
-two dimensional index of the pixel in the image: the first and second integer
-is the index of the line and the column of the pixel in the image,
-respectively.
+not necessarily written as it by *htrdr*(1); they are used here only to help
+in understanding the data layout. The comment after each pixel gives the two
+dimensional index of the pixel in the image: the first and second integer is
+the index of the line and the column of the pixel in the image, respectively.
 
 [verse]
 ------

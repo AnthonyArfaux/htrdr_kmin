@@ -81,7 +81,7 @@ struct htrdr_args {
   },                                                                           \
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
-  1.0, /* Optical thickness */                                                 \
+  @HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@, /* Optical thickness */    \
   @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@, /* Ground reflectivity */          \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \

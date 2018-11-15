@@ -39,9 +39,9 @@ formatted according to the *htmie*(5) file format (*-m* _mie_). The user
 also has to provide: the characteristics of the simulated camera (*-C*
 _camera_), the sensor definition (*-i* _image_), and the position of the sun
 (*-D* _azimuth_,_elevation_). It is also possible to provide an OBJ [2]
-representing the ground geometry (*-g* _ground_). Both, the clouds and the
-ground, can be infinitely repeated along the X and Y axis by setting the *-r*
-and the *-R* options, respectively.
+representing the ground geometry with a diffuse reflectivity (*-g* _ground_).
+Both, the clouds and the ground, can be infinitely repeated along the X and Y
+axis by setting the *-r* and the *-R* options, respectively.
 
 *htrdr* evaluates the intensity incoming on each pixel of the sensor
 array. The underlying algorithm is based on a Monte-Carlo method: it consists
@@ -102,7 +102,7 @@ OPTIONS
   90].  Following the right-handed convention, the azimuthal rotation is
   counter-clockwise, with 0 degree on the X axis. The elevation starts from 0
   degree for a direction in the XY plane, up to 90 degrees at zenith. Thus
-  -D0,0 -D0,90 -D0,180 and -D0,270 will produce solar vectors {+1,0,0} {0,+1,0}
+  -D0,0 -D90,0 -D180,0 and -D270,0 will produce solar vectors {+1,0,0} {0,+1,0}
   {-1,0,0} and {0,-1,0} respectively, while -D__azimuth__,90 will produce
   {0,0,+1} regardless of _azimuth_ value.
 
@@ -116,7 +116,8 @@ OPTIONS
 
 *-e* _reflectivity_::
   Reflectivity of the ground geometry in [0, 1]. By default it is set to
-  @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@.
+  @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@. This parameter is fixed for the
+  while visible range.
 
 *-f*::
   Force overwrite of the _output_ file.
@@ -210,7 +211,7 @@ output in a regular PPM image [5]:
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
       -f -o output
-    $ htpp output -o image.ppm
+    $ htpp -o image.ppm output
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*
 degrees respectively. Use the *-G* option to enable the cache mechanism on
