@@ -34,8 +34,8 @@ pixel component, respectively. The first value of each pair is the expected
 value of the estimated radiance while the second one is its associated
 standard deviation.
 
-Pixels are sorted line by line, with the origin defined as the top corner of
-the image. With an image definition of N by M pixels, with N the number of
+Pixels are sorted line by line, with the origin defined at the top left corner
+of the image. With an image definition of N by M pixels, with N the number of
 pixels per line and M the overall number of lines in the image, the first N
 pixels correspond to the pixels of the top line of the image, the following N
 pixels are the pixels of the second line and so on.

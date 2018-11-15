@@ -4,16 +4,30 @@ This program is a part of the [High-Tune](http://www.umr-cnrm.fr/high-tune/)
 project: it illustrates the implementation of efficient radiative transfer
 Monte-Carlo algorithms in cloudy atmospheres.
 
-This program implements a rendering algorithm that computes the radiance in the
-spectral interval [380, 780] nanometres that reaches an image through a pinhole
-camera. The rendered scene is at least composed of an 1D atmosphere along the Z
-axis. Optionally, one can add 3D data describing the cloud properties and/or a
-geometry describing the ground with a lambertian reflectivity. The clouds and
-the ground, can be both infinitely repeated along the X and Y axis.
+htrdr is an image renderer in the visible part of the spectrum, for scenes
+composed of an atmospheric gaz mixture, clouds, and a ground. It uses spectral
+data that should be provided for the pressure and temperature atmospheric
+vertical profile defined along the Z axis, the liquid water content in
+suspension within the clouds that is a result of Large Eddy Simulation
+computations, and the optical properties of water droplets that have been
+obtained from a Mie code. The user also has to provide: the characteristics of
+the simulated camera, the sensor definition, and the position of the sun. It is
+also possible to provide a geometry representing the ground. Both, the clouds
+and the ground, can be infinitely repeated along the X and Y axis.
+
+htrdr evaluates the intensity incoming on each pixel of the sensor array. The
+underlying algorithm is based on a Monte-Carlo method: it consists in
+simulating a given number of optical paths originating from the camera,
+directed into the atmosphere, taking into account light absorption and
+scattering phenomena. The computation is performed over the whole visible part
+of the spectrum, for the three components of the CIE 1931 XYZ colorimetric
+space that are subsequently recombined in order to obtain the final color for
+each pixel, and finally the whole image of the scene as seen from the required
+observation position.
 
 In addition of shared memory parallelism, htrdr supports the [*M*essage
 *P*assing *I*nterface](https://www.mpi-forum.org/) specification to
-parallelise its computations in a distribute memory environment; the HTRDR
+parallelise its computations in a distribute memory environment; the htrdr
 binary can be run either directly or through a MPI process launcher like
 `mpirun`.
 
