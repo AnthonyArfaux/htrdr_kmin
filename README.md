@@ -5,7 +5,7 @@ project: it illustrates the implementation of efficient radiative transfer
 Monte-Carlo algorithms in cloudy atmospheres.
 
 htrdr is an image renderer in the visible part of the spectrum, for scenes
-composed of an atmospheric gaz mixture, clouds, and a ground. It uses spectral
+composed of an atmospheric gas mixture, clouds, and a ground. It uses spectral
 data that should be provided for the pressure and temperature atmospheric
 vertical profile defined along the Z axis, the liquid water content in
 suspension within the clouds that is a result of Large Eddy Simulation
