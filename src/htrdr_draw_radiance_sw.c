@@ -13,6 +13,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 199309L /* nanosleep */
+
 #include "htrdr.h"
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
