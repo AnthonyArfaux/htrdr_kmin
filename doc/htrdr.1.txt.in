@@ -31,12 +31,11 @@ DESCRIPTION
 *htrdr* is an image renderer in the visible part of the spectrum, for scenes
 composed of an atmospheric gas mixture, clouds, and a ground. It uses spectral
 data that should be provided for the pressure and temperature atmospheric
-vertical profile [1] (*-a* _atmosphere_), the liquid water content
-in suspension within the clouds that is a result of Large Eddy Simulation
-computations stored in a *htcp*(5) file (*-c* _clouds_), and the optical
-properties of water droplets that have been obtained from a Mie code and
-formatted according to the *htmie*(5) file format (*-m* _mie_). The user
-also has to provide: the characteristics of the simulated camera (*-C*
+vertical profile [1] (*-a* _atmosphere_), the liquid water content in
+suspension within the clouds stored in a *htcp*(5) file (*-c* _clouds_), and
+the optical properties of water droplets that have been obtained from a Mie
+code and formatted according to the *htmie*(5) file format (*-m* _mie_). The
+user also has to provide: the characteristics of the simulated camera (*-C*
 _camera_), the sensor definition (*-i* _image_), and the position of the sun
 (*-D* _azimuth_,_elevation_). It is also possible to provide an OBJ [2]
 representing the ground geometry with a diffuse reflectivity (*-g* _ground_).
@@ -61,10 +60,11 @@ ASCII data formatted with respect to the *htrdr-image*(5) file format. Since
 *htrdr* relies on the Monte-Carlo method, the estimated radiance of a pixel
 component is provided with its numerical accuracy.
 
-*htrdr* supports shared memory parallelism and relies on the Message Passing
-Interface specification [4] to parallelise its computations in a distribute
-memory environment. *htrdr* can thus be run either directly or through a MPI
-process launcher like *mpirun*(1).
+During simulation, *htrdr* dynamically loads/unloads cloud properties to handle
+clouds whose data do not feat in main memory. *htrdr* also supports shared
+memory parallelism and relies on the Message Passing Interface specification
+[4] to parallelise its computations in a distribute memory environment; it can
+thus be run either directly or through a MPI process launcher like *mpirun*(1).
 
 OPTIONS
 -------
@@ -255,11 +255,11 @@ NOTES
 
 COPYRIGHT
 ---------
-*htrdr* is copyright &copy; 2018 CNRS, |Meso|Star> <contact@meso-star.com>,
-Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>. License
-GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.  This
-is a free software. You are free to change and redistribute it. There is NO
-WARRANTY, to the extent permitted by law.
+Copyright &copy; 2018 CNRS, |Meso|Star> <contact@meso-star.com>, Université
+Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>. *htrdr* is free software
+released under the GPLv3+ license: GNU GPL version 3 or later
+<https://gnu.org/licenses/gpl.html>. You are free to change and redistribute
+it. There is NO WARRANTY, to the extent permitted by law.
 
 SEE ALSO
 --------
