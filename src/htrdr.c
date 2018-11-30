@@ -888,7 +888,7 @@ error:
 
 void
 send_mpi_progress
-  (struct htrdr* htrdr, const enum htrdr_mpi_message msg, const int32_t percent)
+  (struct htrdr* htrdr, const enum htrdr_mpi_message msg, int32_t percent)
 {
   ASSERT(htrdr);
   ASSERT(msg == HTRDR_MPI_PROGRESS_RENDERING

@@ -552,7 +552,6 @@ draw_image
    struct list_node* tiles)
 {
   struct ssp_rng* rng_proc = NULL;
-  MPI_Request req;
   size_t nthreads = 0;
   size_t nthieves = 0;
   size_t proc_ntiles = 0;
@@ -681,11 +680,8 @@ draw_image
 
   /* Synchronize the process */
   mutex_lock(htrdr->mpi_mutex);
-  MPI(Ibarrier(MPI_COMM_WORLD, &req));
+  MPI(Barrier(MPI_COMM_WORLD));
   mutex_unlock(htrdr->mpi_mutex);
-
-  /* Wait for processes synchronization */
-  mpi_wait_for_request(htrdr, &req);
 
 exit:
   if(rng_proc) SSP(rng_ref_put(rng_proc));
