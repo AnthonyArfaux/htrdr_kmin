@@ -78,6 +78,7 @@ struct htrdr {
 
   struct logger logger;
   struct mem_allocator* allocator;
+  struct mem_allocator svx_allocator;
   struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */
 };
 

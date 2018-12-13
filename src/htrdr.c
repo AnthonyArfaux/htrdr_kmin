@@ -459,6 +459,9 @@ htrdr_init
   htrdr->width = args->image.definition[0];
   htrdr->height = args->image.definition[1];
 
+  res = mem_init_regular_allocator(&htrdr->svx_allocator);
+  if(res != RES_OK) goto error;
+
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
 
@@ -485,7 +488,7 @@ htrdr_init
   }
 
   res = svx_device_create
-    (&htrdr->logger, htrdr->allocator, args->verbose, &htrdr->svx);
+    (&htrdr->logger, &htrdr->svx_allocator, args->verbose, &htrdr->svx);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
       "%s: could not create the Star-VoXel device -- %s.\n",
@@ -589,6 +592,9 @@ htrdr_release(struct htrdr* htrdr)
   }
   str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
+
+  ASSERT(MEM_ALLOCATED_SIZE(&htrdr->svx_allocator) == 0);
+  mem_shutdown_regular_allocator(&htrdr->svx_allocator);
 }
 
 res_T

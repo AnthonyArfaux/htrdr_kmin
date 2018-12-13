@@ -207,6 +207,51 @@ struct htrdr_sky {
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
+static void
+log_svx_memory_usage(struct htrdr* htrdr)
+{
+  char dump[128];
+  char* dst = dump;
+  size_t available_space = sizeof(dump);
+  const size_t KILO_BYTE = 1024;
+  const size_t MEGA_BYTE = 1024*KILO_BYTE;
+  const size_t GIGA_BYTE = 1024*MEGA_BYTE;
+  size_t ngigas, nmegas, nkilos, memsz, len;
+  ASSERT(htrdr);
+
+  memsz = MEM_ALLOCATED_SIZE(&htrdr->svx_allocator);
+
+  if((ngigas = memsz / GIGA_BYTE) != 0) {
+    len = (size_t)snprintf(dst, available_space, 
+      "%lu GB ", (unsigned long)ngigas);
+    CHK(len < available_space);
+    dst += len;
+    available_space -= len;
+    memsz -= ngigas * GIGA_BYTE;
+  }
+  if((nmegas = memsz / MEGA_BYTE) != 0) {
+    len = (size_t)snprintf(dst, available_space, 
+      "%lu MB ", (unsigned long)nmegas);
+    CHK(len < available_space);
+    dst += len;
+    available_space -= len;
+    memsz -= nmegas * MEGA_BYTE;
+  }
+  if((nkilos = memsz / KILO_BYTE) != 0) {
+    len = (size_t)snprintf(dst, available_space,
+      "%lu KB ", (unsigned long)nkilos);
+    dst += len;
+    available_space -= len;
+    memsz -= nkilos * KILO_BYTE;
+  }
+  if(memsz) {
+    len = (size_t)snprintf(dst, available_space, 
+      "%lu Byte%s", (unsigned long)memsz, memsz > 1 ? "s" : "");
+    CHK(len < available_space);
+  }
+  htrdr_log(htrdr, "SVX memory usage: %s\n", dump);
+}
+
 /* Transform pos from world to cloud space */
 static INLINE double*
 world_to_cloud
@@ -1708,6 +1753,8 @@ htrdr_sky_create
     res = update_file_stamp(sky->htrdr, htgop_filename);
     if(res != RES_OK) goto error;
   }
+
+  log_svx_memory_usage(htrdr);
 
 exit:
   *out_sky = sky;
