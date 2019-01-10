@@ -1,4 +1,4 @@
-/* Copyright (C) 2018 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ print_help(const char* cmd)
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"htrdr (C) 2018 CNRS, |Meso|Star> <contact@meso-star.com>, Université Paul\n"
+"htrdr (C) 2018-2019 CNRS, |Meso|Star> <contact@meso-star.com>, Université Paul\n"
 "Sabatier <contact-edstar@laplace.univ-tlse.fr>. This is free software released\n"
 "under the GNU GPL license, version 3 or later.  You are free to change or\n"
 "redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");

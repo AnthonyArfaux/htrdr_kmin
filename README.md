@@ -60,7 +60,7 @@ informations on CMake.
 
 ## License
 
-htrdr is free software copyright (C) 2018 Centre National de la Recherche
+htrdr is free software copyright (C) 2018-2019 Centre National de la Recherche
 Scientifique (CNRS), [|Meso|Star](http://www.meso-star.com)
 <contact@meso-star.com>, Université Paul Sabatier
 <contact-edstar@laplace.univ-tlse.fr>. It is released under the GPL v3+
