@@ -15,6 +15,7 @@
 
 #define _POSIX_C_SOURCE 200809L /* mmap support */
 #define _DEFAULT_SOURCE 1 /* MAP_POPULATE support */
+#define _BSD_SOURCE 1 /* MAP_POPULATE for glibc < 2.19 */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
