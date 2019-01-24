@@ -622,6 +622,10 @@ cloud_vox_get_particle
       ivox[0] = xyz[0];
       ivox[1] = xyz[1];
       ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+      if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
+      && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
+        ivox[2] = split->index;
+      }
 
       /* Compute the upper bound of the *next* LUT cell clamped to the voxel
        * upper bound. Note that the upper bound of the current LUT cell is
@@ -740,6 +744,10 @@ cloud_vox_get_gas
       ivox[0] = xyz[0];
       ivox[1] = xyz[1];
       ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+      if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
+      && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
+        ivox[2] = split->index;
+      }
 
       /* Compute the upper bound of the *next* LUT cell clamped to the voxel
        * upper bound. Note that the upper bound of the current LUT cell is
