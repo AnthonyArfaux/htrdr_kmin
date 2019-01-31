@@ -1148,6 +1148,9 @@ setup_clouds
     goto error;
   }
 
+  htrdr_log(sky->htrdr, "Clouds bounding box: {%g, %g, %g} / {%g, %g, %g}.\n",
+    SPLIT3(sky->htcp_desc.lower), SPLIT3(sky->htcp_desc.upper));
+
   /* Define the number of voxels */
   nvoxs[0] = sky->htcp_desc.spatial_definition[0];
   nvoxs[1] = sky->htcp_desc.spatial_definition[1];
