@@ -25,7 +25,7 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
-find_package(Star3D 0.5 REQUIRED)
+find_package(Star3D 0.6 REQUIRED)
 find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
@@ -60,7 +60,7 @@ include_directories(
 ################################################################################
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 0)
-set(VERSION_PATCH 2)
+set(VERSION_PATCH 3)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
 set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0")

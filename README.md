@@ -58,6 +58,15 @@ resulting project can be edited, built, tested and installed as any CMake
 project. Refer to the [CMake](https://cmake.org/documentation) for further
 informations on CMake.
 
+## Release notes
+
+### Version 0.0.3
+
+- Fix compilation on systems with a GNU C Library whose version is less than
+  2.19.
+- Fix a possible invalid memory access to cloud data leading to segmentation
+  faults.
+
 ## License
 
 Copyright (C) 2018-2019 Centre National de la Recherche
