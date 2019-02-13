@@ -437,6 +437,7 @@ htrdr_init
   double sun_dir[3];
   const char* output_name = NULL;
   size_t ithread;
+  int nthreads_max;
   res_T res = RES_OK;
   ASSERT(args && htrdr);
 
@@ -451,10 +452,11 @@ htrdr_init
 
   str_init(htrdr->allocator, &htrdr->output_name);
 
+  nthreads_max = MMAX(omp_get_max_threads(), omp_get_num_procs());
   htrdr->dump_vtk = args->dump_vtk;
   htrdr->cache_grids = args->cache_grids;
   htrdr->verbose = args->verbose;
-  htrdr->nthreads = MMIN(args->nthreads, (unsigned)omp_get_num_procs());
+  htrdr->nthreads = MMIN(args->nthreads, (unsigned)nthreads_max);
   htrdr->spp = args->image.spp;
   htrdr->width = args->image.definition[0];
   htrdr->height = args->image.definition[1];
