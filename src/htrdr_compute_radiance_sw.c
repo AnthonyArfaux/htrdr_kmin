@@ -325,6 +325,7 @@ htrdr_compute_radiance_sw
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
+    double bounce_reflectivity = 0;
 
     /* Find the first intersection with a surface */
     d2(range, 0, DBL_MAX);
@@ -388,16 +389,14 @@ htrdr_compute_radiance_sw
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
-      double reflectivity;
       double N[3];
       int type;
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
-      reflectivity = ssf_bsdf_sample
-        (bsdf, rng, wo, N, dir_next, &type, &pdf);
-      if(ssp_rng_canonical(rng) > reflectivity) break; /* Russian roulette */
 
+      bounce_reflectivity = ssf_bsdf_sample
+        (bsdf, rng, wo, N, dir_next, &type, &pdf);
       if(d3_dot(N, sun_dir) < 0) { /* Below the ground */
         R = 0;
       } else {
@@ -431,6 +430,9 @@ htrdr_compute_radiance_sw
     /* Update the MC weight */
     ksi *= Tr_abs;
     w += ksi * L_sun * sun_solid_angle * Tr * R;
+
+    /* Russian roulette */
+    if(ssp_rng_canonical(rng) >= bounce_reflectivity) break;
 
     /* Setup the next random walk state */
     d3_set(pos, pos_next);
