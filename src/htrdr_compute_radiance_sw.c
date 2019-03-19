@@ -325,7 +325,7 @@ htrdr_compute_radiance_sw
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
-    double bounce_reflectivity = 0;
+    double bounce_reflectivity = 1;
 
     /* Find the first intersection with a surface */
     d2(range, 0, DBL_MAX);
@@ -431,8 +431,9 @@ htrdr_compute_radiance_sw
     ksi *= Tr_abs;
     w += ksi * L_sun * sun_solid_angle * Tr * R;
 
-    /* Russian roulette */
-    if(ssp_rng_canonical(rng) >= bounce_reflectivity) break;
+    /* Russian roulette wrt surface scattering */
+    if(SVX_HIT_NONE(&svx_hit) && ssp_rng_canonical(rng) >= bounce_reflectivity)
+      break;
 
     /* Setup the next random walk state */
     d3_set(pos, pos_next);
