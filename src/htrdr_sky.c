@@ -1488,7 +1488,7 @@ setup_atmosphere
   vox_desc.challenge_merge = atmosphere_vox_challenge_merge;
   vox_desc.context = &ctx;
   vox_desc.size = sizeof(float) * NFLOATS_PER_COMPONENT;
-  STATIC_ASSERT(HTRDR_GAS__ == 0, Unexpected_enum_value);
+  { STATIC_ASSERT(HTRDR_GAS__ == 0, Unexpected_enum_value); }
 
   /* Create as many atmospheric data structure than considered SW spectral
    * bands */
