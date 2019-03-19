@@ -60,6 +60,18 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.0.4
+
+- Fix the computation of the surface scattering: there was a bug in how Russian
+  roulette was implemented at surface scattering leading to an underestimation
+  of the surface reflection.
+- Update the thread allocation policy: by default, the number of threads is now
+  defined as the maximum between the number of processors detected by OpenMP
+  and the number of threads defined by the `OMP_NUM_THREADS` environment
+  variable. This variable can be used to counteract the number of processors
+  detected by OpenMP that can be lower than the real number of processors of
+  the system.
+
 ### Version 0.0.3
 
 - Fix compilation on systems with a GNU C Library whose version is less than
