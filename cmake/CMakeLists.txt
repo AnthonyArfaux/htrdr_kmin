@@ -87,7 +87,6 @@ add_subdirectory(doc)
 ################################################################################
 # Configure and define targets
 ################################################################################
-
 set(HTRDR_FILES_SRC
   htrdr.c
   htrdr_args.c
@@ -117,8 +116,7 @@ set(HTRDR_FILES_INC
 set(HTRDR_FILES_INC2 # Generated files
   htrdr_args.h
   htrdr_version.h)
-
-set(HTDRD_FILES_DOC COPYING README.md)
+set(HTRDR_FILES_DOC COPYING README.md)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_FILES_SRC ${HTRDR_SOURCE_DIR})
