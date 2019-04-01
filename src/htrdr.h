@@ -59,6 +59,7 @@ struct htrdr {
   FILE* output;
   struct str output_name;
 
+  unsigned grid_max_definition[3]; /* Max definition of the acceleration grids */
   unsigned nthreads; /* #threads of the process */
   int dump_vtk; /* Dump octree VTK */
   int cache_grids; /* Use/Precompute grid caches */

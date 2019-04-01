@@ -143,7 +143,7 @@ OPTIONS
 *-i* <__image-parameter__:...>::
   Define the image to render. Available image parameters are:
 
-  **def**=**_width_**,**_height_**;;
+  **def**=**_width_**x**_height_**;;
     Definition of the image. By default the image definition is
     @HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
 
@@ -174,6 +174,11 @@ OPTIONS
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU
   cores.
+
+*-V* **_x_**,**_y_**,**_z_**::
+  Define the maximum definition of the acceleration data structure that
+  partitions the cloud properties. By default the finest definition is the
+  definition of the submitted *htcp*(5) file.
 
 *-v*::
   Make *htrdr* verbose.

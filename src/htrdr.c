@@ -460,6 +460,9 @@ htrdr_init
   htrdr->spp = args->image.spp;
   htrdr->width = args->image.definition[0];
   htrdr->height = args->image.definition[1];
+  htrdr->grid_max_definition[0] = args->grid_max_definition[0];
+  htrdr->grid_max_definition[1] = args->grid_max_definition[1];
+  htrdr->grid_max_definition[2] = args->grid_max_definition[2];
 
   res = mem_init_regular_allocator(&htrdr->svx_allocator);
   if(res != RES_OK) goto error;

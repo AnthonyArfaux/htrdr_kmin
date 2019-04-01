@@ -16,6 +16,7 @@
 #ifndef HTRDR_ARGS_H
 #define HTRDR_ARGS_H
 
+#include <limits.h>
 #include <rsys/rsys.h>
 
 struct htrdr_args {
@@ -48,6 +49,7 @@ struct htrdr_args {
   double sun_elevation; /* In degrees */
   double optical_thickness; /* Threshold used during octree building */
   double ground_reflectivity; /* Reflectivity of the ground */
+  unsigned grid_max_definition[3]; /* Maximum definition of the grid */
 
   unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
@@ -83,6 +85,7 @@ struct htrdr_args {
   90, /* Sun elevation */                                                      \
   @HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@, /* Optical thickness */    \
   @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@, /* Ground reflectivity */          \
+  {UINT_MAX, UINT_MAX, UINT_MAX}, /* Maximum definition of the grid */         \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \

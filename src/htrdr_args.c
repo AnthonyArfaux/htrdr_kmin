@@ -79,6 +79,9 @@ print_help(const char* cmd)
 "  -t THREADS     hint on the number of threads to use. By default use as\n"
 "                 many threads as CPU cores.\n");
   printf(
+"  -V X,Y,Z       maximum definition of the cloud acceleration grids along\n"
+"                 the 3 axis. By default use the definition of the clouds\n");
+  printf(
 "  -v             make the program verbose.\n");
   printf(
 "  --version      display version information and exit.\n");
@@ -319,6 +322,38 @@ error:
   goto exit;
 }
 
+static res_T
+parse_grid_definition(struct htrdr_args* args, const char* str)
+{
+  unsigned def[3];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(args && str);
+
+  res = cstr_to_list_uint(str, ',', def, &len, 3);
+  if(res == RES_OK && len != 3) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid grid definition `%s'.\n", str);
+    goto error;
+  }
+
+  if(!def[0] || !def[1] || !def[2]) {
+    fprintf(stderr,
+      "Invalid null grid definition {%u, %u, %u}.\n", SPLIT3(def));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  args->grid_max_definition[0] = def[0];
+  args->grid_max_definition[1] = def[1];
+  args->grid_max_definition[2] = def[2];
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -343,7 +378,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:de:fGg:hi:m:o:RrT:t:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:de:fGg:hi:m:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'C':
@@ -383,6 +418,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = cstr_to_uint(optarg, &args->nthreads);
         if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
         break;
+      case 'V': res = parse_grid_definition(args, optarg); break;
       case 'v': args->verbose = 1; break;
       default: res = RES_BAD_ARG; break;
     }
