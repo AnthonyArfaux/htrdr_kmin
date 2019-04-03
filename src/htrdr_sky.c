@@ -662,9 +662,9 @@ cloud_vox_get_particle
     }
   } else {
     double pos_z;
-    size_t ivox_z_prev;
     size_t ilut_low, ilut_upp;
     size_t ilut;
+    size_t ivox_z_prev = SIZE_MAX;
 
     /* Compute the *inclusive* bounds of the indices of the LUT cells
      * overlapped by the SVX voxel */
@@ -673,36 +673,37 @@ cloud_vox_get_particle
     ASSERT(ilut_low <= ilut_upp);
 
     /* Prepare the iteration over the LES voxels overlapped by the SVX voxel */
-    ivox_z_prev = SIZE_MAX;
     ka_min = ks_min = kext_min = DBL_MAX;
     ka_max = ks_max = kext_max =-DBL_MAX;
+    ivox_z_prev = SIZE_MAX;
     pos_z = vox_low[2];
     ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
     ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
 
     /* Iterate over the LUT cells overlapped by the voxel */
-    FOR_EACH(ivox[0], igrid_low[0], igrid_upp[0]+1) {
-      FOR_EACH(ivox[1], igrid_low[1], igrid_upp[1]+1) {
-        FOR_EACH(ilut, ilut_low, ilut_upp+1) {
-          const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
-          ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
+    FOR_EACH(ilut, ilut_low, ilut_upp+1) {
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
+      ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
-          ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
-          if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
-             && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
-            ivox[2] = split->index;
-          }
+      ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+      if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
+         && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
+        ivox[2] = split->index;
+      }
 
-          /* Compute the upper bound of the *next* LUT cell clamped to the voxel
-           * upper bound. Note that the upper bound of the current LUT cell is
-           * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
-           * upper bound of the next cell is thus the lower bound of the cell
-           * following the next cell, i.e. (ilut+2)*lut_cell_sz */
-          pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
+      /* Compute the upper bound of the *next* LUT cell clamped to the voxel
+       * upper bound. Note that the upper bound of the current LUT cell is
+       * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
+       * upper bound of the next cell is thus the lower bound of the cell
+       * following the next cell, i.e. (ilut+2)*lut_cell_sz */
+      pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
 
-          /* Does the LUT cell overlap an already handled LES voxel? */
-          if(ivox[2] == ivox_z_prev) continue;
-          ivox_z_prev = ivox[2];
+      /* Does the LUT cell overlap an already handled LES voxel? */
+      if(ivox[2] == ivox_z_prev) continue;
+      ivox_z_prev = ivox[2];
+
+      FOR_EACH(ivox[0], igrid_low[0], igrid_upp[0]+1) {
+        FOR_EACH(ivox[1], igrid_low[1], igrid_upp[1]+1) {
 
           /* Compute the radiative properties */
           rho_da = cloud_dry_air_density(htcp_desc, ivox);
@@ -824,8 +825,8 @@ cloud_vox_get_gas
   } else { /* A SVX voxel can be overlapped by 2 LES voxels */
     double pos_z;
     size_t ilut_low, ilut_upp;
-    size_t ivox_z_prev;
     size_t ilut;
+    size_t ivox_z_prev;
     ASSERT(xyz[2] < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
     /* Compute the *inclusive* bounds of the indices of the LUT cells
@@ -835,36 +836,37 @@ cloud_vox_get_gas
     ASSERT(ilut_low <= ilut_upp);
 
     /* Prepare the iteration over the LES voxels overlapped by the SVX voxel */
-    ivox_z_prev = SIZE_MAX;
     x_h2o_range[0] = DBL_MAX;
     x_h2o_range[1] =-DBL_MAX;
+    ivox_z_prev = SIZE_MAX;
     pos_z = vox_low[2];
     ASSERT(pos_z >= (double)ilut_low * ctx->sky->lut_cell_sz);
     ASSERT(pos_z <= (double)ilut_upp * ctx->sky->lut_cell_sz);
 
     /* Iterate over the LUT cells overlapped by the voxel */
-    FOR_EACH(ivox[0], igrid_low[0], igrid_upp[0]+1) {
-      FOR_EACH(ivox[1], igrid_low[1], igrid_upp[1]+1) {
-        FOR_EACH(ilut, ilut_low, ilut_upp+1) {
-          const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
-          ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
+    FOR_EACH(ilut, ilut_low, ilut_upp+1) {
+      const struct split* split = darray_split_cdata_get(&ctx->sky->svx2htcp_z)+ilut;
+      ASSERT(ilut < darray_split_size_get(&ctx->sky->svx2htcp_z));
 
-          ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
-          if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
-             && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
-            ivox[2] = split->index;
-          }
+      ivox[2] = pos_z <= split->height ? split->index : split->index + 1;
+      if(ivox[2] >= ctx->sky->htcp_desc.spatial_definition[2]
+         && eq_eps(pos_z, split->height, 1.e-6)) { /* Handle numerical inaccuracy */
+        ivox[2] = split->index;
+      }
 
-          /* Compute the upper bound of the *next* LUT cell clamped to the voxel
-           * upper bound. Note that the upper bound of the current LUT cell is
-           * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
-           * upper bound of the next cell is thus the lower bound of the cell
-           * following the next cell, i.e. (ilut+2)*lut_cell_sz */
-          pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
+      /* Compute the upper bound of the *next* LUT cell clamped to the voxel
+       * upper bound. Note that the upper bound of the current LUT cell is
+       * the lower bound of the next cell, i.e. (ilut+1)*lut_cell_sz. The
+       * upper bound of the next cell is thus the lower bound of the cell
+       * following the next cell, i.e. (ilut+2)*lut_cell_sz */
+      pos_z = MMIN((double)(ilut+2)*ctx->sky->lut_cell_sz, vox_upp[2]);
 
-          /* Does the LUT voxel overlap an already handled LES voxel? */
-          if(ivox[2] == ivox_z_prev) continue;
-          ivox_z_prev = ivox[2];
+      /* Does the LUT voxel overlap an already handled LES voxel? */
+      if(ivox[2] == ivox_z_prev) continue;
+      ivox_z_prev = ivox[2];
+
+      FOR_EACH(ivox[0], igrid_low[0], igrid_upp[0]+1) {
+        FOR_EACH(ivox[1], igrid_low[1], igrid_upp[1]+1) {
 
           /* Compute the xH2O for the current LES voxel */
           x_h2o = cloud_water_vapor_molar_fraction(&ctx->sky->htcp_desc, ivox);
