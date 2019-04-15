@@ -278,15 +278,28 @@ htrdr_compute_radiance_sw
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
 
-  CHK(RES_OK == ssf_bsdf_create
-    (&htrdr->lifo_allocators[ithread], &ssf_lambertian_reflection, &bsdf));
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
+#if 0
+  CHK(RES_OK == ssf_bsdf_create
+    (&htrdr->lifo_allocators[ithread], &ssf_lambertian_reflection, &bsdf));
   SSF(lambertian_reflection_setup
     (bsdf, htrdr_ground_get_reflectivity(htrdr->ground)));
+#else
+  CHK(RES_OK == ssf_bsdf_create
+    (&htrdr->lifo_allocators[ithread], &ssf_specular_reflection, &bsdf));
+  {
+    struct ssf_fresnel* fresnel;
+    SSF(fresnel_create
+      (&htrdr->lifo_allocators[ithread], &ssf_fresnel_dielectric_dielectric, &fresnel));
+    SSF(fresnel_dielectric_dielectric_setup(fresnel, 1.0, 1.33));
+    SSF(specular_reflection_setup(bsdf, fresnel));
+    SSF(fresnel_ref_put(fresnel));
+  }
+#endif
 
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
