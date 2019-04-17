@@ -113,12 +113,12 @@ dump_accum_buffer
   (void)stream_name;
 
   htrdr_buffer_get_layout(buf, &layout);
-  if(layout.elmt_size != sizeof(struct htrdr_accum[4])/*#channels*/
-  || layout.alignment < ALIGNOF(struct htrdr_accum[4])) {
+  if(layout.elmt_size != sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])
+  || layout.alignment < ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])) {
     htrdr_log_err(htrdr,
       "%s: invalid buffer layout. "
-      "The pixel size must be the size of 4 accumulators.\n",
-      FUNC_NAME);
+      "The pixel size must be the size of %lu accumulators.\n",
+      FUNC_NAME, (unsigned long)HTRDR_ESTIMATES_COUNT__);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -130,16 +130,16 @@ dump_accum_buffer
     FOR_EACH(x, 0, layout.width) {
       const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
       int i;
-      FOR_EACH(i, 0, 4) {
+      FOR_EACH(i, 0, HTRDR_ESTIMATES_COUNT__) {
         double E, SE;
 
         htrdr_accum_get_estimation(&accums[i], &E, &SE);
         fprintf(stream, "%g %g ", E, SE);
       }
       if(time_acc) {
-        time_acc->sum_weights += accums[3].sum_weights;
-        time_acc->sum_weights_sqr += accums[3].sum_weights_sqr;
-        time_acc->nweights += accums[3].nweights;
+        time_acc->sum_weights += accums[HTRDR_ESTIMATE_TIME].sum_weights;
+        time_acc->sum_weights_sqr += accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr;
+        time_acc->nweights += accums[HTRDR_ESTIMATE_TIME].nweights;
       }
       fprintf(stream, "\n");
     }
@@ -529,8 +529,8 @@ htrdr_init
    * rendered by the processes are gathered onto the master process. */
   if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
     /* 4 accums: X, Y, Z components and one more for the per realisation time */
-    const size_t pixsz = sizeof(struct htrdr_accum[4]);
-    const size_t pixal = ALIGNOF(struct htrdr_accum[4]);
+    const size_t pixsz = sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
+    const size_t pixal = ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */
       args->image.definition[1], /* Height */

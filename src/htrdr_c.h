@@ -32,6 +32,14 @@ enum htrdr_mpi_message {
   HTRDR_MPI_TILE_DATA
 };
 
+enum htrdr_estimate {
+  HTRDR_ESTIMATE_X,
+  HTRDR_ESTIMATE_Y,
+  HTRDR_ESTIMATE_Z,
+  HTRDR_ESTIMATE_TIME, /* Time per realisation */
+  HTRDR_ESTIMATES_COUNT__
+};
+
 struct htrdr;
 
 #define SW_WAVELENGTH_MIN 380 /* In nanometer */
