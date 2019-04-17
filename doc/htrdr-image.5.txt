@@ -27,12 +27,14 @@ The *htrdr-image* is a raw image file format where data are stored in plain
 text. Characters after the '#' character are considered as comments and are
 thus ignored as well as empty lines. The first valid line stores 2 unsigned
 integers that represent the image definition, i.e. the number of pixels per
-line and per column. Then each line stores 3 pairs of floating points data
-representing the pixel color encoded in the CIE 1931 XYZ color space. The
-first, second and third pair encodes the estimated radiance of the X, Y and Z
-pixel component, respectively. The first value of each pair is the expected
-value of the estimated radiance while the second one is its associated
-standard deviation.
+line and per column. Then each line stores 4 pairs of floating points data
+representing the pixel color encoded in the CIE 1931 XYZ color space and the
+time spent per realisation to estimate the pixel. The first, second and third
+pair encodes the estimated radiance in W.sr^-1.m^-2 of the X, Y and Z pixel
+components, respectively. The first value of each pair is the expected value of
+the estimated radiance while the second one is its associated standard
+deviation. The fourth pair saves the estimate in microseconds of the per
+radiative path computation time and its standard error.
 
 Pixels are sorted line by line, with the origin defined at the top left corner
 of the image. With an image definition of N by M pixels, with N the number of
@@ -56,12 +58,13 @@ GRAMMAR
 <width>          ::= INTEGER
 <height>         ::= INTEGER
 
-<pixel>          ::= <X> <Y> <Z>
+<pixel>          ::= <X> <Y> <Z> <time>
 <X>              ::= <estimate>
 <Y>              ::= <estimate>
 <Z>              ::= <estimate>
+<time>           ::= <estimate>
 
-<estimate>       ::= <exoected-value> <standard-error>
+<estimate>       ::= <expected-value> <standard-error>
 <expected-value> ::= REAL
 <standard-error> ::= REAL
 -------
@@ -80,30 +83,30 @@ the index of the line and the column of the pixel in the image, respectively.
 800 600 # Image definition
 
 # Pixels of the 1st line
-0.0002559 2.90278e-05 0.0003754 4.48780e-05 0.0003200 3.16818e-05 # (1,1)
-0.0002956 3.37333e-05 0.0003395 4.16836e-05 0.0003384 4.60855e-05 # (2,1)
-0.0003761 5.43206e-05 0.0003130 3.48458e-05 0.0003380 3.32255e-05 # (3,1)
+2.55e-4 2.90e-5 3.75e-4 4.48e-5 3.20e-4 3.16e-5 306.484 259.723 # (1,1)
+2.95e-4 3.37e-5 3.39e-4 4.16e-5 3.38e-4 4.60e-5 18.3633 2.66317 # (2,1)
+3.76e-4 5.43e-5 3.13e-4 3.48e-5 3.38e-4 3.32e-5 19.6252 2.67015 # (3,1)
               ...
-0.0007135 0.000114694 0.0007661 0.000135251 0.0007978 0.000126122 # (799,1)
-0.0006591 0.000114968 0.0007473 0.000141289 0.0004398 7.33230e-05 # (800,1)
+7.13e-4 1.14e-4 7.66e-4 1.35e-4 7.97e-4 1.26e-4 119.820 93.7820 # (799,1)
+6.59e-4 1.14e-4 7.47e-4 1.41e-4 4.39e-4 7.33e-5 24.8655 2.46348 # (800,1)
 
 # Pixels of the 2nd line
-0.0003330 6.02808e-05 0.0004218 7.66163e-05 0.0003446 3.81472e-05 # (1,2)
-0.0003504 4.93154e-05 0.0003232 2.52040e-05 0.0003036 2.42803e-05 # (2,2)
-0.0002720 4.69853e-05 0.0003413 4.12614e-05 0.0002525 2.06930e-05 # (3,2)
+3.33e-4 6.02e-5 4.21e-4 7.66e-5 3.44e-4 3.81e-5 19.4580 2.50692 # (1,2)
+3.50e-4 4.93e-5 3.23e-4 2.52e-5 3.03e-4 2.42e-5 102.566 81.2936 # (2,2)
+2.72e-4 4.69e-5 3.41e-4 4.12e-5 2.52e-4 2.06e-5 25.5801 5.37736 # (3,2)
               ...
-0.0007528 0.000131807 0.0008919 0.000184047 0.0005487 0.000130065 # (799,2)
-0.0006822 0.000142027 0.0006618 7.85956e-05 0.0004443 5.99220e-05 # (800,2)
+7.52e-4 1.31e-4 8.91e-4 1.84e-4 5.48e-4 1.30e-4 46.5418 12.4728 # (799,2)
+6.82e-4 1.42e-4 6.61e-4 7.85e-5 4.44e-4 5.99e-5 59.8728 32.1468 # (800,2)
 
               ...
 
 # Pixels of the 600th line
-0.0002697 7.44208e-05 0.0002310 2.56492e-05 0.0001958 2.30952e-05 # (1,600)
-0.0004325 0.000125897 0.0002222 2.22320e-05 0.0002047 2.60948e-05 # (2,600)
-0.0002782 5.81477e-05 0.0002756 4.99110e-05 0.0002172 3.30041e-05 # (3,600)
+2.69e-4 7.44e-5 2.31e-4 2.56e-5 1.95e-4 2.30e-5 43.8242 15.0047 # (1,600)
+4.32e-4 1.25e-4 2.22e-4 2.22e-5 2.04e-4 2.60e-5 25.5498 1.73942 # (2,600)
+2.78e-4 5.81e-5 2.75e-4 4.99e-5 2.17e-4 3.30e-5 38.4448 7.16199 # (3,600)
             ...
-0.0003548 4.32117e-05 0.0003070 3.80437e-05 0.0002387 2.49820e-05 # (799,600)
-0.0003078 2.61915e-05 0.0004609 0.000113663 0.0002699 4.29776e-05 # (800,600)
+3.54e-4 4.32e-5 3.07e-4 3.80e-5 2.38e-4 2.49e-5 102.893 36.9865 # (799,600)
+3.07e-4 2.61e-5 4.60e-4 1.13e-4 2.69e-4 4.29e-5 42.75070 11.913 # (800,600)
 ------
 
 NOTES
