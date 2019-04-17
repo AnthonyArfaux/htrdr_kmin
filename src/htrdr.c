@@ -102,6 +102,7 @@ static res_T
 dump_accum_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
+   struct htrdr_accum* time_acc, /* May be NULL */
    const char* stream_name,
    FILE* stream)
 {
@@ -112,33 +113,33 @@ dump_accum_buffer
   (void)stream_name;
 
   htrdr_buffer_get_layout(buf, &layout);
-  if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
-  || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
+  if(layout.elmt_size != sizeof(struct htrdr_accum[4])/*#channels*/
+  || layout.alignment < ALIGNOF(struct htrdr_accum[4])) {
     htrdr_log_err(htrdr,
       "%s: invalid buffer layout. "
-      "The pixel size must be the size of an accumulator.\n",
+      "The pixel size must be the size of 4 accumulators.\n",
       FUNC_NAME);
     res = RES_BAD_ARG;
     goto error;
   }
 
   fprintf(stream, "%lu %lu\n", layout.width, layout.height);
+
+  if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
       const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
       int i;
-      FOR_EACH(i, 0, 3) {
-        const double N = (double)accums[i].nweights;
-        double E = 0;
-        double V = 0;
-        double SE = 0;
+      FOR_EACH(i, 0, 4) {
+        double E, SE;
 
-        if(accums[i].nweights) {
-          E = accums[i].sum_weights / N;
-          V = MMAX(accums[i].sum_weights_sqr / N - E*E, 0);
-          SE = sqrt(V/N);
-        }
+        htrdr_accum_get_estimation(&accums[i], &E, &SE);
         fprintf(stream, "%g %g ", E, SE);
+      }
+      if(time_acc) {
+        time_acc->sum_weights += accums[3].sum_weights;
+        time_acc->sum_weights_sqr += accums[3].sum_weights_sqr;
+        time_acc->nweights += accums[3].nweights;
       }
       fprintf(stream, "\n");
     }
@@ -527,12 +528,15 @@ htrdr_init
   /* Create the image buffer only on the master process; the image parts
    * rendered by the processes are gathered onto the master process. */
   if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
+    /* 4 accums: X, Y, Z components and one more for the per realisation time */
+    const size_t pixsz = sizeof(struct htrdr_accum[4]);
+    const size_t pixal = ALIGNOF(struct htrdr_accum[4]);
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */
       args->image.definition[1], /* Height */
-      args->image.definition[0]*sizeof(struct htrdr_accum[3]), /* Pitch */
-      sizeof(struct htrdr_accum[3]),
-      ALIGNOF(struct htrdr_accum[3]), /* Alignment */
+      args->image.definition[0] * pixsz, /* Pitch */
+      pixsz, /* Size of a pixel */
+      pixal, /* Alignment of a pixel */
       &htrdr->buf);
     if(res != RES_OK) goto error;
   }
@@ -629,9 +633,16 @@ htrdr_run(struct htrdr* htrdr)
       htrdr->height, htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
-      res = dump_accum_buffer
-        (htrdr, htrdr->buf, str_cget(&htrdr->output_name), htrdr->output);
+      struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
+      double E, SE;
+
+      res = dump_accum_buffer(htrdr, htrdr->buf, &path_time_acc,
+        str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
+
+      htrdr_accum_get_estimation(&path_time_acc, &E, &SE);
+      htrdr_log(htrdr,
+        "Time per radiative path (in micro seconds): %g +/- %g\n", E, SE);
     }
   }
 exit:

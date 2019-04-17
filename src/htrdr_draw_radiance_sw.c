@@ -92,7 +92,7 @@ tile_create(struct mem_allocator* allocator)
   const size_t tile_sz =
     sizeof(struct tile) - sizeof(struct htrdr_accum)/*rm dummy accum*/;
   const size_t buf_sz = /* Flexiblbe array element */
-    TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
+    TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum[4/*#channels*/]);
   ASSERT(allocator);
 
   tile = MEM_ALLOC(allocator, tile_sz+buf_sz);
@@ -135,7 +135,7 @@ tile_at
    const size_t y) /* In tile space */
 {
   ASSERT(tile && x < TILE_SIZE && y < TILE_SIZE);
-  return tile->data.accums + (y*TILE_SIZE + x)*3/*#channels*/;
+  return tile->data.accums + (y*TILE_SIZE + x)*4/*#channels*/;
 }
 
 static void
@@ -150,6 +150,8 @@ write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
 
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
+  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum[4]));
+
 
   /* Compute the row/column of the tile origin into the buffer */
   icol = tile_data->x * (size_t)TILE_SIZE;
@@ -163,9 +165,9 @@ write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
   FOR_EACH(irow_tile, 0, nrows_tile) {
     char* buf_row = buf_mem + (irow + irow_tile) * layout.pitch;
     const struct htrdr_accum* tile_row =
-      tile_data->accums + irow_tile*TILE_SIZE*3/*#channels*/;
-    memcpy(buf_row + icol*sizeof(struct htrdr_accum)*3, tile_row,
-      ncols_tile*sizeof(struct htrdr_accum)*3/*#channels*/);
+      tile_data->accums + irow_tile*TILE_SIZE*4/*#channels*/;
+    memcpy(buf_row + icol*sizeof(struct htrdr_accum[4/*#channels*/]), tile_row,
+      ncols_tile*sizeof(struct htrdr_accum[4/*#channels*/]));
   }
 }
 
@@ -391,7 +393,7 @@ mpi_gather_tiles
   /* Compute the size of the tile_data */
   const size_t msg_sz =
     sizeof(struct tile_data) - sizeof(struct htrdr_accum)/*dummy*/
-  + TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum)*3/*#channels*/;
+  + TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum[4/*#channels*/]);
 
   struct list_node* node = NULL;
   struct tile* tile = NULL;
@@ -480,7 +482,8 @@ draw_tile
 
     /* Fetch and reset the pixel accumulator */
     pix_accums = tile_at(tile, ipix_tile[0], ipix_tile[1]);
-
+    pix_accums[3] = HTRDR_ACCUM_NULL; /* Reset time per radiative path */
+  
     /* Compute the pixel coordinate */
     ipix[0] = tile_org[0] + ipix_tile[0];
     ipix[1] = tile_org[1] + ipix_tile[1];
@@ -490,12 +493,14 @@ draw_tile
       pix_accums[ichannel] = HTRDR_ACCUM_NULL;
 
       FOR_EACH(isamp, 0, spp) {
+        struct time t0, t1;
         double pix_samp[2];
         double ray_org[3];
         double ray_dir[3];
         double weight;
         size_t iband;
         size_t iquad;
+        double usec;
 
         /* Sample a position into the pixel, in the normalized image plane */
         pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
@@ -523,14 +528,22 @@ draw_tile
         }
 
         /* Compute the radiance that reach the pixel through the ray */
+        time_current(&t0);
         weight = htrdr_compute_radiance_sw
           (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
         ASSERT(weight >= 0);
+        time_sub(&t0, time_current(&t1), &t0);
+        usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
 
-        /* Update the pixel accumulator */
+        /* Update the pixel accumulator of the current channel */
         pix_accums[ichannel].sum_weights += weight;
         pix_accums[ichannel].sum_weights_sqr += weight*weight;
         pix_accums[ichannel].nweights += 1;
+
+        /* Update the pixel accumulator of per realisation time */
+        pix_accums[3].sum_weights += usec;
+        pix_accums[3].sum_weights_sqr += usec*usec;
+        pix_accums[3].nweights += 1;
       }
     }
   }
@@ -724,11 +737,11 @@ htrdr_draw_radiance_sw
     ASSERT(layout.width || layout.height || layout.elmt_size);
     ASSERT(layout.width == width && layout.height == height);
 
-    if(layout.elmt_size != sizeof(struct htrdr_accum[3])/*#channels*/
-    || layout.alignment < ALIGNOF(struct htrdr_accum[3])) {
+    if(layout.elmt_size != sizeof(struct htrdr_accum[4])/*#channels*/
+    || layout.alignment < ALIGNOF(struct htrdr_accum[4])) {
       htrdr_log_err(htrdr,
         "%s: invalid buffer layout. "
-        "The pixel size must be the size of 3 * accumulators.\n",
+        "The pixel size must be the size of 4 accumulators.\n",
         FUNC_NAME);
       res = RES_BAD_ARG;
       goto error;

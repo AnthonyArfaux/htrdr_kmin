@@ -51,7 +51,7 @@ htrdr_draw_radiance_sw
    const size_t width, /* Image width */
    const size_t height, /* Image height */
    const size_t spp, /* #samples per pixel, i.e. #realisations */
-   /* Buffer of struct htrdr_accum[3]. May be NULL on on non master processes */
+   /* Buffer of struct htrdr_accum[4]. May be NULL on non master processes */
    struct htrdr_buffer* buf); 
 
 extern LOCAL_SYM int
@@ -61,5 +61,28 @@ htrdr_ground_filter
    const float ray_dir[3],
    void* ray_data,
    void* filter_data);
+
+static FINLINE void
+htrdr_accum_get_estimation
+  (const struct htrdr_accum* acc,
+   double* expected_value,
+   double* std_err)
+{
+  ASSERT(acc && expected_value && std_err);
+
+  if(!acc->nweights) {
+    *expected_value = 0;
+    *std_err = 0;
+  } else {
+    const double N = (double)acc->nweights;
+    double E, V, SE;
+    E = acc->sum_weights / N;
+    V = MMAX(acc->sum_weights_sqr / N - E*E, 0);
+    SE = sqrt(V/N);
+
+    *expected_value = E;
+    *std_err = SE;
+  }
+}
 
 #endif /* HTRDR_SOLVE_H */
