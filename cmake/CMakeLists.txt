@@ -59,8 +59,8 @@ include_directories(
 # Generate files
 ################################################################################
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 0)
-set(VERSION_PATCH 4)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
 set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0")

@@ -60,6 +60,12 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.1
+
+- Add the `-V` option that fixes the maximum definition of the octrees used to
+  partitioned the radiative properties of the clouds.
+- Add a per pixel estimation of the per radiative path computation time.
+
 ### Version 0.0.4
 
 - Fix the computation of the surface scattering: there was a bug in how Russian
