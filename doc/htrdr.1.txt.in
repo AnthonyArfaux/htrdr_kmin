@@ -72,9 +72,16 @@ OPTIONS
   Path toward the file containing the gas optical properties of the atmosphere.
   Data must be formatted according to the fileformat described in [1].
 
+*-b* <diffuse|specular>::
+  Define how light is reflected at the ground surface. When set to diffuse, the
+  reflections are lambertian while a specular surface simulates a perfect
+  mirror. By default, the ground surface is diffuse. Note that this option
+  controls only the directional part of the surface reflections; the amount of
+  reflected energy is defined by the *-e* option.
+
 *-c* _clouds_::
   Submit a *htcp*(5) file describing the properties of the clouds. If not
-  defined, only the atmopshere properties submitted through the *-a* option
+  defined, only the atmosphere properties submitted through the *-a* option
   are taken into account.
 
 *-C* <__camera-parameter__:...>::
@@ -107,7 +114,7 @@ OPTIONS
   {0,0,+1} regardless of _azimuth_ value.
 
 *-d*::
-  Write in _output_ the space partitionning data structures used to speed up
+  Write in _output_ the space partitioning data structures used to speed up
   the radiative transfer computations in the clouds. The written data are
   octrees saved in the VTK file format [3]. Each octree node stores the minimum
   and the maximum of the extinction coefficients of the cloud cells overlapped
@@ -117,7 +124,8 @@ OPTIONS
 *-e* _reflectivity_::
   Reflectivity of the ground geometry in [0, 1]. By default it is set to
   @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@. This parameter is fixed for the
-  while visible range.
+  while visible range and defines the amount of reflected energy. Refer to the
+  *-b* option to control how the light is reflected on the ground surface.
 
 *-f*::
   Force overwrite of the _output_ file.
