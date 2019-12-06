@@ -60,6 +60,13 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.2
+
+- Add the `-b` option that controls the BRDF of the ground geometry.
+- Make optional the use of a ground geometry (option `-g`).
+- Make optional the definition of the optical properties of water droplets
+  (option `-m`) when no cloud field is used.
+
 ### Version 0.1
 
 - Add the `-V` option that fixes the maximum definition of the octrees used to
