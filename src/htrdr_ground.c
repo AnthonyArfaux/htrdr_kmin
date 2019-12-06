@@ -26,6 +26,7 @@
 
 #include <star/s3d.h>
 #include <star/s3daw.h>
+#include <star/ssf.h>
 
 struct ray_context {
   float range[2];
@@ -48,7 +49,7 @@ struct htrdr_ground {
   struct s3d_scene_view* view;
   float lower[3]; /* Ground lower bound */
   float upper[3]; /* Ground upper bound */
-  double reflectivity;
+  struct ssf_bsdf* bsdf;
   int repeat; /* Make the ground infinite in X and Y */
 
   struct htrdr* htrdr;
@@ -136,7 +137,15 @@ setup_ground(struct htrdr_ground* ground, const char* obj_filename)
   size_t nshapes;
   size_t ishape;
   res_T res = RES_OK;
-  ASSERT(ground && obj_filename);
+  ASSERT(ground);
+
+  if(!obj_filename) {
+    /* No geometry! Discard the creation of the scene view */
+    htrdr_log_warn(ground->htrdr,
+      "%s: the scene does not have ground geometry.\n",
+      FUNC_NAME);
+    goto exit;
+  }
 
   res = s3daw_create(&ground->htrdr->logger, ground->htrdr->allocator, NULL,
     NULL, ground->htrdr->s3d, ground->htrdr->verbose, &s3daw);
@@ -207,6 +216,63 @@ error:
   goto exit;
 }
 
+static res_T
+setup_bsdf_diffuse(struct htrdr_ground* ground, const double reflectivity)
+{
+  res_T res = RES_OK;
+  ASSERT(ground);
+
+  res = ssf_bsdf_create
+    (ground->htrdr->allocator, &ssf_lambertian_reflection, &ground->bsdf);
+  if(res != RES_OK) goto error;
+
+  res = ssf_lambertian_reflection_setup(ground->bsdf, reflectivity);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(ground->htrdr,
+    "Could not setup the ground diffuse BSDF with a reflectivity of %g -- %s.\n",
+    reflectivity, res_to_cstr(res));
+  if(ground->bsdf) {
+    SSF(bsdf_ref_put(ground->bsdf));
+    ground->bsdf = NULL;
+  }
+  goto exit;
+}
+
+static res_T
+setup_bsdf_specular(struct htrdr_ground* ground, const double reflectivity)
+{
+  struct ssf_fresnel* fresnel = NULL;
+  res_T res = RES_OK;
+  ASSERT(ground);
+
+  res = ssf_bsdf_create
+    (ground->htrdr->allocator, &ssf_specular_reflection, &ground->bsdf);
+  if(res != RES_OK) goto error;
+  res = ssf_fresnel_create
+    (ground->htrdr->allocator, &ssf_fresnel_constant, &fresnel);
+  if(res != RES_OK) goto error;
+  res = ssf_fresnel_constant_setup(fresnel, reflectivity);
+  if(res != RES_OK) goto error;
+  res = ssf_specular_reflection_setup(ground->bsdf, fresnel);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(ground->htrdr,
+    "Could not setup the ground specular BSDF with a reflectivity of %g -- %s.\n",
+    reflectivity, res_to_cstr(res));
+  if(ground->bsdf) {
+    SSF(bsdf_ref_put(ground->bsdf));
+    ground->bsdf = NULL;
+  }
+  goto exit;
+}
+
 static void
 release_ground(ref_T* ref)
 {
@@ -214,6 +280,7 @@ release_ground(ref_T* ref)
   ASSERT(ref);
   ground = CONTAINER_OF(ref, struct htrdr_ground, ref);
   if(ground->view) S3D(scene_view_ref_put(ground->view));
+  if(ground->bsdf) SSF(bsdf_ref_put(ground->bsdf));
   MEM_RM(ground->htrdr->allocator, ground);
 }
 
@@ -223,7 +290,8 @@ release_ground(ref_T* ref)
 res_T
 htrdr_ground_create
   (struct htrdr* htrdr,
-   const char* obj_filename,
+   const char* obj_filename, /* May be NULL */
+   const enum htrdr_bsdf_type bsdf_type,
    const double reflectivity,
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** out_ground)
@@ -232,7 +300,7 @@ htrdr_ground_create
   struct htrdr_ground* ground = NULL;
   struct time t0, t1;
   res_T res = RES_OK;
-  ASSERT(htrdr && obj_filename && out_ground);
+  ASSERT(htrdr && out_ground);
   ASSERT(reflectivity >= 0 || reflectivity <= 1);
 
   ground = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ground));
@@ -246,7 +314,20 @@ htrdr_ground_create
   ref_init(&ground->ref);
   ground->htrdr = htrdr;
   ground->repeat = repeat_ground;
-  ground->reflectivity = reflectivity;
+  f3_splat(ground->lower, (float)INF);
+  f3_splat(ground->upper,-(float)INF);
+
+  switch(bsdf_type) {
+    case HTRDR_BSDF_DIFFUSE:
+      res = setup_bsdf_diffuse(ground, reflectivity);
+      break;
+    case HTRDR_BSDF_SPECULAR:
+      res = setup_bsdf_specular(ground, reflectivity);
+      break;
+    default: FATAL("Unreachable code\n");
+
+  }
+  if(res != RES_OK) goto error;
 
   time_current(&t0);
   res = setup_ground(ground, obj_filename);
@@ -280,11 +361,11 @@ htrdr_ground_ref_put(struct htrdr_ground* ground)
   ref_put(&ground->ref, release_ground);
 }
 
-double
-htrdr_ground_get_reflectivity(const struct htrdr_ground* ground)
+struct ssf_bsdf*
+htrdr_ground_get_bsdf(const struct htrdr_ground* ground)
 {
   ASSERT(ground);
-  return ground->reflectivity;
+  return ground->bsdf;
 }
 
 res_T
@@ -298,6 +379,11 @@ htrdr_ground_trace_ray
 {
   res_T res = RES_OK;
   ASSERT(ground && org && dir && range && hit);
+
+  if(!ground->view) { /* No ground geometry */
+    *hit = S3D_HIT_NULL;
+    goto exit;
+  }
 
   if(!ground->repeat) {
     struct ray_context ray_ctx = RAY_CONTEXT_NULL;

@@ -18,15 +18,22 @@
 
 #include <rsys/rsys.h>
 
+enum htrdr_bsdf_type {
+  HTRDR_BSDF_DIFFUSE,
+  HTRDR_BSDF_SPECULAR
+};
+
 /* Forward declarations */
 struct htrdr;
 struct htrdr_ground;
 struct s3d_hit;
+struct ssf_bsdf;
 
 extern LOCAL_SYM res_T
 htrdr_ground_create
   (struct htrdr* htrdr,
-   const char* obj_filename,
+   const char* obj_filename, /* May be NULL <=> No ground geometry */
+   const enum htrdr_bsdf_type bsdf_type,
    const double reflectivity, /* In [0, 1] */
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** ground);
@@ -39,8 +46,8 @@ extern LOCAL_SYM void
 htrdr_ground_ref_put
   (struct htrdr_ground* ground);
 
-extern LOCAL_SYM double
-htrdr_ground_get_reflectivity
+extern LOCAL_SYM struct ssf_bsdf*
+htrdr_ground_get_bsdf
   (const struct htrdr_ground* ground);
 
 extern LOCAL_SYM res_T
