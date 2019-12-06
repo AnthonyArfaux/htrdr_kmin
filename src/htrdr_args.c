@@ -475,7 +475,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     res = RES_BAD_ARG;
     goto error;
   }
-  if(!args->filename_mie) {
+  if(args->filename_les && !args->filename_mie) {
     fprintf(stderr,
       "Missing the path toward the file of the Mie's data -- option '-m'\n");
     res = RES_BAD_ARG;

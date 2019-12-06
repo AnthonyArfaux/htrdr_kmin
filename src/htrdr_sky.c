@@ -209,7 +209,7 @@ struct htrdr_sky {
  ******************************************************************************/
 static INLINE int
 aabb_intersect
-  (const double aabb0_low[3], 
+  (const double aabb0_low[3],
    const double aabb0_upp[3],
    const double aabb1_low[3],
    const double aabb1_upp[3])
@@ -1667,10 +1667,6 @@ setup_sw_bands_properties(struct htrdr_sky* sky)
   size_t i;
   ASSERT(sky);
 
-  /* Fetch short wave bands range */
-  res = htgop_get_sw_spectral_intervals_CIE_XYZ(sky->htgop, sky->sw_bands_range);
-  if(res != RES_OK) goto error;
-
   nbands = htrdr_sky_get_sw_spectral_bands_count(sky);
   ASSERT(nbands);
   sky->sw_bands = MEM_CALLOC
@@ -1774,7 +1770,7 @@ htrdr_sky_create
   int htgop_upd = 1;
   int force_upd = 1;
   res_T res = RES_OK;
-  ASSERT(htrdr && sun && htgop_filename && htmie_filename && out_sky);
+  ASSERT(htrdr && sun && htgop_filename && out_sky);
   ASSERT(optical_thickness_threshold >= 0);
 
   sky = MEM_CALLOC(htrdr->allocator, 1, sizeof(*sky));
@@ -1790,6 +1786,8 @@ htrdr_sky_create
   sky->repeat_clouds = repeat_clouds;
   sky->is_cloudy = htcp_filename != NULL;
   darray_split_init(htrdr->allocator, &sky->svx2htcp_z);
+  sky->sw_bands_range[0] = 1;
+  sky->sw_bands_range[1] = 0;
 
   /* Load the gas optical properties */
   res = htgop_create
@@ -1806,6 +1804,21 @@ htrdr_sky_create
     goto error;
   }
 
+  /* Fetch short wave bands range */
+  res = htgop_get_sw_spectral_intervals_CIE_XYZ(sky->htgop, sky->sw_bands_range);
+  if(res != RES_OK) goto error;
+
+  /* Setup the atmopshere */
+  time_current(&t0);
+  res = setup_atmosphere(sky, optical_thickness_threshold);
+  if(res != RES_OK) goto error;
+  time_sub(&t0, time_current(&t1), &t0);
+  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
+  htrdr_log(htrdr, "Setup atmosphere in %s\n", buf);
+
+  /* Nothing more to do */
+  if(!sky->is_cloudy) goto exit;
+
   /* Load MIE data */
   res = htmie_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htmie);
   if(res != RES_OK) {
@@ -1821,17 +1834,6 @@ htrdr_sky_create
 
   res = setup_sw_bands_properties(sky);
   if(res != RES_OK) goto error;
-
-  /* Setup the atmopshere */
-  time_current(&t0);
-  res = setup_atmosphere(sky, optical_thickness_threshold);
-  if(res != RES_OK) goto error;
-  time_sub(&t0, time_current(&t1), &t0);
-  time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
-  htrdr_log(htrdr, "Setup atmosphere in %s\n", buf);
-
-  /* Nothing more to do */
-  if(!sky->is_cloudy) goto exit;
 
   /* Load clouds properties */
   res = htcp_create(&htrdr->logger, htrdr->allocator, htrdr->verbose, &sky->htcp);
@@ -1915,8 +1917,12 @@ htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
   ASSERT(ispectral_band >= sky->sw_bands_range[0]);
   ASSERT(ispectral_band <= sky->sw_bands_range[1]);
   (void)iquad;
-  i = ispectral_band - sky->sw_bands_range[0];
-  return sky->sw_bands[i].g_avg;
+  if(!sky->is_cloudy) {
+    return 0;
+  } else {
+    i = ispectral_band - sky->sw_bands_range[0];
+    return sky->sw_bands[i].g_avg;
+  }
 }
 
 double
@@ -2276,7 +2282,7 @@ htrdr_sky_fetch_svx_voxel_property
 size_t
 htrdr_sky_get_sw_spectral_bands_count(const struct htrdr_sky* sky)
 {
-  ASSERT(sky);
+  ASSERT(sky && sky->sw_bands_range[0] <= sky->sw_bands_range[1]);
   return sky->sw_bands_range[1] - sky->sw_bands_range[0] + 1;
 }
 
