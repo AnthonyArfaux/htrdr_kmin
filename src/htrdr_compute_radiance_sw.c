@@ -283,28 +283,13 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-#if 0
-  CHK(RES_OK == ssf_bsdf_create
-    (&htrdr->lifo_allocators[ithread], &ssf_lambertian_reflection, &bsdf));
-  SSF(lambertian_reflection_setup
-    (bsdf, htrdr_ground_get_reflectivity(htrdr->ground)));
-#else
-  CHK(RES_OK == ssf_bsdf_create
-    (&htrdr->lifo_allocators[ithread], &ssf_specular_reflection, &bsdf));
-  {
-    struct ssf_fresnel* fresnel;
-    SSF(fresnel_create
-      (&htrdr->lifo_allocators[ithread], &ssf_fresnel_dielectric_dielectric, &fresnel));
-    SSF(fresnel_dielectric_dielectric_setup(fresnel, 1.0, 1.33));
-    SSF(specular_reflection_setup(bsdf, fresnel));
-    SSF(fresnel_ref_put(fresnel));
-  }
-#endif
-
   /* Setup the phase function for this spectral band & quadrature point */
   g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
     (htrdr->sky, iband, iquad);
   SSF(phase_hg_setup(phase_hg, g));
+
+  /* Fetch the ground BSDF */
+  bsdf = htrdr_ground_get_bsdf(htrdr->ground);
 
   /* Fetch sun properties. Arbitrarily use the wavelength at the center of the
    * band to retrieve the sun radiance of the current band. Note that the sun
@@ -410,6 +395,10 @@ htrdr_compute_radiance_sw
 
       bounce_reflectivity = ssf_bsdf_sample
         (bsdf, rng, wo, N, dir_next, &type, &pdf);
+      if(!(type & SSF_REFLECTION)) { /* Handle only reflections */
+        bounce_reflectivity = 0;
+      }
+
       if(d3_dot(N, sun_dir) < 0) { /* Below the ground */
         R = 0;
       } else {
@@ -452,7 +441,6 @@ htrdr_compute_radiance_sw
     d3_set(pos, pos_next);
     d3_set(dir, dir_next);
   }
-  SSF(bsdf_ref_put(bsdf));
   SSF(phase_ref_put(phase_hg));
   SSF(phase_ref_put(phase_rayleigh));
   return w;

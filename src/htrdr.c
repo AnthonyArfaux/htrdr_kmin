@@ -513,7 +513,7 @@ htrdr_init
     goto error;
   }
 
-  res = htrdr_ground_create(htrdr, args->filename_obj,
+  res = htrdr_ground_create(htrdr, args->filename_obj, args->ground_bsdf_type,
     args->ground_reflectivity, args->repeat_ground, &htrdr->ground);
   if(res != RES_OK) goto error;
 

@@ -27,6 +27,18 @@
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static const char*
+bsdf_type_to_string(const enum htrdr_bsdf_type type)
+{
+  const char* str = "<none>";
+  switch(type) {
+    case HTRDR_BSDF_DIFFUSE: str = "diffuse"; break;
+    case HTRDR_BSDF_SPECULAR: str = "specular"; break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return str;
+}
+
 static void
 print_help(const char* cmd)
 {
@@ -37,6 +49,10 @@ print_help(const char* cmd)
 "atmospheric gaz mixture, clouds and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
+  printf(
+"  -b <diffuse|specular>\n"
+"                 BSDF of the ground. Default value is %s.\n",
+    bsdf_type_to_string(HTRDR_ARGS_DEFAULT.ground_bsdf_type));
   printf(
 "  -c CLOUDS      properties of the clouds.\n");
   printf(
@@ -354,6 +370,26 @@ error:
   goto exit;
 }
 
+static res_T
+parse_bsdf_type(struct htrdr_args* args, const char* str)
+{
+  res_T res = RES_OK;
+  if(!strcmp(str, "diffuse")) {
+    args->ground_bsdf_type = HTRDR_BSDF_DIFFUSE;
+  } else if(!strcmp(str, "specular")) {
+    args->ground_bsdf_type = HTRDR_BSDF_SPECULAR;
+  } else {
+    fprintf(stderr, "Invalid BRDF type `%s'.\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -378,9 +414,12 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:de:fGg:hi:m:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fGg:hi:m:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
+      case 'b':
+        res = parse_bsdf_type(args, optarg);
+        break;
       case 'C':
         res = parse_multiple_parameters
           (args, optarg, parse_camera_parameter);

@@ -16,6 +16,8 @@
 #ifndef HTRDR_ARGS_H
 #define HTRDR_ARGS_H
 
+#include "htrdr_ground.h"
+
 #include <limits.h>
 #include <rsys/rsys.h>
 
@@ -48,6 +50,7 @@ struct htrdr_args {
   double sun_azimuth; /* In degrees */
   double sun_elevation; /* In degrees */
   double optical_thickness; /* Threshold used during octree building */
+  enum htrdr_bsdf_type ground_bsdf_type;
   double ground_reflectivity; /* Reflectivity of the ground */
   unsigned grid_max_definition[3]; /* Maximum definition of the grid */
 
@@ -84,6 +87,7 @@ struct htrdr_args {
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
   @HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@, /* Optical thickness */    \
+  @HTRDR_ARGS_DEFAULT_GROUND_BSDF@,                                            \
   @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@, /* Ground reflectivity */          \
   {UINT_MAX, UINT_MAX, UINT_MAX}, /* Maximum definition of the grid */         \
   (unsigned)~0, /* #threads */                                                 \
