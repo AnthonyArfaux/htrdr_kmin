@@ -75,6 +75,9 @@ set(HTRDR_ARGS_DEFAULT_IMG_HEIGHT "240")
 set(HTRDR_ARGS_DEFAULT_IMG_SPP "1")
 set(HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1")
 
+configure_file(${HTRDR_SOURCE_DIR}/htrdr_version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/htrdr_version.h @ONLY)
+
 configure_file(${HTRDR_SOURCE_DIR}/htrdr_args.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/htrdr_args.h @ONLY)
 
