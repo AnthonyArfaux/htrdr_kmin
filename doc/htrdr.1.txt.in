@@ -124,7 +124,7 @@ OPTIONS
 *-e* _reflectivity_::
   Reflectivity of the ground geometry in [0, 1]. By default it is set to
   @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@. This parameter is fixed for the
-  while visible range and defines the amount of reflected energy. Refer to the
+  whole visible range and defines the amount of reflected energy. Refer to the
   *-b* option to control how the light is reflected on the ground surface.
 
 *-f*::
