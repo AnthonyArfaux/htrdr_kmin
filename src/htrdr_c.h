@@ -110,22 +110,6 @@ open_output_stream
    int force_overwrite,
    FILE** out_fp);
 
-extern LOCAL_SYM res_T
-is_file_updated
-  (struct htrdr* htrdr,
-   const char* filename,
-   int* is_upd);
-
-extern LOCAL_SYM res_T
-update_file_stamp
-  (struct htrdr* htrdr,
-   const char* filename);
-
-extern LOCAL_SYM res_T
-create_directory
-  (struct htrdr* htrdt,
-   const char* path);
-
 extern LOCAL_SYM void
 send_mpi_progress
   (struct htrdr* htrdr,

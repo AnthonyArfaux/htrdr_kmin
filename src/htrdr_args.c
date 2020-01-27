@@ -73,8 +73,6 @@ print_help(const char* cmd)
   printf(
 "  -g GROUND      ground geometry.\n");
   printf(
-"  -G             precompute/use cached grids of cloud properties.\n");
-  printf(
 "  -h             display this help and exit.\n");
   printf(
 "  -i <image>     define the image to compute.\n");
@@ -414,7 +412,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fGg:hi:m:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fg:hi:m:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'b':
@@ -434,7 +432,6 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         }
         break;
       case 'f': args->force_overwriting = 1; break;
-      case 'G': args->cache_grids = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
         print_help(argv[0]);
