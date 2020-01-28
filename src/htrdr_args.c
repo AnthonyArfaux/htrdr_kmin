@@ -44,7 +44,7 @@ static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [OPION]... -a ATMOSPHERE -m MIE\n", cmd);
+  printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
 "Render an image in the visible part of the spectrum, for scenes composed of an\n"
 "atmospheric gaz mixture, clouds and a ground.\n\n");
@@ -102,7 +102,7 @@ print_help(const char* cmd)
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. Copyright (C), 2018,\n"
+"Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. Copyright (C) 2018,\n"
 "2019, 2020 |Meso|Star> <contact@meso-star.com>. htrdr is free software released\n"
 "under the GNU GPL license, version 3 or later. You are free to change or\n"
 "redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");
