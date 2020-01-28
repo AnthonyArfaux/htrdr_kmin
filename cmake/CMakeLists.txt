@@ -122,7 +122,7 @@ rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
-target_link_libraries(htrdr HTSky RSys Star3D Star3DAW StarSF StarSP StarVX)
+target_link_libraries(htrdr HTSky RSys Star3D Star3DAW StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)

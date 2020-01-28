@@ -41,10 +41,8 @@ struct s3d_device;
 struct s3d_scene;
 struct ssf_bsdf;
 struct ssf_phase;
-struct svx_device;
 
 struct htrdr {
-  struct svx_device* svx;
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
@@ -81,7 +79,6 @@ struct htrdr {
 
   struct logger logger;
   struct mem_allocator* allocator;
-  struct mem_allocator svx_allocator;
   struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */
 };
 

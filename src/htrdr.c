@@ -33,7 +33,6 @@
 
 #include <star/s3d.h>
 #include <star/ssf.h>
-#include <star/svx.h>
 
 #include <errno.h>
 #include <fcntl.h> /* open */
@@ -397,9 +396,6 @@ htrdr_init
   htrdr->grid_max_definition[1] = args->grid_max_definition[1];
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
 
-  res = mem_init_regular_allocator(&htrdr->svx_allocator);
-  if(res != RES_OK) goto error;
-
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
 
@@ -417,15 +413,6 @@ htrdr_init
     htrdr_log_err(htrdr,
       "%s: could not store the name of the output stream `%s' -- %s.\n",
       FUNC_NAME, output_name, res_to_cstr(res));
-    goto error;
-  }
-
-  res = svx_device_create
-    (&htrdr->logger, &htrdr->svx_allocator, args->verbose, &htrdr->svx);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not create the Star-VoXel device -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 
@@ -521,7 +508,6 @@ htrdr_release(struct htrdr* htrdr)
   ASSERT(htrdr);
   release_mpi(htrdr);
   if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
-  if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
   if(htrdr->sky) HTSKY(ref_put(htrdr->sky));
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
@@ -536,9 +522,6 @@ htrdr_release(struct htrdr* htrdr)
   }
   str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
-
-  ASSERT(MEM_ALLOCATED_SIZE(&htrdr->svx_allocator) == 0);
-  mem_shutdown_regular_allocator(&htrdr->svx_allocator);
 }
 
 res_T
