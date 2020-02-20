@@ -464,6 +464,7 @@ htrdr_init
   htsky_args.htcp_filename = args->filename_les;
   htsky_args.htgop_filename = args->filename_gas;
   htsky_args.htmie_filename = args->filename_mie;
+  htsky_args.cache_filename = args->cache;
   htsky_args.grid_max_definition[0] = args->grid_max_definition[0];
   htsky_args.grid_max_definition[1] = args->grid_max_definition[1];
   htsky_args.grid_max_definition[2] = args->grid_max_definition[2];

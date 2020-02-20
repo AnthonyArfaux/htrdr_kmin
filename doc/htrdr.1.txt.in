@@ -24,7 +24,7 @@ htrdr - image renderer of cloudy atmospheres
 SYNOPSIS
 --------
 [verse]
-*htrdr* [_option_]... -a _atmosphere_ -m _mie_
+*htrdr* [_option_]... -a _atmosphere_
 
 DESCRIPTION
 -----------
@@ -133,18 +133,6 @@ OPTIONS
 *-g* _ground_::
   Path toward an OBJ file [2] representing the ground geometry.
 
-*-G*::
-  Pre-compute or use cached grids of the cloud properties built from the
-  _clouds_, the _atmosphere_ and the _mie_ files. If the corresponding grids
-  were generated in a previous run, reuse them as far as it is possible, i.e.
-  if the _clouds_, the _atmosphere_ and the _mie_ files were not updated.  The
-  cached data are written in a hidden directory named *.htrdr* located in the
-  directory where *htrdr* is run. On platforms with an efficient hard-drive and
-  plenty of random access memory, this cache mechanism can significantly
-  speed-up the pre-computation step on _clouds_ data.  Note that this option is
-  incompatible with a MPI execution and is thus forced to off if *htrdr* is run
-  through a process launcher.
-
 *-h*::
   List short help and exit.
 
@@ -170,6 +158,19 @@ OPTIONS
 *-m* _mie_::
   Path toward a *htmie*(5) file defining the optical properties of water
   droplets.
+
+*-O* _cache_::
+  File used to cache the sky data. If the _cache_ file does not exists, it is
+  created and filled with the sky data built from the _clouds_, the
+  _atmosphere_ and the _mie_ input files. This cached data can then be reused
+  in the next runs as long as the input files provided on the command are the
+  same of the ones used to setup the cache; leading to a significant speed-up
+  of the pre-processing step. If _cache_ contains data generated from input
+  files that are not the ones submitted on the command line, an error is
+  notified and the execution is stopped, avoiding the use of wrong cached data.
+  Note that when the cache is used, *htrdr* ignores the arguments used to
+  parametrise the structures partitioning the sky data, i.e. the *-T* and *-V*
+  options.
 
 *-o* _output_::
   File where *htrdr* writes its _output_ data. If not defined, write results to
@@ -227,13 +228,14 @@ output in a regular PPM image [5]:
     $ htpp -o image.ppm output
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*
-degrees respectively. Use the *-G* option to enable the cache mechanism on
-clouds data. Increase the image definition to *1280* by *720* and set the
+degrees respectively. Use the *-O* option to enable the cache mechanism on
+sky data. Increase the image definition to *1280* by *720* and set the
 number of samples per pixel component to *1024*. Write results on standard
 output and convert the resulting image in PPM before visualising it through the
 *feh*(1) image viewer:
 
-    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -G \
+    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp \
+      -O my_cache \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=1280x720:spp=1024 | htpp | feh -
 

@@ -84,6 +84,8 @@ print_help(const char* cmd)
   printf(
 "  -m MIE         file of Mie's data.\n");
   printf(
+"  -O CACHE       name of the cache file used to store/restore the sky data.\n");
+  printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
   printf(
@@ -413,7 +415,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fg:hi:m:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fg:hi:m:O:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'b':
@@ -444,6 +446,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
           (args, optarg, parse_image_parameter);
         break;
       case 'm': args->filename_mie = optarg; break;
+      case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;
