@@ -61,7 +61,7 @@ informations on CMake.
 ### Version 0.3
 
 - Add the `-O` option that defines the file where the sky data are cached. If
-  the file does not exist, the sky data structures are built from scracth and
+  the file does not exist, the sky data structures are built from scratch and
   serialized into this new file. If this file exists, these data structures are
   directly read from it, leading to a huge speed up of the `htrdr`
   pre-processing step. Note that if the provided file exists but is filled with
