@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

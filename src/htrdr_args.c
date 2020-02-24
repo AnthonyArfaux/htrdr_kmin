@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +44,7 @@ static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [OPION]... -a ATMOSPHERE -m MIE\n", cmd);
+  printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
 "Render an image in the visible part of the spectrum, for scenes composed of an\n"
 "atmospheric gaz mixture, clouds and a ground.\n\n");
@@ -73,8 +74,6 @@ print_help(const char* cmd)
   printf(
 "  -g GROUND      ground geometry.\n");
   printf(
-"  -G             precompute/use cached grids of cloud properties.\n");
-  printf(
 "  -h             display this help and exit.\n");
   printf(
 "  -i <image>     define the image to compute.\n");
@@ -84,6 +83,8 @@ print_help(const char* cmd)
 "  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
 "  -m MIE         file of Mie's data.\n");
+  printf(
+"  -O CACHE       name of the cache file used to store/restore the sky data.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
@@ -103,9 +104,9 @@ print_help(const char* cmd)
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"htrdr (C) 2018-2019 CNRS, |Meso|Star> <contact@meso-star.com>, Université Paul\n"
-"Sabatier <contact-edstar@laplace.univ-tlse.fr>. This is free software released\n"
-"under the GNU GPL license, version 3 or later.  You are free to change or\n"
+"Copyright (C) 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>. Copyright\n"
+"(C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free software released\n"
+"under the GNU GPL license, version 3 or later. You are free to change or\n"
 "redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");
 }
 
@@ -414,7 +415,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fGg:hi:m:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fg:hi:m:O:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
       case 'b':
@@ -434,7 +435,6 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         }
         break;
       case 'f': args->force_overwriting = 1; break;
-      case 'G': args->cache_grids = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
         print_help(argv[0]);
@@ -446,6 +446,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
           (args, optarg, parse_image_parameter);
         break;
       case 'm': args->filename_mie = optarg; break;
+      case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;

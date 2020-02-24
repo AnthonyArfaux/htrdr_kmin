@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +20,9 @@
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
-#include "htrdr_sky.h"
 #include "htrdr_solve.h"
+
+#include <high_tune/htsky.h>
 
 #include <rsys/clock_time.h>
 #include <rsys/cstr.h>
@@ -504,6 +506,7 @@ draw_tile
         double ray_org[3];
         double ray_dir[3];
         double weight;
+        double r0, r1;
         size_t iband;
         size_t iquad;
         double usec;
@@ -517,18 +520,20 @@ draw_tile
         htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
 
         /* Sample a spectral band and a quadrature point */
+        r0 = ssp_rng_canonical(rng);
+        r1 = ssp_rng_canonical(rng);
         switch(ichannel) {
           case 0:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_X
-              (htrdr->sky, rng, &iband, &iquad);
+            htsky_sample_sw_spectral_data_CIE_1931_X
+              (htrdr->sky, r0, r1, &iband, &iquad);
             break;
           case 1:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_Y
-              (htrdr->sky, rng, &iband, &iquad);
+            htsky_sample_sw_spectral_data_CIE_1931_Y
+              (htrdr->sky, r0, r1, &iband, &iquad);
             break;
           case 2:
-            htrdr_sky_sample_sw_spectral_data_CIE_1931_Z
-              (htrdr->sky, rng, &iband, &iquad);
+            htsky_sample_sw_spectral_data_CIE_1931_Z
+              (htrdr->sky, r0, r1, &iband, &iquad);
             break;
           default: FATAL("Unreachable code.\n"); break;
         }

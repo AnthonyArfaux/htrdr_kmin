@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +22,7 @@
 #include <rsys/str.h>
 
 /* Helper macro that asserts if the invocation of the htrdr function `Func'
- * returns an error. One should use this macro on htcp function calls for
+ * returns an error. One should use this macro on htrdr function calls for
  * which no explicit error checking is performed */
 #ifndef NDEBUG
   #define HTRDR(Func) ASSERT(htrdr_ ## Func == RES_OK)
@@ -30,9 +31,9 @@
 #endif
 
 /* Forward declarations */
+struct htsky;
 struct htrdr_args;
 struct htrdr_buffer;
-struct htrdr_sky;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct mutext;
@@ -40,18 +41,18 @@ struct s3d_device;
 struct s3d_scene;
 struct ssf_bsdf;
 struct ssf_phase;
-struct svx_device;
 
 struct htrdr {
-  struct svx_device* svx;
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
-  struct htrdr_sky* sky;
   struct htrdr_sun* sun;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
+
+  struct htsky* sky;
+
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */
   size_t height; /* Image height */
@@ -62,7 +63,6 @@ struct htrdr {
   unsigned grid_max_definition[3]; /* Max definition of the acceleration grids */
   unsigned nthreads; /* #threads of the process */
   int dump_vtk; /* Dump octree VTK */
-  int cache_grids; /* Use/Precompute grid caches */
   int verbose; /* Verbosity level */
 
   int mpi_rank; /* Rank of the process in the MPI group */
@@ -79,7 +79,6 @@ struct htrdr {
 
   struct logger logger;
   struct mem_allocator* allocator;
-  struct mem_allocator svx_allocator;
   struct mem_allocator* lifo_allocators; /* Per thread lifo allocator */
 };
 

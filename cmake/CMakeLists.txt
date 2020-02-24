@@ -1,4 +1,5 @@
-# Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+# Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
+# Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,9 +31,7 @@ find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
 find_package(StarVX REQUIRED)
-find_package(HTCP REQUIRED)
-find_package(HTGOP REQUIRED)
-find_package(HTMIE REQUIRED)
+find_package(HTSky REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
 find_package(MPI 1 REQUIRED)
 
@@ -49,9 +48,7 @@ include_directories(
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
-  ${HTCP_INCLUDE_DIR}
-  ${HTGOP_INCLUDE_DIR}
-  ${HTMIE_INCLUDE_DIR}
+  ${HTSky}
   ${HTRDR_SOURCE_DIR}
   ${MPI_INCLUDE_PATH}
   ${CMAKE_CURRENT_BINARY_DIR})
@@ -101,7 +98,6 @@ set(HTRDR_FILES_SRC
   htrdr_main.c
   htrdr_rectangle.c
   htrdr_slab.c
-  htrdr_sky.c
   htrdr_sun.c)
 set(HTRDR_FILES_INC
   htrdr.h
@@ -112,7 +108,6 @@ set(HTRDR_FILES_INC
   htrdr_ground.h
   htrdr_rectangle.h
   htrdr_slab.h
-  htrdr_sky.h
   htrdr_sun.h
   htrdr_solve.h)
 set(HTRDR_FILES_INC2 # Generated files
@@ -127,7 +122,7 @@ rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
-target_link_libraries(htrdr HTCP HTGOP HTMIE RSys Star3D Star3DAW StarSF StarSP StarVX)
+target_link_libraries(htrdr HTSky RSys Star3D Star3DAW StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)

@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +22,6 @@
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
-#include "htrdr_sky.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -29,9 +29,10 @@
 #include <rsys/mem_allocator.h>
 #include <rsys/str.h>
 
+#include "high_tune/htsky.h"
+
 #include <star/s3d.h>
 #include <star/ssf.h>
-#include <star/svx.h>
 
 #include <errno.h>
 #include <fcntl.h> /* open */
@@ -149,76 +150,6 @@ dump_accum_buffer
 exit:
   return res;
 error:
-  goto exit;
-}
-
-static res_T
-open_file_stamp
-  (struct htrdr* htrdr,
-   const char* filename,
-   struct stat* out_stat, /* Stat of the submitted filename */
-   int* out_fd, /* Descriptor of the opened file. Must be closed by the caller */
-   struct str* stamp_filename)
-{
-  struct stat statbuf;
-  struct str str;
-  int err;
-  int fd = -1;
-  res_T res = RES_OK;
-  ASSERT(htrdr && filename && out_fd && out_stat && stamp_filename);
-
-  str_init(htrdr->allocator, &str);
-
-  err = stat(filename, &statbuf);
-  if(err) {
-    htrdr_log_err(htrdr, "%s: could not stat the file -- %s.\n",
-      filename, strerror(errno));
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  if(!S_ISREG(statbuf.st_mode)) {
-    htrdr_log_err(htrdr, "%s: not a regular file.\n", filename);
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  res = create_directory(htrdr, ".htrdr/");
-  if(res != RES_OK) goto error;
-
-  #define CHK_STR(Func, ErrMsg) {                                              \
-    res = str_##Func;                                                          \
-    if(res != RES_OK) {                                                        \
-      htrdr_log_err(htrdr, "%s: "ErrMsg"\n", filename);                        \
-      goto error;                                                              \
-    }                                                                          \
-  } (void)0
-  CHK_STR(set(&str, filename), "could not copy the filename");
-  CHK_STR(set(&str, basename(str_get(&str))), "could not setup the basename");
-  CHK_STR(insert(&str, 0, ".htrdr/"), "could not setup the stamp directory");
-  CHK_STR(append(&str, ".stamp"), "could not setup the stamp extension");
-  #undef CHK_STR
-
-  fd = open(str_cget(&str), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
-  if(fd < 0) {
-    htrdr_log_err(htrdr, "%s: could not open/create the file -- %s.\n",
-      str_cget(&str), strerror(errno));
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  CHK(str_copy_and_clear(stamp_filename, &str) == RES_OK);
-
-exit:
-  str_release(&str);
-  *out_fd = fd;
-  *out_stat = statbuf;
-  return res;
-error:
-  if(fd >= 0) {
-    CHK(close(fd) == 0);
-    fd = -1;
-  }
   goto exit;
 }
 
@@ -434,6 +365,7 @@ htrdr_init
    const struct htrdr_args* args,
    struct htrdr* htrdr)
 {
+  struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
   double proj_ratio;
   double sun_dir[3];
   const char* output_name = NULL;
@@ -455,7 +387,6 @@ htrdr_init
 
   nthreads_max = MMAX(omp_get_max_threads(), omp_get_num_procs());
   htrdr->dump_vtk = args->dump_vtk;
-  htrdr->cache_grids = args->cache_grids;
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)nthreads_max);
   htrdr->spp = args->image.spp;
@@ -465,16 +396,8 @@ htrdr_init
   htrdr->grid_max_definition[1] = args->grid_max_definition[1];
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
 
-  res = mem_init_regular_allocator(&htrdr->svx_allocator);
-  if(res != RES_OK) goto error;
-
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
-
-  if(htrdr->cache_grids && htrdr->mpi_nprocs != 1) {
-    htrdr_log_warn(htrdr, "cached grids are not supported in a MPI execution.\n");
-    htrdr->cache_grids = 0;
-  }
 
   if(!args->output) {
     htrdr->output = stdout;
@@ -490,15 +413,6 @@ htrdr_init
     htrdr_log_err(htrdr,
       "%s: could not store the name of the output stream `%s' -- %s.\n",
       FUNC_NAME, output_name, res_to_cstr(res));
-    goto error;
-  }
-
-  res = svx_device_create
-    (&htrdr->logger, &htrdr->svx_allocator, args->verbose, &htrdr->svx);
-  if(res != RES_OK) {
-    htrdr_log_err(htrdr,
-      "%s: could not create the Star-VoXel device -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
     goto error;
   }
 
@@ -547,9 +461,18 @@ htrdr_init
     (MDEG2RAD(args->sun_azimuth), MDEG2RAD(args->sun_elevation), sun_dir);
   htrdr_sun_set_direction(htrdr->sun, sun_dir);
 
-  res = htrdr_sky_create(htrdr, htrdr->sun, args->filename_les,
-    args->filename_gas, args->filename_mie, args->optical_thickness,
-    args->repeat_clouds, &htrdr->sky);
+  htsky_args.htcp_filename = args->filename_les;
+  htsky_args.htgop_filename = args->filename_gas;
+  htsky_args.htmie_filename = args->filename_mie;
+  htsky_args.cache_filename = args->cache;
+  htsky_args.grid_max_definition[0] = args->grid_max_definition[0];
+  htsky_args.grid_max_definition[1] = args->grid_max_definition[1];
+  htsky_args.grid_max_definition[2] = args->grid_max_definition[2];
+  htsky_args.optical_thickness = args->optical_thickness;
+  htsky_args.nthreads = htrdr->nthreads;
+  htsky_args.repeat_clouds = args->repeat_clouds;
+  htsky_args.verbose = args->verbose;
+  res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
   htrdr->lifo_allocators = MEM_CALLOC
@@ -586,9 +509,8 @@ htrdr_release(struct htrdr* htrdr)
   ASSERT(htrdr);
   release_mpi(htrdr);
   if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
-  if(htrdr->svx) SVX(device_ref_put(htrdr->svx));
   if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
-  if(htrdr->sky) htrdr_sky_ref_put(htrdr->sky);
+  if(htrdr->sky) HTSKY(ref_put(htrdr->sky));
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
@@ -601,9 +523,6 @@ htrdr_release(struct htrdr* htrdr)
   }
   str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
-
-  ASSERT(MEM_ALLOCATED_SIZE(&htrdr->svx_allocator) == 0);
-  mem_shutdown_regular_allocator(&htrdr->svx_allocator);
 }
 
 res_T
@@ -611,19 +530,19 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    const size_t nbands = htrdr_sky_get_sw_spectral_bands_count(htrdr->sky);
+    const size_t nbands = htsky_get_sw_spectral_bands_count(htrdr->sky);
     size_t i;
 
     /* Nothing to do */
     if(htrdr->mpi_rank != 0) goto exit;
 
     FOR_EACH(i, 0, nbands) {
-      const size_t iband = htrdr_sky_get_sw_spectral_band_id(htrdr->sky, i);
-      const size_t nquads = htrdr_sky_get_sw_spectral_band_quadrature_length
+      const size_t iband = htsky_get_sw_spectral_band_id(htrdr->sky, i);
+      const size_t nquads = htsky_get_sw_spectral_band_quadrature_length
         (htrdr->sky, iband);
       size_t iquad;
       FOR_EACH(iquad, 0, nquads) {
-        res = htrdr_sky_dump_clouds_vtk(htrdr->sky, iband, iquad, htrdr->output);
+        res = htsky_dump_cloud_vtk(htrdr->sky, iband, iquad, htrdr->output);
         if(res != RES_OK) goto error;
         fprintf(htrdr->output, "---\n");
       }
@@ -777,134 +696,6 @@ error:
   } else if(fd >= 0) {
     CHK(close(fd) == 0);
   }
-  goto exit;
-}
-
-res_T
-is_file_updated(struct htrdr* htrdr, const char* filename, int* out_upd)
-{
-  struct str stamp_filename;
-  struct stat statbuf;
-  ssize_t n;
-  off_t size;
-  struct timespec mtime;
-  int fd = -1;
-  int upd = 1;
-  res_T res = RES_OK;
-  ASSERT(htrdr && filename && out_upd);
-
-  str_init(htrdr->allocator, &stamp_filename);
-
-  res = open_file_stamp(htrdr, filename, &statbuf, &fd, &stamp_filename);
-  if(res != RES_OK) goto error;
-
-  n = read(fd, &mtime, sizeof(mtime));
-  if(n < 0) {
-    htrdr_log_err(htrdr, "%s: could not read the `mtime' data -- %s.\n",
-      str_cget(&stamp_filename), strerror(errno));
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  upd = (size_t)n != sizeof(mtime)
-      ||mtime.tv_nsec != statbuf.st_mtim.tv_nsec
-      ||mtime.tv_sec  != statbuf.st_mtim.tv_sec;
-
-  if(!upd) {
-    n = read(fd, &size, sizeof(size));
-    if(n < 0) {
-      htrdr_log_err(htrdr, "%s: could not read the `size' data -- %s.\n",
-        str_cget(&stamp_filename), strerror(errno));
-      res = RES_IO_ERR;
-      goto error;
-    }
-    upd = (size_t)n != sizeof(size) || statbuf.st_size != size;
-  }
-
-exit:
-  *out_upd = upd;
-  str_release(&stamp_filename);
-  if(fd >= 0) CHK(close(fd) == 0);
-  return res;
-error:
-  goto exit;
-}
-
-
-res_T
-update_file_stamp(struct htrdr* htrdr, const char* filename)
-{
-  struct str stamp_filename;
-  struct stat statbuf;
-  int fd = -1;
-  ssize_t n;
-  res_T res = RES_OK;
-  ASSERT(htrdr && filename);
-
-  str_init(htrdr->allocator, &stamp_filename);
-
-  res = open_file_stamp(htrdr, filename, &statbuf, &fd, &stamp_filename);
-  if(res != RES_OK) goto error;
-
-  #define CHK_IO(Func, ErrMsg) {                                               \
-    if((Func) < 0) {                                                           \
-      htrdr_log_err(htrdr, "%s: "ErrMsg" -- %s.\n",                            \
-        str_cget(&stamp_filename), strerror(errno));                           \
-      res = RES_IO_ERR;                                                        \
-      goto error;                                                              \
-    }                                                                          \
-  } (void) 0
-
-  CHK_IO(lseek(fd, 0, SEEK_SET), "could not rewind the file descriptor");
-
-  /* NOTE: Ignore n >=0 but != sizeof(DATA). In such case stamp is currupted
-   * and on the next invocation on the same filename, this function will
-   * return 1 */
-  n = write(fd, &statbuf.st_mtim, sizeof(statbuf.st_mtim));
-  CHK_IO(n, "could not update the `mtime' data");
-  n = write(fd, &statbuf.st_size, sizeof(statbuf.st_size));
-  CHK_IO(n, "could not update the `size' data");
-
-  CHK_IO(fsync(fd), "could not sync the file with storage device");
-
-  #undef CHK_IO
-
-exit:
-  str_release(&stamp_filename);
-  if(fd >= 0) CHK(close(fd) == 0);
-  return res;
-error:
-  goto exit;
-}
-
-res_T
-create_directory(struct htrdr* htrdr, const char* path)
-{
-  res_T res = RES_OK;
-  int err;
-  ASSERT(htrdr && path);
-
-  err = mkdir(path, S_IRWXU);
-  if(!err) goto exit;
-
-  if(errno != EEXIST) {
-    htrdr_log_err(htrdr, "cannot create the `%s' directory -- %s.\n",
-      path, strerror(errno));
-    res = RES_IO_ERR;
-    goto error;
-  } else {
-    const int fd = open(path, O_DIRECTORY);
-    if(fd < -1) {
-      htrdr_log_err(htrdr, "cannot open the `%s' directory -- %s.\n",
-        path, strerror(errno));
-      res = RES_IO_ERR;
-      goto error;
-    }
-    CHK(!close(fd));
-  }
-exit:
-  return res;
-error:
   goto exit;
 }
 

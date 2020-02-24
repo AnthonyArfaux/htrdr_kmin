@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +18,9 @@
 #include "htrdr_c.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
-#include "htrdr_sky.h"
 #include "htrdr_sun.h"
+
+#include <high_tune/htsky.h>
 
 #include <star/s3d.h>
 #include <star/ssf.h>
@@ -31,7 +33,7 @@
 
 struct scattering_context {
   struct ssp_rng* rng;
-  const struct htrdr_sky* sky;
+  const struct htsky* sky;
   size_t iband; /* Index of the spectrald */
   size_t iquad; /* Index of the quadrature point into the band */
 
@@ -44,7 +46,7 @@ static const struct scattering_context SCATTERING_CONTEXT_NULL = {
 
 struct transmissivity_context {
   struct ssp_rng* rng;
-  const struct htrdr_sky* sky;
+  const struct htsky* sky;
   size_t iband; /* Index of the spectrald */
   size_t iquad; /* Index of the quadrature point into the band */
 
@@ -52,7 +54,7 @@ struct transmissivity_context {
   double Tmin; /* Minimal optical thickness */
   double traversal_dst; /* Distance traversed along the ray */
 
-  enum htrdr_sky_property prop;
+  enum htsky_property prop;
 };
 static const struct transmissivity_context TRANSMISSION_CONTEXT_NULL = {
   NULL, NULL, 0, 0, 0, 0, 0, 0
@@ -75,8 +77,8 @@ scattering_hit_filter
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
   (void)range;
 
-  ks_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, HTRDR_Ks,
-    HTRDR_SVX_MAX, HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, &hit->voxel);
+  ks_max = htsky_fetch_svx_voxel_property(ctx->sky, HTSKY_Ks,
+    HTSKY_SVX_MAX, HTSKY_CPNT_MASK_ALL, ctx->iband, ctx->iquad, &hit->voxel);
 
   ctx->traversal_dst = hit->distance[0];
 
@@ -111,8 +113,8 @@ scattering_hit_filter
       pos[1] = org[1] + ctx->traversal_dst * dir[1];
       pos[2] = org[2] + ctx->traversal_dst * dir[2];
 
-      ks = htrdr_sky_fetch_raw_property(ctx->sky, HTRDR_Ks,
-        HTRDR_ALL_COMPONENTS, ctx->iband, ctx->iquad, pos, -DBL_MAX, DBL_MAX);
+      ks = htsky_fetch_raw_property(ctx->sky, HTSKY_Ks,
+        HTSKY_CPNT_MASK_ALL, ctx->iband, ctx->iquad, pos, -DBL_MAX, DBL_MAX);
 
       /* Handle the case that ks_max is not *really* the max */
       proba = ks / ks_max;
@@ -137,17 +139,17 @@ transmissivity_hit_filter
    void* context)
 {
   struct transmissivity_context* ctx = context;
-  int comp_mask = HTRDR_ALL_COMPONENTS;
+  int comp_mask = HTSKY_CPNT_MASK_ALL;
   double k_max;
   double k_min;
   int pursue_traversal = 1;
   ASSERT(hit && ctx && !SVX_HIT_NONE(hit) && org && dir && range);
   (void)range;
 
-  k_min = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MIN, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
-  k_max = htrdr_sky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
-    HTRDR_SVX_MAX, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
+  k_min = htsky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
+    HTSKY_SVX_MIN, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
+  k_max = htsky_fetch_svx_voxel_property(ctx->sky, ctx->prop,
+    HTSKY_SVX_MAX, comp_mask, ctx->iband, ctx->iquad, &hit->voxel);
   ASSERT(k_min <= k_max);
 
   ctx->Tmin += (hit->distance[1] - hit->distance[0]) * k_min;
@@ -183,7 +185,7 @@ transmissivity_hit_filter
       x[1] = org[1] + ctx->traversal_dst * dir[1];
       x[2] = org[2] + ctx->traversal_dst * dir[2];
 
-      k = htrdr_sky_fetch_raw_property(ctx->sky, ctx->prop,
+      k = htsky_fetch_raw_property(ctx->sky, ctx->prop,
         comp_mask, ctx->iband, ctx->iquad, x, k_min, k_max);
       ASSERT(k >= k_min && k <= k_max);
 
@@ -204,7 +206,7 @@ static double
 transmissivity
   (struct htrdr* htrdr,
    struct ssp_rng* rng,
-   const enum htrdr_sky_property prop,
+   const enum htsky_property prop,
    const size_t iband,
    const size_t iquad,
    const double pos[3],
@@ -224,7 +226,7 @@ transmissivity
   transmissivity_ctx.prop = prop;
 
   /* Compute the transmissivity */
-  HTRDR(sky_trace_ray(htrdr->sky, pos, dir, range, NULL,
+  HTSKY(trace_ray(htrdr->sky, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, iband, iquad, &svx_hit));
 
   if(SVX_HIT_NONE(&svx_hit)) {
@@ -284,7 +286,7 @@ htrdr_compute_radiance_sw
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
   /* Setup the phase function for this spectral band & quadrature point */
-  g = htrdr_sky_fetch_particle_phase_function_asymmetry_parameter
+  g = htsky_fetch_particle_phase_function_asymmetry_parameter
     (htrdr->sky, iband, iquad);
   SSF(phase_hg_setup(phase_hg, g));
 
@@ -296,7 +298,7 @@ htrdr_compute_radiance_sw
    * spectral data are defined by bands that, actually are the same of the SW
    * spectral bands defined in the default "ecrad_opt_prot.txt" file provided
    * by the HTGOP project. */
-  htrdr_sky_get_sw_spectral_band_bounds(htrdr->sky, iband, band_bounds);
+  htsky_get_sw_spectral_band_bounds(htrdr->sky, iband, band_bounds);
   wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
@@ -315,7 +317,7 @@ htrdr_compute_radiance_sw
       Tr = 0;
     } else {
       Tr = transmissivity
-        (htrdr, rng, HTRDR_Kext, iband, iquad , pos, dir, range);
+        (htrdr, rng, HTSKY_Kext, iband, iquad , pos, dir, range);
       w = L_sun * Tr;
     }
   }
@@ -341,7 +343,7 @@ htrdr_compute_radiance_sw
 
     /* Define if a scattering event occurs */
     d2(range, 0, s3d_hit.distance);
-    HTRDR(sky_trace_ray(htrdr->sky, pos, dir, range, NULL,
+    HTSKY(trace_ray(htrdr->sky, pos, dir, range, NULL,
       scattering_hit_filter, &scattering_ctx, iband, iquad, &svx_hit));
 
     /* No scattering and no surface reflection. Stop the radiative random walk */
@@ -364,7 +366,7 @@ htrdr_compute_radiance_sw
      * next position */
     d2(range, 0, scattering_ctx.traversal_dst);
     Tr_abs = transmissivity
-      (htrdr, rng, HTRDR_Ka, iband, iquad, pos, dir, range);
+      (htrdr, rng, HTSKY_Ka, iband, iquad, pos, dir, range);
     if(Tr_abs <= 0) break;
 
     /* Sample a sun direction */
@@ -382,7 +384,7 @@ htrdr_compute_radiance_sw
       Tr = 0;
     } else {
       Tr = transmissivity
-        (htrdr, rng, HTRDR_Kext, iband, iquad, pos_next, sun_dir, range);
+        (htrdr, rng, HTSKY_Kext, iband, iquad, pos_next, sun_dir, range);
     }
 
     /* Scattering at a surface */
@@ -412,10 +414,10 @@ htrdr_compute_radiance_sw
       double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
 
-      ks_gas = htrdr_sky_fetch_raw_property(htrdr->sky, HTRDR_Ks, HTRDR_GAS,
-        iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
-      ks_particle = htrdr_sky_fetch_raw_property(htrdr->sky, HTRDR_Ks,
-        HTRDR_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
+      ks_gas = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks, 
+        HTSKY_CPNT_FLAG_GAS, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
+      ks_particle = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks,
+        HTSKY_CPNT_FLAG_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks = ks_particle + ks_gas;
 
       r = ssp_rng_canonical(rng);

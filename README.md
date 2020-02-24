@@ -94,9 +94,9 @@ informations on CMake.
 
 ## License
 
-Copyright (C) 2018-2019 Centre National de la Recherche
-Scientifique (CNRS), [|Meso|Star](http://www.meso-star.com)
-<contact@meso-star.com>, Université Paul Sabatier
+Copyright (C) 2018, 2019, 2020 [|Meso|Star>](http://www.meso-star.com)
+<contact@meso-star.com>. Copyright (C) 2018, 2019 Centre National de la
+Recherche Scientifique (CNRS), Université Paul Sabatier
 <contact-edstar@laplace.univ-tlse.fr>. htrdr is free software released under
 the GPL v3+ license: GNU GPL version 3 or later. You are welcome to
 redistribute it under certain conditions; refer to the COPYING file for

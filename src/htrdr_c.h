@@ -1,4 +1,5 @@
-/* Copyright (C) 2018-2019 CNRS, |Meso|Star>, Université Paul Sabatier
+/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -109,22 +110,6 @@ open_output_stream
    const int read, /* Enable read access */
    int force_overwrite,
    FILE** out_fp);
-
-extern LOCAL_SYM res_T
-is_file_updated
-  (struct htrdr* htrdr,
-   const char* filename,
-   int* is_upd);
-
-extern LOCAL_SYM res_T
-update_file_stamp
-  (struct htrdr* htrdr,
-   const char* filename);
-
-extern LOCAL_SYM res_T
-create_directory
-  (struct htrdr* htrdt,
-   const char* path);
 
 extern LOCAL_SYM void
 send_mpi_progress
