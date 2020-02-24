@@ -37,9 +37,7 @@ This program is compatible GNU/Linux 64-bits. It relies on the
 [CMake](http://www.cmake.org) and the
 [RCMake](https://gitlab.com/vaplv/rcmake/) packages to build.  It also depends
 on the
-[HTCP](https://gitlab.com/meso-star/htcp/),
-[HTGOP](https://gitlab.com/meso-star/htgop/),
-[HTMIE](https://gitlab.com/meso-star/htmie/),
+[HTSky](https://gitlab.com/meso-star/htsky/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),
 [Star-3DAW](https://gitlab.com/meso-star/star-3daw/),
@@ -59,6 +57,20 @@ project. Refer to the [CMake](https://cmake.org/documentation) for further
 informations on CMake.
 
 ## Release notes
+
+### Version 0.3
+
+- Add the `-O` option that defines the file where the sky data are cached. If
+  the file does not exist, the sky data structures are built from scracth and
+  serialized into this new file. If this file exists, these data structures are
+  directly read from it, leading to a huge speed up of the `htrdr`
+  pre-processing step. Note that if the provided file exists but is filled with
+  data that do not match the submitted HTGOP, HTCP and HTMie files, an error is
+  detected and the program stops.
+- Rely on the HTSky library to manage the sky data. This library handles the
+  code previously defined into the `htrdr_sky.<c|h>` files. The HTCP, HTGOP,
+  HTMie libraries are thus no more dependencies of `htrdr` since only the
+  `htrdr_sky` files used them.
 
 ### Version 0.2
 
