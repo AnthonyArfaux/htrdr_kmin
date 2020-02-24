@@ -1,5 +1,5 @@
-# Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
 # Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+# Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ include_directories(
 # Generate files
 ################################################################################
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 2)
+set(VERSION_MINOR 3)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
