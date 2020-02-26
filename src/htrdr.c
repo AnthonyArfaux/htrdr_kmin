@@ -471,7 +471,7 @@ htrdr_init
   htsky_args.optical_thickness = args->optical_thickness;
   htsky_args.nthreads = htrdr->nthreads;
   htsky_args.repeat_clouds = args->repeat_clouds;
-  htsky_args.verbose = args->verbose;
+  htsky_args.verbose = htrdr->mpi_rank == 0 ? args->verbose : 0;
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
