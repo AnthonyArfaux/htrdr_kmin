@@ -24,6 +24,8 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 # Check dependencies
 ################################################################################
+find_package(HTSky REQUIRED)
+find_package(MruMtl REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
 find_package(Star3D 0.6 REQUIRED)
@@ -31,7 +33,6 @@ find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
 find_package(StarVX REQUIRED)
-find_package(HTSky REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
 find_package(MPI 1 REQUIRED)
 
@@ -42,6 +43,7 @@ include(rcmake_runtime)
 set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
 
 include_directories(
+  ${MruMtl_INCLUDE_DIR}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
   ${Star3DAW_INCLUDE_DIR}
@@ -96,6 +98,7 @@ set(HTRDR_FILES_SRC
   htrdr_grid.c
   htrdr_ground.c
   htrdr_main.c
+  htrdr_mtl.c
   htrdr_rectangle.c
   htrdr_slab.c
   htrdr_sun.c)
@@ -106,6 +109,7 @@ set(HTRDR_FILES_INC
   htrdr_camera.h
   htrdr_grid.h
   htrdr_ground.h
+  htrdr_mtl.h
   htrdr_rectangle.h
   htrdr_slab.h
   htrdr_sun.h
@@ -122,7 +126,7 @@ rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
-target_link_libraries(htrdr HTSky RSys Star3D Star3DAW StarSF StarSP)
+target_link_libraries(htrdr HTSky MruMtl RSys Star3D Star3DAW StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)
