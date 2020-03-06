@@ -14,31 +14,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_MTL_H
-#define HTRDR_MTL_H
+#ifndef HTRDR_INTERFACE_H
+#define HTRDR_INTERFACE_H
 
-struct htrdr_mtl;
+#include <star/ssf.h>
+
+/* Forward declaration of external data type */
 struct mrumtl;
+struct s3d_hit;
+struct ssf_bsdf;
+
+struct htrdr_interface {
+  const struct mrumtl* mtl_front;
+  const struct mrumtl* mtl_back;
+};
+static const struct htrdr_interface HTRDR_INTERFACE_NULL;
 
 extern LOCAL_SYM res_T
-htrdr_mtl_create
+htrdr_interface_create_bsdf
   (struct htrdr* htrdr,
-   const char* filename,
-   struct htrdr_mtl** mtl);
+   const struct htrdr_interface* interf,
+   const size_t ithread,
+   const double wavelength,
+   const double pos[3],
+   const double dir[3], /* Normalized incoming direction */
+   struct s3d_hit* hit,
+   struct ssf_bsdf** bsdf);
 
-extern LOCAL_SYM void
-htrdr_mtl_ref_get
-  (struct htrdr_mtl* mtl);
-
-extern LOCAL_SYM void
-htrdr_mtl_ref_put
-  (struct htrdr_mtl* mtl);
-
-/* Return NULL if the material name does not exist */
-extern const struct mrumtl*
-htrdr_mtl_get
-  (struct htrdr_mtl* mtl,
-   const char* mtl_name);
-
-#endif /* HTRDR_MTL_H */
+#endif /* HTRDR_INTERFACE_H */
 

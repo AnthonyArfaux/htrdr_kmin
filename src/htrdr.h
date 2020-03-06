@@ -46,6 +46,7 @@ struct htrdr {
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
+  struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
 
   struct htrdr_camera* cam;

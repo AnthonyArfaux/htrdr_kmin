@@ -182,7 +182,7 @@ mtl_release(ref_T* ref)
  * Local symbol
  ******************************************************************************/
 res_T
-htrdr_mtl_load
+htrdr_mtl_create
   (struct htrdr* htrdr,
    const char* filename,
    struct htrdr_mtl** out_mtl)

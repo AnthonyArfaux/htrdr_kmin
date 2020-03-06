@@ -22,6 +22,7 @@
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
+#include "htrdr_mtl.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -428,8 +429,14 @@ htrdr_init
     goto error;
   }
 
-  res = htrdr_ground_create(htrdr, args->filename_obj, args->ground_bsdf_type,
-    args->ground_reflectivity, args->repeat_ground, &htrdr->ground);
+  /* Materials are necessary only if a ground geometry is defined */
+  if(args->filename_obj) {
+    res = htrdr_mtl_create(htrdr, args->filename_mtl, &htrdr->mtl);
+    if(res != RES_OK) goto error;
+  }
+
+  res = htrdr_ground_create(htrdr, args->filename_obj, args->repeat_ground,
+    &htrdr->ground);
   if(res != RES_OK) goto error;
 
   proj_ratio =

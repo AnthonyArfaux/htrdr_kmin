@@ -16,6 +16,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
+#include "htrdr_interface.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
 #include "htrdr_sun.h"
@@ -255,7 +256,6 @@ htrdr_compute_radiance_sw
   struct svx_hit svx_hit = SVX_HIT_NULL;
   struct ssf_phase* phase_hg = NULL;
   struct ssf_phase* phase_rayleigh = NULL;
-  struct ssf_bsdf* bsdf = NULL;
 
   double pos[3];
   double dir[3];
@@ -289,9 +289,6 @@ htrdr_compute_radiance_sw
   g = htsky_fetch_particle_phase_function_asymmetry_parameter
     (htrdr->sky, iband, iquad);
   SSF(phase_hg_setup(phase_hg, g));
-
-  /* Fetch the ground BSDF */
-  bsdf = htrdr_ground_get_bsdf(htrdr->ground);
 
   /* Fetch sun properties. Arbitrarily use the wavelength at the center of the
    * band to retrieve the sun radiance of the current band. Note that the sun
@@ -389,8 +386,15 @@ htrdr_compute_radiance_sw
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
+      struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+      struct ssf_bsdf* bsdf = NULL;
       double N[3];
       int type;
+
+      /* Fetch the hit interface and build its BSDF */
+      htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
+      HTRDR(interface_create_bsdf
+        (htrdr, &interf, ithread, wlen, pos_next, dir, &s3d_hit, &bsdf));
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);

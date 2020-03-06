@@ -1,5 +1,5 @@
-/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
- * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
+/* Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
+ * Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,14 +19,10 @@
 
 #include <rsys/rsys.h>
 
-enum htrdr_bsdf_type {
-  HTRDR_BSDF_DIFFUSE,
-  HTRDR_BSDF_SPECULAR
-};
-
 /* Forward declarations */
 struct htrdr;
 struct htrdr_ground;
+struct htrdr_interface;
 struct s3d_hit;
 struct ssf_bsdf;
 
@@ -34,8 +30,6 @@ extern LOCAL_SYM res_T
 htrdr_ground_create
   (struct htrdr* htrdr,
    const char* obj_filename, /* May be NULL <=> No ground geometry */
-   const enum htrdr_bsdf_type bsdf_type,
-   const double reflectivity, /* In [0, 1] */
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_ground** ground);
 
@@ -47,9 +41,22 @@ extern LOCAL_SYM void
 htrdr_ground_ref_put
   (struct htrdr_ground* ground);
 
-extern LOCAL_SYM struct ssf_bsdf*
-htrdr_ground_get_bsdf
-  (const struct htrdr_ground* ground);
+extern LOCAL_SYM void
+htrdr_ground_get_interface
+  (struct htrdr_ground* ground,
+   const struct s3d_hit* hit,
+   struct htrdr_interface* interface);
+
+extern LOCAL_SYM res_T
+htrdr_ground_create_bsdf
+  (struct htrdr_ground* ground,
+   const size_t ithread,
+   const double wavelength,
+   const double pos[3],
+   const double dir[3], /* Incoming ray */
+   const struct s3d_hit* hit,
+   struct htrdr_interface* interf, /* NULL <=> do not return the interface */
+   struct ssf_bsdf** bsdf);
 
 extern LOCAL_SYM res_T
 htrdr_ground_trace_ray
