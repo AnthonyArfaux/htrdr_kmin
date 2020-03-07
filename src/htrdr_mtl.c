@@ -189,7 +189,7 @@ htrdr_mtl_create
 {
   struct htrdr_mtl* mtl = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && filename && mtl);
+  ASSERT(htrdr && filename && out_mtl);
 
   mtl = MEM_CALLOC(htrdr->allocator, 1, sizeof(*mtl));
   if(!mtl) {

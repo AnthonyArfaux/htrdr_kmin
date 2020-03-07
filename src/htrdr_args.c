@@ -399,6 +399,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
         break;
+      case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
       case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;

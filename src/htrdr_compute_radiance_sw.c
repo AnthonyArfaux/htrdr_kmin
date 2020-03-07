@@ -411,6 +411,9 @@ htrdr_compute_radiance_sw
         R = ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
       }
 
+      /* Release the BSDF */
+      SSF(bsdf_ref_put(bsdf));
+
     /* Scattering in the medium */
     } else {
       struct ssf_phase* phase;
@@ -418,7 +421,7 @@ htrdr_compute_radiance_sw
       double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
 
-      ks_gas = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks, 
+      ks_gas = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks,
         HTSKY_CPNT_FLAG_GAS, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks_particle = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks,
         HTSKY_CPNT_FLAG_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);

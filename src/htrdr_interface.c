@@ -117,15 +117,16 @@ htrdr_interface_create_bsdf
   double N[3];
   res_T res = RES_OK;
   ASSERT(htrdr && pos && hit && out_bsdf);
-  ASSERT(interf && interf->mtl_front && interf->mtl_back);
+  ASSERT(interf && (interf->mtl_front || interf->mtl_back));
 
   ASSERT(htrdr && interf && pos && dir && hit && out_bsdf);
   ASSERT(d3_is_normalized(dir));
 
-  /* Check incoming ray */
   d3_normalize(N, d3_set_f3(N, hit->normal));
+
+  /* Retrieve the brdf of the material on the other side of the hit side */
   if(d3_dot(N, dir) < 0) {
-    mat = interf->mtl_front;
+    mat = interf->mtl_back;
   } else {
     mat = interf->mtl_back;
   }
