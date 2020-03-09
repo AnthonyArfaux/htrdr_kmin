@@ -116,6 +116,7 @@ htrdr_interface_create_bsdf
   const struct mrumtl* mat = NULL;
   double N[3];
   res_T res = RES_OK;
+  (void)pos;
   ASSERT(htrdr && pos && hit && out_bsdf);
   ASSERT(interf && (interf->mtl_front || interf->mtl_back));
 
