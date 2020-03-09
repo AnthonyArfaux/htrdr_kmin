@@ -227,7 +227,7 @@ setup_mesh
   darray_size_t_clear(indices);
   htable_vertex_clear(vertices);
 
-  FOR_EACH(iface, mtl->face_id, mtl->faces_count) {
+  FOR_EACH(iface, mtl->face_id, mtl->face_id+mtl->faces_count) {
     struct aw_obj_face face;
     size_t ivertex;
 
