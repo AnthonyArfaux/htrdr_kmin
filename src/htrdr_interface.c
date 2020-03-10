@@ -129,7 +129,7 @@ htrdr_interface_create_bsdf
   if(d3_dot(N, dir) < 0) {
     mat = interf->mtl_back;
   } else {
-    mat = interf->mtl_back;
+    mat = interf->mtl_front;
   }
   if(!mat) {
     htrdr_log_err(htrdr, "%s: the hit surface has no material.\n", FUNC_NAME);
