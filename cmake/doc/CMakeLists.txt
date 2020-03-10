@@ -29,7 +29,7 @@ endif()
 ################################################################################
 # Copy doc files
 ################################################################################
-set(MAN_NAMES htrdr-image.5)
+set(MAN_NAMES htrdr-image.5 htrdr-materials.5)
 
 set(MAN_FILES)
 foreach(_name IN LISTS MAN_NAMES)

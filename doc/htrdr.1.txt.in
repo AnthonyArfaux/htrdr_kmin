@@ -73,13 +73,6 @@ OPTIONS
   Path toward the file containing the gas optical properties of the atmosphere.
   Data must be formatted according to the fileformat described in [1].
 
-*-b* <diffuse|specular>::
-  Define how light is reflected at the ground surface. When set to diffuse, the
-  reflections are lambertian while a specular surface simulates a perfect
-  mirror. By default, the ground surface is diffuse. Note that this option
-  controls only the directional part of the surface reflections; the amount of
-  reflected energy is defined by the *-e* option.
-
 *-c* _clouds_::
   Submit a *htcp*(5) file describing the properties of the clouds. If not
   defined, only the atmosphere properties submitted through the *-a* option
@@ -122,17 +115,21 @@ OPTIONS
   by the octree node. In the _output_ file, each octree is separated of the
   previous one by a line with three minus characters, i.e. '---'.
 
-*-e* _reflectivity_::
-  Reflectivity of the ground geometry in [0, 1]. By default it is set to
-  @HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY@. This parameter is fixed for the
-  whole visible range and defines the amount of reflected energy. Refer to the
-  *-b* option to control how the light is reflected on the ground surface.
-
 *-f*::
   Force overwrite of the _output_ file.
 
 *-g* _ground_::
-  Path toward an OBJ file [2] representing the ground geometry.
+  Path toward an OBJ file [2] representing the ground geometry. Note that only
+  triangular meshes are handled. Furthermore, each triangle must have a
+  material, i.e. it must belongs to a *usemtl* group as defined by the OBJ file
+  format. The name of the *usemtl* group must be of the form
+  "<__front-mtl-name__>:<__back-mtl-name__>", where <__front-mtl-name__> and
+  <__back-mtl-name__> are strings separated by a colon mark (:). Each
+  string must reference the name of a material listed in the
+  *htrdr-materials*(5) file submitted through the *-M* option.
+  <__front-mtl-name__> and <__back-mtl-name__> are the name of the front and
+  back facing materials, respectively. In *htrdr*(1), a triangle side is said
+  "front facing" if its vertices are clock-wise ordered.
 
 *-h*::
   List short help and exit.
@@ -155,6 +152,9 @@ OPTIONS
 
 *-r*::
   Infinitely repeat the _clouds_ along the X and Y axis.
+
+*-M* _materials_::
+  Path toward a *htrdr-materials*(5) file listing the ground materials.
 
 *-m* _mie_::
   Path toward a *htmie*(5) file defining the optical properties of water
@@ -180,6 +180,7 @@ OPTIONS
 *-T* _threshold_::
   Optical thickness used as threshold criteria to partition the properties of
   the clouds. By default its value is @HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+  This option is ignored if a cache file is used (option *-O*).
 
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU
@@ -188,7 +189,8 @@ OPTIONS
 *-V* **_x_**,**_y_**,**_z_**::
   Define the maximum definition of the acceleration data structure that
   partitions the cloud properties. By default the finest definition is the
-  definition of the submitted *htcp*(5) file.
+  definition of the submitted *htcp*(5) file. This option is ignored if a cache
+  file is used (option *-O*).
 
 *-v*::
   Make *htrdr* verbose.
@@ -286,4 +288,5 @@ SEE ALSO
 *htcp*(5),
 *htmie*(5),
 *htpp*(1),
-*htrdr-image*(5)
+*htrdr-image*(5),
+*htrdr-materials*(5)
