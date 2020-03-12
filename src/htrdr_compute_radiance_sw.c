@@ -35,7 +35,7 @@
 struct scattering_context {
   struct ssp_rng* rng;
   const struct htsky* sky;
-  size_t iband; /* Index of the spectrald */
+  size_t iband; /* Index of the spectral band */
   size_t iquad; /* Index of the quadrature point into the band */
 
   double Ts; /* Sampled optical thickness */
@@ -279,6 +279,7 @@ htrdr_compute_radiance_sw
   double g = 0; /* Asymmetry parameter of the HG phase function */
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
+  ASSERT(!htsky_is_long_wave(htrdr->sky));
 
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
@@ -295,7 +296,7 @@ htrdr_compute_radiance_sw
    * spectral data are defined by bands that, actually are the same of the SW
    * spectral bands defined in the default "ecrad_opt_prot.txt" file provided
    * by the HTGOP project. */
-  htsky_get_sw_spectral_band_bounds(htrdr->sky, iband, band_bounds);
+  htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
   wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);

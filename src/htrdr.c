@@ -538,15 +538,15 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    const size_t nbands = htsky_get_sw_spectral_bands_count(htrdr->sky);
+    const size_t nbands = htsky_get_spectral_bands_count(htrdr->sky);
     size_t i;
 
     /* Nothing to do */
     if(htrdr->mpi_rank != 0) goto exit;
 
     FOR_EACH(i, 0, nbands) {
-      const size_t iband = htsky_get_sw_spectral_band_id(htrdr->sky, i);
-      const size_t nquads = htsky_get_sw_spectral_band_quadrature_length
+      const size_t iband = htsky_get_spectral_band_id(htrdr->sky, i);
+      const size_t nquads = htsky_get_spectral_band_quadrature_length
         (htrdr->sky, iband);
       size_t iquad;
       FOR_EACH(iquad, 0, nquads) {

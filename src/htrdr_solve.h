@@ -45,6 +45,16 @@ htrdr_compute_radiance_sw
    const size_t iband, /* Index of the spectral band */
    const size_t iquad); /* Index of the quadrature point into the band */
 
+extern LOCAL_SYM double
+htrdr_compute_radiance_lw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   struct ssp_rng* rng,
+   const double pos[3],
+   const double dir[3],
+   const size_t iband, /* Index of the spectral band */
+   const size_t iquad); /* Index of the quadrature point into the band */
+
 extern LOCAL_SYM res_T
 htrdr_draw_radiance_sw
   (struct htrdr* htrdr,
