@@ -470,7 +470,7 @@ sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
 
   i = (size_t)(find - cdf);
   ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
-  return i;
+  return htsky_get_spectral_band_id(htrdr->sky, i);
 }
 
 static res_T
