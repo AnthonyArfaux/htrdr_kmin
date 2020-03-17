@@ -458,8 +458,7 @@ sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
   double r_next = nextafter(r, DBL_MAX);
   size_t cdf_length = 0;
   size_t i;
-  ASSERT(htrdr && iband);
-  ASSERT(r >= 0 && r < 1);
+  ASSERT(htrdr && r >= 0 && r < 1);
 
   cdf = darray_double_cdata_get(&htrdr->lw_cdf);
   cdf_length = darray_double_size_get(&htrdr->lw_cdf);
