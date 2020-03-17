@@ -549,6 +549,8 @@ htrdr_init
   htsky_args.nthreads = htrdr->nthreads;
   htsky_args.repeat_clouds = args->repeat_clouds;
   htsky_args.verbose = htrdr->mpi_rank == 0 ? args->verbose : 0;
+  htsky_args.wlen_lw_range[0] = args->wlen_lw_range[0];
+  htsky_args.wlen_lw_range[1] = args->wlen_lw_range[1];
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 

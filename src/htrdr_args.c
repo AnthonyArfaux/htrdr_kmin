@@ -34,8 +34,8 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
-"Render an image in the visible part of the spectrum, for scenes composed of an\n"
-"atmospheric gaz mixture, clouds and a ground.\n\n");
+"Render an image for scenes composed of an atmospheric gas mixture, clouds\n"
+"and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
@@ -58,6 +58,11 @@ print_help(const char* cmd)
 "  -h             display this help and exit.\n");
   printf(
 "  -i <image>     define the image to compute.\n");
+  printf(
+"  -l WLEN_MIN,WLEN_MAX\n"
+"                 enable long wave rendering for the wavelengths included in\n"
+"                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
+"                 rendering is performed for the visible part of the spectrum.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
@@ -354,6 +359,31 @@ error:
   goto exit;
 }
 
+static res_T
+parse_lw_range(struct htrdr_args* args, const char* str)
+{
+  double range[2];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(args && str);
+
+  res = cstr_to_list_double(str, ',', range, &len, 2);
+  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
+  if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid long wave range `%s'.\n", str);
+    goto error;
+  }
+
+  args->wlen_lw_range[0] = range[0];
+  args->wlen_lw_range[1] = range[1];
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -378,7 +408,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:O:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:l:M:m:O:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
        case 'C':
@@ -398,6 +428,9 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       case 'i':
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
+        break;
+      case 'l':
+        res = parse_lw_range(args, optarg);
         break;
       case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
