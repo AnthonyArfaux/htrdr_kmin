@@ -157,7 +157,7 @@ planck
   const double T2 = temperature*temperature;
   const double T4 = T2*T2;
   const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
-  ASSERT(lambda_min < lambda_max && temperature >= 0);
+  ASSERT(lambda_min < lambda_max && temperature > 0);
   return blackbody_fraction(lambda_min, lambda_max, temperature)
        * BOLTZMANN_CONSTANT * T4;
 }

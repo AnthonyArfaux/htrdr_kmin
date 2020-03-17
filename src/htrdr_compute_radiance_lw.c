@@ -265,7 +265,11 @@ htrdr_compute_radiance_lw
          * have this data yet, we use the temperature of the sky at the current
          * position as the temperature of the surface. */
         temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
-        w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+        if(temperature <= 0) {
+          w = 0;
+        } else {
+          w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+        }
         break;
       }
 
