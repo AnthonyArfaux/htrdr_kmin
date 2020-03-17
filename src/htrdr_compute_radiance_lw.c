@@ -114,9 +114,11 @@ hit_filter
       if(r < proba_abs) { /* Absorption event */
         pursue_traversal = 0;
         ctx->event_type = EVENT_ABSORPTION;
+        break;
       } else if(r < proba_abs + proba_sca) { /* Scattering event */
         pursue_traversal = 0;
         ctx->event_type = EVENT_SCATTERING;
+        break;
       } else { /* Null collision */
         ctx->Ts = ssp_ran_exp(ctx->rng, 1); /* Sample a  new optical thickness */
       }
