@@ -602,6 +602,12 @@ draw_tile
         pix_accums[HTRDR_ESTIMATE_TIME].nweights += 1;
       }
     }
+
+    /* Fill up the remaining channels with the estimate of the first one */
+    while(ichannel < 3) {
+      pix_accums[ichannel] = pix_accums[0];
+      ++ichannel;
+    }
   }
   return RES_OK;
 }
