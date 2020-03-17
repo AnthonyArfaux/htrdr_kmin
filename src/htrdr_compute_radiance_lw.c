@@ -30,8 +30,6 @@
 #include <rsys/double2.h>
 #include <rsys/double3.h>
 
-#define BOLTZMANN_CONSTANT 5.6696e-8 /* W/m^2/K^4 */
-
 enum event {
   EVENT_ABSORPTION,
   EVENT_SCATTERING,
@@ -56,64 +54,6 @@ static const struct filter_context FILTER_CONTEXT_NULL = {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-static FINLINE double
-wiebelt(const double v)
-{
-  int m;
-  double w, v2, v4;
-  /*.153989717364e+00;*/
-  const double fifteen_over_pi_power_4 = 15.0/(PI*PI*PI*PI);
-  const double z0 = 1.0/3.0;
-  const double z1 = 1.0/8.0;
-  const double z2 = 1.0/60.0;
-  const double z4 = 1.0/5040.0;
-  const double z6 = 1.0/272160.0;
-  const double z8 = 1.0/13305600.0;
-
-  if(v >= 2.) {
-    w = 0;
-    for(m=1; m<6 ;m++)
-      w+=exp(-m*v)/(m*m*m*m) * (((m*v+3)*m*v+6)*m*v+6);
-    w = w * fifteen_over_pi_power_4;
-  } else {
-    v2 = v*v;
-    v4 = v2*v2;
-    w = z0 - z1*v + z2*v2 - z4*v2*v2 + z6*v4*v2 - z8*v4*v4;
-    w = 1. - fifteen_over_pi_power_4*v2*v*w;
-  }
-  ASSERT(w >= 0.0 && w <= 1.0);
-  return w;
-}
-
-static FINLINE double
-blackbody_fraction
-  (const double lambda0, /* In meter */
-   const double lambda1, /* In meter */
-   const double temperature) /* In Kelvin */
-{
-  const double C2 = 1.43877735e-2; /* m.K */
-  double x0 = C2 / lambda0;
-  double x1 = C2 / lambda1;
-  double v0 = x0 / temperature;
-  double v1 = x1 / temperature;
-  double w0 = wiebelt(v0);
-  double w1 = wiebelt(v1);
-  return w1 - w0;
-}
-
-static FINLINE double
-planck
-  (const double lambda_min, /* In meter */
-   const double lambda_max, /* In meter */
-   const double temperature) /* In Kelvin  */
-{
-  const double T2 = temperature*temperature;
-  const double T4 = T2*T2;
-  ASSERT(lambda_min < lambda_max && temperature >= 0);
-  return blackbody_fraction(lambda_min, lambda_max, temperature)
-       * BOLTZMANN_CONSTANT * T4;
-}
-
 static int
 hit_filter
   (const struct svx_hit* hit,

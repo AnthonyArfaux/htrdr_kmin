@@ -56,7 +56,7 @@ htrdr_compute_radiance_lw
    const size_t iquad); /* Index of the quadrature point into the band */
 
 extern LOCAL_SYM res_T
-htrdr_draw_radiance_sw
+htrdr_draw_radiance
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t width, /* Image width */

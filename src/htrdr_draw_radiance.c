@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 199309L /* nanosleep */
+#define _POSIX_C_SOURCE 200112L /* nanosleep && nextafter */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
@@ -24,6 +24,7 @@
 
 #include <high_tune/htsky.h>
 
+#include <rsys/algorithm.h>
 #include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_u32.h>
@@ -449,6 +450,30 @@ error:
   goto exit;
 }
 
+static INLINE size_t
+sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
+{
+  const double* cdf = NULL;
+  const double* find = NULL;
+  double r_next = nextafter(r, DBL_MAX);
+  size_t cdf_length = 0;
+  size_t i;
+  ASSERT(htrdr && iband);
+  ASSERT(r >= 0 && r < 1);
+
+  cdf = darray_double_cdata_get(&htrdr->lw_cdf);
+  cdf_length = darray_double_size_get(&htrdr->lw_cdf);
+
+  /* Use r_next rather than r in order to find the first entry that is not less
+   * than *or equal* to r */
+  find = search_lower_bound(&r_next, cdf, cdf_length, sizeof(double), cmp_dbl);
+  ASSERT(find);
+
+  i = (size_t)(find - cdf);
+  ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
+  return i;
+}
+
 static res_T
 draw_tile
   (struct htrdr* htrdr,
@@ -462,6 +487,7 @@ draw_tile
    struct ssp_rng* rng,
    struct tile* tile)
 {
+  size_t nchannels;
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
   ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && tile);
@@ -469,6 +495,9 @@ draw_tile
   /* Adjust the #pixels to process them wrt a morton order */
   npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
   npixels *= npixels;
+
+  /* Define how many channels to handle */
+  nchannels = htsky_is_long_wave(htrdr->sky) ? 1 : 3;
 
   FOR_EACH(mcode, 0, npixels) {
     struct htrdr_accum* pix_accums;
@@ -483,13 +512,18 @@ draw_tile
 
     /* Fetch and reset the pixel accumulator */
     pix_accums = tile_at(tile, ipix_tile[0], ipix_tile[1]);
-    pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL; /* Reset time per radiative path */
+
+    /* Reset the pixel accumulators */
+    pix_accums[HTRDR_ESTIMATE_X] = HTRDR_ACCUM_NULL;
+    pix_accums[HTRDR_ESTIMATE_Y] = HTRDR_ACCUM_NULL;
+    pix_accums[HTRDR_ESTIMATE_Z] = HTRDR_ACCUM_NULL;
+    pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL;
 
     /* Compute the pixel coordinate */
     ipix[0] = tile_org[0] + ipix_tile[0];
     ipix[1] = tile_org[1] + ipix_tile[1];
 
-    FOR_EACH(ichannel, 0, 3) {
+    FOR_EACH(ichannel, 0, nchannels) {
       /* Check that the X, Y and Z estimates are stored in accumulators 0, 1 et
        * 2, respectively */
       STATIC_ASSERT
@@ -499,7 +533,6 @@ draw_tile
       Unexpected_htrdr_estimate_enumerate);
       size_t isamp;
 
-      pix_accums[ichannel] = HTRDR_ACCUM_NULL;
       FOR_EACH(isamp, 0, spp) {
         struct time t0, t1;
         double pix_samp[2];
@@ -511,6 +544,9 @@ draw_tile
         size_t iquad;
         double usec;
 
+        /* Begin the registration of the time spent to in the realisation */
+        time_current(&t0);
+
         /* Sample a position into the pixel, in the normalized image plane */
         pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
         pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
@@ -519,30 +555,40 @@ draw_tile
          * pixel sample */
         htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
 
-        /* Sample a spectral band and a quadrature point */
         r0 = ssp_rng_canonical(rng);
         r1 = ssp_rng_canonical(rng);
-        switch(ichannel) {
-          case 0:
-            htsky_sample_sw_spectral_data_CIE_1931_X
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          case 1:
-            htsky_sample_sw_spectral_data_CIE_1931_Y
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          case 2:
-            htsky_sample_sw_spectral_data_CIE_1931_Z
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          default: FATAL("Unreachable code.\n"); break;
-        }
 
-        /* Compute the radiance that reach the pixel through the ray */
-        time_current(&t0);
-        weight = htrdr_compute_radiance_sw
-          (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        if(htsky_is_long_wave(htrdr->sky)) {
+          /* Sample a spectral band and a quadrature point */
+          iband = sample_lw_spectral_interval(htrdr, r0);
+          iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
+          /* Compute the luminance */
+          weight = htrdr_compute_radiance_lw
+            (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        } else {
+          /* Sample a spectral band and a quadrature point */
+          switch(ichannel) {
+            case 0:
+              htsky_sample_sw_spectral_data_CIE_1931_X
+                (htrdr->sky, r0, r1, &iband, &iquad);
+              break;
+            case 1:
+              htsky_sample_sw_spectral_data_CIE_1931_Y
+                (htrdr->sky, r0, r1, &iband, &iquad);
+              break;
+            case 2:
+              htsky_sample_sw_spectral_data_CIE_1931_Z
+                (htrdr->sky, r0, r1, &iband, &iquad);
+              break;
+            default: FATAL("Unreachable code.\n"); break;
+          }
+          /* Compute the luminance */
+          weight = htrdr_compute_radiance_sw
+            (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        }
         ASSERT(weight >= 0);
+
+        /* End the registration of the per realisation time */
         time_sub(&t0, time_current(&t1), &t0);
         usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
 
@@ -662,7 +708,7 @@ draw_image
 
     /* Create a proxy RNG for the current tile. This proxy is used for the
      * current thread only and thus it has to manage only one RNG. This proxy
-     * is initialised in order to ensure that a unique and predictable set of
+     * is initialised in order to ensure that an unique and predictable set of
      * random numbers is used for the current tile. */
     SSP(rng_proxy_create2
       (&htrdr->lifo_allocators[ithread],
@@ -718,7 +764,7 @@ error:
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_draw_radiance_sw
+htrdr_draw_radiance
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t width,

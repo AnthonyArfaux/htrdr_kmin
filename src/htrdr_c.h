@@ -103,6 +103,65 @@ morton_xyz_decode_u21(const uint64_t code, uint32_t xyz[3])
   xyz[2] = (uint32_t)morton3D_decode_u21(code >> 0);
 }
 
+static INLINE double
+wiebelt(const double v)
+{
+  int m;
+  double w, v2, v4;
+  /*.153989717364e+00;*/
+  const double fifteen_over_pi_power_4 = 15.0/(PI*PI*PI*PI);
+  const double z0 = 1.0/3.0;
+  const double z1 = 1.0/8.0;
+  const double z2 = 1.0/60.0;
+  const double z4 = 1.0/5040.0;
+  const double z6 = 1.0/272160.0;
+  const double z8 = 1.0/13305600.0;
+
+  if(v >= 2.) {
+    w = 0;
+    for(m=1; m<6 ;m++)
+      w+=exp(-m*v)/(m*m*m*m) * (((m*v+3)*m*v+6)*m*v+6);
+    w = w * fifteen_over_pi_power_4;
+  } else {
+    v2 = v*v;
+    v4 = v2*v2;
+    w = z0 - z1*v + z2*v2 - z4*v2*v2 + z6*v4*v2 - z8*v4*v4;
+    w = 1. - fifteen_over_pi_power_4*v2*v*w;
+  }
+  ASSERT(w >= 0.0 && w <= 1.0);
+  return w;
+}
+
+static INLINE double
+blackbody_fraction
+  (const double lambda0, /* In meter */
+   const double lambda1, /* In meter */
+   const double temperature) /* In Kelvin */
+{
+  const double C2 = 1.43877735e-2; /* m.K */
+  double x0 = C2 / lambda0;
+  double x1 = C2 / lambda1;
+  double v0 = x0 / temperature;
+  double v1 = x1 / temperature;
+  double w0 = wiebelt(v0);
+  double w1 = wiebelt(v1);
+  return w1 - w0;
+}
+
+static INLINE double
+planck
+  (const double lambda_min, /* In meter */
+   const double lambda_max, /* In meter */
+   const double temperature) /* In Kelvin  */
+{
+  const double T2 = temperature*temperature;
+  const double T4 = T2*T2;
+  const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
+  ASSERT(lambda_min < lambda_max && temperature >= 0);
+  return blackbody_fraction(lambda_min, lambda_max, temperature)
+       * BOLTZMANN_CONSTANT * T4;
+}
+
 extern LOCAL_SYM  res_T
 open_output_stream
   (struct htrdr* htrdr,
@@ -144,6 +203,14 @@ update_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message progress)
   fetch_mpi_progress(htrdr, progress);
   clear_mpi_progress(htrdr, progress);
   print_mpi_progress(htrdr, progress);
+}
+
+static FINLINE int
+cmp_dbl(const void* a, const void* b)
+{
+  const double d0 = *((const double*)a);
+  const double d1 = *((const double*)b);
+  return d0 < d1 ? -1 : (d0 > d1 ? 1 : 0);
 }
 
 #endif /* HTRDR_C_H */

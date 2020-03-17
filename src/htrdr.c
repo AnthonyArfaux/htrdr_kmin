@@ -357,6 +357,74 @@ error:
   goto exit;
 }
 
+static res_T
+setup_lw_cdf(struct htrdr* htrdr)
+{
+  /* Reference temperature used to compute the Long Wave cumulative */
+  const double Tref = 290; /* In Kelvin */
+  double* cdf = NULL;
+  double* pdf = NULL;
+  double sum = 0;
+  size_t i;
+  size_t nbands;
+  res_T res = RES_OK;
+  ASSERT(htrdr && htsky_is_long_wave(htrdr->sky));
+
+  nbands = htsky_get_spectral_bands_count(htrdr->sky);
+  res = darray_double_resize(&htrdr->lw_cdf, nbands);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "error allocating the CDF of the long wave spectral bands -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  /* Alias the same array by the cdf and the pdf variable to make easier the
+   * reading of the code */
+  pdf = darray_double_data_get(&htrdr->lw_cdf);
+  cdf = darray_double_data_get(&htrdr->lw_cdf);
+
+  /* Compute the *unormalized* probability to sample a long wave band */
+  sum = 0;
+  FOR_EACH(i, 0, nbands) {
+    const size_t iband = htsky_get_spectral_band_id(htrdr->sky, i);
+    double wlens[2];
+    HTSKY(get_spectral_band_bounds(htrdr->sky, iband, wlens));
+
+    /* Convert from nanometer to meter */
+    wlens[0] = wlens[0] * 1.e9;
+    wlens[1] = wlens[1] * 1.e9;
+
+    /* Compute the probability of the current band */
+    pdf[i] = planck(wlens[0], wlens[1], Tref);
+
+    /* Update the norm */
+    sum += pdf[i];
+  }
+
+  /* Compute the cumulative of the previously computed probabilities */
+  FOR_EACH(i, 0, nbands) {
+    /* Normalize the probability */
+    pdf[i] /= sum;
+
+    /* Setup the cumulative */
+    if(i == 0) {
+      cdf[i] = pdf[i];
+    } else {
+      cdf[i] = pdf[i] + cdf[i-1];
+      ASSERT(cdf[i] >= cdf[i-1]);
+    }
+  }
+
+  cdf[nbands - 1] = 1.0;
+
+exit:
+  return res;
+error:
+  darray_double_clear(&htrdr->lw_cdf);
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -385,6 +453,8 @@ htrdr_init
   logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
 
   str_init(htrdr->allocator, &htrdr->output_name);
+
+  darray_double_init(htrdr->allocator, &htrdr->lw_cdf);
 
   nthreads_max = MMAX(omp_get_max_threads(), omp_get_num_procs());
   htrdr->dump_vtk = args->dump_vtk;
@@ -482,6 +552,12 @@ htrdr_init
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
+  if(htsky_is_long_wave(htrdr->sky)) {
+    /* Define the CDF used to sample a long wave band */
+    res = setup_lw_cdf(htrdr);
+    if(res != RES_OK) goto error;
+  }
+
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
   if(!htrdr->lifo_allocators) {
@@ -530,6 +606,7 @@ htrdr_release(struct htrdr* htrdr)
     MEM_RM(htrdr->allocator, htrdr->lifo_allocators);
   }
   str_release(&htrdr->output_name);
+  darray_double_release(&htrdr->lw_cdf);
   logger_release(&htrdr->logger);
 }
 
@@ -556,7 +633,7 @@ htrdr_run(struct htrdr* htrdr)
       }
     }
   } else {
-    res = htrdr_draw_radiance_sw(htrdr, htrdr->cam, htrdr->width,
+    res = htrdr_draw_radiance(htrdr, htrdr->cam, htrdr->width,
       htrdr->height, htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {

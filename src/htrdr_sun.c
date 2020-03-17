@@ -45,14 +45,6 @@ struct htrdr_sun {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-static INLINE int
-cmp_dbl(const void* a, const void* b)
-{
-  const double d0 = *((const double*)a);
-  const double d1 = *((const double*)b);
-  return d0 < d1 ? -1 : (d0 > d1 ? 1 : 0);
-}
-
 static void
 release_sun(ref_T* ref)
 {
