@@ -160,14 +160,14 @@ htrdr_compute_radiance_lw
 
   /* Retrieve the band boundaries */
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
-  
+
   /* Arbitrarly use the wavelength at the center of the band as the wavelength
    * to use for data that depend on wavelength rather than spectral band as the
    * BRDF */
   wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
-  band_bounds_m[0] = band_bounds[0] * 1e9;
-  band_bounds_m[1] = band_bounds[1] * 1e9;
-  
+  band_bounds_m[0] = band_bounds[0] * 1e-9;
+  band_bounds_m[1] = band_bounds[1] * 1e-9;
+
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));

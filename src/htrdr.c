@@ -392,8 +392,8 @@ setup_lw_cdf(struct htrdr* htrdr)
     HTSKY(get_spectral_band_bounds(htrdr->sky, iband, wlens));
 
     /* Convert from nanometer to meter */
-    wlens[0] = wlens[0] * 1.e9;
-    wlens[1] = wlens[1] * 1.e9;
+    wlens[0] = wlens[0] * 1.e-9;
+    wlens[1] = wlens[1] * 1.e-9;
 
     /* Compute the probability of the current band */
     pdf[i] = planck(wlens[0], wlens[1], Tref);
