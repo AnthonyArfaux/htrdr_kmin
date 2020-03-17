@@ -111,10 +111,12 @@ htrdr_interface_create_bsdf
    struct s3d_hit* hit,
    struct ssf_bsdf** out_bsdf)
 {
+  enum { FRONT, BACK };
   struct ssf_bsdf* bsdf = NULL;
   const struct mrumtl_brdf* brdf = NULL;
   const struct mrumtl* mat = NULL;
   double N[3];
+  int hit_side;
   res_T res = RES_OK;
   (void)pos;
   ASSERT(htrdr && pos && hit && out_bsdf);
@@ -125,17 +127,26 @@ htrdr_interface_create_bsdf
 
   d3_normalize(N, d3_set_f3(N, hit->normal));
 
+  hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
+
   /* Retrieve the brdf of the material on the other side of the hit side */
-  if(d3_dot(N, dir) < 0) {
-    mat = interf->mtl_back;
-  } else {
-    mat = interf->mtl_front;
+  switch(hit_side) {
+    case BACK: mat = interf->mtl_front; break;
+    case FRONT: mat = interf->mtl_back; break;
+    default: FATAL("Unreachable code.\n");  break;
   }
+
+  /* Due to numerical issue the hit side might be wrong and thus the fetched
+   * material might be undefined (e.g. semi-transparent materials). Handle this
+   * issue by fetching the other material. */
   if(!mat) {
-    htrdr_log_err(htrdr, "%s: the hit surface has no material.\n", FUNC_NAME);
-    res = RES_BAD_ARG;
-    goto error;
+    switch(hit_side) {
+      case BACK: mat = interf->mtl_back; break;
+      case FRONT: mat = interf->mtl_front; break;
+      default: FATAL("Unreachable code.\n");  break;
+    }
   }
+  ASSERT(mat);
 
   res = mrumtl_fetch_brdf(mat, wavelength, &brdf);
   if(res != RES_OK) {
