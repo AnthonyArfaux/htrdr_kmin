@@ -109,18 +109,23 @@ dump_accum_buffer
    FILE* stream)
 {
   struct htrdr_buffer_layout layout;
+  size_t pixsz, pixal;
   size_t x, y;
   res_T res = RES_OK;
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
+  if(htsky_is_long_wave(htrdr->sky)) {
+    pixsz = sizeof(struct htrdr_pixel_lw);
+    pixal = ALIGNOF(struct htrdr_pixel_lw);
+  } else {
+    pixsz = sizeof(struct htrdr_pixel_sw);
+    pixal = ALIGNOF(struct htrdr_pixel_sw);
+  }
+
   htrdr_buffer_get_layout(buf, &layout);
-  if(layout.elmt_size != sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])
-  || layout.alignment < ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])) {
-    htrdr_log_err(htrdr,
-      "%s: invalid buffer layout. "
-      "The pixel size must be the size of %lu accumulators.\n",
-      FUNC_NAME, (unsigned long)HTRDR_ESTIMATES_COUNT__);
+  if(layout.elmt_size != pixsz || layout.alignment != pixal) {
+    htrdr_log_err(htrdr, "%s: invalid buffer layout. ", FUNC_NAME);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -130,20 +135,32 @@ dump_accum_buffer
   if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
-      const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
-      int i;
-      FOR_EACH(i, 0, HTRDR_ESTIMATES_COUNT__) {
-        double E, SE;
+      struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
+      const struct htrdr_accum* pix_time_acc = NULL;
 
-        htrdr_accum_get_estimation(&accums[i], &E, &SE);
-        fprintf(stream, "%g %g ", E, SE);
+      if(htsky_is_long_wave(htrdr->sky)) {
+        const struct htrdr_pixel_lw* pix = htrdr_buffer_at(buf, x, y);
+        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+        pix_time_acc = &pix->time;
+
+      } else {
+        const struct htrdr_pixel_sw* pix = htrdr_buffer_at(buf, x, y);
+        fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
+        fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
+        fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
+        pix_time_acc = &pix->time;
       }
+
+      htrdr_accum_get_estimation(pix_time_acc, &pix_time);
+      fprintf(stream, "%g %g\n", pix_time.E, pix_time.SE);
+
       if(time_acc) {
-        time_acc->sum_weights += accums[HTRDR_ESTIMATE_TIME].sum_weights;
-        time_acc->sum_weights_sqr += accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr;
-        time_acc->nweights += accums[HTRDR_ESTIMATE_TIME].nweights;
+        time_acc->sum_weights += pix_time_acc->sum_weights;
+        time_acc->sum_weights_sqr += pix_time_acc->sum_weights_sqr;
+        time_acc->nweights += pix_time_acc->nweights;
       }
-      fprintf(stream, "\n");
     }
     fprintf(stream, "\n");
   }
@@ -518,22 +535,6 @@ htrdr_init
     args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
   if(res != RES_OK) goto error;
 
-  /* Create the image buffer only on the master process; the image parts
-   * rendered by the processes are gathered onto the master process. */
-  if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
-    /* 4 accums: X, Y, Z components and one more for the per realisation time */
-    const size_t pixsz = sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
-    const size_t pixal = ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
-    res = htrdr_buffer_create(htrdr,
-      args->image.definition[0], /* Width */
-      args->image.definition[1], /* Height */
-      args->image.definition[0] * pixsz, /* Pitch */
-      pixsz, /* Size of a pixel */
-      pixal, /* Alignment of a pixel */
-      &htrdr->buf);
-    if(res != RES_OK) goto error;
-  }
-
   res = htrdr_sun_create(htrdr, &htrdr->sun);
   if(res != RES_OK) goto error;
   spherical_to_cartesian_dir
@@ -590,6 +591,29 @@ htrdr_init
         FUNC_NAME, (unsigned long)ithread, res_to_cstr(res));
       goto error;
     }
+  }
+
+  /* Create the image buffer only on the master process; the image parts
+   * rendered by the processes are gathered onto the master process. */
+  if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
+    size_t pixsz = 0; /* sizeof(pixel) */
+    size_t pixal = 0; /* alignof(pixel) */
+
+    if(htsky_is_long_wave(htrdr->sky)) {
+      pixsz = sizeof(struct htrdr_pixel_lw);
+      pixal = ALIGNOF(struct htrdr_pixel_lw);
+    } else {
+      pixsz = sizeof(struct htrdr_pixel_sw);
+      pixal = ALIGNOF(struct htrdr_pixel_sw);
+    }
+    res = htrdr_buffer_create(htrdr,
+      args->image.definition[0], /* Width */
+      args->image.definition[1], /* Height */
+      args->image.definition[0] * pixsz, /* Pitch */
+      pixsz, /* Size of a pixel */
+      pixal, /* Alignment of a pixel */
+      &htrdr->buf);
+    if(res != RES_OK) goto error;
   }
 
 exit:
@@ -651,15 +675,17 @@ htrdr_run(struct htrdr* htrdr)
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
-      double E, SE;
+      struct htrdr_estimate path_time;
 
       res = dump_accum_buffer(htrdr, htrdr->buf, &path_time_acc,
         str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
 
-      htrdr_accum_get_estimation(&path_time_acc, &E, &SE);
+      htrdr_accum_get_estimation(&path_time_acc, &path_time);
       htrdr_log(htrdr,
-        "Time per radiative path (in micro seconds): %g +/- %g\n", E, SE);
+        "Time per radiative path (in micro seconds): %g +/- %g\n",
+        path_time.E,
+        path_time.SE);
     }
   }
 exit:
