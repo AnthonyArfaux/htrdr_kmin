@@ -35,6 +35,7 @@ enum htrdr_mpi_message {
 
 enum htrdr_estimate {
   HTRDR_ESTIMATE_X,
+  HTRDR_ESTIMATE_RADIANCE = HTRDR_ESTIMATE_X,
   HTRDR_ESTIMATE_Y,
   HTRDR_ESTIMATE_Z,
   HTRDR_ESTIMATE_TIME, /* Time per realisation */
@@ -159,8 +160,17 @@ planck
   const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
   ASSERT(lambda_min < lambda_max && temperature > 0);
   return blackbody_fraction(lambda_min, lambda_max, temperature)
-       * BOLTZMANN_CONSTANT * T4;
+       * BOLTZMANN_CONSTANT * T4 / PI; /* In W/m^2/sr */
 }
+
+extern LOCAL_SYM res_T
+brightness_temperature
+  (struct htrdr* htrdr,
+   const double lambda_min, /* In meter */
+   const double lambda_max, /* In meter */
+   /* Integrated over [lambda_min, lambda_max]. In W/m^2/sr */
+   const double radiance,
+   double* temperature);
 
 extern LOCAL_SYM  res_T
 open_output_stream

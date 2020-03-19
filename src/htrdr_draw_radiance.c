@@ -473,6 +473,170 @@ sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
   return htsky_get_spectral_band_id(htrdr->sky, i);
 }
 
+static void
+draw_pixel_sw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const size_t ipix[2],
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_camera* cam,
+   const size_t spp,
+   struct ssp_rng* rng,
+   struct htrdr_accum* pix_accums)
+{
+  size_t ichannel;
+  ASSERT(ipix && ipix && pix_sz && cam && rng && pix_accums);
+  ASSERT(!htsky_is_long_wave(htrdr->sky));
+
+  /* Reset the pixel accumulators */
+  pix_accums[HTRDR_ESTIMATE_X] = HTRDR_ACCUM_NULL;
+  pix_accums[HTRDR_ESTIMATE_Y] = HTRDR_ACCUM_NULL;
+  pix_accums[HTRDR_ESTIMATE_Z] = HTRDR_ACCUM_NULL;
+  pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(ichannel, 0, 3) {
+    /* Check that the X, Y and Z estimates are stored in accumulators 0, 1 et
+     * 2, respectively */
+    STATIC_ASSERT
+    (  HTRDR_ESTIMATE_X == 0
+    && HTRDR_ESTIMATE_Y == 1
+    && HTRDR_ESTIMATE_Z == 2,
+    Unexpected_htrdr_estimate_enumerate);
+    size_t isamp;
+
+    FOR_EACH(isamp, 0, spp) {
+      struct time t0, t1;
+      double pix_samp[2];
+      double ray_org[3];
+      double ray_dir[3];
+      double weight;
+      double r0, r1;
+      size_t iband;
+      size_t iquad;
+      double usec;
+
+      /* Begin the registration of the time spent to in the realisation */
+      time_current(&t0);
+
+      /* Sample a position into the pixel, in the normalized image plane */
+      pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+      pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+
+      /* Generate a ray starting from the pinhole camera and passing through the
+       * pixel sample */
+      htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+
+      r0 = ssp_rng_canonical(rng);
+      r1 = ssp_rng_canonical(rng);
+
+      /* Sample a spectral band and a quadrature point */
+      switch(ichannel) {
+        case 0:
+          htsky_sample_sw_spectral_data_CIE_1931_X
+            (htrdr->sky, r0, r1, &iband, &iquad);
+          break;
+        case 1:
+          htsky_sample_sw_spectral_data_CIE_1931_Y
+            (htrdr->sky, r0, r1, &iband, &iquad);
+          break;
+        case 2:
+          htsky_sample_sw_spectral_data_CIE_1931_Z
+            (htrdr->sky, r0, r1, &iband, &iquad);
+          break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+
+      /* Compute the luminance */
+      weight = htrdr_compute_radiance_sw
+        (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+      ASSERT(weight >= 0);
+
+      /* End the registration of the per realisation time */
+      time_sub(&t0, time_current(&t1), &t0);
+      usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+      /* Update the pixel accumulator of the current channel */
+      pix_accums[ichannel].sum_weights += weight;
+      pix_accums[ichannel].sum_weights_sqr += weight*weight;
+      pix_accums[ichannel].nweights += 1;
+
+      /* Update the pixel accumulator of per realisation time */
+      pix_accums[HTRDR_ESTIMATE_TIME].sum_weights += usec;
+      pix_accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr += usec*usec;
+      pix_accums[HTRDR_ESTIMATE_TIME].nweights += 1;
+    }
+  }
+}
+
+static void
+draw_pixel_lw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const size_t ipix[2],
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_camera* cam,
+   const size_t spp,
+   struct ssp_rng* rng,
+   struct htrdr_accum* pix_accums)
+{
+  size_t isamp;
+  ASSERT(ipix && ipix && pix_sz && cam && rng && pix_accums);
+  ASSERT(htsky_is_long_wave(htrdr->sky));
+
+  /* Reset the pixel accumulators */
+  pix_accums[HTRDR_ESTIMATE_RADIANCE] = HTRDR_ACCUM_NULL;
+  pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(isamp, 0, spp) {
+    struct time t0, t1;
+    double pix_samp[2];
+    double ray_org[3];
+    double ray_dir[3];
+    double weight;
+    double r0, r1;
+    size_t iband;
+    size_t iquad;
+    double usec;
+
+    /* Begin the registration of the time spent to in the realisation */
+    time_current(&t0);
+
+    /* Sample a position into the pixel, in the normalized image plane */
+    pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+    pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+
+    /* Generate a ray starting from the pinhole camera and passing through the
+     * pixel sample */
+    htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+
+    r0 = ssp_rng_canonical(rng);
+    r1 = ssp_rng_canonical(rng);
+
+    /* Sample a spectral band and a quadrature point */
+    iband = sample_lw_spectral_interval(htrdr, r0);
+    iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
+
+    /* Compute the luminance */
+    weight = htrdr_compute_radiance_lw
+      (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+    ASSERT(weight >= 0);
+
+    /* End the registration of the per realisation time */
+    time_sub(&t0, time_current(&t1), &t0);
+    usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+    /* Update the pixel accumulator of the current channel */
+    pix_accums[HTRDR_ESTIMATE_RADIANCE].sum_weights += weight;
+    pix_accums[HTRDR_ESTIMATE_RADIANCE].sum_weights_sqr += weight*weight;
+    pix_accums[HTRDR_ESTIMATE_RADIANCE].nweights += 1;
+
+    /* Update the pixel accumulator of per realisation time */
+    pix_accums[HTRDR_ESTIMATE_TIME].sum_weights += usec;
+    pix_accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr += usec*usec;
+    pix_accums[HTRDR_ESTIMATE_TIME].nweights += 1;
+  }
+}
+
 static res_T
 draw_tile
   (struct htrdr* htrdr,
@@ -486,7 +650,6 @@ draw_tile
    struct ssp_rng* rng,
    struct tile* tile)
 {
-  size_t nchannels;
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
   ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && tile);
@@ -495,14 +658,10 @@ draw_tile
   npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
   npixels *= npixels;
 
-  /* Define how many channels to handle */
-  nchannels = htsky_is_long_wave(htrdr->sky) ? 1 : 3;
-
   FOR_EACH(mcode, 0, npixels) {
     struct htrdr_accum* pix_accums;
     size_t ipix_tile[2]; /* Pixel coord in the tile */
     size_t ipix[2]; /* Pixel coord in the buffer */
-    size_t ichannel;
 
     ipix_tile[0] = morton2D_decode((uint32_t)(mcode>>0));
     if(ipix_tile[0] >= tile_sz[0]) continue; /* Pixel is out of tile */
@@ -512,101 +671,15 @@ draw_tile
     /* Fetch and reset the pixel accumulator */
     pix_accums = tile_at(tile, ipix_tile[0], ipix_tile[1]);
 
-    /* Reset the pixel accumulators */
-    pix_accums[HTRDR_ESTIMATE_X] = HTRDR_ACCUM_NULL;
-    pix_accums[HTRDR_ESTIMATE_Y] = HTRDR_ACCUM_NULL;
-    pix_accums[HTRDR_ESTIMATE_Z] = HTRDR_ACCUM_NULL;
-    pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL;
-
     /* Compute the pixel coordinate */
     ipix[0] = tile_org[0] + ipix_tile[0];
     ipix[1] = tile_org[1] + ipix_tile[1];
 
-    FOR_EACH(ichannel, 0, nchannels) {
-      /* Check that the X, Y and Z estimates are stored in accumulators 0, 1 et
-       * 2, respectively */
-      STATIC_ASSERT
-      (  HTRDR_ESTIMATE_X == 0
-      && HTRDR_ESTIMATE_Y == 1
-      && HTRDR_ESTIMATE_Z == 2,
-      Unexpected_htrdr_estimate_enumerate);
-      size_t isamp;
-
-      FOR_EACH(isamp, 0, spp) {
-        struct time t0, t1;
-        double pix_samp[2];
-        double ray_org[3];
-        double ray_dir[3];
-        double weight;
-        double r0, r1;
-        size_t iband;
-        size_t iquad;
-        double usec;
-
-        /* Begin the registration of the time spent to in the realisation */
-        time_current(&t0);
-
-        /* Sample a position into the pixel, in the normalized image plane */
-        pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
-        pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
-
-        /* Generate a ray starting from the pinhole camera and passing through the
-         * pixel sample */
-        htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
-
-        r0 = ssp_rng_canonical(rng);
-        r1 = ssp_rng_canonical(rng);
-
-        if(htsky_is_long_wave(htrdr->sky)) {
-          /* Sample a spectral band and a quadrature point */
-          iband = sample_lw_spectral_interval(htrdr, r0);
-          iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
-          /* Compute the luminance */
-          weight = htrdr_compute_radiance_lw
-            (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-        } else {
-          /* Sample a spectral band and a quadrature point */
-          switch(ichannel) {
-            case 0:
-              htsky_sample_sw_spectral_data_CIE_1931_X
-                (htrdr->sky, r0, r1, &iband, &iquad);
-              break;
-            case 1:
-              htsky_sample_sw_spectral_data_CIE_1931_Y
-                (htrdr->sky, r0, r1, &iband, &iquad);
-              break;
-            case 2:
-              htsky_sample_sw_spectral_data_CIE_1931_Z
-                (htrdr->sky, r0, r1, &iband, &iquad);
-              break;
-            default: FATAL("Unreachable code.\n"); break;
-          }
-          /* Compute the luminance */
-          weight = htrdr_compute_radiance_sw
-            (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-        }
-        ASSERT(weight >= 0);
-
-        /* End the registration of the per realisation time */
-        time_sub(&t0, time_current(&t1), &t0);
-        usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
-
-        /* Update the pixel accumulator of the current channel */
-        pix_accums[ichannel].sum_weights += weight;
-        pix_accums[ichannel].sum_weights_sqr += weight*weight;
-        pix_accums[ichannel].nweights += 1;
-
-        /* Update the pixel accumulator of per realisation time */
-        pix_accums[HTRDR_ESTIMATE_TIME].sum_weights += usec;
-        pix_accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr += usec*usec;
-        pix_accums[HTRDR_ESTIMATE_TIME].nweights += 1;
-      }
-    }
-
-    /* Fill up the remaining channels with the estimate of the first one */
-    while(ichannel < 3) {
-      pix_accums[ichannel] = pix_accums[0];
-      ++ichannel;
+    /* Draw the pixel */
+    if(htsky_is_long_wave(htrdr->sky)) {
+      draw_pixel_lw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, pix_accums);
+    } else {
+      draw_pixel_sw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, pix_accums);
     }
   }
   return RES_OK;

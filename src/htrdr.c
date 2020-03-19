@@ -434,9 +434,11 @@ htrdr_init
    const struct htrdr_args* args,
    struct htrdr* htrdr)
 {
+  size_t nbands, iband0, iband1;
   struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
   double proj_ratio;
   double sun_dir[3];
+  double wlen0[2], wlen1[2];
   const char* output_name = NULL;
   size_t ithread;
   int nthreads_max;
@@ -553,6 +555,15 @@ htrdr_init
   htsky_args.wlen_lw_range[1] = args->wlen_lw_range[1];
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
+
+  /* Fetch the wavelengths integration range */
+  nbands = htsky_get_spectral_bands_count(htrdr->sky);
+  iband0 = htsky_get_spectral_band_id(htrdr->sky, 0);
+  iband1 = htsky_get_spectral_band_id(htrdr->sky, nbands-1);
+  HTSKY(get_spectral_band_bounds(htrdr->sky, iband0, wlen0));
+  HTSKY(get_spectral_band_bounds(htrdr->sky, iband1, wlen1));
+  htrdr->wlen_range[0] = wlen0[0];
+  htrdr->wlen_range[1] = wlen1[1];
 
   if(htsky_is_long_wave(htrdr->sky)) {
     /* Define the CDF used to sample a long wave band */
@@ -731,7 +742,67 @@ htrdr_fflush(struct htrdr* htrdr, FILE* stream)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
-extern LOCAL_SYM res_T
+res_T
+brightness_temperature
+  (struct htrdr* htrdr,
+   const double lambda_min,
+   const double lambda_max,
+   const double radiance,
+   double* temperature)
+{
+  const size_t MAX_ITER = 100;
+  const double epsilon_T = 1e-4; /* In K */
+  const double epsilon_B = radiance * 1e-8;
+  double T, T0, T1, T2;
+  double B, B0;
+  size_t i;
+  res_T res = RES_OK;
+  ASSERT(temperature && lambda_min <= lambda_max);
+
+  /* Search for a brightness temperature whose radiance is greater than or
+   * equal to the estimated radiance */
+  T2 = 200;
+  FOR_EACH(i, 0, MAX_ITER) {
+    const double B2 = planck(lambda_min, lambda_max, T2);
+    if(B2 >= radiance) break;
+    T2 *= 2;
+  }
+  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
+
+  B0 = T0 = T1 = 0;
+  FOR_EACH(i, 0, MAX_ITER) {
+    T = (T1+T2)*0.5;
+    B = planck(lambda_min, lambda_max, T);
+
+    if(B < radiance) {
+      T1 = T;
+    } else {
+      T2 = T;
+    }
+
+    if(fabs(T-T0) < epsilon_T || fabs(B-B0) < epsilon_B)
+      break;
+
+    T0 = T;
+    B0 = B;
+  }
+  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
+
+  *temperature = T;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(htrdr,
+    "Could not compute the brightness temperature for the radiance %g "
+    "estimated over [%g, %g] nanometers.\n",
+    radiance,
+    lambda_min*1e9,
+    lambda_max*1e9);
+  goto exit;
+}
+
+res_T
 open_output_stream
   (struct htrdr* htrdr,
    const char* filename,
