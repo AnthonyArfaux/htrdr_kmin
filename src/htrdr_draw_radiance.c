@@ -479,14 +479,19 @@ error:
 }
 
 static INLINE size_t
-sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
+sample_lw_spectral_interval
+  (struct htrdr* htrdr,
+   const double r,
+   double* pdf)
 {
   const double* cdf = NULL;
   const double* find = NULL;
   double r_next = nextafter(r, DBL_MAX);
   size_t cdf_length = 0;
   size_t i;
-  ASSERT(htrdr && r >= 0 && r < 1);
+  ASSERT(htrdr && r >= 0 && r < 1 && pdf);
+  ASSERT(darray_double_size_get(&htrdr->lw_cdf)
+      == darray_double_size_get(&htrdr->lw_pdf));
 
   cdf = darray_double_cdata_get(&htrdr->lw_cdf);
   cdf_length = darray_double_size_get(&htrdr->lw_cdf);
@@ -498,6 +503,8 @@ sample_lw_spectral_interval(struct htrdr* htrdr, const double r)
 
   i = (size_t)(find - cdf);
   ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
+  *pdf = darray_double_cdata_get(&htrdr->lw_pdf)[i];
+
   return htsky_get_spectral_band_id(htrdr->sky, i);
 }
 
@@ -629,6 +636,7 @@ draw_pixel_lw
     size_t iband;
     size_t iquad;
     double usec;
+    double band_pdf;
 
     /* Begin the registration of the time spent to in the realisation */
     time_current(&t0);
@@ -645,12 +653,13 @@ draw_pixel_lw
     r1 = ssp_rng_canonical(rng);
 
     /* Sample a spectral band and a quadrature point */
-    iband = sample_lw_spectral_interval(htrdr, r0);
+    iband = sample_lw_spectral_interval(htrdr, r0, &band_pdf);
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
 
     /* Compute the luminance */
     weight = htrdr_compute_radiance_lw
       (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+    weight /= band_pdf;
     ASSERT(weight >= 0);
 
     /* End the registration of the per realisation time */

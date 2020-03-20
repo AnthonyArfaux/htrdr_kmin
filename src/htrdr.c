@@ -101,7 +101,7 @@ log_msg
 }
 
 static res_T
-dump_accum_buffer
+dump_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
    struct htrdr_accum* time_acc, /* May be NULL */
@@ -389,6 +389,7 @@ setup_lw_cdf(struct htrdr* htrdr)
   ASSERT(htrdr && htsky_is_long_wave(htrdr->sky));
 
   nbands = htsky_get_spectral_bands_count(htrdr->sky);
+
   res = darray_double_resize(&htrdr->lw_cdf, nbands);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
@@ -397,9 +398,15 @@ setup_lw_cdf(struct htrdr* htrdr)
     goto error;
   }
 
-  /* Alias the same array by the cdf and the pdf variable to make easier the
-   * reading of the code */
-  pdf = darray_double_data_get(&htrdr->lw_cdf);
+  res = darray_double_resize(&htrdr->lw_pdf, nbands);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "error allocating the PDF of the long wave spectral bands -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  pdf = darray_double_data_get(&htrdr->lw_pdf);
   cdf = darray_double_data_get(&htrdr->lw_cdf);
 
   /* Compute the *unormalized* probability to sample a long wave band */
@@ -440,6 +447,7 @@ exit:
   return res;
 error:
   darray_double_clear(&htrdr->lw_cdf);
+  darray_double_clear(&htrdr->lw_pdf);
   goto exit;
 }
 
@@ -475,6 +483,7 @@ htrdr_init
   str_init(htrdr->allocator, &htrdr->output_name);
 
   darray_double_init(htrdr->allocator, &htrdr->lw_cdf);
+  darray_double_init(htrdr->allocator, &htrdr->lw_pdf);
 
   nthreads_max = MMAX(omp_get_max_threads(), omp_get_num_procs());
   htrdr->dump_vtk = args->dump_vtk;
@@ -645,6 +654,7 @@ htrdr_release(struct htrdr* htrdr)
   }
   str_release(&htrdr->output_name);
   darray_double_release(&htrdr->lw_cdf);
+  darray_double_release(&htrdr->lw_pdf);
   logger_release(&htrdr->logger);
 }
 
@@ -678,7 +688,7 @@ htrdr_run(struct htrdr* htrdr)
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
       struct htrdr_estimate path_time;
 
-      res = dump_accum_buffer(htrdr, htrdr->buf, &path_time_acc,
+      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc,
         str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
 

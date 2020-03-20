@@ -56,7 +56,8 @@ struct htrdr {
   struct htsky* sky;
   double wlen_range_m[2]; /* Integration range in *meters* */
 
-  struct darray_double lw_cdf; /* CDF to sample a Long Waves band */
+  struct darray_double lw_cdf; /* CDF to sample a long wave bands */
+  struct darray_double lw_pdf; /* PDF of the long wave  bands*/
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */
