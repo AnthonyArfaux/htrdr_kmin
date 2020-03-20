@@ -140,9 +140,10 @@ dump_accum_buffer
 
       if(htsky_is_long_wave(htrdr->sky)) {
         const struct htrdr_pixel_lw* pix = htrdr_buffer_at(buf, x, y);
+        fprintf(stream, "%g %g ",
+          pix->radiance_temperature.E, pix->radiance_temperature.SE);
         fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
-        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
-        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+        fprintf(stream, "0 0 ");
         pix_time_acc = &pix->time;
 
       } else {
@@ -563,8 +564,8 @@ htrdr_init
   iband1 = htsky_get_spectral_band_id(htrdr->sky, nbands-1);
   HTSKY(get_spectral_band_bounds(htrdr->sky, iband0, wlen0));
   HTSKY(get_spectral_band_bounds(htrdr->sky, iband1, wlen1));
-  htrdr->wlen_range[0] = wlen0[0];
-  htrdr->wlen_range[1] = wlen1[1];
+  htrdr->wlen_range_m[0] = wlen0[0]*1e-9; /* Convert in meters */
+  htrdr->wlen_range_m[1] = wlen1[1]*1e-9; /* Convert in meters */
 
   if(htsky_is_long_wave(htrdr->sky)) {
     /* Define the CDF used to sample a long wave band */

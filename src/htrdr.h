@@ -54,7 +54,7 @@ struct htrdr {
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
-  double wlen_range[2]; /* Integration range in nanometers */
+  double wlen_range_m[2]; /* Integration range in *meters* */
 
   struct darray_double lw_cdf; /* CDF to sample a Long Waves band */
 

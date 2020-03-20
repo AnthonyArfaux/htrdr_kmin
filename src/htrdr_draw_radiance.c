@@ -611,6 +611,7 @@ draw_pixel_lw
   struct htrdr_accum radiance;
   struct htrdr_accum time;
   size_t isamp;
+  double temp_min, temp_max;
   ASSERT(ipix && ipix && pix_sz && cam && rng && pixel);
   ASSERT(htsky_is_long_wave(htrdr->sky));
 
@@ -667,10 +668,33 @@ draw_pixel_lw
     time.nweights += 1;
   }
 
-  /* Flush pixel data */
+  /* Compute the estimation of the pixel radiance */
   htrdr_accum_get_estimation(&radiance, &pixel->radiance);
-  pixel->radiance_temperature = HTRDR_ESTIMATE_NULL; /* TODO */
+
+  /* Save the per realisation integration time */
   pixel->time = time;
+
+  /* Compute the brightness_temperature of the pixel and estimate its standard
+   * error */
+  #define BRIGHTNESS_TEMPERATURE(Radiance, Temperature) {                      \
+    res_T res = brightness_temperature                                         \
+      (htrdr,                                                                  \
+       htrdr->wlen_range_m[0],                                                 \
+       htrdr->wlen_range_m[1],                                                 \
+       (Radiance),                                                             \
+       &(Temperature));                                                        \
+    if(res != RES_OK) {                                                        \
+      htrdr_log_warn(htrdr,                                                    \
+        "Could not compute the brightness temperature for the radiance %g.\n", \
+        (Radiance));                                                           \
+      (Temperature) = 0;                                                       \
+    }                                                                          \
+  } (void)0
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E, pixel->radiance_temperature.E);
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E - pixel->radiance.SE, temp_min);
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E + pixel->radiance.SE, temp_max);
+  pixel->radiance_temperature.SE = temp_max - temp_min;
+  #undef BRIGHTNESS_TEMPERATURE
 }
 
 static res_T
