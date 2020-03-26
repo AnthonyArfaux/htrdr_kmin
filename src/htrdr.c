@@ -645,6 +645,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
+  if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
   if(htrdr->lifo_allocators) {
     size_t i;
     FOR_EACH(i, 0, htrdr->nthreads) {
