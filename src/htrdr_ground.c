@@ -32,7 +32,6 @@
 #include <rsys/hash_table.h>
 
 #include <star/s3d.h>
-#include <star/smtl.h>
 
 /* Define the hash table that maps an Obj vertex id to its position into the
  * vertex buffer */
