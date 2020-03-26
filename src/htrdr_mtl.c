@@ -75,7 +75,7 @@ parse_material
     goto error;
   }
 
-  tk = strtok_r(NULL, "", &tk_ctx);
+  tk = strtok_r(NULL, " \t", &tk_ctx);
   if(!tk) {
     htrdr_log_err(mtl->htrdr,
       "%s:%lu: missing the MruMtl file for the material `%s'.\n",
@@ -106,6 +106,12 @@ parse_material
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
       str_cget(str), res_to_cstr(res));
     goto error;
+  }
+
+  tk = strtok_r(NULL, " \t", &tk_ctx);
+  if(tk) {
+    htrdr_log_warn(mtl->htrdr, "%s:%lu: unexpected text `%s'.\n",
+      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr), tk);
   }
 
 exit:
