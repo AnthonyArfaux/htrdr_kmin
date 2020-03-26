@@ -25,7 +25,7 @@ option(NO_TEST "Do not build the tests" OFF)
 # Check dependencies
 ################################################################################
 find_package(AW 2.0 REQUIRED)
-find_package(HTSky REQUIRED)
+find_package(HTSky 0.1 REQUIRED)
 find_package(MruMtl REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
