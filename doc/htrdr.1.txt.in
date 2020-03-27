@@ -29,42 +29,46 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*htrdr* is an image renderer in the visible part of the spectrum, for scenes
-composed of an atmospheric gas mixture, clouds, and a ground. It uses spectral
-data that should be provided for the pressure and temperature atmospheric
-vertical profile [1] (*-a* _atmosphere_), the liquid water content in
-suspension within the clouds stored in a *htcp*(5) file (*-c* _clouds_), and
-the optical properties of water droplets that have been obtained from a Mie
-code and formatted according to the *htmie*(5) file format (*-m* _mie_). The
-user also has to provide: the characteristics of the simulated camera (*-C*
-_camera_), the sensor definition (*-i* _image_), and the position of the sun
-(*-D* _azimuth_,_elevation_). It is also possible to provide an OBJ [2]
-representing the ground geometry with a diffuse reflectivity (*-g* _ground_).
-Both, the clouds and the ground, can be infinitely repeated along the X and Y
-axis by setting the *-r* and the *-R* options, respectively.
+*htrdr* is an image renderer of scenes composed of an atmospheric gas mixture,
+clouds, and a ground. Images can be rendered in the visible or the infrared
+part of the spectrum. It uses spectral data that should be provided for the
+pressure and temperature atmospheric vertical profile [1] (*-a* _atmosphere_),
+the liquid water content in suspension within the clouds stored in a *htcp*(5)
+file (*-c* _clouds_), and the optical properties of water droplets that have
+been obtained from a Mie code and formatted according to the *htmie*(5) file
+format (*-m* _mie_). The user also has to provide: the characteristics of the
+simulated camera (*-C* _camera_), the sensor definition (*-i* _image_), and the
+position of the sun (*-D* _azimuth_,_elevation_). It is also possible to
+provide an *htrdr-obj*(5) file representing the ground geometry (*-g* _ground_)
+whose materials are listed in the *htrdr-material*(5) file provided through the
+*-M* option. Both, the clouds and the ground, can be infinitely repeated along
+the X and Y axis by setting the *-r* and the *-R* options, respectively.
 
-*htrdr* evaluates the intensity incoming on each pixel of the sensor
-array. The underlying algorithm is based on a Monte-Carlo method: it consists
-in simulating a given number of optical paths originating from the camera,
+*htrdr* evaluates the intensity incoming on each pixel of the sensor array. The
+underlying algorithm is based on a Monte-Carlo method: it consists in
+simulating a given number of optical paths originating from the camera,
 directed into the atmosphere, taking into account light absorption and
-scattering phenomena. The computation is performed over the whole visible part
-of the spectrum, for the three components of the CIE 1931 XYZ colorimetric
-space that are subsequently recombined in order to obtain the final color for
-each pixel, and finally the whole image of the scene as seen from the required
-observation position.
+scattering phenomena. In regular image rendering, the computation is performed
+over the visible part of the spectrum in [380, 780] nanometers, for the three
+components of the CIE 1931 XYZ colorimetric space that are subsequently
+recombined in order to obtain the final color for each pixel, and finally the
+whole image of the scene as seen from the required observation position. In
+long waves, the rendering is performed for the range of wavelengths defined by
+the *-l* option. The estimated radiance per pixel is then converted to its
+brightness temperature and both are saved in the output image.
 
-In *htrdr* the spatial unit 1.0 corresponds to one meter. The estimated
-radiance of each pixel component is given in W.sr^-1.m^-2. The pixels are
-written into the _output_ file or to the standard output whether the *-o*
-option is defined or not, respectively.  The output image is a list of raw
-ASCII data formatted with respect to the *htrdr-image*(5) file format. Since
-*htrdr* relies on the Monte-Carlo method, the estimated radiance of a pixel
-component is provided with its numerical accuracy.
+In *htrdr* the spatial unit 1.0 corresponds to one meter, the estimated
+radiance is given in W.sr^-1.m^-2 and the temperatures are expressed in Kelvin.
+The pixels are written into the _output_ file or to the standard output whether
+the *-o* option is defined or not, respectively. The output image is a list of
+raw ASCII data formatted with respect to the *htrdr-image*(5) file format.
+Since *htrdr* relies on the Monte-Carlo method, each estimation is given with
+its numerical accuracy.
 
 During simulation, *htrdr* dynamically loads/unloads cloud properties to handle
 clouds whose data do not feat in main memory. *htrdr* also supports shared
 memory parallelism and relies on the Message Passing Interface specification
-[4] to parallelise its computations in a distribute memory environment; it can
+[3] to parallelise its computations in a distribute memory environment; it can
 thus be run either directly or through a MPI process launcher like *mpirun*(1).
 
 OPTIONS
@@ -110,7 +114,7 @@ OPTIONS
 *-d*::
   Write in _output_ the space partitioning data structures used to speed up
   the radiative transfer computations in the clouds. The written data are
-  octrees saved in the VTK file format [3]. Each octree node stores the minimum
+  octrees saved in the VTK file format [2]. Each octree node stores the minimum
   and the maximum of the extinction coefficients of the cloud cells overlapped
   by the octree node. In the _output_ file, each octree is separated of the
   previous one by a line with three minus characters, i.e. '---'.
@@ -119,17 +123,7 @@ OPTIONS
   Force overwrite of the _output_ file.
 
 *-g* _ground_::
-  Path toward an OBJ file [2] representing the ground geometry. Note that only
-  triangular meshes are handled. Furthermore, each triangle must have a
-  material, i.e. it must belongs to a *usemtl* group as defined by the OBJ file
-  format. The name of the *usemtl* group must be of the form
-  "<__front-mtl-name__>:<__back-mtl-name__>", where <__front-mtl-name__> and
-  <__back-mtl-name__> are strings separated by a colon mark (:). Each
-  string must reference the name of a material listed in the
-  *htrdr-materials*(5) file submitted through the *-M* option.
-  <__front-mtl-name__> and <__back-mtl-name__> are the name of the front and
-  back facing materials, respectively. In *htrdr*(1), a triangle side is said
-  "front facing" if its vertices are clock-wise ordered.
+  Path toward a *htrdr-obj*(5) representing the ground geometry.
 
 *-h*::
   List short help and exit.
@@ -142,10 +136,17 @@ OPTIONS
     @HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
 
   **spp**=**_samples-count_**;;
-    Number of samples per pixel and per component. i.e. the estimation of a
-    pixel will use "3 * _samples-count_" Monte-Carlo realisations, one set of
+    Number of samples per pixel estimation. In regular image rendering, a pixel
+    will use "3 * _samples-count_" Monte-Carlo realisations, one set of
     _samples-count_ realisations for each X, Y and Z component of the CIE 1931
-    XYZ color space. By default, *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+    XYZ color space. In long wave rendering (*-l* option) only one set of
+    _samples-count_ is used to estimate the pixel radiance and the resulting
+    brightness temperature for the submitted range of wavelengths. By default,
+    *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+
+*-l* __wlen-min__,__wlen-max__::
+  Switch in infrared rendering for the long wave interval in [__wlen-min__,
+  __wlen-max__] nanometers.
 
 *-R*::
   Infinitely repeat the _ground_ along the X and Y axis.
@@ -203,32 +204,46 @@ EXAMPLES
 
 Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
 zenith. The vertical atmospheric gaz mixture along the Z axis is described in
-the *gas.txt* file. The Mie data are provided through the *Mie.nc* file and
-the ground geometry is a quad repeated to the infinity. The camera is
-positioned at *400* meters high and looks toward the positive Y axis. The
-definition of the rendered image is *800* by *600* pixels and the radiance of
-each pixel component is estimated with *64* Monte-Carlo realisations. The
-resulting image is written to *output* excepted if the file already exists; in
-this case an error is notified, the program stops and the *output* file
-remains unchanged:
+the *gas.txt* file. the
+ground geometry is a quad repeated to the infinity whose material are listed in
+the *material.mtl* file. The camera is positioned at *400* meters high and
+looks toward the positive Y axis. The definition of the rendered image is *800*
+by *600* pixels and the radiance of each pixel component is estimated with *64*
+Monte-Carlo realisations. The resulting image is written to *output* excepted
+if the file already exists; in this case an error is notified, the program
+stops and the *output* file remains unchanged:
 
     $ htrdr -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
+      -M materials.mtl \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
       -o output
 
 Add clouds to the previous scene and use a more complex geometry to represent
-the ground. The ground geometry was carefully designed to be cyclic and can be
-thus repeated to the infinity without visual glitches. Use the *-f* option to
-write the rendered image to *output* even though the file already exists.
-Fianlly, use the *htpp*(1) command to convert the *htrdr-image*(5) saved in
-output in a regular PPM image [5]:
+the ground. The Mie data are provided through the *Mie.nc* file. The ground
+geometry was carefully designed to be cyclic and can be thus repeated to the
+infinity without visual glitches. Use the *-f* option to write the rendered
+image to *output* even though the file already exists. Finally, use the
+*htpp*(1) command to convert the *htrdr-image*(5) saved in output in a regular
+PPM image [4]:
 
-    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp \
+    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R \
+      -M materials.mtl \
+      -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
       -f -o output
     $ htpp -o image.ppm output
+
+Render the previous scene in infrared for the wavelengths in [9200, 10000]
+nanometers:
+
+    $ htrdr -l 9200,10000 -a gas.txt -m Mie.nc -g mountains.obj -R \
+      -M materials.mtl \
+      -c clouds.htcp \
+      -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+      -i def=800x600:spp=64 \
+      -f -o output
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*
 degrees respectively. Use the *-O* option to enable the cache mechanism on
@@ -237,7 +252,9 @@ number of samples per pixel component to *1024*. Write results on standard
 output and convert the resulting image in PPM before visualising it through the
 *feh*(1) image viewer:
 
-    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp \
+    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
+      -M materials.mtl \
+      -c clouds.htcp \
       -O my_cache \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=1280x720:spp=1024 | htpp | feh -
@@ -255,7 +272,9 @@ Use *mpirun*(1) to launch *htrdr* on several hosts defined in the *my_hosts*
 file. Make the clouds infinite along the X and Y axis:
 
     $ mpirun --hostfile my_hosts htrdr \
-      -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R -c clouds.htcp -r \
+      -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
+      -M materials.mtl \
+      -c clouds.htcp -r \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=1280x720:spp=1024 \
       -f -o output
@@ -264,12 +283,10 @@ NOTES
 -----
 1. High-Tune: Gas Optical Properties file format -
   <https://www.meso-star.com/projects/high-tune/downloads/gas_opt_prop_en.pdf>
-2. OBJ file format -
-  <http://www.martinreddy.net/gfx/3d/OBJ.spec>
-3. VTK file format -
+2. VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
-4. MPI specifications - <https://www.mpi-forum.org/docs/>
-5. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+3. MPI specifications - <https://www.mpi-forum.org/docs/>
+4. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
 
 COPYRIGHT
 ---------
@@ -290,3 +307,4 @@ SEE ALSO
 *htpp*(1),
 *htrdr-image*(5),
 *htrdr-materials*(5)
+*htrdr-obj*(5)

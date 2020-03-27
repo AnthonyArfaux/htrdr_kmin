@@ -25,12 +25,12 @@ htrdr-materials - list of materials used by the ground geometry in htrdr(1)
 DESCRIPTION
 -----------
 A *htrdr-materials* file lists the materials that can be used by the ground
-geometry of the *htrdr*(1) program. Each line of the file gives the name of
-the material and the path toward the *mrumtl*(5) file storing the spectral
-properties of its associated Bidirectional Reflectance Distribution Function.
-The material name can be composed of any characters excepted spaces and
-tabulations. The path toward the *mrumtl*(5) file must be a valid path
-regarding the file system. 
+geometry provided through a *htrdr-obj*(5) file to the *htrdr*(1) program.
+Each line of the file gives the name of the material and the path toward the
+*mrumtl*(5) file storing the spectral properties of its associated
+Bidirectional Reflectance Distribution Function. The material name can be
+composed of any characters excepted spaces and tabulations. The path toward
+the *mrumtl*(5) file must be a valid path regarding the file system.
 
 Characters behind the hash mark (#) are considered as comments and are thus
 ignored. Empty lines, i.e. lines without any characters or composed of spaces
@@ -63,4 +63,4 @@ sand    /opt/materials/B002.mrumtl
 
 SEE ALSO
 --------
-*htrdr*(1), *mrumtl*(5)
+*htrdr*(1), *htrdr-obj*(5), *mrumtl*(5)

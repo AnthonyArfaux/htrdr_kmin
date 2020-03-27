@@ -34,14 +34,15 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
-"Render an image for scenes composed of an atmospheric gas mixture, clouds\n"
-"and a ground.\n\n");
+"Render an image for scenes composed of an atmospheric gas mixture,\n"
+"clouds and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
 "  -c CLOUDS      properties of the clouds.\n");
   printf(
-"  -C <camera>    define the rendering point of view.\n");
+"  -C <camera>    define the rendering point of view. Refer to the\n"
+"                 htrdr man page for the list of camera options.\n");
   printf(
 "  -D AZIMUTH,ELEVATION\n"
 "                 direction in degrees toward the sun center. By default\n"
@@ -57,22 +58,25 @@ print_help(const char* cmd)
   printf(
 "  -h             display this help and exit.\n");
   printf(
-"  -i <image>     define the image to compute.\n");
+"  -i <image>     define the image to compute. Refer to the htrdr man\n"
+"                 page for the list of image options\n");
   printf(
 "  -l WLEN_MIN,WLEN_MAX\n"
-"                 enable long wave rendering for the wavelengths included in\n"
+"                 switch in infrared rendering for the long waves in\n"
 "                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
-"                 rendering is performed for the visible part of the spectrum.\n");
+"                 rendering is performed for the visible part of the\n"
+"                 spectrum in [380, 780] nanometers.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
 "  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
-"  -M MATERIALS   file listing the scene ground materials.\n");
+"  -M MATERIALS   file listing the ground materials.\n");
   printf(
 "  -m MIE         file of Mie's data.\n");
   printf(
-"  -O CACHE       name of the cache file used to store/restore the sky data.\n");
+"  -O CACHE       name of the cache file used to store/restore the sky\n"
+"                 data.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
@@ -81,21 +85,23 @@ print_help(const char* cmd)
 "                 building. By default its value is `%g'.\n",
     HTRDR_ARGS_DEFAULT.optical_thickness);
   printf(
-"  -t THREADS     hint on the number of threads to use. By default use as\n"
-"                 many threads as CPU cores.\n");
+"  -t THREADS     hint on the number of threads to use. By default use\n"
+"                 as many threads as CPU cores.\n");
   printf(
-"  -V X,Y,Z       maximum definition of the cloud acceleration grids along\n"
-"                 the 3 axis. By default use the definition of the clouds\n");
+"  -V X,Y,Z       maximum definition of the cloud acceleration grids\n"
+"                 along the 3 axis. By default use the definition of\n"
+"                 the clouds\n");
   printf(
 "  -v             make the program verbose.\n");
   printf(
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"Copyright (C) 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>. Copyright\n"
-"(C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free software released\n"
-"under the GNU GPL license, version 3 or later. You are free to change or\n"
-"redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");
+"Copyright (C) 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>.\n"
+"Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free\n"
+"software released under the GNU GPL license, version 3 or later. You\n"
+"are free to change or redistribute it under certain conditions\n"
+"<http://gnu.org/licenses/gpl.html>\n");
 }
 
 static INLINE res_T

@@ -28,7 +28,10 @@ The *htrdr-image* is a raw image file format where data are stored in plain
 text. Characters after the '#' character are considered as comments and are
 thus ignored as well as empty lines. The first valid line stores 2 unsigned
 integers that represent the image definition, i.e. the number of pixels per
-line and per column. Then each line stores 4 pairs of floating points data
+line and per column. Then each line stores 8 pixel components.
+
+If the image is a regular rendering in the visible part of the spectrum, the
+pixel components are actually 4 pairs of floating points data
 representing the pixel color encoded in the CIE 1931 XYZ color space and the
 time spent per realisation to estimate the pixel. The first, second and third
 pair encodes the estimated radiance in W.sr^-1.m^-2 of the X, Y and Z pixel
@@ -36,6 +39,15 @@ components, respectively. The first value of each pair is the expected value of
 the estimated radiance while the second one is its associated standard
 deviation. The fourth pair saves the estimate in microseconds of the per
 radiative path computation time and its standard error.
+
+If the image is an infrared rendering, the first and second pixel components
+store the expected value and the standard error, respectively, of the
+estimated brightness temperature in Kelvin. The third and fourth component
+saves the expected values and the standard error of its corresponding radiance
+in W.sr^-1.m^-2. The fifth and sixth pixel components are unused. Finally the
+last 2 pixel components saves, as for a regular rendering, the estimate in
+microseconds of the per radiative path computation time and its standard
+error.
 
 Pixels are sorted line by line, with the origin defined at the top left corner
 of the image. With an image definition of N by M pixels, with N the number of
@@ -59,11 +71,18 @@ GRAMMAR
 <width>          ::= INTEGER
 <height>         ::= INTEGER
 
-<pixel>          ::= <X> <Y> <Z> <time>
+<pixel>          ::= <pixel-sw>
+                   | <pixel-lw>
+
+<pixel-sw>       ::= <X> <Y> <Z> <time>
+<pixel-lw>       ::= <temperature> <radiance> 0 0 <time>
+
 <X>              ::= <estimate>
 <Y>              ::= <estimate>
 <Z>              ::= <estimate>
 <time>           ::= <estimate>
+<temperature>    ::= <estimate>
+<radiance>       ::= <estimate>
 
 <estimate>       ::= <expected-value> <standard-error>
 <expected-value> ::= REAL
