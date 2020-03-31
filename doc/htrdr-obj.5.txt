@@ -40,8 +40,8 @@ format [1] with only a specific convention regarding the material name.
 As a consequence, any software supporting the OBJ file format can be
 used to create or visualise an *htrdr-obj* file.
 
-EXAMPLE
--------
+EXAMPLES
+--------
 Define a quad at the interface between the air medium and the concrete
 material.
 
@@ -55,6 +55,37 @@ v  5.0   5.0  0
 usemtl air:concrete
 f 1 2 3
 f 3 2 4
+-------
+
+Define a wooden cube whose faces aligned with the Z axis are pasted to a brick
+material. The remaining faces are in contact with the air.
+
+[verse]
+-------
+v 0 0 0
+v 1 0 0
+v 0 1 0
+v 1 1 0
+v 0 0 1
+v 1 0 1
+v 0 1 1
+v 1 1 1
+
+usemtl wood:air
+f 1 3 2
+f 2 3 4
+f 1 5 3
+f 3 5 7
+f 5 6 7
+f 7 6 8
+f 4 8 2
+f 2 8 6
+
+usemtl wood:brick
+f 3 7 4
+f 4 7 8
+f 1 2 5
+f 5 2 6
 -------
 
 NOTES
