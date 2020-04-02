@@ -34,7 +34,7 @@ the *mrumtl*(5) file must be a valid path regarding the file system.
 
 Characters behind the hash mark (#) are considered as comments and are thus
 ignored. Empty lines, i.e. lines without any characters or composed of spaces
-tabulations, are simply skipped.
+and tabulations, are simply skipped.
 
 GRAMMAR
 -------
