@@ -1,5 +1,0 @@
-<materials-list>      ::= <material>
-                        [ <material> ... ]
-<material>            ::= <material-name> <mrumtl-path>
-<material-name>       ::= STRING
-<mrumtl-path>         ::= PATH
