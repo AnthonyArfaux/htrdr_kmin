@@ -48,28 +48,30 @@ the X and Y axis by setting the *-r* and the *-R* options, respectively.
 underlying algorithm is based on a Monte-Carlo method: it consists in
 simulating a given number of optical paths originating from the camera,
 directed into the atmosphere, taking into account light absorption and
-scattering phenomena. In regular image rendering, the computation is performed
-over the visible part of the spectrum in [380, 780] nanometers, for the three
-components of the CIE 1931 XYZ colorimetric space that are subsequently
-recombined in order to obtain the final color for each pixel, and finally the
-whole image of the scene as seen from the required observation position. In
-long waves, the rendering is performed for the range of wavelengths defined by
-the *-l* option. The estimated radiance per pixel is then converted to its
-brightness temperature and both are saved in the output image.
+scattering phenomena. When rendering in the visible part of the spectrum, the
+computation is performed over the visible part of the spectrum in [380, 780]
+nanometers, for the three components of the CIE 1931 XYZ colorimetric space
+that are subsequently recombined in order to obtain the final color for each
+pixel, and finally the whole image of the scene as seen from the set
+observation position. In long waves, the rendering is performed for the range
+of wavelengths defined by the *-l* option. The estimated radiance per pixel is
+then converted to its brightness temperature and both are saved in the output
+image.
 
 In *htrdr* the spatial unit 1.0 corresponds to one meter, the estimated
 radiance is given in W.sr^-1.m^-2 and the temperatures are expressed in Kelvin.
-The pixels are written into the _output_ file or to the standard output whether
-the *-o* option is defined or not, respectively. The output image is a list of
-raw ASCII data formatted with respect to the *htrdr-image*(5) file format.
-Since *htrdr* relies on the Monte-Carlo method, each estimation is given with
-its numerical accuracy.
+The results are written to the output file if the *-o* option is defined and
+the standard output otherwise. The output image is a list of raw ASCII data
+formatted with respect to the *htrdr-image*(5) file format.  Since *htrdr*
+relies on the Monte-Carlo method, each estimation is given with its numerical
+accuracy.
 
-During simulation, *htrdr* dynamically loads/unloads cloud properties to handle
-clouds whose data do not feat in main memory. *htrdr* also supports shared
-memory parallelism and relies on the Message Passing Interface specification
-[3] to parallelise its computations in a distribute memory environment; it can
-thus be run either directly or through a MPI process launcher like *mpirun*(1).
+During the simulation, *htrdr* dynamically loads/unloads cloud properties to
+handle clouds whose data that do not feat in main memory. *htrdr* also supports
+shared memory parallelism and relies on the Message Passing Interface
+specification [3] to parallelise its computations in a distributed memory
+environment; it can thus be run either directly or through a MPI process
+launcher like *mpirun*(1).
 
 OPTIONS
 -------
@@ -116,7 +118,7 @@ OPTIONS
   the radiative transfer computations in the clouds. The written data are
   octrees saved in the VTK file format [2]. Each octree node stores the minimum
   and the maximum of the extinction coefficients of the cloud cells overlapped
-  by the octree node. In the _output_ file, each octree is separated of the
+  by the octree node. In the _output_ file, each octree is separated from the
   previous one by a line with three minus characters, i.e. '---'.
 
 *-f*::
@@ -166,7 +168,7 @@ OPTIONS
   created and filled with the sky data built from the _clouds_, the
   _atmosphere_ and the _mie_ input files. This cached data can then be reused
   in the next runs as long as the input files provided on the command are the
-  same of the ones used to setup the cache; leading to a significant speed-up
+  same as the ones used to setup the cache; leading to a significant speed-up
   of the pre-processing step. If _cache_ contains data generated from input
   files that are not the ones submitted on the command line, an error is
   notified and the execution is stopped, avoiding the use of wrong cached data.
@@ -204,14 +206,13 @@ EXAMPLES
 
 Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
 zenith. The vertical atmospheric gaz mixture along the Z axis is described in
-the *gas.txt* file. the
-ground geometry is a quad repeated to the infinity whose material are listed in
-the *material.mtl* file. The camera is positioned at *400* meters high and
-looks toward the positive Y axis. The definition of the rendered image is *800*
-by *600* pixels and the radiance of each pixel component is estimated with *64*
-Monte-Carlo realisations. The resulting image is written to *output* excepted
-if the file already exists; in this case an error is notified, the program
-stops and the *output* file remains unchanged:
+the *gas.txt* file. the ground geometry is a quad repeated to the infinity
+whose materials are listed in the *material.mtl* file. The camera is positioned
+at *400* meters height and looks toward the positive Y axis. The definition of
+the rendered image is *800* by *600* pixels and the radiance of each pixel
+component is estimated with *64* Monte-Carlo realisations. The resulting image
+is written to *output* excepted if the file already exists; in this case an
+error is notified, the program stops and the *output* file remains unchanged:
 
     $ htrdr -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
       -M materials.mtl \
@@ -221,8 +222,8 @@ stops and the *output* file remains unchanged:
 
 Add clouds to the previous scene and use a more complex geometry to represent
 the ground. The Mie data are provided through the *Mie.nc* file. The ground
-geometry was carefully designed to be cyclic and can be thus repeated to the
-infinity without visual glitches. Use the *-f* option to write the rendered
+geometry was carefully designed to be cyclic and can be thus infinitely
+repeated without visual glitches. Use the *-f* option to write the rendered
 image to *output* even though the file already exists. Finally, use the
 *htpp*(1) command to convert the *htrdr-image*(5) saved in output in a regular
 PPM image [4]:

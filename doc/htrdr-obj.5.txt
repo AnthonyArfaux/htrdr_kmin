@@ -24,16 +24,19 @@ htrdr-obj - file format of the ground geometry in htrdr(1)
 
 DESCRIPTION
 -----------
-A *htrdr-obj* file is a regular OBJ [1] composed only of triangular
-meshes. Each triangle must be included in a material group as defined by
-the 'usemtl' directive. The name of the material group must be of the
-form "<__front-mtl-name__>:<__back-mtl-name__>", where
-<__front-mtl-name__> and <__back-mtl-name__> are strings separated by a
-colon mark (:) defining the name of the front and back facing materials,
-respectively. These names can be composed of any characters expected
-spaces and tabulations. Note that regarding the *htrdr*(1) convention, a
-triangle side is said "front facing" when its vertices are clock-wise
-ordered.
+A *htrdr-obj* file is a regular OBJ [1] composed only of triangular meshes.
+Each triangle must be included in a material group as defined by the 'usemtl'
+directive. The name of the material group must be of the form
+"<__front-mtl-name__>:<__back-mtl-name__>", where <__front-mtl-name__> and
+<__back-mtl-name__> are strings separated by a colon (:) defining the name of
+the front and back facing materials, respectively. These names can be composed
+of any characters expected for spaces and tabulations. Note that regarding the
+*htrdr*(1) convention, a triangle side is said "front facing" when its
+vertices are clock-wise ordered. 
+
+Note that to be a valid *htrdr-obj*(5) file for *htrdr*(1), the front and the
+back facing names must reference a material listed in *htrdr-materials*(5)
+file submitted to the *htrdr*(1) command line.
 
 The grammar of a *htrdr-obj* file is thus a subset of the OBJ file
 format [1] with only a specific convention regarding the material name.
@@ -57,8 +60,8 @@ f 1 2 3
 f 3 2 4
 -------
 
-Define a wooden cube whose faces aligned with the Z axis are pasted to a brick
-material. The remaining faces are in contact with the air.
+Define a wooden cube whose faces Z-aligned faces are against a brick material.
+The remaining faces are in contact with the air.
 
 [verse]
 -------

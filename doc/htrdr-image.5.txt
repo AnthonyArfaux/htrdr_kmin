@@ -31,21 +31,21 @@ integers that represent the image definition, i.e. the number of pixels per
 line and per column. Then each line stores 8 pixel components.
 
 If the image is a regular rendering in the visible part of the spectrum, the
-pixel components are actually 4 pairs of floating points data
-representing the pixel color encoded in the CIE 1931 XYZ color space and the
-time spent per realisation to estimate the pixel. The first, second and third
-pair encodes the estimated radiance in W.sr^-1.m^-2 of the X, Y and Z pixel
-components, respectively. The first value of each pair is the expected value of
-the estimated radiance while the second one is its associated standard
-deviation. The fourth pair saves the estimate in microseconds of the per
-radiative path computation time and its standard error.
+pixel components are actually 4 pairs of floating points data representing the
+pixel color encoded in the CIE 1931 XYZ color space and the per radiative path
+computation time. The first, second and third pair encode the estimated
+radiance in W.sr^-1.m^-2 of the X, Y and Z pixel components, respectively. The
+first value of each pair is the expected value of the estimated radiance while
+the second one is its associated standard deviation. The fourth pair saves the
+estimate in microseconds of the per radiative path computation time and its
+standard error.
 
 If the image is an infrared rendering, the first and second pixel components
 store the expected value and the standard error, respectively, of the
 estimated brightness temperature in Kelvin. The third and fourth component
-saves the expected values and the standard error of its corresponding radiance
-in W.sr^-1.m^-2. The fifth and sixth pixel components are unused. Finally the
-last 2 pixel components saves, as for a regular rendering, the estimate in
+save the expected value and standard deviation of the pixel radiance in
+W.sr^-1.m^-2. The fifth and sixth pixel components are unused. Finally the
+last 2 pixel components save, as for a regular rendering, the estimate in
 microseconds of the per radiative path computation time and its standard
 error.
 
@@ -55,7 +55,7 @@ pixels per line and M the overall number of lines in the image, the first N
 pixels correspond to the pixels of the top line of the image, the following N
 pixels are the pixels of the second line and so on.
 
-Note that the *htpp*(1) program can be used to convert an *htrdr-image* in a
+Note that the *htpp*(1) program can be used to convert an *htrdr-image* into a
 regular PPM image [1].
 
 GRAMMAR
@@ -91,12 +91,13 @@ GRAMMAR
 
 EXAMPLE
 -------
-The following output is emitted by *htrdr*(1) invoked to render an image of
-*800* by *600* pixels. Note that actually the comments or the blank lines are
-not necessarily written as it by *htrdr*(1); they are used here only to help
-in understanding the data layout. The comment after each pixel gives the two
-dimensional index of the pixel in the image: the first and second integer is
-the index of the line and the column of the pixel in the image, respectively.
+The following output was produced by *htrdr*(1) invoked to render an image of
+*800* by *600* pixels. Note that actually the comments and blank lines were
+not necessarily written by *htrdr*(1); they are used here only to help the
+reader understand the data layout. The comment after each pixel gives the
+two-dimensional index of the pixel in the image: the first and second integer
+is the index of the line and the column of the pixel in the image,
+respectively.
 
 [verse]
 ------
