@@ -898,10 +898,18 @@ draw_image
 
   if(ATOMIC_GET(&res) != RES_OK) goto error;
 
-  /* Synchronize the process */
-  mutex_lock(htrdr->mpi_mutex);
-  MPI(Barrier(MPI_COMM_WORLD));
-  mutex_unlock(htrdr->mpi_mutex);
+  /* Asynchronously wait for processes completion. Use an asynchronous barrier to
+   * avoid a dead lock with the `mpi_probe_thieves' thread that requires also
+   * the `mpi_mutex'. */
+  {
+    MPI_Request req;
+
+    mutex_lock(htrdr->mpi_mutex);
+    MPI(Ibarrier(MPI_COMM_WORLD, &req));
+    mutex_unlock(htrdr->mpi_mutex);
+
+    mpi_wait_for_request(htrdr, &req);
+  }
 
 exit:
   if(rng_proc) SSP(rng_ref_put(rng_proc));
