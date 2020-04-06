@@ -472,7 +472,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
   }
   if(args->filename_obj && !args->filename_mtl) {
     fprintf(stderr,
-      "Missing the path of the file listing the ground materials -- opton '-M'\n");
+      "Missing the path of the file listing the ground materials -- option '-M'\n");
     res = RES_BAD_ARG;
     goto error;
   }
