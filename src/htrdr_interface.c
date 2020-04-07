@@ -21,6 +21,7 @@
 
 #include <star/s3d.h>
 #include <star/ssf.h>
+#include <star/ssp.h>
 
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
@@ -108,6 +109,7 @@ htrdr_interface_create_bsdf
    const double wavelength,
    const double pos[3],
    const double dir[3],
+   struct ssp_rng* rng,
    struct s3d_hit* hit,
    struct ssf_bsdf** out_bsdf)
 {
@@ -116,6 +118,7 @@ htrdr_interface_create_bsdf
   const struct mrumtl_brdf* brdf = NULL;
   const struct mrumtl* mat = NULL;
   double N[3];
+  double r;
   int hit_side;
   res_T res = RES_OK;
   (void)pos;
@@ -148,7 +151,9 @@ htrdr_interface_create_bsdf
   }
   ASSERT(mat);
 
-  res = mrumtl_fetch_brdf(mat, wavelength, &brdf);
+  r = ssp_rng_canonical(rng);
+
+  res = mrumtl_fetch_brdf2(mat, wavelength, r, &brdf);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
       "%s: error retreiving the MruMtl BRDF for the wavelength %g.\n",

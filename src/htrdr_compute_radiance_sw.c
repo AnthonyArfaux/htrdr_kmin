@@ -395,7 +395,7 @@ htrdr_compute_radiance_sw
       /* Fetch the hit interface and build its BSDF */
       htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
       HTRDR(interface_create_bsdf
-        (htrdr, &interf, ithread, wlen, pos_next, dir, &s3d_hit, &bsdf));
+        (htrdr, &interf, ithread, wlen, pos_next, dir, rng, &s3d_hit, &bsdf));
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);

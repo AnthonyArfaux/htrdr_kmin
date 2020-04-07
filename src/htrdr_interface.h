@@ -23,6 +23,7 @@
 struct mrumtl;
 struct s3d_hit;
 struct ssf_bsdf;
+struct ssp_rng;
 
 struct htrdr_interface {
   const struct mrumtl* mtl_front;
@@ -38,6 +39,7 @@ htrdr_interface_create_bsdf
    const double wavelength,
    const double pos[3],
    const double dir[3], /* Normalized incoming direction */
+   struct ssp_rng* rng,
    struct s3d_hit* hit,
    struct ssf_bsdf** bsdf);
 
