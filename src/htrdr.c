@@ -502,7 +502,10 @@ htrdr_init
   if(!args->output) {
     htrdr->output = stdout;
     output_name = "<stdout>";
-  } else if(htrdr->mpi_rank == 0) {
+  } else if(htrdr->mpi_rank != 0) {
+    htrdr->output = NULL;
+    output_name = "<null>";
+  } else {
     res = open_output_stream
       (htrdr, args->output, 0/*read*/, args->force_overwriting, &htrdr->output);
     if(res != RES_OK) goto error;
