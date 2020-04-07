@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* strtok_r support */
+#define _POSIX_C_SOURCE 200112L /* strtok_r and wordexp support */
 
 #include "htrdr.h"
 #include "htrdr_mtl.h"
@@ -29,6 +29,7 @@
 #include <rsys/text_reader.h>
 
 #include <string.h>
+#include <wordexp.h>
 
 /* Generate the hash table that maps a material name to its data */
 #define HTABLE_NAME name2mtl
@@ -57,9 +58,12 @@ parse_material
    struct txtrdr* txtrdr,
    struct str* str) /* Scratch string */
 {
+  wordexp_t wexp;
   char* tk = NULL;
   char* tk_ctx = NULL;
   struct mrumtl* mrumtl = NULL;
+  int err = 0;
+  int wexp_is_allocated = 0;
   res_T res = RES_OK;
   ASSERT(mtl && txtrdr);
 
@@ -75,8 +79,27 @@ parse_material
     goto error;
   }
 
-  tk = strtok_r(NULL, " \t", &tk_ctx);
+  tk = strtok_r(NULL, "", &tk_ctx);
   if(!tk) {
+    htrdr_log_err(mtl->htrdr,
+      "%s:%lu: missing the MruMtl file for the material `%s'.\n",
+      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+      str_cget(str));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  err = wordexp(tk, &wexp, 0);
+  if(err) {
+    htrdr_log_err(mtl->htrdr,
+      "%s:%lu: error in word expension of the mrumtl path.\n",
+      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  wexp_is_allocated = 1;
+
+  if(wexp.we_wordc < 1) {
     htrdr_log_err(mtl->htrdr,
       "%s:%lu: missing the MruMtl file for the material `%s'.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
@@ -95,7 +118,7 @@ parse_material
     goto error;
   }
 
-  res = mrumtl_load(mrumtl, tk);
+  res = mrumtl_load(mrumtl, wexp.we_wordv[0]);
   if(res != RES_OK) goto error;
 
   /* Register the material */
@@ -108,13 +131,14 @@ parse_material
     goto error;
   }
 
-  tk = strtok_r(NULL, " \t", &tk_ctx);
-  if(tk) {
+  if(wexp.we_wordc > 1) {
     htrdr_log_warn(mtl->htrdr, "%s:%lu: unexpected text `%s'.\n",
-      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr), tk);
+      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+      wexp.we_wordv[1]);
   }
 
 exit:
+  if(wexp_is_allocated) wordfree(&wexp);
   return res;
 error:
   if(mrumtl) MRUMTL(ref_put(mrumtl));
