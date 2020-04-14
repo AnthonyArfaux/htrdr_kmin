@@ -90,6 +90,7 @@ set(HTRDR_FILES_SRC
   htrdr.c
   htrdr_args.c
   htrdr_buffer.c
+  htrdr_CIE_XYZ.c
   htrdr_camera.c
   htrdr_compute_radiance_sw.c
   htrdr_compute_radiance_lw.c
@@ -106,6 +107,7 @@ set(HTRDR_FILES_INC
   htrdr.h
   htrdr_c.h
   htrdr_buffer.h
+  htrdr_CIE_XYZ.h
   htrdr_camera.h
   htrdr_grid.h
   htrdr_ground.h

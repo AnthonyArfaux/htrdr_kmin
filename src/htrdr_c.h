@@ -18,6 +18,7 @@
 #define HTRDR_C_H
 
 #include <rsys/rsys.h>
+#include <rsys/math.h> /* PI support */
 
 #ifndef NDEBUG
   #define MPI(Func) ASSERT(MPI_##Func == MPI_SUCCESS)
