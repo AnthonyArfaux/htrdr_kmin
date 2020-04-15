@@ -19,43 +19,43 @@
 #include <rsys/rsys.h>
 
 struct htrdr;
-struct htrdr_CIE_XYZ;
+struct htrdr_cie_xyz;
 
 /* Wavelength boundaries of the CIE XYZ color space in nanometers */
 static const double HTRDR_CIE_XYZ_RANGE_DEFAULT[2] = {380, 780};
 
 extern LOCAL_SYM res_T
-htrdr_CIE_XYZ_create
+htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in  [380, 780] nanometers */
    const size_t nbands, /* # bands used to discretisze the CIE tristimulus s*/
-   struct htrdr_CIE_XYZ** cie);
+   struct htrdr_cie_xyz** cie);
 
 extern LOCAL_SYM void
-htrdr_CIE_XYZ_ref_get
-  (struct htrdr_CIE_XYZ* cie);
+htrdr_cie_xyz_ref_get
+  (struct htrdr_cie_xyz* cie);
 
 extern LOCAL_SYM void
-htrdr_CIE_XYZ_ref_put
-  (struct htrdr_CIE_XYZ* cie);
+htrdr_cie_xyz_ref_put
+  (struct htrdr_cie_xyz* cie);
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
-htrdr_CIE_XYZ_sample_X
-  (struct htrdr_CIE_XYZ* cie,
+htrdr_cie_xyz_sample_X
+  (struct htrdr_cie_xyz* cie,
    const double r); /* Canonical number in [0, 1[ */
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
-htrdr_CIE_XYZ_sample_Y
-  (struct htrdr_CIE_XYZ* cie,
+htrdr_cie_xyz_sample_Y
+  (struct htrdr_cie_xyz* cie,
    const double r); /* Canonical number in [0, 1[ */
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
-htrdr_CIE_XYZ_sample_Z
-  (struct htrdr_CIE_XYZ* cie,
+htrdr_cie_xyz_sample_Z
+  (struct htrdr_cie_xyz* cie,
    const double r); /* Canonical number in [0, 1[ */
 
-#endif /* HTRDR_CIE_XYZ_H */
+#endif /* HTRDR_cie_xyz_H */
 

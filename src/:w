@@ -265,6 +265,7 @@ htrdr_compute_radiance_sw
   double dir_next[3];
   double band_bounds[2]; /* In nanometers */
 
+  double wlen;
   double R;
   double r; /* Random number */
   double wo[3]; /* -dir */

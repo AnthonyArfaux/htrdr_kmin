@@ -63,6 +63,7 @@ htrdr_compute_radiance_sw
    struct ssp_rng* rng,
    const double pos[3],
    const double dir[3],
+   const double wlen,
    const size_t iband, /* Index of the spectral band */
    const size_t iquad); /* Index of the quadrature point into the band */
 

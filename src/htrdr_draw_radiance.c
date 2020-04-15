@@ -20,6 +20,7 @@
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
+#include "htrdr_cie_xyz.h"
 #include "htrdr_solve.h"
 
 #include <high_tune/htsky.h>
@@ -541,8 +542,9 @@ draw_pixel_sw
       double ray_dir[3];
       double weight;
       double r0, r1;
-      size_t iband;
-      size_t iquad;
+      double wlen; /* Sampled wavelength into the spectral band */
+      size_t iband; /* Sampled spectral band */
+      size_t iquad; /* Sampled quadrature point into the spectral band */
       double usec;
 
       /* Begin the registration of the time spent to in the realisation */
@@ -561,24 +563,18 @@ draw_pixel_sw
 
       /* Sample a spectral band and a quadrature point */
       switch(ichannel) {
-        case 0:
-          htsky_sample_sw_spectral_data_CIE_1931_X
-            (htrdr->sky, r0, r1, &iband, &iquad);
-          break;
-        case 1:
-          htsky_sample_sw_spectral_data_CIE_1931_Y
-            (htrdr->sky, r0, r1, &iband, &iquad);
-          break;
-        case 2:
-          htsky_sample_sw_spectral_data_CIE_1931_Z
-            (htrdr->sky, r0, r1, &iband, &iquad);
-          break;
+        case 0: wlen = htrdr_cie_xyz_sample_X(htrdr->cie, r0); break;
+        case 1: wlen = htrdr_cie_xyz_sample_Y(htrdr->cie, r0); break;
+        case 2: wlen = htrdr_cie_xyz_sample_Z(htrdr->cie, r0); break;
         default: FATAL("Unreachable code.\n"); break;
       }
 
+      iband = htsky_find_spectral_band(htrdr->sky, wlen);
+      iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
+
       /* Compute the luminance */
       weight = htrdr_compute_radiance_sw
-        (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
+        (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
       /* End the registration of the per realisation time */

@@ -35,6 +35,7 @@
 struct htsky;
 struct htrdr_args;
 struct htrdr_buffer;
+struct htrdr_cie_xyz;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct mutext;
@@ -49,6 +50,7 @@ struct htrdr {
   struct htrdr_ground* ground;
   struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
+  struct htrdr_cie_xyz* cie;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;

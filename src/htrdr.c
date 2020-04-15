@@ -20,6 +20,7 @@
 #include "htrdr_c.h"
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
+#include "htrdr_cie_xyz.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
 #include "htrdr_mtl.h"
@@ -583,6 +584,12 @@ htrdr_init
     /* Define the CDF used to sample a long wave band */
     res = setup_lw_cdf(htrdr);
     if(res != RES_OK) goto error;
+  } else {
+    /* Setup the CDF used to sample the short wave */
+    res = htrdr_cie_xyz_create
+      (htrdr, HTRDR_CIE_XYZ_RANGE_DEFAULT, 400, &htrdr->cie);
+    if(res != RES_OK) goto error;
+
   }
 
   htrdr->lifo_allocators = MEM_CALLOC
@@ -648,6 +655,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
+  if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
   if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
   if(htrdr->lifo_allocators) {
     size_t i;

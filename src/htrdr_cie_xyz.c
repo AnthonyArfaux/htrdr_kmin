@@ -17,7 +17,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
-#include "htrdr_CIE_XYZ.h"
+#include "htrdr_cie_xyz.h"
 
 #include <rsys/algorithm.h>
 #include <rsys/cstr.h>
@@ -27,7 +27,7 @@
 
 #include <math.h> /* nextafter */
 
-struct htrdr_CIE_XYZ {
+struct htrdr_cie_xyz {
   struct darray_double cdf_X;
   struct darray_double cdf_Y;
   struct darray_double cdf_Z;
@@ -96,8 +96,8 @@ fit_z_bar_1931(const double lambda)
 }
 
 static INLINE double
-sample_CIE_XYZ
-  (const struct htrdr_CIE_XYZ* cie,
+sample_cie_xyz
+  (const struct htrdr_cie_xyz* cie,
    const double* cdf,
    const size_t cdf_length,
    const double r) /* Canonical number in [0, 1[ */
@@ -117,36 +117,37 @@ sample_CIE_XYZ
   ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
 
   /* Return the wavelength at the center of the sampled band */
-  wlen = (double)i * cie->band_len + 0.5*cie->band_len;
+  wlen = cie->range[0] + cie->band_len * ((double)i + 0.5);
   ASSERT(cie->range[0] < wlen && wlen < cie->range[1]);
   return wlen;
 }
 
 
 static void
-release_CIE_XYZ(ref_T* ref)
+release_cie_xyz(ref_T* ref)
 {
-  struct htrdr_CIE_XYZ* cie = NULL;
+  struct htrdr_cie_xyz* cie = NULL;
   ASSERT(ref);
-  cie = CONTAINER_OF(ref, struct htrdr_CIE_XYZ, ref);
+  cie = CONTAINER_OF(ref, struct htrdr_cie_xyz, ref);
   darray_double_release(&cie->cdf_X);
   darray_double_release(&cie->cdf_Y);
   darray_double_release(&cie->cdf_Z);
+  MEM_RM(cie->htrdr->allocator, cie);
 }
 
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_CIE_XYZ_create
+htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in  [380, 780] nanometers */
    const size_t nbands, /* # bands used to discretisze the CIE tristimulus */
-   struct htrdr_CIE_XYZ** out_cie)
+   struct htrdr_cie_xyz** out_cie)
 {
 
   enum { X, Y, Z }; /* Helper constant */
-  struct htrdr_CIE_XYZ* cie = NULL;
+  struct htrdr_cie_xyz* cie = NULL;
   double* pdf[3] = {NULL, NULL, NULL};
   double* cdf[3] = {NULL, NULL, NULL};
   double sum[3] = {0,0,0};
@@ -184,12 +185,12 @@ htrdr_CIE_XYZ_create
     }                                                                          \
     cdf[Stimulus] = darray_double_data_get(&cie->cdf_ ## Stimulus);            \
     pdf[Stimulus] = cdf[Stimulus];                                             \
-    memset(cdf, 0, nbands*sizeof(double));                                     \
+    memset(cdf[Stimulus], 0, nbands*sizeof(double));                           \
   } (void)0
   SETUP_STIMULUS(X);
   SETUP_STIMULUS(Y);
   SETUP_STIMULUS(Z);
-  #undef RESERVE
+  #undef SETUP_STIMULUS
 
   /* Compute the *unormalized* pdf of the tristimulus */
   cie->band_len = (range[1] - range[0]) / (double)nbands;
@@ -242,42 +243,42 @@ exit:
   *out_cie = cie;
   return res;
 error:
-  if(cie) htrdr_CIE_XYZ_ref_put(cie);
+  if(cie) htrdr_cie_xyz_ref_put(cie);
   goto exit;
 }
 
 void
-htrdr_CIE_XYZ_ref_get(struct htrdr_CIE_XYZ* cie)
+htrdr_cie_xyz_ref_get(struct htrdr_cie_xyz* cie)
 {
   ASSERT(cie);
   ref_get(&cie->ref);
 }
 
 void
-htrdr_CIE_XYZ_ref_put(struct htrdr_CIE_XYZ* cie)
+htrdr_cie_xyz_ref_put(struct htrdr_cie_xyz* cie)
 {
   ASSERT(cie);
-  ref_put(&cie->ref, release_CIE_XYZ);
+  ref_put(&cie->ref, release_cie_xyz);
 }
 
 double
-htrdr_CIE_XYZ_sample_X(struct htrdr_CIE_XYZ* cie, const double r)
+htrdr_cie_xyz_sample_X(struct htrdr_cie_xyz* cie, const double r)
 {
-  return sample_CIE_XYZ(cie, darray_double_cdata_get(&cie->cdf_X),
+  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_X),
     darray_double_size_get(&cie->cdf_X), r);
 }
 
 double
-htrdr_CIE_XYZ_sample_Y(struct htrdr_CIE_XYZ* cie, const double r)
+htrdr_cie_xyz_sample_Y(struct htrdr_cie_xyz* cie, const double r)
 {
-  return sample_CIE_XYZ(cie, darray_double_cdata_get(&cie->cdf_Y),
+  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Y),
     darray_double_size_get(&cie->cdf_Y), r);
 }
 
 double
-htrdr_CIE_XYZ_sample_Z(struct htrdr_CIE_XYZ* cie, const double r)
+htrdr_cie_xyz_sample_Z(struct htrdr_cie_xyz* cie, const double r)
 {
-  return sample_CIE_XYZ(cie, darray_double_cdata_get(&cie->cdf_Z),
+  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Z),
     darray_double_size_get(&cie->cdf_Z), r);
 }
 
