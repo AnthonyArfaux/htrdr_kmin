@@ -17,7 +17,6 @@
 #ifndef HTRDR_H
 #define HTRDR_H
 
-#include <rsys/dynamic_array_double.h>
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 #include <rsys/str.h>
@@ -51,15 +50,13 @@ struct htrdr {
   struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
+  struct htrdr_ran_lw* ran_lw;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
   double wlen_range_m[2]; /* Integration range in *meters* */
-
-  struct darray_double lw_cdf; /* CDF to sample a long wave bands */
-  struct darray_double lw_pdf; /* PDF of the long wave  bands*/
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */

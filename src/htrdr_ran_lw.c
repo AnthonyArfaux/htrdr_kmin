@@ -21,7 +21,7 @@
 
 #include <rsys/algorithm.h>
 #include <rsys/cstr.h>
-#include <rsys/dynamic_array.h>
+#include <rsys/dynamic_array_double.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/ref_count.h>
 
@@ -148,7 +148,7 @@ htrdr_ran_lw_create
   ASSERT(htrdr && range && nbands && out_ran_lw);
 
   ran_lw = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ran_lw));
-  if(ran_lw) {
+  if(!ran_lw) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
       "%s: could not allocate long wave random variate data structure -- %s.\n",

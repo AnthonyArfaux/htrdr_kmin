@@ -137,6 +137,7 @@ htrdr_compute_radiance_lw
    struct ssp_rng* rng,
    const double pos_in[3],
    const double dir_in[3],
+   const double wlen, /* In nanometer */
    const size_t iband,
    const size_t iquad)
 {
@@ -153,7 +154,6 @@ htrdr_compute_radiance_lw
   double dir_next[3];
   double band_bounds[2]; /* In nanometers */
   double band_bounds_m[2]; /* In meters */
-  double wlen;
   double temperature;
   double g;
   double w = 0; /* Weight */
@@ -163,10 +163,6 @@ htrdr_compute_radiance_lw
   /* Retrieve the band boundaries */
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
 
-  /* Arbitrarly use the wavelength at the center of the band as the wavelength
-   * to use for data that depend on wavelength rather than spectral band as the
-   * BRDF */
-  wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
   band_bounds_m[0] = band_bounds[0] * 1e-9;
   band_bounds_m[1] = band_bounds[1] * 1e-9;
 

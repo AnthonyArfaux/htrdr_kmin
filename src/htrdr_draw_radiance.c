@@ -21,6 +21,7 @@
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_cie_xyz.h"
+#include "htrdr_ran_lw.h"
 #include "htrdr_solve.h"
 
 #include <high_tune/htsky.h>
@@ -479,36 +480,6 @@ error:
   goto exit;
 }
 
-static INLINE size_t
-sample_lw_spectral_interval
-  (struct htrdr* htrdr,
-   const double r,
-   double* pdf)
-{
-  const double* cdf = NULL;
-  const double* find = NULL;
-  double r_next = nextafter(r, DBL_MAX);
-  size_t cdf_length = 0;
-  size_t i;
-  ASSERT(htrdr && r >= 0 && r < 1 && pdf);
-  ASSERT(darray_double_size_get(&htrdr->lw_cdf)
-      == darray_double_size_get(&htrdr->lw_pdf));
-
-  cdf = darray_double_cdata_get(&htrdr->lw_cdf);
-  cdf_length = darray_double_size_get(&htrdr->lw_cdf);
-
-  /* Use r_next rather than r in order to find the first entry that is not less
-   * than *or equal* to r */
-  find = search_lower_bound(&r_next, cdf, cdf_length, sizeof(double), cmp_dbl);
-  ASSERT(find);
-
-  i = (size_t)(find - cdf);
-  ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
-  *pdf = darray_double_cdata_get(&htrdr->lw_pdf)[i];
-
-  return htsky_get_spectral_band_id(htrdr->sky, i);
-}
-
 static void
 draw_pixel_sw
   (struct htrdr* htrdr,
@@ -629,10 +600,11 @@ draw_pixel_lw
     double ray_dir[3];
     double weight;
     double r0, r1;
+    double wlen;
     size_t iband;
     size_t iquad;
     double usec;
-    double band_pdf;
+    double pdf;
 
     /* Begin the registration of the time spent to in the realisation */
     time_current(&t0);
@@ -648,14 +620,17 @@ draw_pixel_lw
     r0 = ssp_rng_canonical(rng);
     r1 = ssp_rng_canonical(rng);
 
-    /* Sample a spectral band and a quadrature point */
-    iband = sample_lw_spectral_interval(htrdr, r0, &band_pdf);
+    /* Sample a wavelength */
+    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0, &pdf);
+
+    /* Select the associated band and sample a quadrature point */
+    iband = htsky_find_spectral_band(htrdr->sky, wlen);
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
 
     /* Compute the luminance */
     weight = htrdr_compute_radiance_lw
-      (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-    weight /= band_pdf;
+      (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
+    weight /= pdf;
     ASSERT(weight >= 0);
 
     /* End the registration of the per realisation time */
