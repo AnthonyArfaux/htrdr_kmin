@@ -169,8 +169,8 @@ htrdr_compute_radiance_lw
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
-  g = htsky_fetch_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, iband, iquad);
+  g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
+    (htrdr->sky, wlen);
   SSF(phase_hg_setup(phase_hg, g));
 
   /* Initialise the random walk */

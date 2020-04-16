@@ -286,9 +286,9 @@ htrdr_compute_radiance_sw
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  /* Setup the phase function for this spectral band & quadrature point */
-  g = htsky_fetch_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, iband, iquad);
+  /* Setup the phase function for this wavelength */
+  g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
+    (htrdr->sky, wlen);
   SSF(phase_hg_setup(phase_hg, g));
 
   /* Fetch sun properties. Note that the sun spectral data are defined by bands
