@@ -100,6 +100,7 @@ set(HTRDR_FILES_SRC
   htrdr_interface.c
   htrdr_main.c
   htrdr_mtl.c
+  htrdr_ran_lw.c
   htrdr_rectangle.c
   htrdr_slab.c
   htrdr_sun.c)
@@ -113,6 +114,7 @@ set(HTRDR_FILES_INC
   htrdr_ground.h
   htrdr_interface.h
   htrdr_mtl.h
+  htrdr_ran_lw.h
   htrdr_rectangle.h
   htrdr_slab.h
   htrdr_sun.h
