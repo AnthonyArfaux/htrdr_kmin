@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L
+#define _POSIX_C_SOURCE 200112L /* nextafter */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
@@ -122,65 +122,32 @@ sample_cie_xyz
   return wlen;
 }
 
-
-static void
-release_cie_xyz(ref_T* ref)
+static res_T
+setup_cie_xyz
+  (struct htrdr_cie_xyz* cie,
+   const char* func_name,
+   const double range[2],
+   const size_t nbands)
 {
-  struct htrdr_cie_xyz* cie = NULL;
-  ASSERT(ref);
-  cie = CONTAINER_OF(ref, struct htrdr_cie_xyz, ref);
-  darray_double_release(&cie->cdf_X);
-  darray_double_release(&cie->cdf_Y);
-  darray_double_release(&cie->cdf_Z);
-  MEM_RM(cie->htrdr->allocator, cie);
-}
-
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-res_T
-htrdr_cie_xyz_create
-  (struct htrdr* htrdr,
-   const double range[2], /* Must be included in  [380, 780] nanometers */
-   const size_t nbands, /* # bands used to discretisze the CIE tristimulus */
-   struct htrdr_cie_xyz** out_cie)
-{
-
   enum { X, Y, Z }; /* Helper constant */
-  struct htrdr_cie_xyz* cie = NULL;
   double* pdf[3] = {NULL, NULL, NULL};
   double* cdf[3] = {NULL, NULL, NULL};
   double sum[3] = {0,0,0};
   size_t i;
   res_T res = RES_OK;
-  ASSERT(htrdr && range && nbands && out_cie);
+
+  ASSERT(cie && func_name && range && nbands);
   ASSERT(range[0] >= HTRDR_CIE_XYZ_RANGE_DEFAULT[0]);
   ASSERT(range[1] <= HTRDR_CIE_XYZ_RANGE_DEFAULT[1]);
   ASSERT(range[0] < range[1]);
-
-  cie = MEM_CALLOC(htrdr->allocator, 1, sizeof(*cie));
-  if(!cie) {
-    res = RES_MEM_ERR;
-    htrdr_log_err(htrdr,
-      "%s: could not allocate the CIE XYZ data structure -- %s.\n",
-      FUNC_NAME, res_to_cstr(res));
-    goto error;
-  }
-  ref_init(&cie->ref);
-  cie->htrdr = htrdr;
-  cie->range[0] = range[0];
-  cie->range[1] = range[1];
-  darray_double_init(htrdr->allocator, &cie->cdf_X);
-  darray_double_init(htrdr->allocator, &cie->cdf_Y);
-  darray_double_init(htrdr->allocator, &cie->cdf_Z);
 
   /* Allocate and reset the memory space for the tristimulus CDF */
   #define SETUP_STIMULUS(Stimulus) {                                           \
     res = darray_double_resize(&cie->cdf_ ## Stimulus, nbands);                \
     if(res != RES_OK) {                                                        \
-      htrdr_log_err(htrdr,                                                     \
+      htrdr_log_err(cie->htrdr,                                                \
         "%s: Could not reserve the memory space for the CDF "                  \
-        "of the "STR(X)" stimulus -- %s.\n", FUNC_NAME, res_to_cstr(res));     \
+        "of the "STR(X)" stimulus -- %s.\n", func_name, res_to_cstr(res));     \
       goto error;                                                              \
     }                                                                          \
     cdf[Stimulus] = darray_double_data_get(&cie->cdf_ ## Stimulus);            \
@@ -193,6 +160,8 @@ htrdr_cie_xyz_create
   #undef SETUP_STIMULUS
 
   /* Compute the *unormalized* pdf of the tristimulus */
+  cie->range[0] = range[0];
+  cie->range[1] = range[1];
   cie->band_len = (range[1] - range[0]) / (double)nbands;
   FOR_EACH(i, 0, nbands) {
     const double lambda_lo = range[0] + (double)i * cie->band_len;
@@ -220,24 +189,71 @@ htrdr_cie_xyz_create
       cdf[X][i] = pdf[X][i] + cdf[X][i-1];
       cdf[Y][i] = pdf[Y][i] + cdf[Y][i-1];
       cdf[Z][i] = pdf[Z][i] + cdf[Z][i-1];
+      ASSERT(cdf[X][i] >= cdf[X][i-1]);
+      ASSERT(cdf[Y][i] >= cdf[Y][i-1]);
+      ASSERT(cdf[Z][i] >= cdf[Z][i-1]);
     }
   }
   ASSERT(eq_eps(cdf[X][nbands-1], 1, 1.e-6));
   ASSERT(eq_eps(cdf[Y][nbands-1], 1, 1.e-6));
   ASSERT(eq_eps(cdf[Z][nbands-1], 1, 1.e-6));
 
-#ifndef NDEBUG
-  FOR_EACH(i, 1, nbands) {
-    ASSERT(cdf[X][i] >= cdf[X][i-1]);
-    ASSERT(cdf[Y][i] >= cdf[Y][i-1]);
-    ASSERT(cdf[Z][i] >= cdf[Z][i-1]);
-  }
-#endif
-
   /* Handle numerical issue */
   cdf[X][nbands-1] = 1.0;
   cdf[Y][nbands-1] = 1.0;
   cdf[Z][nbands-1] = 1.0;
+
+exit:
+  return res;
+error:
+  darray_double_clear(&cie->cdf_X);
+  darray_double_clear(&cie->cdf_Y);
+  darray_double_clear(&cie->cdf_Z);
+  goto exit;
+}
+
+static void
+release_cie_xyz(ref_T* ref)
+{
+  struct htrdr_cie_xyz* cie = NULL;
+  ASSERT(ref);
+  cie = CONTAINER_OF(ref, struct htrdr_cie_xyz, ref);
+  darray_double_release(&cie->cdf_X);
+  darray_double_release(&cie->cdf_Y);
+  darray_double_release(&cie->cdf_Z);
+  MEM_RM(cie->htrdr->allocator, cie);
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+htrdr_cie_xyz_create
+  (struct htrdr* htrdr,
+   const double range[2], /* Must be included in [380, 780] nanometers */
+   const size_t nbands, /* # bands used to discretisze the CIE tristimulus */
+   struct htrdr_cie_xyz** out_cie)
+{
+  struct htrdr_cie_xyz* cie = NULL;
+  res_T res = RES_OK;
+  ASSERT(htrdr && range && nbands && out_cie);
+
+  cie = MEM_CALLOC(htrdr->allocator, 1, sizeof(*cie));
+  if(!cie) {
+    res = RES_MEM_ERR;
+    htrdr_log_err(htrdr,
+      "%s: could not allocate the CIE XYZ data structure -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+  ref_init(&cie->ref);
+  cie->htrdr = htrdr;
+  darray_double_init(htrdr->allocator, &cie->cdf_X);
+  darray_double_init(htrdr->allocator, &cie->cdf_Y);
+  darray_double_init(htrdr->allocator, &cie->cdf_Z);
+
+  res = setup_cie_xyz(cie, FUNC_NAME, range, nbands);
+  if(res != RES_OK) goto error;
 
 exit:
   *out_cie = cie;
