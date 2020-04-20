@@ -527,7 +527,7 @@ htrdr_init
       }
       n = 1;
     }
-    res = htrdr_ran_lw_create(htrdr, range, nbands, Tref, &htrdr->ran_lw);
+    res = htrdr_ran_lw_create(htrdr, range, n, Tref, &htrdr->ran_lw);
     if(res != RES_OK) goto error;
   }
 
