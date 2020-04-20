@@ -68,11 +68,17 @@ setup_ran_lw_cdf
   cdf = darray_double_data_get(&ran_lw->cdf);
   pdf = cdf; /* Alias the CDF by the PDF since only one array is necessary */
 
+  htrdr_log(ran_lw->htrdr,
+    "Number of bands of the long wave cumulative: %lu\n",
+    (unsigned long)ran_lw->nbands);
+
   /* Compute the *unormalized* probability to sample a long wave band */
   FOR_EACH(i, 0, ran_lw->nbands) {
     double lambda_lo = ran_lw->range[0] + (double)i * ran_lw->band_len;
-    double lambda_hi = lambda_lo + ran_lw->band_len;
-    ASSERT(lambda_lo <= lambda_hi);
+    double lambda_hi = MMIN(lambda_lo + ran_lw->band_len, ran_lw->range[1]);
+    ASSERT(lambda_lo<= lambda_hi);
+    ASSERT(lambda_lo > ran_lw->range[0] || eq_eps(lambda_lo, ran_lw->range[0], 1.e-6));
+    ASSERT(lambda_lo < ran_lw->range[1] || eq_eps(lambda_lo, ran_lw->range[1], 1.e-6));
 
     /* Convert from nanometer to meter */
     lambda_lo *= 1.e-9;
@@ -109,11 +115,13 @@ error:
 }
 
 static res_T
-compute_sky_bands_pdf(struct htrdr_ran_lw* ran_lw, const char* func_name)
+compute_sky_bands_pdf
+  (struct htrdr_ran_lw* ran_lw,
+   const char* func_name,
+   double* out_min_band_len)
 {
   double* pdf = NULL;
-  double sum = 0;
-  size_t i;
+  double min_band_len = DBL_MAX;
   size_t nbands;
   res_T res = RES_OK;
   ASSERT(ran_lw && htsky_is_long_wave(ran_lw->htrdr->sky) && func_name);
@@ -131,33 +139,47 @@ compute_sky_bands_pdf(struct htrdr_ran_lw* ran_lw, const char* func_name)
 
   pdf = darray_double_data_get(&ran_lw->sky_bands_pdf);
 
-  /* Compute the *unormalized* probability to sample a long wave band */
-  sum = 0;
-  FOR_EACH(i, 0, nbands) {
-    const size_t iband = htsky_get_spectral_band_id(ran_lw->htrdr->sky, i);
-    double wlens[2];
-    HTSKY(get_spectral_band_bounds(ran_lw->htrdr->sky, iband, wlens));
+  if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+    ASSERT(nbands == 1);
+    pdf[0] = 1;
+    min_band_len = 0;
+  } else {
+    double sum = 0;
+    size_t i = 0;
 
-    /* Convert from nanometer to meter */
-    wlens[0] = MMAX(wlens[0], ran_lw->range[0]) * 1.e-9;
-    wlens[1] = MMIN(wlens[1], ran_lw->range[1]) * 1.e-9;
+    /* Compute the *unormalized* probability to sample a long wave band */
+    FOR_EACH(i, 0, nbands) {
+      const size_t iband = htsky_get_spectral_band_id(ran_lw->htrdr->sky, i);
+      double wlens[2];
+      HTSKY(get_spectral_band_bounds(ran_lw->htrdr->sky, iband, wlens));
 
-    /* Compute the probability of the current band */
-    pdf[i] = planck(wlens[0], wlens[1], ran_lw->ref_temperature);
+      /* Adjust band boundaries to the submitted range */
+      wlens[0] = MMAX(wlens[0], ran_lw->range[0]);
+      wlens[1] = MMIN(wlens[1], ran_lw->range[1]);
 
-    /* Update the norm */
-    sum += pdf[i];
+      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
+
+      /* Convert from nanometer to meter */
+      wlens[0] *= 1.e-9;
+      wlens[1] *= 1.e-9;
+
+      /* Compute the probability of the current band */
+      pdf[i] = planck(wlens[0], wlens[1], ran_lw->ref_temperature);
+
+      /* Update the norm */
+      sum += pdf[i];
+    }
+
+    /* Normalize the probabilities */
+    FOR_EACH(i, 0, nbands)  pdf[i] /= sum;
   }
 
-  /* Normalize the probabilities */
-  FOR_EACH(i, 0, nbands)  pdf[i] /= sum;
-
 exit:
+  *out_min_band_len = min_band_len;
   return res;
 error:
   darray_double_clear(&ran_lw->sky_bands_pdf);
   goto exit;
-
 }
 
 static double
@@ -203,7 +225,7 @@ ran_lw_sample_continue
 {
   /* Numerical parameters of the dichotomy search */
   const size_t MAX_ITER = 100;
-  const double EPSILON_LAMBDA = 1e-6;
+  const double EPSILON_LAMBDA_M = 1e-15;
   const double EPSILON_BF = 1e-6;
 
   /* Local variables */
@@ -222,8 +244,8 @@ ran_lw_sample_continue
   ASSERT(0 <= r && r < 1);
 
   /* Convert the wavelength range in meters */
-  range_m[0] = ran_lw->range[0] / 1.0e9;
-  range_m[1] = ran_lw->range[1] / 1.0e9;
+  range_m[0] = ran_lw->range[0] * 1.0e-9;
+  range_m[1] = ran_lw->range[1] * 1.0e-9;
 
   /* Setup the dichotomy search */
   lambda_m_min = range_m[0];
@@ -245,7 +267,7 @@ ran_lw_sample_continue
       lambda_m_max = lambda_m;
     }
 
-    if(fabs(lambda_m_prev - lambda_m) < EPSILON_LAMBDA
+    if(fabs(lambda_m_prev - lambda_m) < EPSILON_LAMBDA_M
     || fabs(bf_prev - bf) < EPSILON_BF)
       break;
 
@@ -285,12 +307,13 @@ htrdr_ran_lw_create
    struct htrdr_ran_lw** out_ran_lw)
 {
   struct htrdr_ran_lw* ran_lw = NULL;
+  double min_band_len = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && range && out_ran_lw && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
   ASSERT(range[0] >= 1000);
   ASSERT(range[1] <= 100000);
-  ASSERT(range[0] < range[1]);
+  ASSERT(range[0] <= range[1]);
 
   ran_lw = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ran_lw));
   if(!ran_lw) {
@@ -310,16 +333,24 @@ htrdr_ran_lw_create
   ran_lw->ref_temperature = ref_temperature;
   ran_lw->nbands = nbands;
 
+  res = compute_sky_bands_pdf(ran_lw, FUNC_NAME, &min_band_len);
+  if(res != RES_OK) goto error;
+
   if(nbands == HTRDR_RAN_LW_CONTINUE) {
     ran_lw->band_len = 0;
   } else {
-    ran_lw->band_len = (range[1] - range[0]) / (double)nbands;
+    ran_lw->band_len = (range[1] - range[0]) / (double)ran_lw->nbands;
+
+    /* Adjust the band length to ensure that each sky spectral interval is
+     * overlapped by at least one band */
+    if(ran_lw->band_len > min_band_len) {
+      ran_lw->band_len = min_band_len;
+      ran_lw->nbands = (size_t)ceil((range[1] - range[0]) / ran_lw->band_len);
+    }
+
     res = setup_ran_lw_cdf(ran_lw, FUNC_NAME);
     if(res != RES_OK) goto error;
   }
-
-  res = compute_sky_bands_pdf(ran_lw, FUNC_NAME);
-  if(res != RES_OK) goto error;
 
 exit:
   *out_ran_lw = ran_lw;
@@ -349,10 +380,12 @@ htrdr_ran_lw_sample
    const double r)
 {
   ASSERT(ran_lw);
-  if(ran_lw->band_len == 0) {
-    return ran_lw_sample_continue(ran_lw, r, FUNC_NAME);
-  } else {
+  if(ran_lw->nbands != HTRDR_RAN_LW_CONTINUE) {
     return ran_lw_sample_discreet(ran_lw, r, FUNC_NAME);
+  } else if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+    return ran_lw->range[0];
+  } else {
+    return ran_lw_sample_continue(ran_lw, r, FUNC_NAME);
   }
 }
 

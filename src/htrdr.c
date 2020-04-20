@@ -386,11 +386,9 @@ htrdr_init
    const struct htrdr_args* args,
    struct htrdr* htrdr)
 {
-  size_t nbands, iband0, iband1;
   struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
   double proj_ratio;
   double sun_dir[3];
-  double wlen0[2], wlen1[2];
   const char* output_name = NULL;
   size_t ithread;
   int nthreads_max;
@@ -491,17 +489,9 @@ htrdr_init
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  /* Fetch the wavelengths integration range */
-  nbands = htsky_get_spectral_bands_count(htrdr->sky);
-  iband0 = htsky_get_spectral_band_id(htrdr->sky, 0);
-  iband1 = htsky_get_spectral_band_id(htrdr->sky, nbands-1);
-  HTSKY(get_spectral_band_bounds(htrdr->sky, iband0, wlen0));
-  HTSKY(get_spectral_band_bounds(htrdr->sky, iband1, wlen1));
-
-  /* Note that the bands are ranged in descending order wrt wavelength */
-  htrdr->wlen_range_m[1] = wlen0[0]*1e-9; /* Convert in meters */
-  htrdr->wlen_range_m[0] = wlen1[1]*1e-9; /* Convert in meters */
-  ASSERT(htrdr->wlen_range_m[0] < htrdr->wlen_range_m[1]);
+  htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
+  htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
+  ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
 
   if(!htsky_is_long_wave(htrdr->sky)) { /* Short wave random variate */
     const double* range = HTRDR_CIE_XYZ_RANGE_DEFAULT;
@@ -512,22 +502,12 @@ htrdr_init
     if(res != RES_OK) goto error;
 
   } else { /* Long Wave random variate */
-    double range[2];
     const double Tref = 290; /* In Kelvin */
     size_t n;
 
-    range[0] = args->wlen_lw_range[0];
-    range[1] = args->wlen_lw_range[1];
-    n = (size_t)(range[1] - range[0]);
-
-    if(!n) {
-      if(eq_eps(range[0], range[1], 1.e-6)) {
-        range[0] -= 0.5;
-        range[1] += 0.5;
-      }
-      n = 1;
-    }
-    res = htrdr_ran_lw_create(htrdr, range, n, Tref, &htrdr->ran_lw);
+    n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
+    res = htrdr_ran_lw_create
+      (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_lw);
     if(res != RES_OK) goto error;
   }
 
