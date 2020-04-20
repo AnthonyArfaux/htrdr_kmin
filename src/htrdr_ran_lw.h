@@ -18,6 +18,8 @@
 
 #include <rsys/rsys.h>
 
+#define HTRDR_RAN_LW_CONTINUE 0
+
 struct htrdr;
 struct htrdr_ran_lw;
 
@@ -25,7 +27,9 @@ extern LOCAL_SYM res_T
 htrdr_ran_lw_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in [1000, 100000] nanometers */
-   const size_t nbands, /* # bands used to discretisze the LW domain */
+   /* # bands used to discretisze the LW domain. HTRDR_RAN_LW_CONTINUE <=> no
+    * discretisation */
+   const size_t nbands,
    const double ref_temperature, /* Reference temperature */
    struct htrdr_ran_lw** ran_lw);
 
@@ -41,8 +45,12 @@ htrdr_ran_lw_ref_put
 extern LOCAL_SYM double
 htrdr_ran_lw_sample
   (const struct htrdr_ran_lw* ran_lw,
-   const double r,
-   double* pdf); /* May be NULL */
+   const double r); /* Canonical number in [0, 1[ */
+
+extern LOCAL_SYM double
+htrdr_ran_lw_get_sky_band_pdf
+  (const struct htrdr_ran_lw* ran_lw,
+   const size_t iband);
 
 #endif /* HTRDR_RAN_LW_H */
 

@@ -100,26 +100,66 @@ sample_cie_xyz
   (const struct htrdr_cie_xyz* cie,
    const double* cdf,
    const size_t cdf_length,
-   const double r) /* Canonical number in [0, 1[ */
+   double (*f_bar)(const double lambda), /* Function to integrate */
+   const double r0, /* Canonical number in [0, 1[ */
+   const double r1) /* Canonical number in [0, 1[ */
 {
-  double r_next = nextafter(r, DBL_MAX);
+  double r0_next = nextafter(r0, DBL_MAX);
   double* find;
-  double wlen;
-  size_t i;
-  ASSERT(cie && cdf && cdf_length && r >= 0 && r < 1);
+  double f_min, f_max; /* CIE 1931 value for the band boundaries */
+  double lambda; /* Sampled wavelength */
+  double lambda_min, lambda_max; /* Boundaries of the sampled band */
+  double lambda_1, lambda_2; /* Solutions if the equation to solve */
+  double a, b, c, d; /* Equation parameters */
+  double delta, sqrt_delta;
+  size_t iband; /* Index of the sampled band */
+  ASSERT(cie && cdf && cdf_length);
+  ASSERT(0 <= r0 && r0 < 1);
+  ASSERT(0 <= r1 && r1 < 1);
 
   /* Use r_next rather than r in order to find the first entry that is not less
    * than *or equal* to r */
-  find = search_lower_bound(&r_next, cdf, cdf_length, sizeof(double), cmp_dbl);
+  find = search_lower_bound(&r0_next, cdf, cdf_length, sizeof(double), cmp_dbl);
   ASSERT(find);
 
-  i = (size_t)(find - cdf);
-  ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
+  /* Define and check the sampled band */
+  iband = (size_t)(find - cdf);
+  ASSERT(iband < cdf_length);
+  ASSERT(cdf[iband] > r0 && (!iband || cdf[iband-1] <= r0));
 
-  /* Return the wavelength at the center of the sampled band */
-  wlen = cie->range[0] + cie->band_len * ((double)i + 0.5);
-  ASSERT(cie->range[0] < wlen && wlen < cie->range[1]);
-  return wlen;
+  /* Define the boundaries of the sampled band */
+  lambda_min = cie->range[0] + cie->band_len * (double)iband;
+  lambda_max = lambda_min + cie->band_len;
+
+  /* Define the value of the CIE 1931 function for the boudaries of the sampled
+   * band */
+  f_min = f_bar(lambda_min);
+  f_max = f_bar(lambda_max);
+
+  /* Compute the equation constants */
+  a = 0.5 * (f_max - f_min) / cie->band_len;
+  b = (lambda_max * f_min - lambda_min * f_max) / cie->band_len;
+  c = -lambda_min * f_min + lambda_min*lambda_min * a;
+  d = 0.5 * (f_max + f_min) * cie->band_len;
+
+  delta = b*b - 4*a*(c-d*r1);
+  ASSERT(delta > 0);
+  sqrt_delta = sqrt(delta);
+
+  /* Compute the roots that solve the equation */
+  lambda_1 = (-b - sqrt_delta) / (2*a);
+  lambda_2 = (-b + sqrt_delta) / (2*a);
+
+  /* Select the solution */
+  if(lambda_min <= lambda_1 && lambda_1 < lambda_max) {
+    lambda = lambda_1;
+  } else if(lambda_min <= lambda_2 && lambda_2 < lambda_max) {
+    lambda = lambda_2;
+  } else {
+    FATAL("Unexpected error.\n");
+  }
+
+  return lambda;
 }
 
 static res_T
@@ -278,23 +318,32 @@ htrdr_cie_xyz_ref_put(struct htrdr_cie_xyz* cie)
 }
 
 double
-htrdr_cie_xyz_sample_X(struct htrdr_cie_xyz* cie, const double r)
+htrdr_cie_xyz_sample_X
+  (struct htrdr_cie_xyz* cie,
+   const double r0,
+   const double r1)
 {
   return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_X),
-    darray_double_size_get(&cie->cdf_X), r);
+    darray_double_size_get(&cie->cdf_X), fit_x_bar_1931, r0, r1);
 }
 
 double
-htrdr_cie_xyz_sample_Y(struct htrdr_cie_xyz* cie, const double r)
+htrdr_cie_xyz_sample_Y
+  (struct htrdr_cie_xyz* cie,
+   const double r0,
+   const double r1)
 {
   return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Y),
-    darray_double_size_get(&cie->cdf_Y), r);
+    darray_double_size_get(&cie->cdf_Y), fit_y_bar_1931, r0, r1);
 }
 
 double
-htrdr_cie_xyz_sample_Z(struct htrdr_cie_xyz* cie, const double r)
+htrdr_cie_xyz_sample_Z
+  (struct htrdr_cie_xyz* cie,
+   const double r0,
+   const double r1)
 {
   return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Z),
-    darray_double_size_get(&cie->cdf_Z), r);
+    darray_double_size_get(&cie->cdf_Z), fit_z_bar_1931, r0, r1);
 }
 

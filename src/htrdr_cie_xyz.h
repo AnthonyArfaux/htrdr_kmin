@@ -43,19 +43,19 @@ htrdr_cie_xyz_ref_put
 extern LOCAL_SYM double
 htrdr_cie_xyz_sample_X
   (struct htrdr_cie_xyz* cie,
-   const double r); /* Canonical number in [0, 1[ */
+   const double r0, const double r1); /* Canonical numbers in [0, 1[ */
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
 htrdr_cie_xyz_sample_Y
   (struct htrdr_cie_xyz* cie,
-   const double r); /* Canonical number in [0, 1[ */
+   const double r0, const double r1); /* Canonical number in [0, 1[ */
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
 htrdr_cie_xyz_sample_Z
   (struct htrdr_cie_xyz* cie,
-   const double r); /* Canonical number in [0, 1[ */
+   const double r0, const double r1); /* Canonical number in [0, 1[ */
 
 #endif /* HTRDR_cie_xyz_H */
 

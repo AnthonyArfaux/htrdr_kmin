@@ -512,7 +512,7 @@ draw_pixel_sw
       double ray_org[3];
       double ray_dir[3];
       double weight;
-      double r0, r1;
+      double r0, r1, r2;
       double wlen; /* Sampled wavelength into the spectral band */
       size_t iband; /* Sampled spectral band */
       size_t iquad; /* Sampled quadrature point into the spectral band */
@@ -531,17 +531,18 @@ draw_pixel_sw
 
       r0 = ssp_rng_canonical(rng);
       r1 = ssp_rng_canonical(rng);
+      r2 = ssp_rng_canonical(rng);
 
       /* Sample a spectral band and a quadrature point */
       switch(ichannel) {
-        case 0: wlen = htrdr_cie_xyz_sample_X(htrdr->cie, r0); break;
-        case 1: wlen = htrdr_cie_xyz_sample_Y(htrdr->cie, r0); break;
-        case 2: wlen = htrdr_cie_xyz_sample_Z(htrdr->cie, r0); break;
+        case 0: wlen = htrdr_cie_xyz_sample_X(htrdr->cie, r0, r1); break;
+        case 1: wlen = htrdr_cie_xyz_sample_Y(htrdr->cie, r0, r1); break;
+        case 2: wlen = htrdr_cie_xyz_sample_Z(htrdr->cie, r0, r1); break;
         default: FATAL("Unreachable code.\n"); break;
       }
 
       iband = htsky_find_spectral_band(htrdr->sky, wlen);
-      iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
+      iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
 
       /* Compute the luminance */
       weight = htrdr_compute_radiance_sw
@@ -604,9 +605,9 @@ draw_pixel_lw
     size_t iband;
     size_t iquad;
     double usec;
-    double pdf;
+    double band_pdf;
 
-    /* Begin the registration of the time spent to in the realisation */
+    /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
     /* Sample a position into the pixel, in the normalized image plane */
@@ -621,16 +622,19 @@ draw_pixel_lw
     r1 = ssp_rng_canonical(rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0, &pdf);
+    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0);
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(htrdr->sky, wlen);
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
 
+    /* Retrieve the PDF to sample this sky band */
+    band_pdf = htrdr_ran_lw_get_sky_band_pdf(htrdr->ran_lw, iband);
+
     /* Compute the luminance */
     weight = htrdr_compute_radiance_lw
       (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
-    weight /= pdf;
+    weight /= band_pdf;
     ASSERT(weight >= 0);
 
     /* End the registration of the per realisation time */
