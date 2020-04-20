@@ -139,8 +139,8 @@ compute_sky_bands_pdf(struct htrdr_ran_lw* ran_lw, const char* func_name)
     HTSKY(get_spectral_band_bounds(ran_lw->htrdr->sky, iband, wlens));
 
     /* Convert from nanometer to meter */
-    wlens[0] = wlens[0] * 1.e-9;
-    wlens[1] = wlens[1] * 1.e-9;
+    wlens[0] = MMAX(wlens[0], ran_lw->range[0]) * 1.e-9;
+    wlens[1] = MMIN(wlens[1], ran_lw->range[1]) * 1.e-9;
 
     /* Compute the probability of the current band */
     pdf[i] = planck(wlens[0], wlens[1], ran_lw->ref_temperature);
