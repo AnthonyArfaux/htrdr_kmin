@@ -127,8 +127,8 @@ wiebelt(const double v)
 
 static INLINE double
 blackbody_fraction
-  (const double lambda0, /* In meter */
-   const double lambda1, /* In meter */
+  (const double lambda0, /* In meters */
+   const double lambda1, /* In meters */
    const double temperature) /* In Kelvin */
 {
   const double C2 = 1.43877735e-2; /* m.K */
@@ -141,10 +141,31 @@ blackbody_fraction
   return w1 - w0;
 }
 
+
+
+/* Return the Planck value in W/m^2/sr/m at a given wavelength */
 static INLINE double
-planck
-  (const double lambda_min, /* In meter */
-   const double lambda_max, /* In meter */
+planck_monochromatic
+  (const double lambda, /* In meters */
+   const double temperature) /* In Kelvin */
+{
+  const double c = 299792458; /* m/s */
+  const double h = 6.62607015e-34; /* J.s */
+  const double k = 1.380649e-23; /* J/K */
+  const double lambda2 = lambda*lambda;
+  const double lambda5 = lambda2*lambda2*lambda;
+  const double B = ((2.0 * h * c*c) / lambda5) /* W/m^2/sr/m */
+                 / (exp(h*c/(lambda*k*temperature))-1.0);
+  ASSERT(temperature > 0);
+  return B;
+}
+
+/* Return the average Planck value in W/m^2/sr/m over the
+ * [lambda_min, lambda_max] interval. */
+static INLINE double
+planck_interval
+  (const double lambda_min, /* In meters */
+   const double lambda_max, /* In meters */
    const double temperature) /* In Kelvin  */
 {
   const double T2 = temperature*temperature;
@@ -152,15 +173,31 @@ planck
   const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
   ASSERT(lambda_min < lambda_max && temperature > 0);
   return blackbody_fraction(lambda_min, lambda_max, temperature)
-       * BOLTZMANN_CONSTANT * T4 / PI; /* In W/m^2/sr */
+       * BOLTZMANN_CONSTANT * T4 / (PI * (lambda_max-lambda_min)); /* In W/m^2/sr/m */
+}
+
+/* Invoke planck_monochromatic or planck_interval whether the submitted
+ * interval is null or not, respectively. The returned value is in W/m^2/sr/m */
+static FINLINE double
+planck
+  (const double lambda_min, /* In meters */
+   const double lambda_max, /* In meters */
+   const double temperature) /* In Kelvin  */
+{
+  ASSERT(lambda_min <= lambda_max && temperature > 0);
+  if(lambda_min == lambda_max) {
+    return planck_monochromatic(lambda_min, temperature);
+  } else {
+    return planck_interval(lambda_min, lambda_max, temperature);
+  }
 }
 
 extern LOCAL_SYM res_T
 brightness_temperature
   (struct htrdr* htrdr,
-   const double lambda_min, /* In meter */
-   const double lambda_max, /* In meter */
-   /* Integrated over [lambda_min, lambda_max]. In W/m^2/sr */
+   const double lambda_min, /* In meters */
+   const double lambda_max, /* In meters */
+   /* Integrated over [lambda_min, lambda_max]. In W/m^2/sr/m */
    const double radiance,
    double* temperature);
 

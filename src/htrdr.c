@@ -489,10 +489,6 @@ htrdr_init
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
-  htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
-  ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
-
   if(!htsky_is_long_wave(htrdr->sky)) { /* Short wave random variate */
     const double* range = HTRDR_CIE_XYZ_RANGE_DEFAULT;
     size_t n;
@@ -504,6 +500,10 @@ htrdr_init
   } else { /* Long Wave random variate */
     const double Tref = 290; /* In Kelvin */
     size_t n;
+
+    htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
+    htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
+    ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
 
     n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
     res = htrdr_ran_lw_create
