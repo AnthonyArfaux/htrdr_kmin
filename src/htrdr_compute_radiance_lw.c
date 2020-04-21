@@ -163,8 +163,10 @@ htrdr_compute_radiance_lw
   /* Retrieve the band boundaries */
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
 
-  band_bounds_m[0] = band_bounds[0] * 1e-9;
-  band_bounds_m[1] = band_bounds[1] * 1e-9;
+  /* Transform the band boundaries in meters and clamp them to the integration
+   * domain */
+  band_bounds_m[0] = MMAX(band_bounds[0] * 1e-9, htrdr->wlen_range_m[0]);
+  band_bounds_m[1] = MMIN(band_bounds[1] * 1e-9, htrdr->wlen_range_m[1]);
 
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
@@ -277,6 +279,7 @@ htrdr_compute_radiance_lw
     d3_set(dir, dir_next);
   }
   SSF(phase_ref_put(phase_hg));
+
   return w;
 }
 
