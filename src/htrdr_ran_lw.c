@@ -164,7 +164,7 @@ compute_sky_bands_pdf
       wlens[1] *= 1.e-9;
 
       /* Compute the probability of the current band */
-      pdf[i] = planck(wlens[0], wlens[1], ran_lw->ref_temperature);
+      pdf[i] = blackbody_fraction(wlens[0], wlens[1], ran_lw->ref_temperature);
 
       /* Update the norm */
       sum += pdf[i];
@@ -302,7 +302,7 @@ res_T
 htrdr_ran_lw_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in [1000, 100000] nanometers */
-   const size_t nbands, /* # bands used to discretized the CIE tristimulus */
+   const size_t nbands, /* # bands used to discretized CDF */
    const double ref_temperature,
    struct htrdr_ran_lw** out_ran_lw)
 {

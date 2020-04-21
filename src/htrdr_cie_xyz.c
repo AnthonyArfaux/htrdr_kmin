@@ -143,6 +143,9 @@ sample_cie_xyz
   d = 0.5 * (f_max + f_min) * cie->band_len;
 
   delta = b*b - 4*a*(c-d*r1);
+  if(delta < 0 && eq_eps(delta, 0, 1.e-6)) {
+    delta = 0;
+  }
   ASSERT(delta > 0);
   sqrt_delta = sqrt(delta);
 

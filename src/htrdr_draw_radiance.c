@@ -631,7 +631,7 @@ draw_pixel_lw
     /* Retrieve the PDF to sample this sky band */
     band_pdf = htrdr_ran_lw_get_sky_band_pdf(htrdr->ran_lw, iband);
 
-    /* Compute the luminance */
+    /* Compute the luminance in W/m^2/sr/m */
     weight = htrdr_compute_radiance_lw
       (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
     weight /= band_pdf;
@@ -679,6 +679,10 @@ draw_pixel_lw
   BRIGHTNESS_TEMPERATURE(pixel->radiance.E + pixel->radiance.SE, temp_max);
   pixel->radiance_temperature.SE = temp_max - temp_min;
   #undef BRIGHTNESS_TEMPERATURE
+
+  /* Transform the pixel radiance from W/m^2/sr/m to W/m^/sr/nm */
+  pixel->radiance.E *= 1.0e-9;
+  pixel->radiance.SE *= 1.0e-9;
 }
 
 static res_T

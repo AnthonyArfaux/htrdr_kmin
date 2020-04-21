@@ -34,18 +34,18 @@ If the image is a regular rendering in the visible part of the spectrum, the
 pixel components are actually 4 pairs of floating points data representing the
 pixel color encoded in the CIE 1931 XYZ color space and the per radiative path
 computation time. The first, second and third pair encode the estimated
-radiance in W.sr^-1.m^-2 of the X, Y and Z pixel components, respectively. The
-first value of each pair is the expected value of the estimated radiance while
-the second one is its associated standard deviation. The fourth pair saves the
-estimate in microseconds of the per radiative path computation time and its
-standard error.
+integrated radiance in W.sr^-1.m^-2 of the X, Y and Z pixel components,
+respectively. The first value of each pair is the expected value of the
+estimated radiance while the second one is its associated standard deviation.
+The fourth pair saves the estimate in microseconds of the per radiative path
+computation time and its standard error.
 
 If the image is an infrared rendering, the first and second pixel components
 store the expected value and the standard error, respectively, of the
 estimated brightness temperature in Kelvin. The third and fourth component
 save the expected value and standard deviation of the pixel radiance in
-W.sr^-1.m^-2. The fifth and sixth pixel components are unused. Finally the
-last 2 pixel components save, as for a regular rendering, the estimate in
+W.sr^-1.m^-2.nm^-1. The fifth and sixth pixel components are unused. Finally
+the last 2 pixel components save, as for a regular rendering, the estimate in
 microseconds of the per radiative path computation time and its standard
 error.
 
