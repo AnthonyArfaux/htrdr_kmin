@@ -352,6 +352,9 @@ htrdr_ran_lw_create
     if(res != RES_OK) goto error;
   }
 
+  htrdr_log(htrdr, "Long wave interval defined on [%g, %g] nanometers.\n",
+    range[0], range[1]);
+
 exit:
   *out_ran_lw = ran_lw;
   return res;

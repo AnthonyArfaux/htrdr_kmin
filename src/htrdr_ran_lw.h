@@ -29,7 +29,7 @@ htrdr_ran_lw_create
    const double range[2], /* Must be included in [1000, 100000] nanometers */
    /* # bands used to discretisze the LW domain. HTRDR_RAN_LW_CONTINUE <=> no
     * discretisation */
-   const size_t nbands,
+   const size_t nbands, /* Hint on #bands used to discretised th CDF */
    const double ref_temperature, /* Reference temperature */
    struct htrdr_ran_lw** ran_lw);
 
