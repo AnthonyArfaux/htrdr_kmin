@@ -28,36 +28,21 @@
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-static const char*
-bsdf_type_to_string(const enum htrdr_bsdf_type type)
-{
-  const char* str = "<none>";
-  switch(type) {
-    case HTRDR_BSDF_DIFFUSE: str = "diffuse"; break;
-    case HTRDR_BSDF_SPECULAR: str = "specular"; break;
-    default: FATAL("Unreachable code.\n"); break;
-  }
-  return str;
-}
-
 static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
   printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
-"Render an image in the visible part of the spectrum, for scenes composed of an\n"
-"atmospheric gaz mixture, clouds and a ground.\n\n");
+"Render an image for scenes composed of an atmospheric gas mixture,\n"
+"clouds and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
-"  -b <diffuse|specular>\n"
-"                 BSDF of the ground. Default value is %s.\n",
-    bsdf_type_to_string(HTRDR_ARGS_DEFAULT.ground_bsdf_type));
-  printf(
 "  -c CLOUDS      properties of the clouds.\n");
   printf(
-"  -C <camera>    define the rendering point of view.\n");
+"  -C <camera>    define the rendering point of view. Refer to the\n"
+"                 htrdr man page for the list of camera options.\n");
   printf(
 "  -D AZIMUTH,ELEVATION\n"
 "                 direction in degrees toward the sun center. By default\n"
@@ -67,24 +52,31 @@ print_help(const char* cmd)
   printf(
 "  -d             dump octrees data to OUTPUT and exit.\n");
   printf(
-"  -e REFLECT     ground reflectivity in [0, 1]. Default value is %g.\n",
-    HTRDR_ARGS_DEFAULT.ground_reflectivity);
-  printf(
 "  -f             overwrite the OUTPUT file if it already exists.\n");
   printf(
 "  -g GROUND      ground geometry.\n");
   printf(
 "  -h             display this help and exit.\n");
   printf(
-"  -i <image>     define the image to compute.\n");
+"  -i <image>     define the image to compute. Refer to the htrdr man\n"
+"                 page for the list of image options\n");
+  printf(
+"  -l WLEN_MIN,WLEN_MAX\n"
+"                 switch in infrared rendering for the long waves in\n"
+"                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
+"                 rendering is performed for the visible part of the\n"
+"                 spectrum in [380, 780] nanometers.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
 "  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
+"  -M MATERIALS   file listing the ground materials.\n");
+  printf(
 "  -m MIE         file of Mie's data.\n");
   printf(
-"  -O CACHE       name of the cache file used to store/restore the sky data.\n");
+"  -O CACHE       name of the cache file used to store/restore the sky\n"
+"                 data.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
@@ -93,21 +85,23 @@ print_help(const char* cmd)
 "                 building. By default its value is `%g'.\n",
     HTRDR_ARGS_DEFAULT.optical_thickness);
   printf(
-"  -t THREADS     hint on the number of threads to use. By default use as\n"
-"                 many threads as CPU cores.\n");
+"  -t THREADS     hint on the number of threads to use. By default use\n"
+"                 as many threads as CPU cores.\n");
   printf(
-"  -V X,Y,Z       maximum definition of the cloud acceleration grids along\n"
-"                 the 3 axis. By default use the definition of the clouds\n");
+"  -V X,Y,Z       maximum definition of the cloud acceleration grids\n"
+"                 along the 3 axis. By default use the definition of\n"
+"                 the clouds\n");
   printf(
 "  -v             make the program verbose.\n");
   printf(
 "  --version      display version information and exit.\n");
   printf("\n");
   printf(
-"Copyright (C) 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>. Copyright\n"
-"(C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free software released\n"
-"under the GNU GPL license, version 3 or later. You are free to change or\n"
-"redistribute it under certain conditions <http://gnu.org/licenses/gpl.html>\n");
+"Copyright (C) 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>.\n"
+"Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free\n"
+"software released under the GNU GPL license, version 3 or later. You\n"
+"are free to change or redistribute it under certain conditions\n"
+"<http://gnu.org/licenses/gpl.html>\n");
 }
 
 static INLINE res_T
@@ -372,18 +366,23 @@ error:
 }
 
 static res_T
-parse_bsdf_type(struct htrdr_args* args, const char* str)
+parse_lw_range(struct htrdr_args* args, const char* str)
 {
+  double range[2];
+  size_t len;
   res_T res = RES_OK;
-  if(!strcmp(str, "diffuse")) {
-    args->ground_bsdf_type = HTRDR_BSDF_DIFFUSE;
-  } else if(!strcmp(str, "specular")) {
-    args->ground_bsdf_type = HTRDR_BSDF_SPECULAR;
-  } else {
-    fprintf(stderr, "Invalid BRDF type `%s'.\n", str);
-    res = RES_BAD_ARG;
+  ASSERT(args && str);
+
+  res = cstr_to_list_double(str, ',', range, &len, 2);
+  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
+  if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid long wave range `%s'.\n", str);
     goto error;
   }
+
+  args->wlen_lw_range[0] = range[0];
+  args->wlen_lw_range[1] = range[1];
 
 exit:
   return res;
@@ -415,25 +414,16 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:b:C:c:D:de:fg:hi:m:O:o:RrT:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:l:M:m:O:o:RrT:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
-      case 'b':
-        res = parse_bsdf_type(args, optarg);
-        break;
-      case 'C':
+       case 'C':
         res = parse_multiple_parameters
           (args, optarg, parse_camera_parameter);
         break;
       case 'c': args->filename_les = optarg; break;
       case 'D': res = parse_sun_dir(args, optarg); break;
       case 'd': args->dump_vtk = 1; break;
-      case 'e':
-        res = cstr_to_double(optarg, &args->ground_reflectivity);
-        if(args->ground_reflectivity < 0 || args->ground_reflectivity > 1) {
-          res = RES_BAD_ARG;
-        }
-        break;
       case 'f': args->force_overwriting = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
@@ -445,6 +435,10 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
         break;
+      case 'l':
+        res = parse_lw_range(args, optarg);
+        break;
+      case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
       case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;
@@ -473,6 +467,12 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
   if(!args->filename_gas) {
     fprintf(stderr,
       "Missing the path of the gas optical properties file -- option '-a'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(args->filename_obj && !args->filename_mtl) {
+    fprintf(stderr,
+      "Missing the path of the file listing the ground materials -- option '-M'\n");
     res = RES_BAD_ARG;
     goto error;
   }

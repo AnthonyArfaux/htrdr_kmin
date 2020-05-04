@@ -14,16 +14,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 199309L /* nanosleep */
+#define _POSIX_C_SOURCE 200112L /* nanosleep && nextafter */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
+#include "htrdr_cie_xyz.h"
+#include "htrdr_ran_lw.h"
 #include "htrdr_solve.h"
 
 #include <high_tune/htsky.h>
 
+#include <rsys/algorithm.h>
 #include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_u32.h>
@@ -42,6 +45,16 @@
 #define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
+enum pixel_format {
+  PIXEL_LW,
+  PIXEL_SW
+};
+
+union pixel {
+  struct htrdr_pixel_lw lw;
+  struct htrdr_pixel_sw sw;
+};
+
 /* Tile of row ordered image pixels */
 struct tile {
   struct list_node node;
@@ -50,8 +63,9 @@ struct tile {
 
   struct tile_data {
     uint16_t x, y; /* 2D coordinates of the tile in tile space */
+    enum pixel_format format;
     /* Simulate the flexible array member of the C99 standard. */
-    struct htrdr_accum accums[1/*dummy element*/];
+    union pixel pixels[1/*Dummy element*/];
   } data;
 };
 
@@ -88,22 +102,24 @@ morton2D_encode(const uint16_t u16)
 }
 
 static FINLINE struct tile*
-tile_create(struct mem_allocator* allocator)
+tile_create(struct mem_allocator* allocator, const enum pixel_format fmt)
 {
   struct tile* tile;
   const size_t tile_sz =
-    sizeof(struct tile) - sizeof(struct htrdr_accum)/*rm dummy accum*/;
+    sizeof(struct tile) - sizeof(union pixel)/*rm dummy pixel*/;
   const size_t buf_sz = /* Flexiblbe array element */
-    TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
+    TILE_SIZE*TILE_SIZE*sizeof(union pixel);
   ASSERT(allocator);
 
   tile = MEM_ALLOC(allocator, tile_sz+buf_sz);
   if(!tile) return NULL;
 
+  tile->data.format = fmt;
+
   ref_init(&tile->ref);
   list_init(&tile->node);
   tile->allocator = allocator;
-  ASSERT(IS_ALIGNED(&tile->data.accums, ALIGNOF(struct htrdr_accum)));
+  ASSERT(IS_ALIGNED(&tile->data.pixels, ALIGNOF(union pixel)));
 
   return tile;
 }
@@ -130,18 +146,19 @@ tile_ref_put(struct tile* tile)
   ref_put(&tile->ref, release_tile);
 }
 
-static FINLINE struct htrdr_accum*
+static FINLINE union pixel*
 tile_at
   (struct tile* tile,
    const size_t x, /* In tile space */
    const size_t y) /* In tile space */
 {
   ASSERT(tile && x < TILE_SIZE && y < TILE_SIZE);
-  return tile->data.accums + (y*TILE_SIZE + x) * HTRDR_ESTIMATES_COUNT__;
+  return tile->data.pixels + (y*TILE_SIZE + x);
 }
-
 static void
-write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
+write_tile_data
+  (struct htrdr_buffer* buf,
+   const struct tile_data* tile_data)
 {
   struct htrdr_buffer_layout layout = HTRDR_BUFFER_LAYOUT_NULL;
   size_t icol, irow;
@@ -152,7 +169,9 @@ write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
 
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
-  ASSERT(layout.elmt_size == sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]));
+  ASSERT(layout.elmt_size == (tile_data->format == PIXEL_LW
+    ? sizeof(struct htrdr_pixel_lw)
+    : sizeof(struct htrdr_pixel_sw)));
 
   /* Compute the row/column of the tile origin into the buffer */
   icol = tile_data->x * (size_t)TILE_SIZE;
@@ -162,13 +181,24 @@ write_tile_data(struct htrdr_buffer* buf, const struct tile_data* tile_data)
   ncols_tile = MMIN(icol + TILE_SIZE, layout.width)  - icol;
   nrows_tile = MMIN(irow + TILE_SIZE, layout.height) - irow;
 
-  /* Copy the tile data, row by row */
+  /* Copy the row ordered tile data */
   FOR_EACH(irow_tile, 0, nrows_tile) {
     char* buf_row = buf_mem + (irow + irow_tile) * layout.pitch;
-    const struct htrdr_accum* tile_row =
-      tile_data->accums + irow_tile*TILE_SIZE*HTRDR_ESTIMATES_COUNT__;
-    memcpy(buf_row + icol*sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]),
-      tile_row, ncols_tile*sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]));
+    char* buf_col = buf_row + icol * layout.elmt_size;
+    const union pixel* tile_row = tile_data->pixels + irow_tile*TILE_SIZE;
+    size_t x;
+
+    FOR_EACH(x, 0, ncols_tile) {
+      switch(tile_data->format) {
+        case PIXEL_LW:
+          ((struct htrdr_pixel_lw*)buf_col)[x] = tile_row[x].lw;
+          break;
+        case PIXEL_SW:
+          ((struct htrdr_pixel_sw*)buf_col)[x] = tile_row[x].sw;
+          break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+    }
   }
 }
 
@@ -393,8 +423,8 @@ mpi_gather_tiles
 {
   /* Compute the size of the tile_data */
   const size_t msg_sz =
-    sizeof(struct tile_data) - sizeof(struct htrdr_accum)/*dummy*/
-  + TILE_SIZE*TILE_SIZE*sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
+    sizeof(struct tile_data) - sizeof(union pixel)/*dummy*/
+  + TILE_SIZE*TILE_SIZE*sizeof(union pixel);
 
   struct list_node* node = NULL;
   struct tile* tile = NULL;
@@ -424,7 +454,8 @@ mpi_gather_tiles
 
       /* Create a temporary tile to receive the tile data computed by the
        * concurrent MPI processes */
-      tile = tile_create(htrdr->allocator);
+      tile = tile_create
+        (htrdr->allocator, htsky_is_long_wave(htrdr->sky) ? PIXEL_LW : PIXEL_SW);
       if(!tile) {
         res = RES_MEM_ERR;
         htrdr_log_err(htrdr,
@@ -433,7 +464,7 @@ mpi_gather_tiles
         goto error;
       }
 
-      /* Receive the tile data of the concurret MPI processes */
+      /* Receive the tile data of the concurrent MPI processes */
       FOR_EACH(itile, itile, ntiles) {
         MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
           HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
@@ -447,6 +478,211 @@ exit:
   return res;
 error:
   goto exit;
+}
+
+static void
+draw_pixel_sw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const size_t ipix[2],
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_camera* cam,
+   const size_t spp,
+   struct ssp_rng* rng,
+   struct htrdr_pixel_sw* pixel)
+{
+  struct htrdr_accum XYZ[3]; /* X, Y, and Z */
+  struct htrdr_accum time;
+  size_t ichannel;
+  ASSERT(ipix && ipix && pix_sz && cam && rng && pixel);
+  ASSERT(!htsky_is_long_wave(htrdr->sky));
+
+  /* Reset accumulators */
+  XYZ[0] = HTRDR_ACCUM_NULL;
+  XYZ[1] = HTRDR_ACCUM_NULL;
+  XYZ[2] = HTRDR_ACCUM_NULL;
+  time = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(ichannel, 0, 3) {
+    size_t isamp;
+
+    FOR_EACH(isamp, 0, spp) {
+      struct time t0, t1;
+      double pix_samp[2];
+      double ray_org[3];
+      double ray_dir[3];
+      double weight;
+      double r0, r1, r2;
+      double wlen; /* Sampled wavelength into the spectral band */
+      size_t iband; /* Sampled spectral band */
+      size_t iquad; /* Sampled quadrature point into the spectral band */
+      double usec;
+
+      /* Begin the registration of the time spent to in the realisation */
+      time_current(&t0);
+
+      /* Sample a position into the pixel, in the normalized image plane */
+      pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+      pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+
+      /* Generate a ray starting from the pinhole camera and passing through the
+       * pixel sample */
+      htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+
+      r0 = ssp_rng_canonical(rng);
+      r1 = ssp_rng_canonical(rng);
+      r2 = ssp_rng_canonical(rng);
+
+      /* Sample a spectral band and a quadrature point */
+      switch(ichannel) {
+        case 0: wlen = htrdr_cie_xyz_sample_X(htrdr->cie, r0, r1); break;
+        case 1: wlen = htrdr_cie_xyz_sample_Y(htrdr->cie, r0, r1); break;
+        case 2: wlen = htrdr_cie_xyz_sample_Z(htrdr->cie, r0, r1); break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+
+      iband = htsky_find_spectral_band(htrdr->sky, wlen);
+      iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
+
+      /* Compute the luminance */
+      weight = htrdr_compute_radiance_sw
+        (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
+      ASSERT(weight >= 0);
+
+      /* End the registration of the per realisation time */
+      time_sub(&t0, time_current(&t1), &t0);
+      usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+      /* Update the pixel accumulator of the current channel */
+      XYZ[ichannel].sum_weights += weight;
+      XYZ[ichannel].sum_weights_sqr += weight*weight;
+      XYZ[ichannel].nweights += 1;
+
+      /* Update the pixel accumulator of per realisation time */
+      time.sum_weights += usec;
+      time.sum_weights_sqr += usec*usec;
+      time.nweights += 1;
+    }
+  }
+
+  /* Flush pixel data */
+  htrdr_accum_get_estimation(XYZ+0, &pixel->X);
+  htrdr_accum_get_estimation(XYZ+1, &pixel->Y);
+  htrdr_accum_get_estimation(XYZ+2, &pixel->Z);
+  pixel->time = time;
+}
+
+static void
+draw_pixel_lw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const size_t ipix[2],
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_camera* cam,
+   const size_t spp,
+   struct ssp_rng* rng,
+   struct htrdr_pixel_lw* pixel)
+{
+  struct htrdr_accum radiance;
+  struct htrdr_accum time;
+  size_t isamp;
+  double temp_min, temp_max;
+  ASSERT(ipix && ipix && pix_sz && cam && rng && pixel);
+  ASSERT(htsky_is_long_wave(htrdr->sky));
+
+  /* Reset the pixel accumulators */
+  radiance = HTRDR_ACCUM_NULL;
+  time = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(isamp, 0, spp) {
+    struct time t0, t1;
+    double pix_samp[2];
+    double ray_org[3];
+    double ray_dir[3];
+    double weight;
+    double r0, r1;
+    double wlen;
+    size_t iband;
+    size_t iquad;
+    double usec;
+    double band_pdf;
+
+    /* Begin the registration of the time spent in the realisation */
+    time_current(&t0);
+
+    /* Sample a position into the pixel, in the normalized image plane */
+    pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
+    pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
+
+    /* Generate a ray starting from the pinhole camera and passing through the
+     * pixel sample */
+    htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+
+    r0 = ssp_rng_canonical(rng);
+    r1 = ssp_rng_canonical(rng);
+
+    /* Sample a wavelength */
+    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0);
+
+    /* Select the associated band and sample a quadrature point */
+    iband = htsky_find_spectral_band(htrdr->sky, wlen);
+    iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
+
+    /* Retrieve the PDF to sample this sky band */
+    band_pdf = htrdr_ran_lw_get_sky_band_pdf(htrdr->ran_lw, iband);
+
+    /* Compute the luminance in W/m^2/sr/m */
+    weight = htrdr_compute_radiance_lw
+      (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
+    weight /= band_pdf;
+    ASSERT(weight >= 0);
+
+    /* End the registration of the per realisation time */
+    time_sub(&t0, time_current(&t1), &t0);
+    usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+    /* Update the pixel accumulator of the current channel */
+    radiance.sum_weights += weight;
+    radiance.sum_weights_sqr += weight*weight;
+    radiance.nweights += 1;
+
+    /* Update the pixel accumulator of per realisation time */
+    time.sum_weights += usec;
+    time.sum_weights_sqr += usec*usec;
+    time.nweights += 1;
+  }
+
+  /* Compute the estimation of the pixel radiance */
+  htrdr_accum_get_estimation(&radiance, &pixel->radiance);
+
+  /* Save the per realisation integration time */
+  pixel->time = time;
+
+  /* Compute the brightness_temperature of the pixel and estimate its standard
+   * error */
+  #define BRIGHTNESS_TEMPERATURE(Radiance, Temperature) {                      \
+    res_T res = brightness_temperature                                         \
+      (htrdr,                                                                  \
+       htrdr->wlen_range_m[0],                                                 \
+       htrdr->wlen_range_m[1],                                                 \
+       (Radiance),                                                             \
+       &(Temperature));                                                        \
+    if(res != RES_OK) {                                                        \
+      htrdr_log_warn(htrdr,                                                    \
+        "Could not compute the brightness temperature for the radiance %g.\n", \
+        (Radiance));                                                           \
+      (Temperature) = 0;                                                       \
+    }                                                                          \
+  } (void)0
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E, pixel->radiance_temperature.E);
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E - pixel->radiance.SE, temp_min);
+  BRIGHTNESS_TEMPERATURE(pixel->radiance.E + pixel->radiance.SE, temp_max);
+  pixel->radiance_temperature.SE = temp_max - temp_min;
+  #undef BRIGHTNESS_TEMPERATURE
+
+  /* Transform the pixel radiance from W/m^2/sr/m to W/m^/sr/nm */
+  pixel->radiance.E *= 1.0e-9;
+  pixel->radiance.SE *= 1.0e-9;
 }
 
 static res_T
@@ -471,10 +707,9 @@ draw_tile
   npixels *= npixels;
 
   FOR_EACH(mcode, 0, npixels) {
-    struct htrdr_accum* pix_accums;
+    union pixel* pixel;
     size_t ipix_tile[2]; /* Pixel coord in the tile */
     size_t ipix[2]; /* Pixel coord in the buffer */
-    size_t ichannel;
 
     ipix_tile[0] = morton2D_decode((uint32_t)(mcode>>0));
     if(ipix_tile[0] >= tile_sz[0]) continue; /* Pixel is out of tile */
@@ -482,80 +717,17 @@ draw_tile
     if(ipix_tile[1] >= tile_sz[1]) continue; /* Pixel is out of tile */
 
     /* Fetch and reset the pixel accumulator */
-    pix_accums = tile_at(tile, ipix_tile[0], ipix_tile[1]);
-    pix_accums[HTRDR_ESTIMATE_TIME] = HTRDR_ACCUM_NULL; /* Reset time per radiative path */
+    pixel = tile_at(tile, ipix_tile[0], ipix_tile[1]);
 
     /* Compute the pixel coordinate */
     ipix[0] = tile_org[0] + ipix_tile[0];
     ipix[1] = tile_org[1] + ipix_tile[1];
 
-    FOR_EACH(ichannel, 0, 3) {
-      /* Check that the X, Y and Z estimates are stored in accumulators 0, 1 et
-       * 2, respectively */
-      STATIC_ASSERT
-      (  HTRDR_ESTIMATE_X == 0
-      && HTRDR_ESTIMATE_Y == 1
-      && HTRDR_ESTIMATE_Z == 2,
-      Unexpected_htrdr_estimate_enumerate);
-      size_t isamp;
-
-      pix_accums[ichannel] = HTRDR_ACCUM_NULL;
-      FOR_EACH(isamp, 0, spp) {
-        struct time t0, t1;
-        double pix_samp[2];
-        double ray_org[3];
-        double ray_dir[3];
-        double weight;
-        double r0, r1;
-        size_t iband;
-        size_t iquad;
-        double usec;
-
-        /* Sample a position into the pixel, in the normalized image plane */
-        pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
-        pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
-
-        /* Generate a ray starting from the pinhole camera and passing through the
-         * pixel sample */
-        htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
-
-        /* Sample a spectral band and a quadrature point */
-        r0 = ssp_rng_canonical(rng);
-        r1 = ssp_rng_canonical(rng);
-        switch(ichannel) {
-          case 0:
-            htsky_sample_sw_spectral_data_CIE_1931_X
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          case 1:
-            htsky_sample_sw_spectral_data_CIE_1931_Y
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          case 2:
-            htsky_sample_sw_spectral_data_CIE_1931_Z
-              (htrdr->sky, r0, r1, &iband, &iquad);
-            break;
-          default: FATAL("Unreachable code.\n"); break;
-        }
-
-        /* Compute the radiance that reach the pixel through the ray */
-        time_current(&t0);
-        weight = htrdr_compute_radiance_sw
-          (htrdr, ithread, rng, ray_org, ray_dir, iband, iquad);
-        ASSERT(weight >= 0);
-        time_sub(&t0, time_current(&t1), &t0);
-        usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
-
-        /* Update the pixel accumulator of the current channel */
-        pix_accums[ichannel].sum_weights += weight;
-        pix_accums[ichannel].sum_weights_sqr += weight*weight;
-        pix_accums[ichannel].nweights += 1;
-
-        /* Update the pixel accumulator of per realisation time */
-        pix_accums[HTRDR_ESTIMATE_TIME].sum_weights += usec;
-        pix_accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr += usec*usec;
-        pix_accums[HTRDR_ESTIMATE_TIME].nweights += 1;
-      }
+    /* Draw the pixel */
+    if(htsky_is_long_wave(htrdr->sky)) {
+      draw_pixel_lw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->lw);
+    } else {
+      draw_pixel_sw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->sw);
     }
   }
   return RES_OK;
@@ -579,6 +751,7 @@ draw_image
   size_t nthreads = 0;
   size_t nthieves = 0;
   size_t proc_ntiles = 0;
+  enum pixel_format pixfmt;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
   ASSERT(htrdr && cam && spp && ntiles_adjusted && work && tiles);
@@ -599,6 +772,8 @@ draw_image
   /* The process is not considered as a working process for himself */
   htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
   --htrdr->mpi_nworking_procs;
+
+  pixfmt = htsky_is_long_wave(htrdr->sky) ? PIXEL_LW : PIXEL_SW;
 
   omp_set_num_threads((int)nthreads);
   #pragma omp parallel
@@ -635,7 +810,7 @@ draw_image
     ASSERT(tile_org[0] < ntiles_x && tile_org[1] < ntiles_y);
 
     /* Create the tile */
-    tile = tile_create(htrdr->allocator);
+    tile = tile_create(htrdr->allocator, pixfmt);
     if(!tile) {
       ATOMIC_SET(&res, RES_MEM_ERR);
       htrdr_log_err(htrdr,
@@ -662,7 +837,7 @@ draw_image
 
     /* Create a proxy RNG for the current tile. This proxy is used for the
      * current thread only and thus it has to manage only one RNG. This proxy
-     * is initialised in order to ensure that a unique and predictable set of
+     * is initialised in order to ensure that an unique and predictable set of
      * random numbers is used for the current tile. */
     SSP(rng_proxy_create2
       (&htrdr->lifo_allocators[ithread],
@@ -702,10 +877,18 @@ draw_image
 
   if(ATOMIC_GET(&res) != RES_OK) goto error;
 
-  /* Synchronize the process */
-  mutex_lock(htrdr->mpi_mutex);
-  MPI(Barrier(MPI_COMM_WORLD));
-  mutex_unlock(htrdr->mpi_mutex);
+  /* Asynchronously wait for processes completion. Use an asynchronous barrier to
+   * avoid a dead lock with the `mpi_probe_thieves' thread that requires also
+   * the `mpi_mutex'. */
+  {
+    MPI_Request req;
+
+    mutex_lock(htrdr->mpi_mutex);
+    MPI(Ibarrier(MPI_COMM_WORLD, &req));
+    mutex_unlock(htrdr->mpi_mutex);
+
+    mpi_wait_for_request(htrdr, &req);
+  }
 
 exit:
   if(rng_proc) SSP(rng_ref_put(rng_proc));
@@ -718,7 +901,7 @@ error:
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_draw_radiance_sw
+htrdr_draw_radiance
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t width,
@@ -744,16 +927,21 @@ htrdr_draw_radiance_sw
   proc_work_init(htrdr->allocator, &work);
 
   if(htrdr->mpi_rank == 0) {
+    size_t pixsz, pixal;
     htrdr_buffer_get_layout(buf, &layout);
     ASSERT(layout.width || layout.height || layout.elmt_size);
     ASSERT(layout.width == width && layout.height == height);
 
-    if(layout.elmt_size != sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])
-    || layout.alignment < ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])) {
-      htrdr_log_err(htrdr,
-        "%s: invalid buffer layout. "
-        "The pixel size must be the size of %lu accumulators.\n",
-        FUNC_NAME, (unsigned long)HTRDR_ESTIMATES_COUNT__);
+    if(htsky_is_long_wave(htrdr->sky)) {
+      pixsz = sizeof(struct htrdr_pixel_lw);
+      pixal = ALIGNOF(struct htrdr_pixel_lw);
+    } else {
+      pixsz = sizeof(struct htrdr_pixel_sw);
+      pixal = ALIGNOF(struct htrdr_pixel_sw);
+    }
+
+    if(layout.elmt_size != pixsz || layout.alignment < pixal) {
+      htrdr_log_err(htrdr, "%s: invalid buffer layout.\n", FUNC_NAME);
       res = RES_BAD_ARG;
       goto error;
     }

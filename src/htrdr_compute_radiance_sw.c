@@ -16,6 +16,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
+#include "htrdr_interface.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
 #include "htrdr_sun.h"
@@ -34,7 +35,7 @@
 struct scattering_context {
   struct ssp_rng* rng;
   const struct htsky* sky;
-  size_t iband; /* Index of the spectrald */
+  size_t iband; /* Index of the spectral band */
   size_t iquad; /* Index of the quadrature point into the band */
 
   double Ts; /* Sampled optical thickness */
@@ -246,6 +247,7 @@ htrdr_compute_radiance_sw
    struct ssp_rng* rng,
    const double pos_in[3],
    const double dir_in[3],
+   const double wlen, /* In nanometer */
    const size_t iband,
    const size_t iquad)
 {
@@ -255,7 +257,6 @@ htrdr_compute_radiance_sw
   struct svx_hit svx_hit = SVX_HIT_NULL;
   struct ssf_phase* phase_hg = NULL;
   struct ssf_phase* phase_rayleigh = NULL;
-  struct ssf_bsdf* bsdf = NULL;
 
   double pos[3];
   double dir[3];
@@ -264,7 +265,6 @@ htrdr_compute_radiance_sw
   double dir_next[3];
   double band_bounds[2]; /* In nanometers */
 
-  double wlen;
   double R;
   double r; /* Random number */
   double wo[3]; /* -dir */
@@ -279,27 +279,23 @@ htrdr_compute_radiance_sw
   double g = 0; /* Asymmetry parameter of the HG phase function */
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
+  ASSERT(!htsky_is_long_wave(htrdr->sky));
 
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_rayleigh, &phase_rayleigh));
 
-  /* Setup the phase function for this spectral band & quadrature point */
-  g = htsky_fetch_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, iband, iquad);
+  /* Setup the phase function for this wavelength */
+  g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
+    (htrdr->sky, wlen);
   SSF(phase_hg_setup(phase_hg, g));
 
-  /* Fetch the ground BSDF */
-  bsdf = htrdr_ground_get_bsdf(htrdr->ground);
-
-  /* Fetch sun properties. Arbitrarily use the wavelength at the center of the
-   * band to retrieve the sun radiance of the current band. Note that the sun
-   * spectral data are defined by bands that, actually are the same of the SW
-   * spectral bands defined in the default "ecrad_opt_prot.txt" file provided
-   * by the HTGOP project. */
-  htsky_get_sw_spectral_band_bounds(htrdr->sky, iband, band_bounds);
-  wlen = (band_bounds[0] + band_bounds[1]) * 0.5;
+  /* Fetch sun properties. Note that the sun spectral data are defined by bands
+   * that, actually are the same of the SW spectral bands defined in the
+   * default "ecrad_opt_prot.txt" file provided by the HTGOP project. */
+  htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
+  ASSERT(band_bounds[0] <= wlen  && wlen <= band_bounds[1]);
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
 
@@ -389,8 +385,15 @@ htrdr_compute_radiance_sw
 
     /* Scattering at a surface */
     if(SVX_HIT_NONE(&svx_hit)) {
+      struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+      struct ssf_bsdf* bsdf = NULL;
       double N[3];
       int type;
+
+      /* Fetch the hit interface and build its BSDF */
+      htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
+      HTRDR(interface_create_bsdf
+        (htrdr, &interf, ithread, wlen, pos_next, dir, rng, &s3d_hit, &bsdf));
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
@@ -407,6 +410,9 @@ htrdr_compute_radiance_sw
         R = ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
       }
 
+      /* Release the BSDF */
+      SSF(bsdf_ref_put(bsdf));
+
     /* Scattering in the medium */
     } else {
       struct ssf_phase* phase;
@@ -414,7 +420,7 @@ htrdr_compute_radiance_sw
       double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
 
-      ks_gas = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks, 
+      ks_gas = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks,
         HTSKY_CPNT_FLAG_GAS, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);
       ks_particle = htsky_fetch_raw_property(htrdr->sky, HTSKY_Ks,
         HTSKY_CPNT_FLAG_PARTICLES, iband, iquad, pos_next, -DBL_MAX, DBL_MAX);

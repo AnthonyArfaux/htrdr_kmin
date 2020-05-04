@@ -20,8 +20,11 @@
 #include "htrdr_c.h"
 #include "htrdr_args.h"
 #include "htrdr_buffer.h"
+#include "htrdr_cie_xyz.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
+#include "htrdr_mtl.h"
+#include "htrdr_ran_lw.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -100,7 +103,7 @@ log_msg
 }
 
 static res_T
-dump_accum_buffer
+dump_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
    struct htrdr_accum* time_acc, /* May be NULL */
@@ -108,18 +111,23 @@ dump_accum_buffer
    FILE* stream)
 {
   struct htrdr_buffer_layout layout;
+  size_t pixsz, pixal;
   size_t x, y;
   res_T res = RES_OK;
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
+  if(htsky_is_long_wave(htrdr->sky)) {
+    pixsz = sizeof(struct htrdr_pixel_lw);
+    pixal = ALIGNOF(struct htrdr_pixel_lw);
+  } else {
+    pixsz = sizeof(struct htrdr_pixel_sw);
+    pixal = ALIGNOF(struct htrdr_pixel_sw);
+  }
+
   htrdr_buffer_get_layout(buf, &layout);
-  if(layout.elmt_size != sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])
-  || layout.alignment < ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__])) {
-    htrdr_log_err(htrdr,
-      "%s: invalid buffer layout. "
-      "The pixel size must be the size of %lu accumulators.\n",
-      FUNC_NAME, (unsigned long)HTRDR_ESTIMATES_COUNT__);
+  if(layout.elmt_size != pixsz || layout.alignment != pixal) {
+    htrdr_log_err(htrdr, "%s: invalid buffer layout. ", FUNC_NAME);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -129,20 +137,33 @@ dump_accum_buffer
   if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
-      const struct htrdr_accum* accums = htrdr_buffer_at(buf, x, y);
-      int i;
-      FOR_EACH(i, 0, HTRDR_ESTIMATES_COUNT__) {
-        double E, SE;
+      struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
+      const struct htrdr_accum* pix_time_acc = NULL;
 
-        htrdr_accum_get_estimation(&accums[i], &E, &SE);
-        fprintf(stream, "%g %g ", E, SE);
+      if(htsky_is_long_wave(htrdr->sky)) {
+        const struct htrdr_pixel_lw* pix = htrdr_buffer_at(buf, x, y);
+        fprintf(stream, "%g %g ",
+          pix->radiance_temperature.E, pix->radiance_temperature.SE);
+        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+        fprintf(stream, "0 0 ");
+        pix_time_acc = &pix->time;
+
+      } else {
+        const struct htrdr_pixel_sw* pix = htrdr_buffer_at(buf, x, y);
+        fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
+        fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
+        fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
+        pix_time_acc = &pix->time;
       }
+
+      htrdr_accum_get_estimation(pix_time_acc, &pix_time);
+      fprintf(stream, "%g %g\n", pix_time.E, pix_time.SE);
+
       if(time_acc) {
-        time_acc->sum_weights += accums[HTRDR_ESTIMATE_TIME].sum_weights;
-        time_acc->sum_weights_sqr += accums[HTRDR_ESTIMATE_TIME].sum_weights_sqr;
-        time_acc->nweights += accums[HTRDR_ESTIMATE_TIME].nweights;
+        time_acc->sum_weights += pix_time_acc->sum_weights;
+        time_acc->sum_weights_sqr += pix_time_acc->sum_weights_sqr;
+        time_acc->nweights += pix_time_acc->nweights;
       }
-      fprintf(stream, "\n");
     }
     fprintf(stream, "\n");
   }
@@ -382,9 +403,7 @@ htrdr_init
   logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, NULL);
   logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
   logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
-
   str_init(htrdr->allocator, &htrdr->output_name);
-
   nthreads_max = MMAX(omp_get_max_threads(), omp_get_num_procs());
   htrdr->dump_vtk = args->dump_vtk;
   htrdr->verbose = args->verbose;
@@ -402,6 +421,9 @@ htrdr_init
   if(!args->output) {
     htrdr->output = stdout;
     output_name = "<stdout>";
+  } else if(htrdr->mpi_rank != 0) {
+    htrdr->output = NULL;
+    output_name = "<null>";
   } else {
     res = open_output_stream
       (htrdr, args->output, 0/*read*/, args->force_overwriting, &htrdr->output);
@@ -428,8 +450,14 @@ htrdr_init
     goto error;
   }
 
-  res = htrdr_ground_create(htrdr, args->filename_obj, args->ground_bsdf_type,
-    args->ground_reflectivity, args->repeat_ground, &htrdr->ground);
+  /* Materials are necessary only if a ground geometry is defined */
+  if(args->filename_obj) {
+    res = htrdr_mtl_create(htrdr, args->filename_mtl, &htrdr->mtl);
+    if(res != RES_OK) goto error;
+  }
+
+  res = htrdr_ground_create(htrdr, args->filename_obj, args->repeat_ground,
+    &htrdr->ground);
   if(res != RES_OK) goto error;
 
   proj_ratio =
@@ -438,22 +466,6 @@ htrdr_init
   res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
     args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
   if(res != RES_OK) goto error;
-
-  /* Create the image buffer only on the master process; the image parts
-   * rendered by the processes are gathered onto the master process. */
-  if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
-    /* 4 accums: X, Y, Z components and one more for the per realisation time */
-    const size_t pixsz = sizeof(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
-    const size_t pixal = ALIGNOF(struct htrdr_accum[HTRDR_ESTIMATES_COUNT__]);
-    res = htrdr_buffer_create(htrdr,
-      args->image.definition[0], /* Width */
-      args->image.definition[1], /* Height */
-      args->image.definition[0] * pixsz, /* Pitch */
-      pixsz, /* Size of a pixel */
-      pixal, /* Alignment of a pixel */
-      &htrdr->buf);
-    if(res != RES_OK) goto error;
-  }
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);
   if(res != RES_OK) goto error;
@@ -472,8 +484,32 @@ htrdr_init
   htsky_args.nthreads = htrdr->nthreads;
   htsky_args.repeat_clouds = args->repeat_clouds;
   htsky_args.verbose = htrdr->mpi_rank == 0 ? args->verbose : 0;
+  htsky_args.wlen_lw_range[0] = args->wlen_lw_range[0];
+  htsky_args.wlen_lw_range[1] = args->wlen_lw_range[1];
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
+
+  if(!htsky_is_long_wave(htrdr->sky)) { /* Short wave random variate */
+    const double* range = HTRDR_CIE_XYZ_RANGE_DEFAULT;
+    size_t n;
+
+    n = (size_t)(range[1] - range[0]);
+    res = htrdr_cie_xyz_create(htrdr, range, n, &htrdr->cie);
+    if(res != RES_OK) goto error;
+
+  } else { /* Long Wave random variate */
+    const double Tref = 290; /* In Kelvin */
+    size_t n;
+
+    htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
+    htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
+    ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
+
+    n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
+    res = htrdr_ran_lw_create
+      (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_lw);
+    if(res != RES_OK) goto error;
+  }
 
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
@@ -496,6 +532,29 @@ htrdr_init
     }
   }
 
+  /* Create the image buffer only on the master process; the image parts
+   * rendered by the processes are gathered onto the master process. */
+  if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
+    size_t pixsz = 0; /* sizeof(pixel) */
+    size_t pixal = 0; /* alignof(pixel) */
+
+    if(htsky_is_long_wave(htrdr->sky)) {
+      pixsz = sizeof(struct htrdr_pixel_lw);
+      pixal = ALIGNOF(struct htrdr_pixel_lw);
+    } else {
+      pixsz = sizeof(struct htrdr_pixel_sw);
+      pixal = ALIGNOF(struct htrdr_pixel_sw);
+    }
+    res = htrdr_buffer_create(htrdr,
+      args->image.definition[0], /* Width */
+      args->image.definition[1], /* Height */
+      args->image.definition[0] * pixsz, /* Pitch */
+      pixsz, /* Size of a pixel */
+      pixal, /* Alignment of a pixel */
+      &htrdr->buf);
+    if(res != RES_OK) goto error;
+  }
+
 exit:
   return res;
 error:
@@ -514,6 +573,10 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
   if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
+  if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
+  if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
+  if(htrdr->ran_lw) htrdr_ran_lw_ref_put(htrdr->ran_lw);
+  if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
   if(htrdr->lifo_allocators) {
     size_t i;
     FOR_EACH(i, 0, htrdr->nthreads) {
@@ -530,15 +593,15 @@ htrdr_run(struct htrdr* htrdr)
 {
   res_T res = RES_OK;
   if(htrdr->dump_vtk) {
-    const size_t nbands = htsky_get_sw_spectral_bands_count(htrdr->sky);
+    const size_t nbands = htsky_get_spectral_bands_count(htrdr->sky);
     size_t i;
 
     /* Nothing to do */
     if(htrdr->mpi_rank != 0) goto exit;
 
     FOR_EACH(i, 0, nbands) {
-      const size_t iband = htsky_get_sw_spectral_band_id(htrdr->sky, i);
-      const size_t nquads = htsky_get_sw_spectral_band_quadrature_length
+      const size_t iband = htsky_get_spectral_band_id(htrdr->sky, i);
+      const size_t nquads = htsky_get_spectral_band_quadrature_length
         (htrdr->sky, iband);
       size_t iquad;
       FOR_EACH(iquad, 0, nquads) {
@@ -548,20 +611,22 @@ htrdr_run(struct htrdr* htrdr)
       }
     }
   } else {
-    res = htrdr_draw_radiance_sw(htrdr, htrdr->cam, htrdr->width,
+    res = htrdr_draw_radiance(htrdr, htrdr->cam, htrdr->width,
       htrdr->height, htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
-      double E, SE;
+      struct htrdr_estimate path_time;
 
-      res = dump_accum_buffer(htrdr, htrdr->buf, &path_time_acc,
+      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc,
         str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
 
-      htrdr_accum_get_estimation(&path_time_acc, &E, &SE);
+      htrdr_accum_get_estimation(&path_time_acc, &path_time);
       htrdr_log(htrdr,
-        "Time per radiative path (in micro seconds): %g +/- %g\n", E, SE);
+        "Time per radiative path (in micro seconds): %g +/- %g\n",
+        path_time.E,
+        path_time.SE);
     }
   }
 exit:
@@ -644,7 +709,67 @@ htrdr_fflush(struct htrdr* htrdr, FILE* stream)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
-extern LOCAL_SYM res_T
+res_T
+brightness_temperature
+  (struct htrdr* htrdr,
+   const double lambda_min,
+   const double lambda_max,
+   const double radiance,
+   double* temperature)
+{
+  const size_t MAX_ITER = 100;
+  const double epsilon_T = 1e-4; /* In K */
+  const double epsilon_B = radiance * 1e-8;
+  double T, T0, T1, T2;
+  double B, B0;
+  size_t i;
+  res_T res = RES_OK;
+  ASSERT(temperature && lambda_min <= lambda_max);
+
+  /* Search for a brightness temperature whose radiance is greater than or
+   * equal to the estimated radiance */
+  T2 = 200;
+  FOR_EACH(i, 0, MAX_ITER) {
+    const double B2 = planck(lambda_min, lambda_max, T2);
+    if(B2 >= radiance) break;
+    T2 *= 2;
+  }
+  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
+
+  B0 = T0 = T1 = 0;
+  FOR_EACH(i, 0, MAX_ITER) {
+    T = (T1+T2)*0.5;
+    B = planck(lambda_min, lambda_max, T);
+
+    if(B < radiance) {
+      T1 = T;
+    } else {
+      T2 = T;
+    }
+
+    if(fabs(T-T0) < epsilon_T || fabs(B-B0) < epsilon_B)
+      break;
+
+    T0 = T;
+    B0 = B;
+  }
+  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
+
+  *temperature = T;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(htrdr,
+    "Could not compute the brightness temperature for the radiance %g "
+    "estimated over [%g, %g] nanometers.\n",
+    radiance,
+    lambda_min*1e9,
+    lambda_max*1e9);
+  goto exit;
+}
+
+res_T
 open_output_stream
   (struct htrdr* htrdr,
    const char* filename,

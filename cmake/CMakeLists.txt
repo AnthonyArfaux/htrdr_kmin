@@ -24,14 +24,15 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 # Check dependencies
 ################################################################################
+find_package(AW 2.0 REQUIRED)
+find_package(HTSky 0.1 REQUIRED)
+find_package(MruMtl REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
 find_package(Star3D 0.6 REQUIRED)
-find_package(Star3DAW 0.3.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
 find_package(StarVX REQUIRED)
-find_package(HTSky REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
 find_package(MPI 1 REQUIRED)
 
@@ -42,9 +43,10 @@ include(rcmake_runtime)
 set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
 
 include_directories(
+  ${AW_INCLUDE_DIR}
+  ${MruMtl_INCLUDE_DIR}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
-  ${Star3DAW_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
@@ -65,8 +67,6 @@ set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0")
 set(HTRDR_ARGS_DEFAULT_CAMERA_TGT "0,1,0")
 set(HTRDR_ARGS_DEFAULT_CAMERA_UP  "0,0,1")
 set(HTRDR_ARGS_DEFAULT_CAMERA_FOV "70")
-set(HTRDR_ARGS_DEFAULT_GROUND_BSDF "HTRDR_BSDF_DIFFUSE")
-set(HTRDR_ARGS_DEFAULT_GROUND_REFLECTIVITY "0.5")
 set(HTRDR_ARGS_DEFAULT_IMG_WIDTH "320")
 set(HTRDR_ARGS_DEFAULT_IMG_HEIGHT "240")
 set(HTRDR_ARGS_DEFAULT_IMG_SPP "1")
@@ -91,11 +91,16 @@ set(HTRDR_FILES_SRC
   htrdr_args.c
   htrdr_buffer.c
   htrdr_camera.c
+  htrdr_cie_xyz.c
   htrdr_compute_radiance_sw.c
-  htrdr_draw_radiance_sw.c
+  htrdr_compute_radiance_lw.c
+  htrdr_draw_radiance.c
   htrdr_grid.c
   htrdr_ground.c
+  htrdr_interface.c
   htrdr_main.c
+  htrdr_mtl.c
+  htrdr_ran_lw.c
   htrdr_rectangle.c
   htrdr_slab.c
   htrdr_sun.c)
@@ -104,8 +109,12 @@ set(HTRDR_FILES_INC
   htrdr_c.h
   htrdr_buffer.h
   htrdr_camera.h
+  htrdr_cie_xyz.h
   htrdr_grid.h
   htrdr_ground.h
+  htrdr_interface.h
+  htrdr_mtl.h
+  htrdr_ran_lw.h
   htrdr_rectangle.h
   htrdr_slab.h
   htrdr_sun.h
@@ -122,7 +131,7 @@ rcmake_prepend_path(HTRDR_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
 rcmake_prepend_path(HTRDR_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(htrdr ${HTRDR_FILES_SRC} ${HTRDR_FILES_INC} ${HTRDR_FILES_INC2})
-target_link_libraries(htrdr HTSky RSys Star3D Star3DAW StarSF StarSP)
+target_link_libraries(htrdr AW HTSky MruMtl RSys Star3D StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr m)

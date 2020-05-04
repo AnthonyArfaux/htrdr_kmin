@@ -1,0 +1,66 @@
+// Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+// Copyright (C) 2018-2019 CNRS, Université Paul Sabatier
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+:toc:
+
+htrdr-materials(5)
+=================
+
+NAME
+----
+htrdr-materials - list of materials used by the ground geometry in htrdr(1)
+
+DESCRIPTION
+-----------
+A *htrdr-materials* file lists the materials that can be used by the ground
+geometry provided through a *htrdr-obj*(5) file to the *htrdr*(1) program.
+Each line of the file gives the name of the material and the path toward the
+*mrumtl*(5) file storing the spectral properties of its associated
+Bidirectional Reflectance Distribution Function. The material name can be
+composed of any characters excepted for spaces and tabulations. The path toward
+the *mrumtl*(5) file must be a valid path relative to the file system.
+
+Characters behind the hash mark (#) are considered as comments and are thus
+ignored. Empty lines, i.e. lines without any characters or composed of spaces
+and tabulations, are simply skipped.
+
+GRAMMAR
+-------
+
+[verse]
+-------
+<htrdr-materials>     ::= <material>
+                        [ <material> ... ]
+<material>            ::= <name> <mrumtl-path>
+<name>                ::= STRING
+<mrumtl-path>         ::= PATH
+-------
+
+EXAMPLE
+-------
+
+The following file lists 2 materials. The first one named *grass* has its
+spectral BRDF defines in the *A001.mrumtl* file. The second one is named
+*sand* and has its spectral properties saved in the *B002.mrumtl* file.
+
+[verse]
+-------
+grass   /opt/materials/A001.mrumtl
+sand    /opt/materials/B002.mrumtl
+-------
+
+SEE ALSO
+--------
+*htrdr*(1), *htrdr-obj*(5), *mrumtl*(5)

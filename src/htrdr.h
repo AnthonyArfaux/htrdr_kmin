@@ -34,6 +34,7 @@
 struct htsky;
 struct htrdr_args;
 struct htrdr_buffer;
+struct htrdr_cie_xyz;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct mutext;
@@ -46,12 +47,16 @@ struct htrdr {
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
+  struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
+  struct htrdr_cie_xyz* cie;
+  struct htrdr_ran_lw* ran_lw;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
+  double wlen_range_m[2]; /* Integration range in *meters* */
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */

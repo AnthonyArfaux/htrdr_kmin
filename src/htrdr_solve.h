@@ -26,8 +26,29 @@ struct htrdr_accum {
   size_t nweights; /* #accumlated weights */
   size_t nfailures; /* #failures */
 };
-#define HTRDR_ACCUM_NULL__ {0,0,0,0}
-static const struct htrdr_accum HTRDR_ACCUM_NULL = HTRDR_ACCUM_NULL__;
+static const struct htrdr_accum HTRDR_ACCUM_NULL;
+
+/* Monte carlo estimate */
+struct htrdr_estimate {
+  double E; /* Expected value */
+  double SE; /* Standard error */
+};
+static const struct htrdr_estimate HTRDR_ESTIMATE_NULL;
+
+struct htrdr_pixel_sw {
+  struct htrdr_estimate X; /* In W/m^2/sr */
+  struct htrdr_estimate Y; /* In W/m^2/sr */
+  struct htrdr_estimate Z; /* In W/m^2/sr */
+  struct htrdr_accum time; /* In microseconds */
+};
+static const struct htrdr_pixel_sw HTRDR_PIXEL_SW_NULL;
+
+struct htrdr_pixel_lw {
+  struct htrdr_estimate radiance; /* In W/m^2/sr */
+  struct htrdr_estimate radiance_temperature; /* In K */
+  struct htrdr_accum time; /* In microseconds */
+};
+static const struct htrdr_pixel_lw HTRDR_PIXEL_LW_NULL;
 
 /* Forward declarations */
 struct htrdr;
@@ -42,18 +63,30 @@ htrdr_compute_radiance_sw
    struct ssp_rng* rng,
    const double pos[3],
    const double dir[3],
+   const double wlen, /* In nanometer */
+   const size_t iband, /* Index of the spectral band */
+   const size_t iquad); /* Index of the quadrature point into the band */
+
+extern LOCAL_SYM double
+htrdr_compute_radiance_lw
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   struct ssp_rng* rng,
+   const double pos[3],
+   const double dir[3],
+   const double wlen, /* In nanometer */
    const size_t iband, /* Index of the spectral band */
    const size_t iquad); /* Index of the quadrature point into the band */
 
 extern LOCAL_SYM res_T
-htrdr_draw_radiance_sw
+htrdr_draw_radiance
   (struct htrdr* htrdr,
    const struct htrdr_camera* cam,
    const size_t width, /* Image width */
    const size_t height, /* Image height */
    const size_t spp, /* #samples per pixel, i.e. #realisations */
    /* Buffer of struct htrdr_accum[4]. May be NULL on non master processes */
-   struct htrdr_buffer* buf); 
+   struct htrdr_buffer* buf);
 
 extern LOCAL_SYM int
 htrdr_ground_filter
@@ -66,14 +99,13 @@ htrdr_ground_filter
 static FINLINE void
 htrdr_accum_get_estimation
   (const struct htrdr_accum* acc,
-   double* expected_value,
-   double* std_err)
+   struct htrdr_estimate* estimate)
 {
-  ASSERT(acc && expected_value && std_err);
+  ASSERT(acc && estimate);
 
   if(!acc->nweights) {
-    *expected_value = 0;
-    *std_err = 0;
+    estimate->E = 0;
+    estimate->SE = 0;
   } else {
     const double N = (double)acc->nweights;
     double E, V, SE;
@@ -81,8 +113,8 @@ htrdr_accum_get_estimation
     V = MMAX(acc->sum_weights_sqr / N - E*E, 0);
     SE = sqrt(V/N);
 
-    *expected_value = E;
-    *std_err = SE;
+    estimate->E = E;
+    estimate->SE = SE;
   }
 }
 
