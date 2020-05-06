@@ -35,12 +35,13 @@ binary can be run either directly or through a MPI process launcher like
 
 This program is compatible GNU/Linux 64-bits. It relies on the
 [CMake](http://www.cmake.org) and the
-[RCMake](https://gitlab.com/vaplv/rcmake/) packages to build.  It also depends
+[RCMake](https://gitlab.com/vaplv/rcmake/) packages to build. It also depends
 on the
+[AW](https://gitlab.com/vaplv/loader_aw/#tab-readme),
 [HTSky](https://gitlab.com/meso-star/htsky/),
+[MruMtl](https://gitlab.com/meso-star/mrumtl/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),
-[Star-3DAW](https://gitlab.com/meso-star/star-3daw/),
 [Star-SF](https://gitlab.com/meso-star/star-sf/),
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
 [Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on
@@ -57,6 +58,29 @@ project. Refer to the [CMake](https://cmake.org/documentation) for further
 informations on CMake.
 
 ## Release notes
+
+### Version 0.4
+
+- Add support of infrared rendering: when defined, the new `-l` option setups
+  the range of long waves into which the rendering is performed. In infrared
+  rendering, each pixel stores the radiance per pixel and its associated
+  brightness temperature.
+- The ground geometry can now have several materials whose data vary over the
+  spectrum. These materials are listed in a new
+  [htrdr-materials](https://gitlab.com/meso-star/htrdr/-/blob/master/doc/htrdr-materials.5.txt)
+  file where each materials is defined by a name and a file storing its spectral
+  data with respect to the
+  [MruMtl](https://gitlab.com/meso-star/mrumtl/-/blob/master/doc/mrumtl.5.txt)
+  fileformat. A material is mapped to a part of the OBJ geometry by using the
+  `usemtl` directive of the
+  [OBJ fileformat](https://gitlab.com/meso-star/htrdr/-/blob/master/doc/htrdr-obj.5.txt).
+- Improve the sampling of the spectral dimension: the per wavelength
+  realisation is now precisely sampled rather than arbitrarly fixed to the
+  center of the sampled spectral band. Consequently, high
+  resolution data defined per wavelength (e.g. Mie's properties and the
+  reflectivity of the materials) are now fully taken into account.
+- Fix a deadlock when `htrdr` was run through MPI.
+- Fix a memory leak: the output file was not closed on exit.
 
 ### Version 0.3
 
