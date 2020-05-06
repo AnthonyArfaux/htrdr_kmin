@@ -26,13 +26,13 @@ option(NO_TEST "Do not build the tests" OFF)
 ################################################################################
 find_package(AW 2.0 REQUIRED)
 find_package(HTSky 0.1 REQUIRED)
-find_package(MruMtl REQUIRED)
+find_package(MruMtl 0.0 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
 find_package(Star3D 0.6 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
-find_package(StarVX REQUIRED)
+find_package(StarVX 0.1 REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
 find_package(MPI 1 REQUIRED)
 
@@ -59,7 +59,7 @@ include_directories(
 # Generate files
 ################################################################################
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 3)
+set(VERSION_MINOR 4)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
