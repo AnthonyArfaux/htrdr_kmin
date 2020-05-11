@@ -60,7 +60,7 @@ f 1 2 3
 f 3 2 4
 -------
 
-Define a wooden cube whose faces Z-aligned faces are against a brick material.
+Define a wooden cube whose Z-aligned faces are against a brick material.
 The remaining faces are in contact with the air.
 
 [verse]
