@@ -32,7 +32,7 @@
 struct htrdr_ran_lw {
   struct darray_double pdf;
   struct darray_double cdf;
-  double range[2]; /* Boundaries of the handled CIE XYZ color space */
+  double range[2]; /* Boundaries of the spectral integration interval */
   double band_len; /* Length in nanometers of a band */
   double ref_temperature; /* In Kelvin */
   size_t nbands; /* # bands */
@@ -153,55 +153,10 @@ compute_sky_min_band_len(struct htrdr_ran_lw* ran_lw, const char* func_name)
 }
 
 static double
-ran_lw_sample_discrete
-  (const struct htrdr_ran_lw* ran_lw,
-   const double r,
-   const char* func_name,
-   double sampled_band_bounds[2], 
-   double* pdf)
-{
-  const double* cdf = NULL;
-  const double* find = NULL;
-  double r_next = nextafter(r, DBL_MAX);
-  double wlen = 0;
-  size_t cdf_length = 0;
-  size_t i;
-  ASSERT(ran_lw && ran_lw->nbands != HTRDR_RAN_LW_CONTINUE);
-  ASSERT(0 <= r && r < 1);
-  (void)func_name;
-
-  cdf = darray_double_cdata_get(&ran_lw->cdf);
-  cdf_length = darray_double_size_get(&ran_lw->cdf);
-  ASSERT(cdf_length > 0);
-
-  /* Use r_next rather than r in order to find the first entry that is not less
-   * than *or equal* to r */
-  find = search_lower_bound(&r_next, cdf, cdf_length, sizeof(double), cmp_dbl);
-  ASSERT(find);
-
-  i = (size_t)(find - cdf);
-  ASSERT(i < cdf_length && cdf[i] > r && (!i || cdf[i-1] <= r));
-
-  /* Return the wavelength at the center of the sampled band */
-  wlen = ran_lw->range[0] + ran_lw->band_len * ((double)i + 0.5);
-  ASSERT(ran_lw->range[0] < wlen && wlen < ran_lw->range[1]);
-
-  if(sampled_band_bounds) {
-    sampled_band_bounds[0] = ran_lw->range[0] + (double)i*ran_lw->band_len;
-    sampled_band_bounds[1] = sampled_band_bounds[0] + ran_lw->band_len;
-  }
-
-  if(pdf) {
-    *pdf = darray_double_cdata_get(&ran_lw->pdf)[i];
-  }
-
-  return wlen;
-}
-
-static double
 ran_lw_sample_continue
   (const struct htrdr_ran_lw* ran_lw,
    const double r,
+   const double range[2], /* In nanometer */
    const char* func_name,
    double sampled_band_bounds[2],
    double* pdf)
@@ -223,12 +178,13 @@ ran_lw_sample_continue
   size_t i;
 
   /* Check precondition */
-  ASSERT(ran_lw && ran_lw->nbands == HTRDR_RAN_LW_CONTINUE && func_name);
+  ASSERT(ran_lw && func_name);
+  ASSERT(range && range[0] < range[1]);
   ASSERT(0 <= r && r < 1);
 
   /* Convert the wavelength range in meters */
-  range_m[0] = ran_lw->range[0] * 1.0e-9;
-  range_m[1] = ran_lw->range[1] * 1.0e-9;
+  range_m[0] = range[0] * 1.0e-9;
+  range_m[1] = range[1] * 1.0e-9;
 
   /* Setup the dichotomy search */
   lambda_m_min = range_m[0];
@@ -261,7 +217,7 @@ ran_lw_sample_continue
     htrdr_log_warn(ran_lw->htrdr,
       "%s: could not sample a wavelength in the range [%g, %g] nanometers "
       "for the reference temperature %g Kelvin.\n",
-      func_name, SPLIT2(ran_lw->range), ran_lw->ref_temperature);
+      func_name, SPLIT2(range), ran_lw->ref_temperature);
   }
 
   if(sampled_band_bounds) {
@@ -278,6 +234,69 @@ ran_lw_sample_continue
   }
 
   return lambda_m * 1.0e9; /* Convert in nanometers */
+}
+
+static double
+ran_lw_sample_discrete
+  (const struct htrdr_ran_lw* ran_lw,
+   const double r0,
+   const double r1,
+   const char* func_name,
+   double sampled_band_bounds[2],
+   double* pdf)
+{
+  const double* cdf = NULL;
+  const double* find = NULL;
+  double r0_next = nextafter(r0, DBL_MAX);
+  double band_range[2];
+  double lambda = 0;
+  double pdf_continue = 0;
+  double pdf_band = 0;
+  size_t cdf_length = 0;
+  size_t i;
+  ASSERT(ran_lw && ran_lw->nbands != HTRDR_RAN_LW_CONTINUE);
+  ASSERT(0 <= r0 && r0 < 1);
+  ASSERT(0 <= r1 && r1 < 1);
+  (void)func_name;
+
+  cdf = darray_double_cdata_get(&ran_lw->cdf);
+  cdf_length = darray_double_size_get(&ran_lw->cdf);
+  ASSERT(cdf_length > 0);
+
+  /* Use r_next rather than r0 in order to find the first entry that is not less
+   * than *or equal* to r0 */
+  find = search_lower_bound(&r0_next, cdf, cdf_length, sizeof(double), cmp_dbl);
+  ASSERT(find);
+
+  i = (size_t)(find - cdf);
+  ASSERT(i < cdf_length && cdf[i] > r0 && (!i || cdf[i-1] <= r0));
+
+  band_range[0] = ran_lw->range[0] + (double)i*ran_lw->band_len;
+  band_range[1] = band_range[0] + ran_lw->band_len;
+
+  /* Fetch the pdf of the sampled band */
+  pdf_band = darray_double_cdata_get(&ran_lw->pdf)[i];
+
+  /* Continously sample a wavelength in the sampled band */
+  lambda = ran_lw_sample_continue
+    (ran_lw, r1, band_range, func_name, sampled_band_bounds, &pdf_continue);
+
+  if(pdf) {
+    const double Tref = ran_lw->ref_temperature;
+    const double lambda_m = lambda * 1.e-9;
+    const double B_lambda = planck(lambda_m, lambda_m, Tref);
+    double range_m[2];
+    double B_mean;
+
+    range_m[0] = ran_lw->range[0] * 1.e-9;
+    range_m[1] = ran_lw->range[1] * 1.e-9;
+
+    B_mean = planck(range_m[0], range_m[1], Tref);
+    *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
+    ASSERT(eq_eps(*pdf, pdf_continue * pdf_band, 1e-6));
+  }
+
+  return lambda;
 }
 
 static void
@@ -375,14 +394,15 @@ htrdr_ran_lw_ref_put(struct htrdr_ran_lw* ran_lw)
 double
 htrdr_ran_lw_sample
   (const struct htrdr_ran_lw* ran_lw,
-   const double r,
+   const double r0,
+   const double r1,
    double sampled_band_bounds[2],
    double* pdf)
 {
   ASSERT(ran_lw);
   if(ran_lw->nbands != HTRDR_RAN_LW_CONTINUE) { /* Discrete */
     return ran_lw_sample_discrete
-      (ran_lw, r, FUNC_NAME, sampled_band_bounds, pdf);
+      (ran_lw, r0, r1, FUNC_NAME, sampled_band_bounds, pdf);
   } else if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
     if(sampled_band_bounds) { /* Monochromatic */
       sampled_band_bounds[0] = ran_lw->range[0];
@@ -392,7 +412,7 @@ htrdr_ran_lw_sample
     return ran_lw->range[0];
   } else { /* Continue */
     return ran_lw_sample_continue
-      (ran_lw, r, FUNC_NAME, sampled_band_bounds, pdf);
+      (ran_lw, r0, ran_lw->range, FUNC_NAME, sampled_band_bounds, pdf);
   }
 }
 

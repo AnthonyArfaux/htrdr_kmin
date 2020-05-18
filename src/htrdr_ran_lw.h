@@ -45,7 +45,8 @@ htrdr_ran_lw_ref_put
 extern LOCAL_SYM double
 htrdr_ran_lw_sample
   (const struct htrdr_ran_lw* ran_lw,
-   const double r,  /* Canonical number in [0, 1[ */
+   const double r0, /* Canonical number in [0, 1[ */
+   const double r1, /* Canonical number in [0, 1[ */
    double sampled_band_bounds[2], /* May be NULL */
    double* pdf); /* May be NULL */
 
