@@ -158,7 +158,6 @@ ran_lw_sample_continue
    const double r,
    const double range[2], /* In nanometer */
    const char* func_name,
-   double sampled_band_bounds[2],
    double* pdf)
 {
   /* Numerical parameters of the dichotomy search */
@@ -220,12 +219,6 @@ ran_lw_sample_continue
       func_name, SPLIT2(range), ran_lw->ref_temperature);
   }
 
-  if(sampled_band_bounds) {
-    const double lambda = lambda_m * 1.e+9;
-    sampled_band_bounds[0] = lambda;
-    sampled_band_bounds[1] = lambda;
-  }
-
   if(pdf) {
     const double Tref = ran_lw->ref_temperature;
     const double B_lambda = planck(lambda_m, lambda_m, Tref);
@@ -242,7 +235,6 @@ ran_lw_sample_discrete
    const double r0,
    const double r1,
    const char* func_name,
-   double sampled_band_bounds[2],
    double* pdf)
 {
   const double* cdf = NULL;
@@ -278,23 +270,12 @@ ran_lw_sample_discrete
   /* Fetch the pdf of the sampled band */
   pdf_band = darray_double_cdata_get(&ran_lw->pdf)[i];
 
-  /* Continously sample a wavelength in the sampled band */
-  lambda = ran_lw_sample_continue
-    (ran_lw, r1, band_range, func_name, sampled_band_bounds, &pdf_continue);
+  /* Uniformly sample a wavelength in the sampled band */
+  lambda = band_range[0] + (band_range[1] - band_range[0]) * r1;
+  pdf_continue = 1.0 / ((band_range[1] - band_range[0])*1.e-9);
 
   if(pdf) {
-    const double Tref = ran_lw->ref_temperature;
-    const double lambda_m = lambda * 1.e-9;
-    const double B_lambda = planck(lambda_m, lambda_m, Tref);
-    double range_m[2];
-    double B_mean;
-
-    range_m[0] = ran_lw->range[0] * 1.e-9;
-    range_m[1] = ran_lw->range[1] * 1.e-9;
-
-    B_mean = planck(range_m[0], range_m[1], Tref);
-    *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
-    ASSERT(eq_eps(*pdf, pdf_continue * pdf_band, 1e-6));
+    *pdf = pdf_band * pdf_continue;
   }
 
   return lambda;
@@ -397,23 +378,17 @@ htrdr_ran_lw_sample
   (const struct htrdr_ran_lw* ran_lw,
    const double r0,
    const double r1,
-   double sampled_band_bounds[2],
    double* pdf)
 {
   ASSERT(ran_lw);
   if(ran_lw->nbands != HTRDR_RAN_LW_CONTINUE) { /* Discrete */
-    return ran_lw_sample_discrete
-      (ran_lw, r0, r1, FUNC_NAME, sampled_band_bounds, pdf);
+    return ran_lw_sample_discrete(ran_lw, r0, r1, FUNC_NAME, pdf);
   } else if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
-    if(sampled_band_bounds) { /* Monochromatic */
-      sampled_band_bounds[0] = ran_lw->range[0];
-      sampled_band_bounds[1] = ran_lw->range[0];
-    }
     if(pdf) *pdf = 1;
     return ran_lw->range[0];
   } else { /* Continue */
     return ran_lw_sample_continue
-      (ran_lw, r0, ran_lw->range, FUNC_NAME, sampled_band_bounds, pdf);
+      (ran_lw, r0, ran_lw->range, FUNC_NAME, pdf);
   }
 }
 

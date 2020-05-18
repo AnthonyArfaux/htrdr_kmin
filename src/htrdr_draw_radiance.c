@@ -605,7 +605,6 @@ draw_pixel_lw
     size_t iband;
     size_t iquad;
     double usec;
-    double samp_band_bounds[2];
     double band_pdf;
 
     /* Begin the registration of the time spent in the realisation */
@@ -624,7 +623,7 @@ draw_pixel_lw
     r2 = ssp_rng_canonical(rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0, r1, samp_band_bounds, &band_pdf);
+    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0, r1, &band_pdf);
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(htrdr->sky, wlen);
@@ -632,7 +631,7 @@ draw_pixel_lw
 
     /* Compute the integrated luminance in W/m^2/sr */
     weight = htrdr_compute_radiance_lw(htrdr, ithread, rng, ray_org, ray_dir,
-      wlen, samp_band_bounds, iband, iquad);
+      wlen, iband, iquad);
 
     /* Importance sampling: correct weight with pdf */
     weight /= band_pdf;
