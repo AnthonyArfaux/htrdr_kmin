@@ -75,6 +75,7 @@ htrdr_compute_radiance_lw
    const double pos[3],
    const double dir[3],
    const double wlen, /* In nanometer */
+   const double samp_band_bounds[2], /* In nanometer */
    const size_t iband, /* Index of the spectral band */
    const size_t iquad); /* Index of the quadrature point into the band */
 
