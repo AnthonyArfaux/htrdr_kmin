@@ -197,7 +197,7 @@ brightness_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */
    const double lambda_max, /* In meters */
-   /* Integrated over [lambda_min, lambda_max]. In W/m^2/sr/m */
+   /* Averaged over [lambda_min, lambda_max]. In W/m^2/sr/m */
    const double radiance,
    double* temperature);
 

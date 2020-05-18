@@ -19,6 +19,7 @@
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
+#include "htrdr_ran_lw.h"
 
 #include <high_tune/htsky.h>
 
@@ -152,21 +153,23 @@ htrdr_compute_radiance_lw
   double range[2];
   double pos_next[3];
   double dir_next[3];
-  double band_bounds[2]; /* In nanometers */
-  double band_bounds_m[2]; /* In meters */
+  double wlen_bounds[2]; /* sub-interval bounds in nano meters */
+  double wlen_bounds_m[2]; /* sub-interval bounds in meters */
+  double delta_wlen ; /* sub-interval size in meters */
   double temperature;
   double g;
   double w = 0; /* Weight */
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
 
-  /* Retrieve the band boundaries */
-  htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
+  /* Retrieve the band boundaries in nano meters*/
+  htrdr_ran_lw_get_wlen_band_bounds(htrdr->ran_lw, wlen, wlen_bounds);
+  /* Convert to meters */
+  wlen_bounds_m[0] = wlen_bounds[0] * 1e-9;
+  wlen_bounds_m[1] = wlen_bounds[1] * 1e-9;
 
-  /* Transform the band boundaries in meters and clamp them to the integration
-   * domain */
-  band_bounds_m[0] = MMAX(band_bounds[0] * 1e-9, htrdr->wlen_range_m[0]);
-  band_bounds_m[1] = MMIN(band_bounds[1] * 1e-9, htrdr->wlen_range_m[1]);
+  /* If monochromatic, set delta_wlen to 1 m, otherwise lmax - lmin in meters */
+  delta_wlen = eq_eps(wlen_bounds[0],wlen_bounds[1],1e-6) ? 1 : wlen_bounds_m[1]-wlen_bounds_m[0] ;
 
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
@@ -220,7 +223,8 @@ htrdr_compute_radiance_lw
     if(ctx.event_type == EVENT_ABSORPTION) {
       ASSERT(!SVX_HIT_NONE(&svx_hit));
       temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
-      w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+      /* weight is planck integrated over the spectral sub-interval */
+      w = planck(wlen_bounds_m[0],wlen_bounds_m[1],temperature)*delta_wlen ;
       break;
     }
 
@@ -268,7 +272,8 @@ htrdr_compute_radiance_lw
         if(temperature <= 0) {
           w = 0;
         } else {
-          w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+          /* weight is planck integrated over the spectral sub-interval */
+          w = planck(wlen_bounds_m[0],wlen_bounds_m[1],temperature) * delta_wlen ;
         }
         break;
       }
@@ -279,7 +284,6 @@ htrdr_compute_radiance_lw
     d3_set(dir, dir_next);
   }
   SSF(phase_ref_put(phase_hg));
-
   return w;
 }
 

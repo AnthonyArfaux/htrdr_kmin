@@ -601,6 +601,7 @@ draw_pixel_lw
     double ray_dir[3];
     double weight;
     double r0, r1;
+    double wlen_range_nm[2] ;
     double wlen;
     size_t iband;
     size_t iquad;
@@ -629,12 +630,21 @@ draw_pixel_lw
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r1, iband);
 
     /* Retrieve the PDF to sample this sky band */
-    band_pdf = htrdr_ran_lw_get_sky_band_pdf(htrdr->ran_lw, iband);
+    /* band_pdf is the pdf in the band of ran_lw->band_len nm */
+    band_pdf = htrdr_ran_lw_get_wlen_band_pdf(htrdr->ran_lw,wlen) ;
 
-    /* Compute the luminance in W/m^2/sr/m */
+    /* Compute the integrated luminance in W/m^2/sr */
     weight = htrdr_compute_radiance_lw
       (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
+
+    /* Importance sampling: correct weight with pdf */
     weight /= band_pdf;
+
+    htrdr_ran_lw_get_wlen_range(htrdr->ran_lw, wlen_range_nm) ;
+    /* From integrated radiance to average radiance in W/m^2/sr/m */
+    if (!eq_eps(wlen_range_nm[0], wlen_range_nm[1], 1e-6)) {
+      weight /= (htrdr->wlen_range_m[1] - htrdr->wlen_range_m[0]) ;
+    }
     ASSERT(weight >= 0);
 
     /* End the registration of the per realisation time */

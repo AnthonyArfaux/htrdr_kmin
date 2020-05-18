@@ -30,6 +30,7 @@
 #include <math.h> /* nextafter */
 
 struct htrdr_ran_lw {
+  struct darray_double pdf;
   struct darray_double cdf;
   /* Probas to sample a sky band overlapped by the range */
   struct darray_double sky_bands_pdf;
@@ -64,9 +65,16 @@ setup_ran_lw_cdf
       func_name, res_to_cstr(res));
     goto error;
   }
+  res = darray_double_resize(&ran_lw->pdf, ran_lw->nbands);
+  if(res != RES_OK) {
+    htrdr_log_err(ran_lw->htrdr,
+      "%s: Error allocating the pdf of the long wave spectral bands -- %s.\n",
+      func_name, res_to_cstr(res));
+    goto error;
+  }
 
   cdf = darray_double_data_get(&ran_lw->cdf);
-  pdf = cdf; /* Alias the CDF by the PDF since only one array is necessary */
+  pdf = darray_double_data_get(&ran_lw->pdf); /* Now save pdf to correct weight */
 
   htrdr_log(ran_lw->htrdr,
     "Number of bands of the long wave cumulative: %lu\n",
@@ -85,7 +93,7 @@ setup_ran_lw_cdf
     lambda_hi *= 1.e-9;
 
     /* Compute the probability of the current band */
-    pdf[i] = planck(lambda_lo, lambda_hi, ran_lw->ref_temperature);
+    pdf[i] = blackbody_fraction(lambda_lo, lambda_hi, ran_lw->ref_temperature);
 
     /* Update the norm */
     sum += pdf[i];
@@ -111,6 +119,7 @@ exit:
   return res;
 error:
   darray_double_clear(&ran_lw->cdf);
+  darray_double_clear(&ran_lw->pdf);
   goto exit;
 }
 
@@ -291,6 +300,7 @@ release_ran_lw(ref_T* ref)
   ASSERT(ref);
   ran_lw = CONTAINER_OF(ref, struct htrdr_ran_lw, ref);
   darray_double_release(&ran_lw->cdf);
+  darray_double_release(&ran_lw->pdf);
   darray_double_release(&ran_lw->sky_bands_pdf);
   MEM_RM(ran_lw->htrdr->allocator, ran_lw);
 }
@@ -326,6 +336,7 @@ htrdr_ran_lw_create
   ref_init(&ran_lw->ref);
   ran_lw->htrdr = htrdr;
   darray_double_init(htrdr->allocator, &ran_lw->cdf);
+  darray_double_init(htrdr->allocator, &ran_lw->pdf);
   darray_double_init(htrdr->allocator, &ran_lw->sky_bands_pdf);
 
   ran_lw->range[0] = range[0];
@@ -389,6 +400,70 @@ htrdr_ran_lw_sample
     return ran_lw->range[0];
   } else {
     return ran_lw_sample_continue(ran_lw, r, FUNC_NAME);
+  }
+}
+
+res_T  
+htrdr_ran_lw_get_wlen_range
+  (const struct htrdr_ran_lw* ran_lw,
+   double * wlens)
+{
+  wlens[0] = ran_lw->range[0] ;
+  wlens[1] = ran_lw->range[1] ;
+  return RES_OK ;
+}
+
+res_T  
+htrdr_ran_lw_get_wlen_band_bounds
+  (const struct htrdr_ran_lw* ran_lw,
+   const double wlen,
+   double * wlens)
+{
+  size_t i = htrdr_ran_lw_get_index_wlen(ran_lw,wlen) ;
+  wlens[0] = ran_lw->range[0] + (double) i*ran_lw->band_len ;
+  wlens[1] = ran_lw->range[0] + (double)(i+1)*ran_lw->band_len ;
+  return RES_OK ;
+}
+
+size_t 
+htrdr_ran_lw_get_index_wlen
+  (const struct htrdr_ran_lw* ran_lw,
+   const double wlen)
+{
+  /* i==0 corresponds to pdf for band 
+   * [range[0], range[0] + band_len] 
+   * i==j corresponds to pdf for band 
+   * [range[0] + j*band_len , range[0] +(j+1)* band_len] 
+   * to find i, floor((wlen - range[0]) / band_len) */
+  if (eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+    return 0 ; 
+  }
+  else {
+    return (size_t) ((wlen - ran_lw->range[0]) / ran_lw->band_len );
+  }
+}
+
+double
+htrdr_ran_lw_get_wlen_band_pdf
+  (const struct htrdr_ran_lw* ran_lw,
+   const double wlen)
+{
+  /* need to retrieve ran_lw->pdf[i] 
+   * where i corresponds to the wlen */
+  size_t i ;
+  ASSERT(ran_lw);
+  ASSERT(wlen >= ran_lw->range[0]);
+  ASSERT(wlen <= ran_lw->range[1]);
+
+  i = htrdr_ran_lw_get_index_wlen(ran_lw,wlen) ;
+
+  if (darray_double_size_get(&ran_lw->pdf)==0) {
+    return 1 ;
+  } 
+  else {
+    /* Fetch its PDF */
+    ASSERT(i < darray_double_size_get(&ran_lw->pdf));
+    return darray_double_cdata_get(&ran_lw->pdf)[i];
   }
 }
 
