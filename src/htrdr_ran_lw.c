@@ -122,11 +122,11 @@ error:
 }
 
 static double
-compute_sky_min_band_len(struct htrdr_ran_lw* ran_lw, const char* func_name)
+compute_sky_min_band_len(struct htrdr_ran_lw* ran_lw)
 {
   double min_band_len = DBL_MAX;
   size_t nbands;
-  ASSERT(ran_lw && htsky_is_long_wave(ran_lw->htrdr->sky) && func_name);
+  ASSERT(ran_lw && htsky_is_long_wave(ran_lw->htrdr->sky));
 
   nbands = htsky_get_spectral_bands_count(ran_lw->htrdr->sky);
 
@@ -258,6 +258,7 @@ ran_lw_sample_discrete
   ASSERT(0 <= r0 && r0 < 1);
   ASSERT(0 <= r1 && r1 < 1);
   (void)func_name;
+  (void)pdf_band;
 
   cdf = darray_double_cdata_get(&ran_lw->cdf);
   cdf_length = darray_double_size_get(&ran_lw->cdf);
@@ -348,7 +349,7 @@ htrdr_ran_lw_create
   ran_lw->ref_temperature = ref_temperature;
   ran_lw->nbands = nbands;
 
-  min_band_len = compute_sky_min_band_len(ran_lw, FUNC_NAME);
+  min_band_len = compute_sky_min_band_len(ran_lw);
 
   if(nbands == HTRDR_RAN_LW_CONTINUE) {
     ran_lw->band_len = 0;
