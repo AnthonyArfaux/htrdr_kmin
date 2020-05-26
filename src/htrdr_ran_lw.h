@@ -45,12 +45,9 @@ htrdr_ran_lw_ref_put
 extern LOCAL_SYM double
 htrdr_ran_lw_sample
   (const struct htrdr_ran_lw* ran_lw,
-   const double r); /* Canonical number in [0, 1[ */
-
-extern LOCAL_SYM double
-htrdr_ran_lw_get_sky_band_pdf
-  (const struct htrdr_ran_lw* ran_lw,
-   const size_t iband);
+   const double r0, /* Canonical number in [0, 1[ */
+   const double r1, /* Canonical number in [0, 1[ */
+   double* pdf); /* May be NULL */
 
 #endif /* HTRDR_RAN_LW_H */
 

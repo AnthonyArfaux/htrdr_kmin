@@ -19,6 +19,7 @@
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
+#include "htrdr_ran_lw.h"
 
 #include <high_tune/htsky.h>
 
@@ -152,21 +153,12 @@ htrdr_compute_radiance_lw
   double range[2];
   double pos_next[3];
   double dir_next[3];
-  double band_bounds[2]; /* In nanometers */
-  double band_bounds_m[2]; /* In meters */
   double temperature;
+  double wlen_m = wlen * 1.e-9;
   double g;
   double w = 0; /* Weight */
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
-
-  /* Retrieve the band boundaries */
-  htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
-
-  /* Transform the band boundaries in meters and clamp them to the integration
-   * domain */
-  band_bounds_m[0] = MMAX(band_bounds[0] * 1e-9, htrdr->wlen_range_m[0]);
-  band_bounds_m[1] = MMIN(band_bounds[1] * 1e-9, htrdr->wlen_range_m[1]);
 
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
@@ -220,7 +212,8 @@ htrdr_compute_radiance_lw
     if(ctx.event_type == EVENT_ABSORPTION) {
       ASSERT(!SVX_HIT_NONE(&svx_hit));
       temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
-      w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+      /* weight is planck integrated over the spectral sub-interval */
+      w = planck_monochromatic(wlen_m, temperature);
       break;
     }
 
@@ -268,7 +261,8 @@ htrdr_compute_radiance_lw
         if(temperature <= 0) {
           w = 0;
         } else {
-          w = planck(band_bounds_m[0], band_bounds_m[1], temperature);
+          /* weight is planck integrated over the spectral sub-interval */
+          w = planck_monochromatic(wlen_m, temperature);
         }
         break;
       }
@@ -279,7 +273,6 @@ htrdr_compute_radiance_lw
     d3_set(dir, dir_next);
   }
   SSF(phase_ref_put(phase_hg));
-
   return w;
 }
 

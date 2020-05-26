@@ -714,7 +714,7 @@ brightness_temperature
   (struct htrdr* htrdr,
    const double lambda_min,
    const double lambda_max,
-   const double radiance,
+   const double radiance, /* In W/m2/sr/m */
    double* temperature)
 {
   const size_t MAX_ITER = 100;
@@ -761,8 +761,8 @@ exit:
   return res;
 error:
   htrdr_log_err(htrdr,
-    "Could not compute the brightness temperature for the radiance %g "
-    "estimated over [%g, %g] nanometers.\n",
+    "Could not compute the brightness temperature for the estimated radiance %g "
+    "averaged over [%g, %g] nanometers.\n",
     radiance,
     lambda_min*1e9,
     lambda_max*1e9);

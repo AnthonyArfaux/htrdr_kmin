@@ -48,7 +48,7 @@ static const struct scattering_context SCATTERING_CONTEXT_NULL = {
 struct transmissivity_context {
   struct ssp_rng* rng;
   const struct htsky* sky;
-  size_t iband; /* Index of the spectrald */
+  size_t iband; /* Index of the spectral */
   size_t iquad; /* Index of the quadrature point into the band */
 
   double Ts; /* Sampled optical thickness */
