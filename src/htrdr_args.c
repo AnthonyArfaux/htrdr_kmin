@@ -62,7 +62,7 @@ print_help(const char* cmd)
 "                 page for the list of image options\n");
   printf(
 "  -l WLEN_MIN,WLEN_MAX\n"
-"                 switch in infrared rendering for the long waves in\n"
+"                 switch in infrared rendering for longwave in\n"
 "                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
 "                 rendering is performed for the visible part of the\n"
 "                 spectrum in [380, 780] nanometers.\n");
@@ -377,7 +377,7 @@ parse_lw_range(struct htrdr_args* args, const char* str)
   if(res == RES_OK && len != 2) res = RES_BAD_ARG;
   if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
   if(res != RES_OK) {
-    fprintf(stderr, "Invalid long wave range `%s'.\n", str);
+    fprintf(stderr, "Invalid longwave range `%s'.\n", str);
     goto error;
   }
 

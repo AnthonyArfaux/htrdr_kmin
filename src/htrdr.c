@@ -709,6 +709,39 @@ htrdr_fflush(struct htrdr* htrdr, FILE* stream)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
+double
+compute_sky_min_band_len
+  (struct htsky* sky,
+   const double range[2])
+{
+  double min_band_len = DBL_MAX;
+  size_t nbands;
+  ASSERT(sky && range && range[0] <= range[1]);
+
+  nbands = htsky_get_spectral_bands_count(sky);
+
+  if(eq_eps(range[0], range[1], 1.e-6)) {
+    ASSERT(nbands == 1);
+    min_band_len = 0;
+  } else {
+    size_t i = 0;
+
+    /* Compute the length of the current band clamped to the submitted range */
+    FOR_EACH(i, 0, nbands) {
+      const size_t iband = htsky_get_spectral_band_id(sky, i);
+      double wlens[2];
+      HTSKY(get_spectral_band_bounds(sky, iband, wlens));
+
+      /* Adjust band boundaries to the submitted range */
+      wlens[0] = MMAX(wlens[0], range[0]);
+      wlens[1] = MMIN(wlens[1], range[1]);
+
+      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
+    }
+  }
+  return min_band_len;
+}
+
 res_T
 brightness_temperature
   (struct htrdr* htrdr,

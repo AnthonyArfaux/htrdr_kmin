@@ -19,6 +19,8 @@
 #include "htrdr_c.h"
 #include "htrdr_cie_xyz.h"
 
+#include <high_tune/htsky.h>
+
 #include <rsys/algorithm.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_double.h>
@@ -58,7 +60,7 @@ trapezoidal_integration
 
   FOR_EACH(i, 0, n) {
     const double lambda1 = lambda_lo + dlambda*(double)(i+0);
-    const double lambda2 = lambda_hi + dlambda*(double)(i+1);
+    const double lambda2 = lambda_lo + dlambda*(double)(i+1);
     const double f1 = f_bar(lambda1);
     const double f2 = f_bar(lambda2);
     integral += (f1 + f2)*dlambda*0.5;
@@ -169,7 +171,6 @@ static res_T
 setup_cie_xyz
   (struct htrdr_cie_xyz* cie,
    const char* func_name,
-   const double range[2],
    const size_t nbands)
 {
   enum { X, Y, Z }; /* Helper constant */
@@ -179,10 +180,10 @@ setup_cie_xyz
   size_t i;
   res_T res = RES_OK;
 
-  ASSERT(cie && func_name && range && nbands);
-  ASSERT(range[0] >= HTRDR_CIE_XYZ_RANGE_DEFAULT[0]);
-  ASSERT(range[1] <= HTRDR_CIE_XYZ_RANGE_DEFAULT[1]);
-  ASSERT(range[0] < range[1]);
+  ASSERT(cie && func_name && nbands);
+  ASSERT(cie->range[0] >= HTRDR_CIE_XYZ_RANGE_DEFAULT[0]);
+  ASSERT(cie->range[1] <= HTRDR_CIE_XYZ_RANGE_DEFAULT[1]);
+  ASSERT(cie->range[0] < cie->range[1]);
 
   /* Allocate and reset the memory space for the tristimulus CDF */
   #define SETUP_STIMULUS(Stimulus) {                                           \
@@ -203,13 +204,13 @@ setup_cie_xyz
   #undef SETUP_STIMULUS
 
   /* Compute the *unormalized* pdf of the tristimulus */
-  cie->range[0] = range[0];
-  cie->range[1] = range[1];
-  cie->band_len = (range[1] - range[0]) / (double)nbands;
+
   FOR_EACH(i, 0, nbands) {
-    const double lambda_lo = range[0] + (double)i * cie->band_len;
-    const double lambda_hi = lambda_lo + cie->band_len;
+    const double lambda_lo = cie->range[0] + (double)i * cie->band_len;
+    const double lambda_hi = MMIN(lambda_lo + cie->band_len, cie->range[1]);
     ASSERT(lambda_lo <= lambda_hi);
+    ASSERT(lambda_lo >= cie->range[0]);
+    ASSERT(lambda_hi <= cie->range[1]);
     pdf[X][i] = trapezoidal_integration(lambda_lo, lambda_hi, fit_x_bar_1931);
     pdf[Y][i] = trapezoidal_integration(lambda_lo, lambda_hi, fit_y_bar_1931);
     pdf[Z][i] = trapezoidal_integration(lambda_lo, lambda_hi, fit_z_bar_1931);
@@ -274,10 +275,12 @@ res_T
 htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in [380, 780] nanometers */
-   const size_t nbands, /* # bands used to discretisze the CIE tristimulus */
+   const size_t bands_count, /* # bands used to discretisze the CIE tristimulus */
    struct htrdr_cie_xyz** out_cie)
 {
   struct htrdr_cie_xyz* cie = NULL;
+  double min_band_len = 0;
+  size_t nbands = bands_count;
   res_T res = RES_OK;
   ASSERT(htrdr && range && nbands && out_cie);
 
@@ -294,8 +297,21 @@ htrdr_cie_xyz_create
   darray_double_init(htrdr->allocator, &cie->cdf_X);
   darray_double_init(htrdr->allocator, &cie->cdf_Y);
   darray_double_init(htrdr->allocator, &cie->cdf_Z);
+  cie->range[0] = range[0];
+  cie->range[1] = range[1];
 
-  res = setup_cie_xyz(cie, FUNC_NAME, range, nbands);
+  min_band_len = compute_sky_min_band_len(cie->htrdr->sky, range);
+  cie->band_len = (range[1] - range[0]) / (double)nbands;
+
+  /* Adjust the band length to ensure that each sky spectral interval is
+   * overlapped by at least one band */
+  if(cie->band_len > min_band_len) {
+    cie->band_len = min_band_len;
+    nbands = (size_t)ceil((range[1] - range[0]) / cie->band_len);
+    printf("%lu\n", nbands);
+  }
+
+  res = setup_cie_xyz(cie, FUNC_NAME, nbands);
   if(res != RES_OK) goto error;
 
   htrdr_log(htrdr, "Short wave interval defined on [%g, %g] nanometers.\n",

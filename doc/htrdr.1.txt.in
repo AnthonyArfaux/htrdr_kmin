@@ -53,7 +53,7 @@ computation is performed over the visible part of the spectrum in [380, 780]
 nanometers, for the three components of the CIE 1931 XYZ colorimetric space
 that are subsequently recombined in order to obtain the final color for each
 pixel, and finally the whole image of the scene as seen from the set
-observation position. In long waves, the rendering is performed for the range
+observation position. In longwave, the rendering is performed for the range
 of wavelengths defined by the *-l* option. The estimated radiance per pixel is
 then converted to its brightness temperature and both are saved in the output
 image.
@@ -141,13 +141,13 @@ OPTIONS
     Number of samples per pixel estimation. In regular image rendering, a pixel
     will use "3 * _samples-count_" Monte-Carlo realisations, one set of
     _samples-count_ realisations for each X, Y and Z component of the CIE 1931
-    XYZ color space. In long wave rendering (*-l* option) only one set of
+    XYZ color space. In longwave rendering (*-l* option) only one set of
     _samples-count_ is used to estimate the pixel radiance and the resulting
     brightness temperature for the submitted range of wavelengths. By default,
     *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
 
 *-l* __wlen-min__,__wlen-max__::
-  Switch in infrared rendering for the long wave interval in [__wlen-min__,
+  Switch in infrared rendering for the longwave interval in [__wlen-min__,
   __wlen-max__] nanometers.
 
 *-R*::
