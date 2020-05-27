@@ -122,37 +122,6 @@ error:
 }
 
 static double
-compute_sky_min_band_len(struct htrdr_ran_lw* ran_lw)
-{
-  double min_band_len = DBL_MAX;
-  size_t nbands;
-  ASSERT(ran_lw && htsky_is_long_wave(ran_lw->htrdr->sky));
-
-  nbands = htsky_get_spectral_bands_count(ran_lw->htrdr->sky);
-
-  if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
-    ASSERT(nbands == 1);
-    min_band_len = 0;
-  } else {
-    size_t i = 0;
-
-    /* Compute the *unormalized* probability to sample a long wave band */
-    FOR_EACH(i, 0, nbands) {
-      const size_t iband = htsky_get_spectral_band_id(ran_lw->htrdr->sky, i);
-      double wlens[2];
-      HTSKY(get_spectral_band_bounds(ran_lw->htrdr->sky, iband, wlens));
-
-      /* Adjust band boundaries to the submitted range */
-      wlens[0] = MMAX(wlens[0], ran_lw->range[0]);
-      wlens[1] = MMIN(wlens[1], ran_lw->range[1]);
-
-      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
-    }
-  }
-  return min_band_len;
-}
-
-static double
 ran_lw_sample_continue
   (const struct htrdr_ran_lw* ran_lw,
    const double r,
@@ -330,7 +299,7 @@ htrdr_ran_lw_create
   ran_lw->ref_temperature = ref_temperature;
   ran_lw->nbands = nbands;
 
-  min_band_len = compute_sky_min_band_len(ran_lw);
+  min_band_len = compute_sky_min_band_len(ran_lw->htrdr->sky, ran_lw->range);
 
   if(nbands == HTRDR_RAN_LW_CONTINUE) {
     ran_lw->band_len = 0;

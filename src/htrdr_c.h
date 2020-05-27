@@ -192,6 +192,13 @@ planck
   }
 }
 
+/* Return the minimum length in nanometer of the sky spectral bands
+ * clamped to in [range[0], range[1]]. */
+extern LOCAL_SYM double
+compute_sky_min_band_len
+  (struct htsky* sky,
+   const double range[2]);
+
 extern LOCAL_SYM res_T
 brightness_temperature
   (struct htrdr* htrdr,
