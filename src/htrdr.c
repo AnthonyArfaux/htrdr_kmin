@@ -490,16 +490,16 @@ htrdr_init
     htsky_args.is_long_wave = 0 ; 
     htsky_args.wlen_range[0] = args->wlen_sw_range[0];
     htsky_args.wlen_range[1] = args->wlen_sw_range[1];
-    htrdr->is_image=0;
-  } else {
-    htsky_args.is_long_wave = 1 ;
-    htsky_args.wlen_range[0] = args->wlen_lw_range[0];
-    htsky_args.wlen_range[1] = args->wlen_lw_range[1];
     if(args->wlen_sw_range[0] > args->wlen_sw_range[1]) { /* image */
       htrdr->is_image = 1 ;
     } else {
       htrdr->is_image = 0 ;
     }
+  } else {
+    htsky_args.is_long_wave = 1 ;
+    htsky_args.wlen_range[0] = args->wlen_lw_range[0];
+    htsky_args.wlen_range[1] = args->wlen_lw_range[1];
+    htrdr->is_image=0;
   }
 
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);

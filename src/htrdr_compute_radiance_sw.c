@@ -299,8 +299,11 @@ htrdr_compute_radiance_sw
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
   ASSERT(band_bounds[0] <= wlen  && wlen <= band_bounds[1]);
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
-  /* L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);*/
-  L_sun = planck_monochromatic(wlen_m, temperature);
+  if (htrdr->is_image) {
+    L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
+  } else {
+    L_sun = planck_monochromatic(wlen_m, temperature);
+  }
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
