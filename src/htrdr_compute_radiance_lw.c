@@ -1,4 +1,4 @@
-/* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+/*Spectralt (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
  * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,7 +19,6 @@
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
 #include "htrdr_solve.h"
-#include "htrdr_ran_lw.h"
 
 #include <high_tune/htsky.h>
 

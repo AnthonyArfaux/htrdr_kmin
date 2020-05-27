@@ -35,20 +35,20 @@ struct htrdr_estimate {
 };
 static const struct htrdr_estimate HTRDR_ESTIMATE_NULL;
 
-struct htrdr_pixel_sw {
+struct htrdr_pixel_image {
   struct htrdr_estimate X; /* In W/m^2/sr */
   struct htrdr_estimate Y; /* In W/m^2/sr */
   struct htrdr_estimate Z; /* In W/m^2/sr */
   struct htrdr_accum time; /* In microseconds */
 };
-static const struct htrdr_pixel_sw HTRDR_PIXEL_SW_NULL;
+static const struct htrdr_pixel_image HTRDR_PIXEL_IMAGE_NULL;
 
-struct htrdr_pixel_lw {
+struct htrdr_pixel_integ {
   struct htrdr_estimate radiance; /* In W/m^2/sr */
   struct htrdr_estimate radiance_temperature; /* In K */
   struct htrdr_accum time; /* In microseconds */
 };
-static const struct htrdr_pixel_lw HTRDR_PIXEL_LW_NULL;
+static const struct htrdr_pixel_integ HTRDR_PIXEL_INTEG_NULL;
 
 /* Forward declarations */
 struct htrdr;

@@ -50,13 +50,14 @@ struct htrdr {
   struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
-  struct htrdr_ran_lw* ran_lw;
+  struct htrdr_wlen_ran* wlen_ran;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
   double wlen_range_m[2]; /* Integration range in *meters* */
+  int is_image ; /* XYZ Image or spectral integration? */
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */

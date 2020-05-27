@@ -17,7 +17,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
-#include "htrdr_ran_lw.h"
+#include "htrdr_wlen_ran.h"
 
 #include <high_tune/htsky.h>
 
@@ -29,7 +29,7 @@
 
 #include <math.h> /* nextafter */
 
-struct htrdr_ran_lw {
+struct htrdr_wlen_ran {
   struct darray_double pdf;
   struct darray_double cdf;
   double range[2]; /* Boundaries of the spectral integration interval */
@@ -45,8 +45,8 @@ struct htrdr_ran_lw {
  * Helper functions
  ******************************************************************************/
 static res_T
-setup_ran_lw_cdf
-  (struct htrdr_ran_lw* ran_lw,
+setup_wlen_ran_cdf
+  (struct htrdr_wlen_ran* wlen_ran,
    const char* func_name)
 {
   double* pdf = NULL;
@@ -54,51 +54,51 @@ setup_ran_lw_cdf
   double sum = 0;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(ran_lw && func_name && ran_lw->nbands != HTRDR_RAN_LW_CONTINUE);
+  ASSERT(wlen_ran && func_name && wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE);
 
-  res = darray_double_resize(&ran_lw->cdf, ran_lw->nbands);
+  res = darray_double_resize(&wlen_ran->cdf, wlen_ran->nbands);
   if(res != RES_OK) {
-    htrdr_log_err(ran_lw->htrdr,
-      "%s: Error allocating the CDF of the longwave spectral bands -- %s.\n",
+    htrdr_log_err(wlen_ran->htrdr,
+      "%s: Error allocating the CDF of the spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
-  res = darray_double_resize(&ran_lw->pdf, ran_lw->nbands);
+  res = darray_double_resize(&wlen_ran->pdf, wlen_ran->nbands);
   if(res != RES_OK) {
-    htrdr_log_err(ran_lw->htrdr,
-      "%s: Error allocating the pdf of the longwave spectral bands -- %s.\n",
+    htrdr_log_err(wlen_ran->htrdr,
+      "%s: Error allocating the pdf of the spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
 
-  cdf = darray_double_data_get(&ran_lw->cdf);
-  pdf = darray_double_data_get(&ran_lw->pdf); /* Now save pdf to correct weight */
+  cdf = darray_double_data_get(&wlen_ran->cdf);
+  pdf = darray_double_data_get(&wlen_ran->pdf); /* Now save pdf to correct weight */
 
-  htrdr_log(ran_lw->htrdr,
-    "Number of bands of the longwave cumulative: %lu\n",
-    (unsigned long)ran_lw->nbands);
+  htrdr_log(wlen_ran->htrdr,
+    "Number of bands of the spectrum cumulative: %lu\n",
+    (unsigned long)wlen_ran->nbands);
 
-  /* Compute the *unormalized* probability to sample a longwave band */
-  FOR_EACH(i, 0, ran_lw->nbands) {
-    double lambda_lo = ran_lw->range[0] + (double)i * ran_lw->band_len;
-    double lambda_hi = MMIN(lambda_lo + ran_lw->band_len, ran_lw->range[1]);
+  /* Compute the *unnormalized* probability to sample a small band */
+  FOR_EACH(i, 0, wlen_ran->nbands) {
+    double lambda_lo = wlen_ran->range[0] + (double)i * wlen_ran->band_len;
+    double lambda_hi = MMIN(lambda_lo + wlen_ran->band_len, wlen_ran->range[1]);
     ASSERT(lambda_lo<= lambda_hi);
-    ASSERT(lambda_lo > ran_lw->range[0] || eq_eps(lambda_lo, ran_lw->range[0], 1.e-6));
-    ASSERT(lambda_lo < ran_lw->range[1] || eq_eps(lambda_lo, ran_lw->range[1], 1.e-6));
+    ASSERT(lambda_lo > wlen_ran->range[0] || eq_eps(lambda_lo, wlen_ran->range[0], 1.e-6));
+    ASSERT(lambda_lo < wlen_ran->range[1] || eq_eps(lambda_lo, wlen_ran->range[1], 1.e-6));
 
     /* Convert from nanometer to meter */
     lambda_lo *= 1.e-9;
     lambda_hi *= 1.e-9;
 
     /* Compute the probability of the current band */
-    pdf[i] = blackbody_fraction(lambda_lo, lambda_hi, ran_lw->ref_temperature);
+    pdf[i] = blackbody_fraction(lambda_lo, lambda_hi, wlen_ran->ref_temperature);
 
     /* Update the norm */
     sum += pdf[i];
   }
 
   /* Compute the cumulative of the previously computed probabilities */
-  FOR_EACH(i, 0, ran_lw->nbands) {
+  FOR_EACH(i, 0, wlen_ran->nbands) {
     /* Normalize the probability */
     pdf[i] /= sum;
 
@@ -110,20 +110,20 @@ setup_ran_lw_cdf
       ASSERT(cdf[i] >= cdf[i-1]);
     }
   }
-  ASSERT(eq_eps(cdf[ran_lw->nbands-1], 1, 1.e-6));
-  cdf[ran_lw->nbands - 1] = 1.0; /* Handle numerical issue */
+  ASSERT(eq_eps(cdf[wlen_ran->nbands-1], 1, 1.e-6));
+  cdf[wlen_ran->nbands - 1] = 1.0; /* Handle numerical issue */
 
 exit:
   return res;
 error:
-  darray_double_clear(&ran_lw->cdf);
-  darray_double_clear(&ran_lw->pdf);
+  darray_double_clear(&wlen_ran->cdf);
+  darray_double_clear(&wlen_ran->pdf);
   goto exit;
 }
 
 static double
-ran_lw_sample_continue
-  (const struct htrdr_ran_lw* ran_lw,
+wlen_ran_sample_continue
+  (const struct htrdr_wlen_ran* wlen_ran,
    const double r,
    const double range[2], /* In nanometer */
    const char* func_name,
@@ -146,7 +146,7 @@ ran_lw_sample_continue
   size_t i;
 
   /* Check precondition */
-  ASSERT(ran_lw && func_name);
+  ASSERT(wlen_ran && func_name);
   ASSERT(range && range[0] < range[1]);
   ASSERT(0 <= r && r < 1);
 
@@ -158,14 +158,14 @@ ran_lw_sample_continue
   lambda_m_min = range_m[0];
   lambda_m_max = range_m[1];
   bf_min_max = blackbody_fraction
-    (range_m[0], range_m[1], ran_lw->ref_temperature);
+    (range_m[0], range_m[1], wlen_ran->ref_temperature);
 
   /* Numerically search the lambda corresponding to the submitted canonical
    * number */
   FOR_EACH(i, 0, MAX_ITER) {
     double r_test;
     lambda_m = (lambda_m_min + lambda_m_max) * 0.5;
-    bf = blackbody_fraction(range_m[0], lambda_m, ran_lw->ref_temperature);
+    bf = blackbody_fraction(range_m[0], lambda_m, wlen_ran->ref_temperature);
 
     r_test = bf / bf_min_max;
     if(r_test < r) {
@@ -182,14 +182,14 @@ ran_lw_sample_continue
     bf_prev = bf;
   }
   if(i >= MAX_ITER) {
-    htrdr_log_warn(ran_lw->htrdr,
+    htrdr_log_warn(wlen_ran->htrdr,
       "%s: could not sample a wavelength in the range [%g, %g] nanometers "
       "for the reference temperature %g Kelvin.\n",
-      func_name, SPLIT2(range), ran_lw->ref_temperature);
+      func_name, SPLIT2(range), wlen_ran->ref_temperature);
   }
 
   if(pdf) {
-    const double Tref = ran_lw->ref_temperature;
+    const double Tref = wlen_ran->ref_temperature;
     const double B_lambda = planck(lambda_m, lambda_m, Tref);
     const double B_mean = planck(range_m[0], range_m[1], Tref);
     *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
@@ -199,8 +199,8 @@ ran_lw_sample_continue
 }
 
 static double
-ran_lw_sample_discrete
-  (const struct htrdr_ran_lw* ran_lw,
+wlen_ran_sample_discrete
+  (const struct htrdr_wlen_ran* wlen_ran,
    const double r0,
    const double r1,
    const char* func_name,
@@ -215,14 +215,14 @@ ran_lw_sample_discrete
   double pdf_band = 0;
   size_t cdf_length = 0;
   size_t i;
-  ASSERT(ran_lw && ran_lw->nbands != HTRDR_RAN_LW_CONTINUE);
+  ASSERT(wlen_ran && wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE);
   ASSERT(0 <= r0 && r0 < 1);
   ASSERT(0 <= r1 && r1 < 1);
   (void)func_name;
   (void)pdf_band;
 
-  cdf = darray_double_cdata_get(&ran_lw->cdf);
-  cdf_length = darray_double_size_get(&ran_lw->cdf);
+  cdf = darray_double_cdata_get(&wlen_ran->cdf);
+  cdf_length = darray_double_size_get(&wlen_ran->cdf);
   ASSERT(cdf_length > 0);
 
   /* Use r_next rather than r0 in order to find the first entry that is not less
@@ -233,11 +233,11 @@ ran_lw_sample_discrete
   i = (size_t)(find - cdf);
   ASSERT(i < cdf_length && cdf[i] > r0 && (!i || cdf[i-1] <= r0));
 
-  band_range[0] = ran_lw->range[0] + (double)i*ran_lw->band_len;
-  band_range[1] = band_range[0] + ran_lw->band_len;
+  band_range[0] = wlen_ran->range[0] + (double)i*wlen_ran->band_len;
+  band_range[1] = band_range[0] + wlen_ran->band_len;
 
   /* Fetch the pdf of the sampled band */
-  pdf_band = darray_double_cdata_get(&ran_lw->pdf)[i];
+  pdf_band = darray_double_cdata_get(&wlen_ran->pdf)[i];
 
   /* Uniformly sample a wavelength in the sampled band */
   lambda = band_range[0] + (band_range[1] - band_range[0]) * r1;
@@ -251,113 +251,115 @@ ran_lw_sample_discrete
 }
 
 static void
-release_ran_lw(ref_T* ref)
+release_wlen_ran(ref_T* ref)
 {
-  struct htrdr_ran_lw* ran_lw = NULL;
+  struct htrdr_wlen_ran* wlen_ran = NULL;
   ASSERT(ref);
-  ran_lw = CONTAINER_OF(ref, struct htrdr_ran_lw, ref);
-  darray_double_release(&ran_lw->cdf);
-  darray_double_release(&ran_lw->pdf);
-  MEM_RM(ran_lw->htrdr->allocator, ran_lw);
+  wlen_ran = CONTAINER_OF(ref, struct htrdr_wlen_ran, ref);
+  darray_double_release(&wlen_ran->cdf);
+  darray_double_release(&wlen_ran->pdf);
+  MEM_RM(wlen_ran->htrdr->allocator, wlen_ran);
 }
 
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_ran_lw_create
+htrdr_wlen_ran_create
   (struct htrdr* htrdr,
-   const double range[2], /* Must be included in [1000, 100000] nanometers */
+   /* range must be included in [200,1000] nm for solar or in [1000, 100000]
+    * nanometers for longwave (thermal)*/
+   const double range[2], 
    const size_t nbands, /* # bands used to discretized CDF */
    const double ref_temperature,
-   struct htrdr_ran_lw** out_ran_lw)
+   struct htrdr_wlen_ran** out_wlen_ran)
 {
-  struct htrdr_ran_lw* ran_lw = NULL;
+  struct htrdr_wlen_ran* wlen_ran = NULL;
   double min_band_len = 0;
   res_T res = RES_OK;
-  ASSERT(htrdr && range && out_ran_lw && ref_temperature > 0);
+  ASSERT(htrdr && range && out_wlen_ran && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
-  ASSERT(range[0] >= 1000);
+  ASSERT(range[0] >= 200);
   ASSERT(range[1] <= 100000);
   ASSERT(range[0] <= range[1]);
 
-  ran_lw = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ran_lw));
-  if(!ran_lw) {
+  wlen_ran = MEM_CALLOC(htrdr->allocator, 1, sizeof(*wlen_ran));
+  if(!wlen_ran) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
       "%s: could not allocate longwave random variate data structure -- %s.\n",
       FUNC_NAME, res_to_cstr(res));
     goto error;
   }
-  ref_init(&ran_lw->ref);
-  ran_lw->htrdr = htrdr;
-  darray_double_init(htrdr->allocator, &ran_lw->cdf);
-  darray_double_init(htrdr->allocator, &ran_lw->pdf);
+  ref_init(&wlen_ran->ref);
+  wlen_ran->htrdr = htrdr;
+  darray_double_init(htrdr->allocator, &wlen_ran->cdf);
+  darray_double_init(htrdr->allocator, &wlen_ran->pdf);
 
-  ran_lw->range[0] = range[0];
-  ran_lw->range[1] = range[1];
-  ran_lw->ref_temperature = ref_temperature;
-  ran_lw->nbands = nbands;
+  wlen_ran->range[0] = range[0];
+  wlen_ran->range[1] = range[1];
+  wlen_ran->ref_temperature = ref_temperature;
+  wlen_ran->nbands = nbands;
 
-  min_band_len = compute_sky_min_band_len(ran_lw->htrdr->sky, ran_lw->range);
+  min_band_len = compute_sky_min_band_len(wlen_ran->htrdr->sky, wlen_ran->range);
 
-  if(nbands == HTRDR_RAN_LW_CONTINUE) {
-    ran_lw->band_len = 0;
+  if(nbands == HTRDR_WLEN_RAN_CONTINUE) {
+    wlen_ran->band_len = 0;
   } else {
-    ran_lw->band_len = (range[1] - range[0]) / (double)ran_lw->nbands;
+    wlen_ran->band_len = (range[1] - range[0]) / (double)wlen_ran->nbands;
 
     /* Adjust the band length to ensure that each sky spectral interval is
      * overlapped by at least one band */
-    if(ran_lw->band_len > min_band_len) {
-      ran_lw->band_len = min_band_len;
-      ran_lw->nbands = (size_t)ceil((range[1] - range[0]) / ran_lw->band_len);
+    if(wlen_ran->band_len > min_band_len) {
+      wlen_ran->band_len = min_band_len;
+      wlen_ran->nbands = (size_t)ceil((range[1] - range[0]) / wlen_ran->band_len);
     }
 
-    res = setup_ran_lw_cdf(ran_lw, FUNC_NAME);
+    res = setup_wlen_ran_cdf(wlen_ran, FUNC_NAME);
     if(res != RES_OK) goto error;
   }
 
-  htrdr_log(htrdr, "Long wave interval defined on [%g, %g] nanometers.\n",
+  htrdr_log(htrdr, "Spectral interval defined on [%g, %g] nanometers.\n",
     range[0], range[1]);
 
 exit:
-  *out_ran_lw = ran_lw;
+  *out_wlen_ran = wlen_ran;
   return res;
 error:
-  if(ran_lw) htrdr_ran_lw_ref_put(ran_lw);
+  if(wlen_ran) htrdr_wlen_ran_ref_put(wlen_ran);
   goto exit;
 }
 
 void
-htrdr_ran_lw_ref_get(struct htrdr_ran_lw* ran_lw)
+htrdr_wlen_ran_ref_get(struct htrdr_wlen_ran* wlen_ran)
 {
-  ASSERT(ran_lw);
-  ref_get(&ran_lw->ref);
+  ASSERT(wlen_ran);
+  ref_get(&wlen_ran->ref);
 }
 
 void
-htrdr_ran_lw_ref_put(struct htrdr_ran_lw* ran_lw)
+htrdr_wlen_ran_ref_put(struct htrdr_wlen_ran* wlen_ran)
 {
-  ASSERT(ran_lw);
-  ref_put(&ran_lw->ref, release_ran_lw);
+  ASSERT(wlen_ran);
+  ref_put(&wlen_ran->ref, release_wlen_ran);
 }
 
 double
-htrdr_ran_lw_sample
-  (const struct htrdr_ran_lw* ran_lw,
+htrdr_wlen_ran_sample
+  (const struct htrdr_wlen_ran* wlen_ran,
    const double r0,
    const double r1,
    double* pdf)
 {
-  ASSERT(ran_lw);
-  if(ran_lw->nbands != HTRDR_RAN_LW_CONTINUE) { /* Discrete */
-    return ran_lw_sample_discrete(ran_lw, r0, r1, FUNC_NAME, pdf);
-  } else if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+  ASSERT(wlen_ran);
+  if(wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE) { /* Discrete */
+    return wlen_ran_sample_discrete(wlen_ran, r0, r1, FUNC_NAME, pdf);
+  } else if(eq_eps(wlen_ran->range[0], wlen_ran->range[1], 1.e-6)) {
     if(pdf) *pdf = 1;
-    return ran_lw->range[0];
+    return wlen_ran->range[0];
   } else { /* Continue */
-    return ran_lw_sample_continue
-      (ran_lw, r0, ran_lw->range, FUNC_NAME, pdf);
+    return wlen_ran_sample_continue
+      (wlen_ran, r0, wlen_ran->range, FUNC_NAME, pdf);
   }
 }
 

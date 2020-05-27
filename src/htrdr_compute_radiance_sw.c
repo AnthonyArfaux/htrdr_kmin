@@ -275,6 +275,8 @@ htrdr_compute_radiance_sw
   double L_sun; /* Sun radiance in W.m^-2.sr^-1 */
   double sun_dir[3];
   double ksi = 1; /* Throughput */
+  double temperature=5778;
+  double wlen_m = wlen * 1.e-9;
   double w = 0; /* MC weight */
   double g = 0; /* Asymmetry parameter of the HG phase function */
 
@@ -297,8 +299,8 @@ htrdr_compute_radiance_sw
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
   ASSERT(band_bounds[0] <= wlen  && wlen <= band_bounds[1]);
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
-  L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
-
+  /* L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);*/
+  L_sun = planck_monochromatic(wlen_m, temperature);
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 

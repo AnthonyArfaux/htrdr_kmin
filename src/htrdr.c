@@ -24,7 +24,7 @@
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
 #include "htrdr_mtl.h"
-#include "htrdr_ran_lw.h"
+#include "htrdr_wlen_ran.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -117,12 +117,12 @@ dump_buffer
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
-  if(htsky_is_long_wave(htrdr->sky)) {
-    pixsz = sizeof(struct htrdr_pixel_lw);
-    pixal = ALIGNOF(struct htrdr_pixel_lw);
+  if(!htrdr->is_image) {
+    pixsz = sizeof(struct htrdr_pixel_integ);
+    pixal = ALIGNOF(struct htrdr_pixel_integ);
   } else {
-    pixsz = sizeof(struct htrdr_pixel_sw);
-    pixal = ALIGNOF(struct htrdr_pixel_sw);
+    pixsz = sizeof(struct htrdr_pixel_image);
+    pixal = ALIGNOF(struct htrdr_pixel_image);
   }
 
   htrdr_buffer_get_layout(buf, &layout);
@@ -140,8 +140,8 @@ dump_buffer
       struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
       const struct htrdr_accum* pix_time_acc = NULL;
 
-      if(htsky_is_long_wave(htrdr->sky)) {
-        const struct htrdr_pixel_lw* pix = htrdr_buffer_at(buf, x, y);
+      if(!htrdr->is_image){
+        const struct htrdr_pixel_integ* pix = htrdr_buffer_at(buf, x, y);
         fprintf(stream, "%g %g ",
           pix->radiance_temperature.E, pix->radiance_temperature.SE);
         fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
@@ -149,7 +149,7 @@ dump_buffer
         pix_time_acc = &pix->time;
 
       } else {
-        const struct htrdr_pixel_sw* pix = htrdr_buffer_at(buf, x, y);
+        const struct htrdr_pixel_image* pix = htrdr_buffer_at(buf, x, y);
         fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
         fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
         fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
@@ -484,12 +484,28 @@ htrdr_init
   htsky_args.nthreads = htrdr->nthreads;
   htsky_args.repeat_clouds = args->repeat_clouds;
   htsky_args.verbose = htrdr->mpi_rank == 0 ? args->verbose : 0;
-  htsky_args.wlen_lw_range[0] = args->wlen_lw_range[0];
-  htsky_args.wlen_lw_range[1] = args->wlen_lw_range[1];
+  /* should the sky load short or long wave data ? */
+  /* if longwave is degenerated => sw ; else : lw */
+  if(args->wlen_lw_range[0] > args->wlen_lw_range[1]) {
+    htsky_args.is_long_wave = 0 ; 
+    htsky_args.wlen_range[0] = args->wlen_sw_range[0];
+    htsky_args.wlen_range[1] = args->wlen_sw_range[1];
+    htrdr->is_image=0;
+  } else {
+    htsky_args.is_long_wave = 1 ;
+    htsky_args.wlen_range[0] = args->wlen_lw_range[0];
+    htsky_args.wlen_range[1] = args->wlen_lw_range[1];
+    if(args->wlen_sw_range[0] > args->wlen_sw_range[1]) { /* image */
+      htrdr->is_image = 1 ;
+    } else {
+      htrdr->is_image = 0 ;
+    }
+  }
+
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  if(!htsky_is_long_wave(htrdr->sky)) { /* Short wave random variate */
+  if(htrdr->is_image) {
     const double* range = HTRDR_CIE_XYZ_RANGE_DEFAULT;
     size_t n;
 
@@ -497,19 +513,34 @@ htrdr_init
     res = htrdr_cie_xyz_create(htrdr, range, n, &htrdr->cie);
     if(res != RES_OK) goto error;
 
-  } else { /* Long Wave random variate */
-    const double Tref = 290; /* In Kelvin */
-    size_t n;
+  } else {
+    if(htsky_is_long_wave(htrdr->sky)) { /* Long wave random variate */
+      const double Tref=290 ; /* In Kelvin */
+      size_t n;
 
-    htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
-    htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
-    ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
+      htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
+      htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
+      ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
+      n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
 
-    n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
-    res = htrdr_ran_lw_create
-      (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_lw);
-    if(res != RES_OK) goto error;
-  }
+      res = htrdr_wlen_ran_create
+        (htrdr, args->wlen_lw_range, n, Tref, &htrdr->wlen_ran);
+      if(res != RES_OK) goto error;
+
+    } else {
+      const double Tref=5778 ; /* Tsun In Kelvin */
+      size_t n;
+
+      htrdr->wlen_range_m[0] = args->wlen_sw_range[0]*1e-9; /* Convert in meters */
+      htrdr->wlen_range_m[1] = args->wlen_sw_range[1]*1e-9; /* Convert in meters */
+      ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
+      n = (size_t)(args->wlen_sw_range[1] - args->wlen_sw_range[0]);
+
+      res = htrdr_wlen_ran_create
+        (htrdr, args->wlen_sw_range, n, Tref, &htrdr->wlen_ran);
+      if(res != RES_OK) goto error;
+    }
+  } 
 
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
@@ -538,12 +569,12 @@ htrdr_init
     size_t pixsz = 0; /* sizeof(pixel) */
     size_t pixal = 0; /* alignof(pixel) */
 
-    if(htsky_is_long_wave(htrdr->sky)) {
-      pixsz = sizeof(struct htrdr_pixel_lw);
-      pixal = ALIGNOF(struct htrdr_pixel_lw);
+    if(!htrdr->is_image) {
+      pixsz = sizeof(struct htrdr_pixel_integ);
+      pixal = ALIGNOF(struct htrdr_pixel_integ);
     } else {
-      pixsz = sizeof(struct htrdr_pixel_sw);
-      pixal = ALIGNOF(struct htrdr_pixel_sw);
+      pixsz = sizeof(struct htrdr_pixel_image);
+      pixal = ALIGNOF(struct htrdr_pixel_image);
     }
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */
@@ -575,7 +606,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
   if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
-  if(htrdr->ran_lw) htrdr_ran_lw_ref_put(htrdr->ran_lw);
+  if(htrdr->wlen_ran) htrdr_wlen_ran_ref_put(htrdr->wlen_ran);
   if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
   if(htrdr->lifo_allocators) {
     size_t i;

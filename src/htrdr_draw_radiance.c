@@ -21,7 +21,7 @@
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_cie_xyz.h"
-#include "htrdr_ran_lw.h"
+#include "htrdr_wlen_ran.h"
 #include "htrdr_solve.h"
 
 #include <high_tune/htsky.h>
@@ -46,13 +46,13 @@
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
 enum pixel_format {
-  PIXEL_LW,
-  PIXEL_SW
+  PIXEL_INTEG,
+  PIXEL_IMAGE
 };
 
 union pixel {
-  struct htrdr_pixel_lw lw;
-  struct htrdr_pixel_sw sw;
+  struct htrdr_pixel_integ integ;
+  struct htrdr_pixel_image image;
 };
 
 /* Tile of row ordered image pixels */
@@ -169,9 +169,9 @@ write_tile_data
 
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
-  ASSERT(layout.elmt_size == (tile_data->format == PIXEL_LW
-    ? sizeof(struct htrdr_pixel_lw)
-    : sizeof(struct htrdr_pixel_sw)));
+  ASSERT(layout.elmt_size == (tile_data->format == PIXEL_INTEG
+    ? sizeof(struct htrdr_pixel_integ)
+    : sizeof(struct htrdr_pixel_image)));
 
   /* Compute the row/column of the tile origin into the buffer */
   icol = tile_data->x * (size_t)TILE_SIZE;
@@ -190,11 +190,11 @@ write_tile_data
 
     FOR_EACH(x, 0, ncols_tile) {
       switch(tile_data->format) {
-        case PIXEL_LW:
-          ((struct htrdr_pixel_lw*)buf_col)[x] = tile_row[x].lw;
+        case PIXEL_INTEG:
+          ((struct htrdr_pixel_integ*)buf_col)[x] = tile_row[x].integ;
           break;
-        case PIXEL_SW:
-          ((struct htrdr_pixel_sw*)buf_col)[x] = tile_row[x].sw;
+        case PIXEL_IMAGE:
+          ((struct htrdr_pixel_image*)buf_col)[x] = tile_row[x].image;
           break;
         default: FATAL("Unreachable code.\n"); break;
       }
@@ -455,7 +455,7 @@ mpi_gather_tiles
       /* Create a temporary tile to receive the tile data computed by the
        * concurrent MPI processes */
       tile = tile_create
-        (htrdr->allocator, htsky_is_long_wave(htrdr->sky) ? PIXEL_LW : PIXEL_SW);
+        (htrdr->allocator, htrdr->is_image ? PIXEL_IMAGE : PIXEL_INTEG) ;
       if(!tile) {
         res = RES_MEM_ERR;
         htrdr_log_err(htrdr,
@@ -481,7 +481,7 @@ error:
 }
 
 static void
-draw_pixel_sw
+draw_pixel_image
   (struct htrdr* htrdr,
    const size_t ithread,
    const size_t ipix[2],
@@ -489,7 +489,7 @@ draw_pixel_sw
    const struct htrdr_camera* cam,
    const size_t spp,
    struct ssp_rng* rng,
-   struct htrdr_pixel_sw* pixel)
+   struct htrdr_pixel_image* pixel)
 {
   struct htrdr_accum XYZ[3]; /* X, Y, and Z */
   struct htrdr_accum time;
@@ -577,7 +577,7 @@ draw_pixel_sw
 }
 
 static void
-draw_pixel_lw
+draw_pixel_integ
   (struct htrdr* htrdr,
    const size_t ithread,
    const size_t ipix[2],
@@ -585,14 +585,14 @@ draw_pixel_lw
    const struct htrdr_camera* cam,
    const size_t spp,
    struct ssp_rng* rng,
-   struct htrdr_pixel_lw* pixel)
+   struct htrdr_pixel_integ* pixel)
 {
   struct htrdr_accum radiance;
   struct htrdr_accum time;
   size_t isamp;
   double temp_min, temp_max;
   ASSERT(ipix && ipix && pix_sz && cam && rng && pixel);
-  ASSERT(htsky_is_long_wave(htrdr->sky));
+  ASSERT(!(htrdr->is_image));
 
   /* Reset the pixel accumulators */
   radiance = HTRDR_ACCUM_NULL;
@@ -627,15 +627,20 @@ draw_pixel_lw
     r2 = ssp_rng_canonical(rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_ran_lw_sample(htrdr->ran_lw, r0, r1, &band_pdf);
+    wlen = htrdr_wlen_ran_sample(htrdr->wlen_ran, r0, r1, &band_pdf);
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(htrdr->sky, wlen);
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
 
     /* Compute the integrated luminance in W/m^2/sr/m */
-    weight = htrdr_compute_radiance_lw(htrdr, ithread, rng, ray_org, ray_dir,
-      wlen, iband, iquad);
+    if(htsky_is_long_wave(htrdr->sky)) {
+      weight = htrdr_compute_radiance_lw(htrdr, ithread, rng, ray_org, ray_dir,
+        wlen, iband, iquad);
+    } else {
+      weight = htrdr_compute_radiance_sw(htrdr, ithread, rng, ray_org, ray_dir,
+        wlen, iband, iquad);
+    }
 
     /* Importance sampling: correct weight with pdf */
     weight /= band_pdf; /* In W/m^2/sr */
@@ -669,26 +674,28 @@ draw_pixel_lw
   pixel->time = time;
 
   /* Compute the brightness_temperature of the pixel and estimate its standard
-   * error */
-  #define BRIGHTNESS_TEMPERATURE(Radiance, Temperature) {                      \
-    res_T res = brightness_temperature                                         \
-      (htrdr,                                                                  \
-       htrdr->wlen_range_m[0],                                                 \
-       htrdr->wlen_range_m[1],                                                 \
-       (Radiance),                                                             \
-       &(Temperature));                                                        \
-    if(res != RES_OK) {                                                        \
-      htrdr_log_warn(htrdr,                                                    \
-        "Could not compute the brightness temperature for the radiance %g.\n", \
-        (Radiance));                                                           \
-      (Temperature) = 0;                                                       \
-    }                                                                          \
-  } (void)0
-  BRIGHTNESS_TEMPERATURE(pixel->radiance.E, pixel->radiance_temperature.E);
-  BRIGHTNESS_TEMPERATURE(pixel->radiance.E - pixel->radiance.SE, temp_min);
-  BRIGHTNESS_TEMPERATURE(pixel->radiance.E + pixel->radiance.SE, temp_max);
-  pixel->radiance_temperature.SE = temp_max - temp_min;
-  #undef BRIGHTNESS_TEMPERATURE
+   * error if the sources were in the medium (i.e., is_long_wave) */
+  if(htsky_is_long_wave(htrdr->sky)) {
+    #define BRIGHTNESS_TEMPERATURE(Radiance, Temperature) {                      \
+      res_T res = brightness_temperature                                         \
+        (htrdr,                                                                  \
+         htrdr->wlen_range_m[0],                                                 \
+         htrdr->wlen_range_m[1],                                                 \
+         (Radiance),                                                             \
+         &(Temperature));                                                        \
+      if(res != RES_OK) {                                                        \
+        htrdr_log_warn(htrdr,                                                    \
+          "Could not compute the brightness temperature for the radiance %g.\n", \
+          (Radiance));                                                           \
+        (Temperature) = 0;                                                       \
+      }                                                                          \
+    } (void)0
+    BRIGHTNESS_TEMPERATURE(pixel->radiance.E, pixel->radiance_temperature.E);
+    BRIGHTNESS_TEMPERATURE(pixel->radiance.E - pixel->radiance.SE, temp_min);
+    BRIGHTNESS_TEMPERATURE(pixel->radiance.E + pixel->radiance.SE, temp_max);
+    pixel->radiance_temperature.SE = temp_max - temp_min;
+    #undef BRIGHTNESS_TEMPERATURE
+  }
 
   /* Transform the pixel radiance from W/m^2/sr/m to W/m^/sr/nm */
   pixel->radiance.E *= 1.0e-9;
@@ -734,10 +741,10 @@ draw_tile
     ipix[1] = tile_org[1] + ipix_tile[1];
 
     /* Draw the pixel */
-    if(htsky_is_long_wave(htrdr->sky)) {
-      draw_pixel_lw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->lw);
+    if(!(htrdr->is_image)) {
+      draw_pixel_integ(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->integ);
     } else {
-      draw_pixel_sw(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->sw);
+      draw_pixel_image(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->image);
     }
   }
   return RES_OK;
@@ -783,7 +790,7 @@ draw_image
   htrdr->mpi_working_procs[htrdr->mpi_rank] = 0;
   --htrdr->mpi_nworking_procs;
 
-  pixfmt = htsky_is_long_wave(htrdr->sky) ? PIXEL_LW : PIXEL_SW;
+  pixfmt = htrdr->is_image ? PIXEL_IMAGE : PIXEL_INTEG ;
 
   omp_set_num_threads((int)nthreads);
   #pragma omp parallel
@@ -942,12 +949,12 @@ htrdr_draw_radiance
     ASSERT(layout.width || layout.height || layout.elmt_size);
     ASSERT(layout.width == width && layout.height == height);
 
-    if(htsky_is_long_wave(htrdr->sky)) {
-      pixsz = sizeof(struct htrdr_pixel_lw);
-      pixal = ALIGNOF(struct htrdr_pixel_lw);
+    if(!(htrdr->is_image)) {
+      pixsz = sizeof(struct htrdr_pixel_integ);
+      pixal = ALIGNOF(struct htrdr_pixel_integ);
     } else {
-      pixsz = sizeof(struct htrdr_pixel_sw);
-      pixal = ALIGNOF(struct htrdr_pixel_sw);
+      pixsz = sizeof(struct htrdr_pixel_image);
+      pixal = ALIGNOF(struct htrdr_pixel_image);
     }
 
     if(layout.elmt_size != pixsz || layout.alignment < pixal) {
