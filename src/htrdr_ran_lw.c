@@ -59,14 +59,14 @@ setup_ran_lw_cdf
   res = darray_double_resize(&ran_lw->cdf, ran_lw->nbands);
   if(res != RES_OK) {
     htrdr_log_err(ran_lw->htrdr,
-      "%s: Error allocating the CDF of the long wave spectral bands -- %s.\n",
+      "%s: Error allocating the CDF of the longwave spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
   res = darray_double_resize(&ran_lw->pdf, ran_lw->nbands);
   if(res != RES_OK) {
     htrdr_log_err(ran_lw->htrdr,
-      "%s: Error allocating the pdf of the long wave spectral bands -- %s.\n",
+      "%s: Error allocating the pdf of the longwave spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
@@ -75,10 +75,10 @@ setup_ran_lw_cdf
   pdf = darray_double_data_get(&ran_lw->pdf); /* Now save pdf to correct weight */
 
   htrdr_log(ran_lw->htrdr,
-    "Number of bands of the long wave cumulative: %lu\n",
+    "Number of bands of the longwave cumulative: %lu\n",
     (unsigned long)ran_lw->nbands);
 
-  /* Compute the *unormalized* probability to sample a long wave band */
+  /* Compute the *unormalized* probability to sample a longwave band */
   FOR_EACH(i, 0, ran_lw->nbands) {
     double lambda_lo = ran_lw->range[0] + (double)i * ran_lw->band_len;
     double lambda_hi = MMIN(lambda_lo + ran_lw->band_len, ran_lw->range[1]);
@@ -285,7 +285,7 @@ htrdr_ran_lw_create
   if(!ran_lw) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
-      "%s: could not allocate long wave random variate data structure -- %s.\n",
+      "%s: could not allocate longwave random variate data structure -- %s.\n",
       FUNC_NAME, res_to_cstr(res));
     goto error;
   }
