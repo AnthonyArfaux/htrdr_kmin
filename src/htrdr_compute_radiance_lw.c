@@ -154,9 +154,7 @@ htrdr_compute_radiance_lw
   double pos_next[3];
   double dir_next[3];
   double temperature;
-  double sky_band_bounds[2];
-  double sky_band_bounds_m[2];
-  double sky_band_len_m;
+  double wlen_m = wlen * 1.e-9;
   double g;
   double w = 0; /* Weight */
 
@@ -165,15 +163,9 @@ htrdr_compute_radiance_lw
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
-  g = htsky_fetch_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, iband, iquad);
+  g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
+    (htrdr->sky, wlen);
   SSF(phase_hg_setup(phase_hg, g));
-
-  /* Fetch the boundaries of the sampled sky band */
-  HTSKY(get_spectral_band_bounds(htrdr->sky, iband, sky_band_bounds));
-  sky_band_bounds_m[0] = sky_band_bounds[0] * 1.e-9;
-  sky_band_bounds_m[1] = sky_band_bounds[1] * 1.e-9;
-  sky_band_len_m = sky_band_bounds_m[1] - sky_band_bounds_m[0];
 
   /* Initialise the random walk */
   d3_set(pos, pos_in);
@@ -221,8 +213,7 @@ htrdr_compute_radiance_lw
       ASSERT(!SVX_HIT_NONE(&svx_hit));
       temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
       /* weight is planck integrated over the spectral sub-interval */
-      w = planck(sky_band_bounds_m[0], sky_band_bounds_m[1], temperature);
-      w = w * sky_band_len_m;
+      w = planck_monochromatic(wlen_m, temperature);
       break;
     }
 
@@ -271,8 +262,7 @@ htrdr_compute_radiance_lw
           w = 0;
         } else {
           /* weight is planck integrated over the spectral sub-interval */
-          w = planck(sky_band_bounds_m[0], sky_band_bounds_m[1], temperature);
-          w = w * sky_band_len_m;
+          w = planck_monochromatic(wlen_m, temperature);
         }
         break;
       }
