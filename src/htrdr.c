@@ -499,15 +499,16 @@ htrdr_init
 
   } else { /* Long Wave random variate */
     const double Tref = 290; /* In Kelvin */
+    double sky_range[2];
     size_t n;
 
-    htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
-    htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
+    HTSKY(get_spectral_bounds(htrdr->sky, sky_range));
+    htrdr->wlen_range_m[0] = sky_range[0]*1e-9; /* Convert in meters */
+    htrdr->wlen_range_m[1] = sky_range[1]*1e-9; /* Convert in meters */
     ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
 
     n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
-    res = htrdr_ran_lw_create
-      (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_lw);
+    res = htrdr_ran_lw_create(htrdr, n, Tref, &htrdr->ran_lw);
     if(res != RES_OK) goto error;
   }
 

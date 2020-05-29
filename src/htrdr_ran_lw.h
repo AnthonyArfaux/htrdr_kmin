@@ -26,10 +26,9 @@ struct htrdr_ran_lw;
 extern LOCAL_SYM res_T
 htrdr_ran_lw_create
   (struct htrdr* htrdr,
-   const double range[2], /* Must be included in [1000, 100000] nanometers */
    /* # bands used to discretisze the LW domain. HTRDR_RAN_LW_CONTINUE <=> no
     * discretisation */
-   const size_t nbands, /* Hint on #bands used to discretised th CDF */
+   const size_t nbands, /* Hint on #bands used to discretised the CDF */
    const double ref_temperature, /* Reference temperature */
    struct htrdr_ran_lw** ran_lw);
 
@@ -48,6 +47,11 @@ htrdr_ran_lw_sample
    const double r0, /* Canonical number in [0, 1[ */
    const double r1, /* Canonical number in [0, 1[ */
    double* pdf); /* May be NULL */
+
+extern LOCAL_SYM double
+htrdr_ran_lw_get_sky_band_pdf
+  (const struct htrdr_ran_lw* ran_lw,
+   const size_t iband);
 
 #endif /* HTRDR_RAN_LW_H */
 

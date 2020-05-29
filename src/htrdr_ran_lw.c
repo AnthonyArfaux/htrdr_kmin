@@ -30,6 +30,7 @@
 #include <math.h> /* nextafter */
 
 struct htrdr_ran_lw {
+  struct darray_double pdf_sky_bands;
   struct darray_double pdf;
   struct darray_double cdf;
   double range[2]; /* Boundaries of the spectral integration interval */
@@ -120,6 +121,69 @@ error:
   darray_double_clear(&ran_lw->pdf);
   goto exit;
 }
+
+static res_T
+compute_sky_bands_pdf(struct htrdr_ran_lw* ran_lw, const char* func_name)
+{
+  double* pdf = NULL;
+  size_t nbands;
+  res_T res = RES_OK;
+  ASSERT(ran_lw && htsky_is_long_wave(ran_lw->htrdr->sky) && func_name);
+
+  nbands = htsky_get_spectral_bands_count(ran_lw->htrdr->sky);
+
+  res = darray_double_resize(&ran_lw->pdf_sky_bands, nbands);
+  if(res != RES_OK) {
+    htrdr_log_err(ran_lw->htrdr,
+      "%s: error allocating the PDF of the long wave spectral bands "
+      "of the sky -- %s.\n",
+      func_name, res_to_cstr(res));
+    goto error;
+  }
+
+  pdf = darray_double_data_get(&ran_lw->pdf_sky_bands);
+
+  if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+    ASSERT(nbands == 1);
+    pdf[0] = 1;
+  } else {
+    double sum = 0;
+    size_t i = 0;
+
+    /* Compute the *unormalized* probability to sample a long wave band */
+    FOR_EACH(i, 0, nbands) {
+      const size_t iband = htsky_get_spectral_band_id(ran_lw->htrdr->sky, i);
+      double wlens[2];
+
+      HTSKY(get_spectral_band_bounds(ran_lw->htrdr->sky, iband, wlens));
+      /* Ensure that the whole sky band is included into the random variate range */
+      ASSERT(wlens[0] >= ran_lw->range[0]);
+      ASSERT(wlens[1] <= ran_lw->range[1]);
+
+      /* Convert from nanometer to meter */
+      wlens[0] *= 1.e-9;
+      wlens[1] *= 1.e-9;
+
+      /* Compute the probability of the current band */
+      pdf[i] = blackbody_fraction(wlens[0], wlens[1], ran_lw->ref_temperature);
+
+      /* Update the norm */
+      sum += pdf[i];
+    }
+    ASSERT(eq_eps(sum, blackbody_fraction(ran_lw->range[0]*1.e-9,
+      ran_lw->range[1]*1.e-9, ran_lw->ref_temperature), 1.e-6f));
+
+    /* Normalize the probabilities */
+    FOR_EACH(i, 0, nbands)  pdf[i] /= sum;
+  }
+
+exit:
+  return res;
+error:
+  darray_double_clear(&ran_lw->pdf_sky_bands);
+  goto exit;
+}
+
 
 static double
 ran_lw_sample_continue
@@ -258,6 +322,7 @@ release_ran_lw(ref_T* ref)
   ran_lw = CONTAINER_OF(ref, struct htrdr_ran_lw, ref);
   darray_double_release(&ran_lw->cdf);
   darray_double_release(&ran_lw->pdf);
+  darray_double_release(&ran_lw->pdf_sky_bands);
   MEM_RM(ran_lw->htrdr->allocator, ran_lw);
 }
 
@@ -267,19 +332,16 @@ release_ran_lw(ref_T* ref)
 res_T
 htrdr_ran_lw_create
   (struct htrdr* htrdr,
-   const double range[2], /* Must be included in [1000, 100000] nanometers */
    const size_t nbands, /* # bands used to discretized CDF */
    const double ref_temperature,
    struct htrdr_ran_lw** out_ran_lw)
 {
   struct htrdr_ran_lw* ran_lw = NULL;
+  double sky_range[2];
   double min_band_len = 0;
   res_T res = RES_OK;
-  ASSERT(htrdr && range && out_ran_lw && ref_temperature > 0);
+  ASSERT(htrdr && out_ran_lw && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
-  ASSERT(range[0] >= 1000);
-  ASSERT(range[1] <= 100000);
-  ASSERT(range[0] <= range[1]);
 
   ran_lw = MEM_CALLOC(htrdr->allocator, 1, sizeof(*ran_lw));
   if(!ran_lw) {
@@ -293,9 +355,12 @@ htrdr_ran_lw_create
   ran_lw->htrdr = htrdr;
   darray_double_init(htrdr->allocator, &ran_lw->cdf);
   darray_double_init(htrdr->allocator, &ran_lw->pdf);
+  darray_double_init(htrdr->allocator, &ran_lw->pdf_sky_bands);
 
-  ran_lw->range[0] = range[0];
-  ran_lw->range[1] = range[1];
+  HTSKY(get_spectral_bounds(htrdr->sky, sky_range));
+
+  ran_lw->range[0] = sky_range[0];
+  ran_lw->range[1] = sky_range[1];
   ran_lw->ref_temperature = ref_temperature;
   ran_lw->nbands = nbands;
 
@@ -304,21 +369,24 @@ htrdr_ran_lw_create
   if(nbands == HTRDR_RAN_LW_CONTINUE) {
     ran_lw->band_len = 0;
   } else {
-    ran_lw->band_len = (range[1] - range[0]) / (double)ran_lw->nbands;
+    ran_lw->band_len = (sky_range[1] - sky_range[0]) / (double)ran_lw->nbands;
 
     /* Adjust the band length to ensure that each sky spectral interval is
      * overlapped by at least one band */
     if(ran_lw->band_len > min_band_len) {
       ran_lw->band_len = min_band_len;
-      ran_lw->nbands = (size_t)ceil((range[1] - range[0]) / ran_lw->band_len);
+      ran_lw->nbands = (size_t)ceil((sky_range[1] - sky_range[0]) / ran_lw->band_len);
     }
 
     res = setup_ran_lw_cdf(ran_lw, FUNC_NAME);
     if(res != RES_OK) goto error;
   }
 
+  res = compute_sky_bands_pdf(ran_lw, FUNC_NAME);
+  if(res != RES_OK) goto error;
+
   htrdr_log(htrdr, "Long wave interval defined on [%g, %g] nanometers.\n",
-    range[0], range[1]);
+    sky_range[0], sky_range[1]);
 
 exit:
   *out_ran_lw = ran_lw;
@@ -353,6 +421,7 @@ htrdr_ran_lw_sample
   if(ran_lw->nbands != HTRDR_RAN_LW_CONTINUE) { /* Discrete */
     return ran_lw_sample_discrete(ran_lw, r0, r1, FUNC_NAME, pdf);
   } else if(eq_eps(ran_lw->range[0], ran_lw->range[1], 1.e-6)) {
+    FATAL("Unexpected behaviour\n");
     if(pdf) *pdf = 1;
     return ran_lw->range[0];
   } else { /* Continue */
@@ -361,3 +430,16 @@ htrdr_ran_lw_sample
   }
 }
 
+double
+htrdr_ran_lw_get_sky_band_pdf
+  (const struct htrdr_ran_lw* ran_lw,
+   const size_t iband)
+{
+  size_t i, n;
+  ASSERT(ran_lw);
+
+  n = htsky_get_spectral_bands_count(ran_lw->htrdr->sky);
+  i = iband - htsky_get_spectral_band_id(ran_lw->htrdr->sky, 0);
+  ASSERT(i < n);
+  return darray_double_cdata_get(&ran_lw->pdf_sky_bands)[i];
+}
