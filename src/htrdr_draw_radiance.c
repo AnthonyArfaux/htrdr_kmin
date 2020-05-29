@@ -633,15 +633,15 @@ draw_pixel_lw
     iband = htsky_find_spectral_band(htrdr->sky, wlen);
     iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
 
-    /* Compute the integrated luminance in W/m^2/sr */
+    /* Compute the integrated luminance in W/m^2/sr/m */
     weight = htrdr_compute_radiance_lw(htrdr, ithread, rng, ray_org, ray_dir,
       wlen, iband, iquad);
 
     /* Importance sampling: correct weight with pdf */
-    weight /= band_pdf;
+    weight /= band_pdf; /* In W/m^2/sr */
 
     /* From integrated radiance to average radiance in W/m^2/sr/m */
-    if(htrdr->wlen_range_m[0] != htrdr->wlen_range_m[1]) { 
+    if(htrdr->wlen_range_m[0] != htrdr->wlen_range_m[1]) {
       /* Is not monochromatic */
       weight /= (htrdr->wlen_range_m[1] - htrdr->wlen_range_m[0]) ;
     }

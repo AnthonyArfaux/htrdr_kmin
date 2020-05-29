@@ -56,6 +56,7 @@ struct htrdr_camera;
 struct s3d_hit;
 struct ssp_rng;
 
+/* Return the shortwave radiance in W/m^2/sr/m */
 extern LOCAL_SYM double
 htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
@@ -67,6 +68,7 @@ htrdr_compute_radiance_sw
    const size_t iband, /* Index of the spectral band */
    const size_t iquad); /* Index of the quadrature point into the band */
 
+/* Return the longwave radiance in W/m^2/sr/m */
 extern LOCAL_SYM double
 htrdr_compute_radiance_lw
   (struct htrdr* htrdr,
