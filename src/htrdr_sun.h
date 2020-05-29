@@ -64,21 +64,4 @@ htrdr_sun_is_dir_in_solar_cone
   (const struct htrdr_sun* sun,
    const double dir[3]);
 
-extern LOCAL_SYM size_t
-htrdr_sun_get_spectral_bands_count
-  (const struct htrdr_sun* sun);
-
-extern LOCAL_SYM void
-htrdr_sun_get_spectral_band_bounds
-  (const struct htrdr_sun* sun,
-   const size_t ispectral_band,
-   double bounds[2]); /* Lower and upper wavelength in nanometer */
-
-/* Return the ranges of the spectral bands where the CIE XYZ color space is
- * defined. CIE XYZ in [band_range[0], band_range[1]] */
-extern LOCAL_SYM void
-htrdr_sun_get_CIE_XYZ_spectral_bands_range
-  (const struct htrdr_sun* sun,
-   size_t band_range[2]);
-
 #endif /* HTRDR_SUN_H */
