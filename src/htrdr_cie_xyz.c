@@ -33,6 +33,9 @@ struct htrdr_cie_xyz {
   struct darray_double cdf_X;
   struct darray_double cdf_Y;
   struct darray_double cdf_Z;
+  double rcp_integral_X;
+  double rcp_integral_Y;
+  double rcp_integral_Z;
   double range[2]; /* Boundaries of the handled CIE XYZ color space */
   double band_len; /* Length in nanometers of a band */
 
@@ -176,7 +179,7 @@ setup_cie_xyz
   enum { X, Y, Z }; /* Helper constant */
   double* pdf[3] = {NULL, NULL, NULL};
   double* cdf[3] = {NULL, NULL, NULL};
-  double sum[3] = {0,0,0};
+  double sum[3] = {0, 0, 0};
   size_t i;
   res_T res = RES_OK;
 
@@ -204,7 +207,6 @@ setup_cie_xyz
   #undef SETUP_STIMULUS
 
   /* Compute the *unormalized* pdf of the tristimulus */
-
   FOR_EACH(i, 0, nbands) {
     const double lambda_lo = cie->range[0] + (double)i * cie->band_len;
     const double lambda_hi = MMIN(lambda_lo + cie->band_len, cie->range[1]);
@@ -218,6 +220,15 @@ setup_cie_xyz
     sum[Y] += pdf[Y][i];
     sum[Z] += pdf[Z][i];
   }
+  #define CHK_SUM(Sum, Range, Fit) \
+    ASSERT(eq_eps(Sum, trapezoidal_integration(Range[0], Range[1], Fit), 1.e-3))
+  CHK_SUM(sum[X], cie->range, fit_x_bar_1931);
+  CHK_SUM(sum[Y], cie->range, fit_y_bar_1931);
+  CHK_SUM(sum[Z], cie->range, fit_z_bar_1931);
+  #undef CHK_SUM
+  cie->rcp_integral_X = 1.0 / sum[X];
+  cie->rcp_integral_Y = 1.0 / sum[Y];
+  cie->rcp_integral_Z = 1.0 / sum[Z];
 
   FOR_EACH(i, 0, nbands) {
     /* Normalize the pdf */
@@ -343,29 +354,38 @@ double
 htrdr_cie_xyz_sample_X
   (struct htrdr_cie_xyz* cie,
    const double r0,
-   const double r1)
+   const double r1,
+   double* pdf)
 {
-  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_X),
+  const double wlen = sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_X),
     darray_double_size_get(&cie->cdf_X), fit_x_bar_1931, r0, r1);
+  if(pdf) *pdf = cie->rcp_integral_X;
+  return wlen;
 }
 
 double
 htrdr_cie_xyz_sample_Y
   (struct htrdr_cie_xyz* cie,
    const double r0,
-   const double r1)
+   const double r1,
+   double* pdf)
 {
-  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Y),
+  const double wlen = sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Y),
     darray_double_size_get(&cie->cdf_Y), fit_y_bar_1931, r0, r1);
+  if(pdf) *pdf = cie->rcp_integral_Y;
+  return wlen;
 }
 
 double
 htrdr_cie_xyz_sample_Z
   (struct htrdr_cie_xyz* cie,
    const double r0,
-   const double r1)
+   const double r1,
+   double* pdf)
 {
-  return sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Z),
+  const double wlen = sample_cie_xyz(cie, darray_double_cdata_get(&cie->cdf_Z),
     darray_double_size_get(&cie->cdf_Z), fit_z_bar_1931, r0, r1);
+  if(pdf) *pdf = cie->rcp_integral_Z;
+  return wlen;
 }
 

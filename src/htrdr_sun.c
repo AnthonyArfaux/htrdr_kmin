@@ -27,7 +27,7 @@
 #include <star/ssp.h>
 
 struct htrdr_sun {
-  /* Short wave radiance in W.m^-2.sr^-1, for each spectral interval */
+  /* Short wave radiance in W/m^2/sr/m, for each spectral interval */
   struct darray_double radiances_sw;
 
   /* Short wave spectral interval boundaries, in cm^-1 */
@@ -37,6 +37,7 @@ struct htrdr_sun {
   double cos_half_angle;
   double solid_angle; /* In sr; solid_angle = 2*PI*(1 - cos(half_angle)) */
   double frame[9];
+  double temperature; /* In K */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -87,13 +88,14 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   if(!sun) {
     htrdr_log_err(htrdr, "could not allocate the sun data structure.\n");
     res = RES_MEM_ERR;
-  goto error;
-}
+    goto error;
+  }
   ref_init(&sun->ref);
   sun->htrdr = htrdr;
   darray_double_init(htrdr->allocator, &sun->radiances_sw);
   darray_double_init(htrdr->allocator, &sun->wavenumbers_sw);
   sun->half_angle = 4.6524e-3;
+  sun->temperature = 5778;
   sun->cos_half_angle = cos(sun->half_angle);
   sun->solid_angle = 2*PI*(1-sun->cos_half_angle);
   d33_basis(sun->frame, main_dir);
@@ -112,8 +114,17 @@ htrdr_sun_create(struct htrdr* htrdr, struct htrdr_sun** out_sun)
   }
 
   FOR_EACH(i, 0, darray_double_size_get(&sun->radiances_sw)) {
-    /* Convert the incoming flux in radiance */
-    darray_double_data_get(&sun->radiances_sw)[i] = incoming_flux_sw[i] / PI;
+    double band_bounds_m[2];
+    double band_len_m;
+
+    /* Retrieve the boundaries of the spectral band (in meters) */
+    band_bounds_m[0] = wavenumber_to_wavelength(wavenumbers_sw[i+1])*1.e-9;
+    band_bounds_m[1] = wavenumber_to_wavelength(wavenumbers_sw[i+0])*1.e-9;
+    band_len_m = band_bounds_m[1] - band_bounds_m[0];
+
+    /* Convert the incoming flux in radiance  (in W/m^2/sr/m) */
+    darray_double_data_get(&sun->radiances_sw)[i] =
+      incoming_flux_sw[i] / (band_len_m * sun->solid_angle);
   }
   FOR_EACH(i, 0, darray_double_size_get(&sun->wavenumbers_sw)) {
     darray_double_data_get(&sun->wavenumbers_sw)[i] = wavenumbers_sw[i];

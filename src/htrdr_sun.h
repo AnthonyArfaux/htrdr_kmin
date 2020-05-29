@@ -54,7 +54,7 @@ extern LOCAL_SYM double
 htrdr_sun_get_solid_angle
   (const struct htrdr_sun* sun);
 
-extern LOCAL_SYM double /* W.sr^-1.m^-2 */
+extern LOCAL_SYM double /* W/m^2/sr/m */
 htrdr_sun_get_radiance
   (const struct htrdr_sun* sun,
    const double wavelength);
