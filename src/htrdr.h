@@ -50,7 +50,7 @@ struct htrdr {
   struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
-  struct htrdr_wlen_ran* wlen_ran;
+  struct htrdr_ran_wlen* ran_wlen;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;

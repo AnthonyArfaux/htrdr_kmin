@@ -24,7 +24,7 @@
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
 #include "htrdr_mtl.h"
-#include "htrdr_wlen_ran.h"
+#include "htrdr_ran_wlen.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -523,8 +523,8 @@ htrdr_init
       ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
       n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
 
-      res = htrdr_wlen_ran_create
-        (htrdr, args->wlen_lw_range, n, Tref, &htrdr->wlen_ran);
+      res = htrdr_ran_wlen_create
+        (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_wlen);
       if(res != RES_OK) goto error;
 
     } else {
@@ -536,8 +536,8 @@ htrdr_init
       ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
       n = (size_t)(args->wlen_sw_range[1] - args->wlen_sw_range[0]);
 
-      res = htrdr_wlen_ran_create
-        (htrdr, args->wlen_sw_range, n, Tref, &htrdr->wlen_ran);
+      res = htrdr_ran_wlen_create
+        (htrdr, args->wlen_sw_range, n, Tref, &htrdr->ran_wlen);
       if(res != RES_OK) goto error;
     }
   } 
@@ -606,7 +606,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
   if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
-  if(htrdr->wlen_ran) htrdr_wlen_ran_ref_put(htrdr->wlen_ran);
+  if(htrdr->ran_wlen) htrdr_ran_wlen_ref_put(htrdr->ran_wlen);
   if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
   if(htrdr->lifo_allocators) {
     size_t i;

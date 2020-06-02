@@ -21,7 +21,7 @@
 #include "htrdr_buffer.h"
 #include "htrdr_camera.h"
 #include "htrdr_cie_xyz.h"
-#include "htrdr_wlen_ran.h"
+#include "htrdr_ran_wlen.h"
 #include "htrdr_solve.h"
 
 #include <high_tune/htsky.h>
@@ -627,7 +627,7 @@ draw_pixel_integ
     r2 = ssp_rng_canonical(rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_wlen_ran_sample(htrdr->wlen_ran, r0, r1, &band_pdf);
+    wlen = htrdr_ran_wlen_sample(htrdr->ran_wlen, r0, r1, &band_pdf);
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(htrdr->sky, wlen);

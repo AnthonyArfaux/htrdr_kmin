@@ -1,4 +1,5 @@
 /* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +18,7 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
-#include "htrdr_wlen_ran.h"
+#include "htrdr_ran_wlen.h"
 
 #include <high_tune/htsky.h>
 
@@ -29,7 +30,7 @@
 
 #include <math.h> /* nextafter */
 
-struct htrdr_wlen_ran {
+struct htrdr_ran_wlen {
   struct darray_double pdf;
   struct darray_double cdf;
   double range[2]; /* Boundaries of the spectral integration interval */
@@ -46,7 +47,7 @@ struct htrdr_wlen_ran {
  ******************************************************************************/
 static res_T
 setup_wlen_ran_cdf
-  (struct htrdr_wlen_ran* wlen_ran,
+  (struct htrdr_ran_wlen* wlen_ran,
    const char* func_name)
 {
   double* pdf = NULL;
@@ -123,7 +124,7 @@ error:
 
 static double
 wlen_ran_sample_continue
-  (const struct htrdr_wlen_ran* wlen_ran,
+  (const struct htrdr_ran_wlen* wlen_ran,
    const double r,
    const double range[2], /* In nanometer */
    const char* func_name,
@@ -200,7 +201,7 @@ wlen_ran_sample_continue
 
 static double
 wlen_ran_sample_discrete
-  (const struct htrdr_wlen_ran* wlen_ran,
+  (const struct htrdr_ran_wlen* wlen_ran,
    const double r0,
    const double r1,
    const char* func_name,
@@ -253,9 +254,9 @@ wlen_ran_sample_discrete
 static void
 release_wlen_ran(ref_T* ref)
 {
-  struct htrdr_wlen_ran* wlen_ran = NULL;
+  struct htrdr_ran_wlen* wlen_ran = NULL;
   ASSERT(ref);
-  wlen_ran = CONTAINER_OF(ref, struct htrdr_wlen_ran, ref);
+  wlen_ran = CONTAINER_OF(ref, struct htrdr_ran_wlen, ref);
   darray_double_release(&wlen_ran->cdf);
   darray_double_release(&wlen_ran->pdf);
   MEM_RM(wlen_ran->htrdr->allocator, wlen_ran);
@@ -265,16 +266,16 @@ release_wlen_ran(ref_T* ref)
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_wlen_ran_create
+htrdr_ran_wlen_create
   (struct htrdr* htrdr,
    /* range must be included in [200,1000] nm for solar or in [1000, 100000]
     * nanometers for longwave (thermal)*/
-   const double range[2], 
+   const double range[2],
    const size_t nbands, /* # bands used to discretized CDF */
    const double ref_temperature,
-   struct htrdr_wlen_ran** out_wlen_ran)
+   struct htrdr_ran_wlen** out_wlen_ran)
 {
-  struct htrdr_wlen_ran* wlen_ran = NULL;
+  struct htrdr_ran_wlen* wlen_ran = NULL;
   double min_band_len = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && range && out_wlen_ran && ref_temperature > 0);
@@ -326,27 +327,27 @@ exit:
   *out_wlen_ran = wlen_ran;
   return res;
 error:
-  if(wlen_ran) htrdr_wlen_ran_ref_put(wlen_ran);
+  if(wlen_ran) htrdr_ran_wlen_ref_put(wlen_ran);
   goto exit;
 }
 
 void
-htrdr_wlen_ran_ref_get(struct htrdr_wlen_ran* wlen_ran)
+htrdr_ran_wlen_ref_get(struct htrdr_ran_wlen* wlen_ran)
 {
   ASSERT(wlen_ran);
   ref_get(&wlen_ran->ref);
 }
 
 void
-htrdr_wlen_ran_ref_put(struct htrdr_wlen_ran* wlen_ran)
+htrdr_ran_wlen_ref_put(struct htrdr_ran_wlen* wlen_ran)
 {
   ASSERT(wlen_ran);
   ref_put(&wlen_ran->ref, release_wlen_ran);
 }
 
 double
-htrdr_wlen_ran_sample
-  (const struct htrdr_wlen_ran* wlen_ran,
+htrdr_ran_wlen_sample
+  (const struct htrdr_ran_wlen* wlen_ran,
    const double r0,
    const double r1,
    double* pdf)
