@@ -30,6 +30,12 @@
   #define HTRDR(Func) htrdr_ ## Func
 #endif
 
+enum htrdr_spectral_type {
+  HTRDR_SPECTRAL_LW, /* Longwave */
+  HTRDR_SPECTRAL_SW, /* Shortwave */
+  HTRDR_SPECTRAL_SW_CIE_XYZ /* Shortwave wrt the CIE XYZ tristimulus */
+};
+
 /* Forward declarations */
 struct htsky;
 struct htrdr_args;
@@ -56,8 +62,8 @@ struct htrdr {
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
+  enum htrdr_spectral_type spectral_type;
   double wlen_range_m[2]; /* Integration range in *meters* */
-  int is_image ; /* XYZ Image or spectral integration? */
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */

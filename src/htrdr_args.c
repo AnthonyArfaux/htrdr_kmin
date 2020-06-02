@@ -61,12 +61,6 @@ print_help(const char* cmd)
 "  -i <image>     define the image to compute. Refer to the htrdr man\n"
 "                 page for the list of image options\n");
   printf(
-"  -l WLEN_MIN,WLEN_MAX\n"
-"                 switch in infrared rendering for longwave in\n"
-"                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
-"                 rendering is performed for the visible part of the\n"
-"                 spectrum in [380, 780] nanometers.\n");
-  printf(
 "  -M MATERIALS   file listing the ground materials.\n");
   printf(
 "  -m MIE         file of Mie's data.\n");
@@ -81,11 +75,9 @@ print_help(const char* cmd)
   printf(
 "  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
-"  -s WLEN_MIN,WLEN_MAX\n"
-"                 switch in solar rendering for the short waves in\n"
-"                 [WLEN_MIN, WLEN_MAX], in nanometers. By default, the\n"
-"                 rendering is performed for the visible part of the\n"
-"                 spectrum in [380, 780] nanometers with CIE.\n");
+"  -s <spectral>  define the type and range of the spectral\n"
+"                 integration. Refer to the htrdr man page for the list\n"
+"                 of spectral options\n");
   printf(
 "  -T THRESHOLD   optical thickness used as threshold during the octree\n"
 "                 building. By default its value is `%g'.\n",
@@ -223,10 +215,11 @@ parse_camera_parameter(struct htrdr_args* args, const char* str)
   char* val;
   char* ctx;
   res_T res = RES_OK;
+  ASSERT(args);
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
     fprintf(stderr,
-      "Could not duplicate the rectangle option string `%s'.\n", str);
+      "Could not duplicate the camera option string `%s'.\n", str);
     res = RES_MEM_ERR;
     goto error;
   }
@@ -261,6 +254,82 @@ parse_camera_parameter(struct htrdr_args* args, const char* str)
     goto error;
   }
   #undef PARSE
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_spectral_range(const char* str, double wlen_range[2])
+{
+  double range[2];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(wlen_range && str);
+
+  res = cstr_to_list_double(str, ',', range, &len, 2);
+  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
+  if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid spectral range `%s'.\n", str);
+    goto error;
+  }
+  wlen_range[0] = range[0];
+  wlen_range[1] = range[1];
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_spectral_parameter(struct htrdr_args* args, const char* str)
+{
+  char buf[128];
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+  ASSERT(args);
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the spectral option string `%s'.\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &ctx);
+  val = strtok_r(buf, "",  &ctx);
+
+  if(!strcmp(key, "cie_xyz")) {
+    args->spectral_type = HTRDR_SPECTRAL_SW_CIE_XYZ;
+    args->wlen_range[0] = HTRDR_CIE_XYZ_RANGE_DEFAULT[0];
+    args->wlen_range[1] = HTRDR_CIE_XYZ_RANGE_DEFAULT[1];
+  } else {
+    if(!val) {
+      fprintf(stderr, "Missing value to the spectral option `%s'.\n", key);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    if(!strcmp(key, "sw")) {
+      args->spectral_type = HTRDR_SPECTRAL_SW;
+      res = parse_spectral_range(val, args->wlen_range);
+      if(res != RES_OK) goto error;
+    } else if(!strcmp(val, "lw")) {
+      args->spectral_type = HTRDR_SPECTRAL_LW;
+      res = parse_spectral_range(val, args->wlen_range);
+      if(res != RES_OK) goto error;
+    } else {
+      fprintf(stderr, "Invalid spectral parameter `%s'.\n", key);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
 exit:
   return res;
 error:
@@ -371,53 +440,6 @@ error:
   goto exit;
 }
 
-static res_T
-parse_spectral_range(const char* str, double wlen_range[2])
-{
-  double range[2];
-  size_t len;
-  res_T res = RES_OK;
-  ASSERT(wlen_range && str);
-
-  res = cstr_to_list_double(str, ',', range, &len, 2);
-  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
-  if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
-  if(res != RES_OK) {
-    fprintf(stderr, "Invalid spectral range `%s'.\n", str);
-    goto error;
-  }
-
-  wlen_range[0] = range[0];
-  wlen_range[1] = range[1];
-
-exit:
-  return res;
-error:
-  goto exit;
-}
-
-static res_T
-parse_lw_range(struct htrdr_args* args, const char* str)
-{
-  res_T res = RES_OK;
-  ASSERT(args && str);
-
-  res = parse_spectral_range(str, args->wlen_lw_range) ;
-
-  return res ;
-}
-
-static res_T
-parse_sw_range(struct htrdr_args* args, const char* str)
-{
-  res_T res = RES_OK;
-  ASSERT(args && str);
-
-  res = parse_spectral_range(str, args->wlen_sw_range) ;
-
-  return res ;
-}
-
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -442,7 +464,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:l:M:m:O:o:Rrs:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:O:o:Rrs:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
        case 'C':
@@ -463,9 +485,6 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         res = parse_multiple_parameters
           (args, optarg, parse_image_parameter);
         break;
-      case 'l':
-        res = parse_lw_range(args, optarg);
-        break;
       case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
       case 'O': args->cache = optarg; break;
@@ -473,7 +492,8 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;
       case 's':
-        res = parse_sw_range(args, optarg);
+        res = parse_multiple_parameters
+          (args, optarg, parse_spectral_parameter);
         break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);

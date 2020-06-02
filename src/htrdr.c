@@ -102,6 +102,23 @@ log_msg
   }
 }
 
+static enum htsky_spectral_type
+htrdr_to_sky_spectral_type(const enum htrdr_spectral_type type)
+{
+  enum htsky_spectral_type spectype;
+  switch(type) {
+    case HTRDR_SPECTRAL_LW:
+      spectype = HTSKY_SPECTRAL_LW;
+      break;
+    case HTRDR_SPECTRAL_SW:
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      spectype = HTSKY_SPECTRAL_SW;
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return spectype;
+}
+
 static res_T
 dump_buffer
   (struct htrdr* htrdr,
@@ -117,13 +134,8 @@ dump_buffer
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
-  if(!htrdr->is_image) {
-    pixsz = sizeof(struct htrdr_pixel_integ);
-    pixal = ALIGNOF(struct htrdr_pixel_integ);
-  } else {
-    pixsz = sizeof(struct htrdr_pixel_image);
-    pixal = ALIGNOF(struct htrdr_pixel_image);
-  }
+  pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
+  pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
 
   htrdr_buffer_get_layout(buf, &layout);
   if(layout.elmt_size != pixsz || layout.alignment != pixal) {
@@ -140,8 +152,8 @@ dump_buffer
       struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
       const struct htrdr_accum* pix_time_acc = NULL;
 
-      if(!htrdr->is_image){
-        const struct htrdr_pixel_integ* pix = htrdr_buffer_at(buf, x, y);
+      if(htrdr->spectral_type != HTRDR_SPECTRAL_SW_CIE_XYZ){
+        const struct htrdr_pixel_xwave* pix = htrdr_buffer_at(buf, x, y);
         fprintf(stream, "%g %g ",
           pix->radiance_temperature.E, pix->radiance_temperature.SE);
         fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
@@ -414,6 +426,7 @@ htrdr_init
   htrdr->grid_max_definition[0] = args->grid_max_definition[0];
   htrdr->grid_max_definition[1] = args->grid_max_definition[1];
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
+  htrdr->spectral_type = args->spectral_type;
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
@@ -484,62 +497,37 @@ htrdr_init
   htsky_args.nthreads = htrdr->nthreads;
   htsky_args.repeat_clouds = args->repeat_clouds;
   htsky_args.verbose = htrdr->mpi_rank == 0 ? args->verbose : 0;
-  /* should the sky load short or long wave data ? */
-  /* if longwave is degenerated => sw ; else : lw */
-  if(args->wlen_lw_range[0] > args->wlen_lw_range[1]) {
-    htsky_args.is_long_wave = 0 ; 
-    htsky_args.wlen_range[0] = args->wlen_sw_range[0];
-    htsky_args.wlen_range[1] = args->wlen_sw_range[1];
-    if(args->wlen_sw_range[0] > args->wlen_sw_range[1]) { /* image */
-      htrdr->is_image = 1 ;
-    } else {
-      htrdr->is_image = 0 ;
-    }
-  } else {
-    htsky_args.is_long_wave = 1 ;
-    htsky_args.wlen_range[0] = args->wlen_lw_range[0];
-    htsky_args.wlen_range[1] = args->wlen_lw_range[1];
-    htrdr->is_image=0;
-  }
-
+  htsky_args.spectral_type = htrdr_to_sky_spectral_type(args->spectral_type);
+  htsky_args.wlen_range[0] = args->wlen_range[0];
+  htsky_args.wlen_range[1] = args->wlen_range[1];
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  if(htrdr->is_image) {
-    const double* range = HTRDR_CIE_XYZ_RANGE_DEFAULT;
-    size_t n;
+  htrdr->wlen_range_m[0] = args->wlen_range[0]*1e-9; /* Convert in meters */
+  htrdr->wlen_range_m[1] = args->wlen_range[1]*1e-9; /* Convert in meters */
 
-    n = (size_t)(range[1] - range[0]);
-    res = htrdr_cie_xyz_create(htrdr, range, n, &htrdr->cie);
+  if(htrdr->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+    size_t n;
+    n = (size_t)(args->wlen_range[1] - args->wlen_range[0]);
+    res = htrdr_cie_xyz_create(htrdr, args->wlen_range, n, &htrdr->cie);
     if(res != RES_OK) goto error;
 
   } else {
-    if(htsky_is_long_wave(htrdr->sky)) { /* Long wave random variate */
-      const double Tref=290 ; /* In Kelvin */
-      size_t n;
+    double Tref; /* In Kelvin */
+    size_t n;
 
-      htrdr->wlen_range_m[0] = args->wlen_lw_range[0]*1e-9; /* Convert in meters */
-      htrdr->wlen_range_m[1] = args->wlen_lw_range[1]*1e-9; /* Convert in meters */
-      ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
-      n = (size_t)(args->wlen_lw_range[1] - args->wlen_lw_range[0]);
-
-      res = htrdr_ran_wlen_create
-        (htrdr, args->wlen_lw_range, n, Tref, &htrdr->ran_wlen);
-      if(res != RES_OK) goto error;
-
-    } else {
-      const double Tref=5778 ; /* Tsun In Kelvin */
-      size_t n;
-
-      htrdr->wlen_range_m[0] = args->wlen_sw_range[0]*1e-9; /* Convert in meters */
-      htrdr->wlen_range_m[1] = args->wlen_sw_range[1]*1e-9; /* Convert in meters */
-      ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
-      n = (size_t)(args->wlen_sw_range[1] - args->wlen_sw_range[0]);
-
-      res = htrdr_ran_wlen_create
-        (htrdr, args->wlen_sw_range, n, Tref, &htrdr->ran_wlen);
-      if(res != RES_OK) goto error;
+    switch(htrdr->spectral_type) {
+      case HTRDR_SPECTRAL_LW: Tref = 290; break;
+      case HTRDR_SPECTRAL_SW: Tref = 5778; /* Tsun */ break;
+      default: FATAL("Unreachable code.\n"); break;
     }
+
+    ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
+    n = (size_t)(args->wlen_range[1] - args->wlen_range[0]);
+
+    res = htrdr_ran_wlen_create
+      (htrdr, args->wlen_range, n, Tref, &htrdr->ran_wlen);
+    if(res != RES_OK) goto error;
   } 
 
   htrdr->lifo_allocators = MEM_CALLOC
@@ -566,16 +554,9 @@ htrdr_init
   /* Create the image buffer only on the master process; the image parts
    * rendered by the processes are gathered onto the master process. */
   if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
-    size_t pixsz = 0; /* sizeof(pixel) */
-    size_t pixal = 0; /* alignof(pixel) */
+    const size_t pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
+    const size_t pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
 
-    if(!htrdr->is_image) {
-      pixsz = sizeof(struct htrdr_pixel_integ);
-      pixal = ALIGNOF(struct htrdr_pixel_integ);
-    } else {
-      pixsz = sizeof(struct htrdr_pixel_image);
-      pixal = ALIGNOF(struct htrdr_pixel_image);
-    }
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */
       args->image.definition[1], /* Height */
