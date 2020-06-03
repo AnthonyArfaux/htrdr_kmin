@@ -565,7 +565,7 @@ draw_pixel_image
         (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
-      pdf *= 1.e9; /* Transform the pdf fro nm^-1 to m^-1 */
+      pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
       weight /= pdf; /* In W/m^2/sr */
 
       /* End the registration of the per realisation time */
