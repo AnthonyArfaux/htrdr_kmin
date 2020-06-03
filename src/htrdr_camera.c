@@ -73,7 +73,7 @@ htrdr_camera_create
   ref_init(&cam->ref);
   cam->htrdr = htrdr;
 
-  if(fov <= 0) {
+  if(fov <= 0 || fov >= PI) {
     htrdr_log_err(htrdr, "invalid horizontal camera field of view `%g'\n", fov);
     res = RES_BAD_ARG;
     goto error;

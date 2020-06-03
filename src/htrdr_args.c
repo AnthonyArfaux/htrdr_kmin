@@ -138,7 +138,7 @@ parse_fov(const char* str, double* out_fov)
     fprintf(stderr, "Invalid field of view `%s'.\n", str);
     return RES_BAD_ARG;
   }
-  if(fov < 30 || fov > 120) {
+  if(fov <= 0 || fov >= 180) {
     fprintf(stderr, "The field of view %g is not in [30, 120].\n", fov);
     return RES_BAD_ARG;
   }
