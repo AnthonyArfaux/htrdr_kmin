@@ -401,6 +401,7 @@ htrdr_init
   struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
   double proj_ratio;
   double sun_dir[3];
+  double spectral_range[2];
   const char* output_name = NULL;
   size_t ithread;
   int nthreads_max;
@@ -503,13 +504,23 @@ htrdr_init
   res = htsky_create(&htrdr->logger, htrdr->allocator, &htsky_args, &htrdr->sky);
   if(res != RES_OK) goto error;
 
-  htrdr->wlen_range_m[0] = args->wlen_range[0]*1e-9; /* Convert in meters */
-  htrdr->wlen_range_m[1] = args->wlen_range[1]*1e-9; /* Convert in meters */
+  HTSKY(get_raw_spectral_bounds(htrdr->sky, spectral_range));
+
+  spectral_range[0] = MMAX(args->wlen_range[0], spectral_range[0]);
+  spectral_range[1] = MMIN(args->wlen_range[1], spectral_range[1]);
+  if(spectral_range[0] != args->wlen_range[0]
+  || spectral_range[1] != args->wlen_range[1]) {
+    htrdr_log_warn(htrdr,
+      "%s: the submitted spectral range overflowed the spectral data.\n", FUNC_NAME);
+  }
+
+  htrdr->wlen_range_m[0] = spectral_range[0]*1e-9; /* Convert in meters */
+  htrdr->wlen_range_m[1] = spectral_range[1]*1e-9; /* Convert in meters */
 
   if(htrdr->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
     size_t n;
-    n = (size_t)(args->wlen_range[1] - args->wlen_range[0]);
-    res = htrdr_cie_xyz_create(htrdr, args->wlen_range, n, &htrdr->cie);
+    n = (size_t)(spectral_range[1] - spectral_range[0]);
+    res = htrdr_cie_xyz_create(htrdr, spectral_range, n, &htrdr->cie);
     if(res != RES_OK) goto error;
 
   } else {
@@ -523,10 +534,10 @@ htrdr_init
     }
 
     ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
-    n = (size_t)(args->wlen_range[1] - args->wlen_range[0]);
+    n = (size_t)(spectral_range[1] - spectral_range[0]);
 
     res = htrdr_ran_wlen_create
-      (htrdr, args->wlen_range, n, Tref, &htrdr->ran_wlen);
+      (htrdr, spectral_range, n, Tref, &htrdr->ran_wlen);
     if(res != RES_OK) goto error;
   } 
 

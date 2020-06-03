@@ -280,8 +280,6 @@ htrdr_ran_wlen_create
   res_T res = RES_OK;
   ASSERT(htrdr && range && out_wlen_ran && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
-  ASSERT(range[0] >= 200);
-  ASSERT(range[1] <= 100000);
   ASSERT(range[0] <= range[1]);
 
   wlen_ran = MEM_CALLOC(htrdr->allocator, 1, sizeof(*wlen_ran));
