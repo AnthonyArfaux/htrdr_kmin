@@ -303,7 +303,7 @@ parse_spectral_parameter(struct htrdr_args* args, const char* str)
   strncpy(buf, str, sizeof(buf));
 
   key = strtok_r(buf, "=", &ctx);
-  val = strtok_r(buf, "",  &ctx);
+  val = strtok_r(NULL, "",  &ctx);
 
   if(!strcmp(key, "cie_xyz")) {
     args->spectral_type = HTRDR_SPECTRAL_SW_CIE_XYZ;
@@ -319,7 +319,7 @@ parse_spectral_parameter(struct htrdr_args* args, const char* str)
       args->spectral_type = HTRDR_SPECTRAL_SW;
       res = parse_spectral_range(val, args->wlen_range);
       if(res != RES_OK) goto error;
-    } else if(!strcmp(val, "lw")) {
+    } else if(!strcmp(key, "lw")) {
       args->spectral_type = HTRDR_SPECTRAL_LW;
       res = parse_spectral_range(val, args->wlen_range);
       if(res != RES_OK) goto error;
