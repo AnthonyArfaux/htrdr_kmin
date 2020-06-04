@@ -42,7 +42,7 @@ microseconds of the per radiative path computation time and its standard
 error.
 
 If the image is an infrared rendering (*-s* *lw*=_wlen-min_,_wlen_max_ option
-in *htrdr(1)), the first and second pixel components store the expected value
+in *htrdr*(1)), the first and second pixel components store the expected value
 and the standard error, respectively, of the estimated brightness temperature
 in Kelvin. The third and fourth components save the expected value and standard
 deviation of the pixel radiance that is either an integrated radiance in
