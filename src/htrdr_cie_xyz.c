@@ -325,7 +325,7 @@ htrdr_cie_xyz_create
   res = setup_cie_xyz(cie, FUNC_NAME, nbands);
   if(res != RES_OK) goto error;
 
-  htrdr_log(htrdr, "Short wave interval defined on [%g, %g] nanometers.\n",
+  htrdr_log(htrdr, "CIE XYZ spectral interval defined on [%g, %g] nanometers.\n",
     range[0], range[1]);
 
 exit:
