@@ -279,7 +279,8 @@ htrdr_compute_radiance_sw
   double g = 0; /* Asymmetry parameter of the HG phase function */
 
   ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
-  ASSERT(!htsky_is_long_wave(htrdr->sky));
+  ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_SW
+      || htrdr->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ);
 
   CHK(RES_OK == ssf_phase_create
     (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
@@ -298,7 +299,6 @@ htrdr_compute_radiance_sw
   ASSERT(band_bounds[0] <= wlen  && wlen <= band_bounds[1]);
   sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
-
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 

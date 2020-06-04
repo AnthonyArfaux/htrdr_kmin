@@ -25,7 +25,7 @@ option(NO_TEST "Do not build the tests" OFF)
 # Check dependencies
 ################################################################################
 find_package(AW 2.0 REQUIRED)
-find_package(HTSky 0.1 REQUIRED)
+find_package(HTSky 0.2 REQUIRED)
 find_package(MruMtl 0.0 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.7 REQUIRED)
@@ -100,9 +100,10 @@ set(HTRDR_FILES_SRC
   htrdr_interface.c
   htrdr_main.c
   htrdr_mtl.c
-  htrdr_ran_lw.c
+  htrdr_ran_wlen.c
   htrdr_rectangle.c
   htrdr_slab.c
+  htrdr_spectral.c
   htrdr_sun.c)
 set(HTRDR_FILES_INC
   htrdr.h
@@ -114,9 +115,10 @@ set(HTRDR_FILES_INC
   htrdr_ground.h
   htrdr_interface.h
   htrdr_mtl.h
-  htrdr_ran_lw.h
+  htrdr_ran_wlen.h
   htrdr_rectangle.h
   htrdr_slab.h
+  htrdr_spectral.h
   htrdr_sun.h
   htrdr_solve.h)
 set(HTRDR_FILES_INC2 # Generated files

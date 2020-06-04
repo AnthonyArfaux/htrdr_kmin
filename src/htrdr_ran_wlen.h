@@ -1,4 +1,5 @@
 /* Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,41 +14,41 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_RAN_LW_H
-#define HTRDR_RAN_LW_H
+#ifndef HTRDR_RAN_WLEN_H
+#define HTRDR_RAN_WLEN_H
 
 #include <rsys/rsys.h>
 
-#define HTRDR_RAN_LW_CONTINUE 0
+#define HTRDR_WLEN_RAN_CONTINUE 0
 
 struct htrdr;
-struct htrdr_ran_lw;
+struct htrdr_ran_wlen;
 
 extern LOCAL_SYM res_T
-htrdr_ran_lw_create
+htrdr_ran_wlen_create
   (struct htrdr* htrdr,
-   const double range[2], /* Must be included in [1000, 100000] nanometers */
-   /* # bands used to discretisze the LW domain. HTRDR_RAN_LW_CONTINUE <=> no
-    * discretisation */
-   const size_t nbands, /* Hint on #bands used to discretised the CDF */
+   const double range[2], 
+   /* # bands used to discretisze the spectral domain. HTRDR_WLEN_RAN_CONTINUE
+    * <=> no discretisation */
+   const size_t nbands, /* Hint on #bands used to discretised th CDF */
    const double ref_temperature, /* Reference temperature */
-   struct htrdr_ran_lw** ran_lw);
+   struct htrdr_ran_wlen** wlen_ran);
 
 extern LOCAL_SYM void
-htrdr_ran_lw_ref_get
-  (struct htrdr_ran_lw* ran_lw);
+htrdr_ran_wlen_ref_get
+  (struct htrdr_ran_wlen* wlen_ran);
 
 extern LOCAL_SYM void
-htrdr_ran_lw_ref_put
-  (struct htrdr_ran_lw* ran_lw);
+htrdr_ran_wlen_ref_put
+  (struct htrdr_ran_wlen* wlen_ran);
 
 /* Return a wavelength in nanometer */
 extern LOCAL_SYM double
-htrdr_ran_lw_sample
-  (const struct htrdr_ran_lw* ran_lw,
+htrdr_ran_wlen_sample
+  (const struct htrdr_ran_wlen* wlen_ran,
    const double r0, /* Canonical number in [0, 1[ */
    const double r1, /* Canonical number in [0, 1[ */
    double* pdf); /* May be NULL */
 
-#endif /* HTRDR_RAN_LW_H */
+#endif /* HTRDR_RAN_WLEN_H */
 

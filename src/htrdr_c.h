@@ -18,7 +18,6 @@
 #define HTRDR_C_H
 
 #include <rsys/rsys.h>
-#include <rsys/math.h> /* PI support */
 
 #ifndef NDEBUG
   #define MPI(Func) ASSERT(MPI_##Func == MPI_SUCCESS)
@@ -35,9 +34,6 @@ enum htrdr_mpi_message {
 };
 
 struct htrdr;
-
-#define SW_WAVELENGTH_MIN 380 /* In nanometer */
-#define SW_WAVELENGTH_MAX 780 /* In nanometer */
 
 /* In nanometer */
 static FINLINE double
@@ -96,117 +92,12 @@ morton_xyz_decode_u21(const uint64_t code, uint32_t xyz[3])
   xyz[2] = (uint32_t)morton3D_decode_u21(code >> 0);
 }
 
-static INLINE double
-wiebelt(const double v)
-{
-  int m;
-  double w, v2, v4;
-  /*.153989717364e+00;*/
-  const double fifteen_over_pi_power_4 = 15.0/(PI*PI*PI*PI);
-  const double z0 = 1.0/3.0;
-  const double z1 = 1.0/8.0;
-  const double z2 = 1.0/60.0;
-  const double z4 = 1.0/5040.0;
-  const double z6 = 1.0/272160.0;
-  const double z8 = 1.0/13305600.0;
-
-  if(v >= 2.) {
-    w = 0;
-    for(m=1; m<6 ;m++)
-      w+=exp(-m*v)/(m*m*m*m) * (((m*v+3)*m*v+6)*m*v+6);
-    w = w * fifteen_over_pi_power_4;
-  } else {
-    v2 = v*v;
-    v4 = v2*v2;
-    w = z0 - z1*v + z2*v2 - z4*v2*v2 + z6*v4*v2 - z8*v4*v4;
-    w = 1. - fifteen_over_pi_power_4*v2*v*w;
-  }
-  ASSERT(w >= 0.0 && w <= 1.0);
-  return w;
-}
-
-static INLINE double
-blackbody_fraction
-  (const double lambda0, /* In meters */
-   const double lambda1, /* In meters */
-   const double temperature) /* In Kelvin */
-{
-  const double C2 = 1.43877735e-2; /* m.K */
-  double x0 = C2 / lambda0;
-  double x1 = C2 / lambda1;
-  double v0 = x0 / temperature;
-  double v1 = x1 / temperature;
-  double w0 = wiebelt(v0);
-  double w1 = wiebelt(v1);
-  return w1 - w0;
-}
-
-
-
-/* Return the Planck value in W/m^2/sr/m at a given wavelength */
-static INLINE double
-planck_monochromatic
-  (const double lambda, /* In meters */
-   const double temperature) /* In Kelvin */
-{
-  const double c = 299792458; /* m/s */
-  const double h = 6.62607015e-34; /* J.s */
-  const double k = 1.380649e-23; /* J/K */
-  const double lambda2 = lambda*lambda;
-  const double lambda5 = lambda2*lambda2*lambda;
-  const double B = ((2.0 * h * c*c) / lambda5) /* W/m^2/sr/m */
-                 / (exp(h*c/(lambda*k*temperature))-1.0);
-  ASSERT(temperature > 0);
-  return B;
-}
-
-/* Return the average Planck value in W/m^2/sr/m over the
- * [lambda_min, lambda_max] interval. */
-static INLINE double
-planck_interval
-  (const double lambda_min, /* In meters */
-   const double lambda_max, /* In meters */
-   const double temperature) /* In Kelvin  */
-{
-  const double T2 = temperature*temperature;
-  const double T4 = T2*T2;
-  const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
-  ASSERT(lambda_min < lambda_max && temperature > 0);
-  return blackbody_fraction(lambda_min, lambda_max, temperature)
-       * BOLTZMANN_CONSTANT * T4 / (PI * (lambda_max-lambda_min)); /* In W/m^2/sr/m */
-}
-
-/* Invoke planck_monochromatic or planck_interval whether the submitted
- * interval is null or not, respectively. The returned value is in W/m^2/sr/m */
-static FINLINE double
-planck
-  (const double lambda_min, /* In meters */
-   const double lambda_max, /* In meters */
-   const double temperature) /* In Kelvin  */
-{
-  ASSERT(lambda_min <= lambda_max && temperature > 0);
-  if(lambda_min == lambda_max) {
-    return planck_monochromatic(lambda_min, temperature);
-  } else {
-    return planck_interval(lambda_min, lambda_max, temperature);
-  }
-}
-
 /* Return the minimum length in nanometer of the sky spectral bands
  * clamped to in [range[0], range[1]]. */
 extern LOCAL_SYM double
 compute_sky_min_band_len
   (struct htsky* sky,
    const double range[2]);
-
-extern LOCAL_SYM res_T
-brightness_temperature
-  (struct htrdr* htrdr,
-   const double lambda_min, /* In meters */
-   const double lambda_max, /* In meters */
-   /* Averaged over [lambda_min, lambda_max]. In W/m^2/sr/m */
-   const double radiance,
-   double* temperature);
 
 extern LOCAL_SYM  res_T
 open_output_stream

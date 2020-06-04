@@ -17,6 +17,8 @@
 #ifndef HTRDR_H
 #define HTRDR_H
 
+#include "htrdr_spectral.h"
+
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 #include <rsys/str.h>
@@ -50,13 +52,15 @@ struct htrdr {
   struct htrdr_mtl* mtl;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
-  struct htrdr_ran_lw* ran_lw;
+  struct htrdr_ran_wlen* ran_wlen;
 
   struct htrdr_camera* cam;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
+  enum htrdr_spectral_type spectral_type;
   double wlen_range_m[2]; /* Integration range in *meters* */
+  double ref_temperature; /* Reference temperature in Kelvin */
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */

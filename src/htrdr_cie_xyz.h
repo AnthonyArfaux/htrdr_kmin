@@ -22,7 +22,9 @@ struct htrdr;
 struct htrdr_cie_xyz;
 
 /* Wavelength boundaries of the CIE XYZ color space in nanometers */
-static const double HTRDR_CIE_XYZ_RANGE_DEFAULT[2] = {380, 780};
+#define HTRDR_CIE_XYZ_RANGE_DEFAULT__ {380, 780}
+static const double HTRDR_CIE_XYZ_RANGE_DEFAULT[2] =
+  HTRDR_CIE_XYZ_RANGE_DEFAULT__;
 
 extern LOCAL_SYM res_T
 htrdr_cie_xyz_create

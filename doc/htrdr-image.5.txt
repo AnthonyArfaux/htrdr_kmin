@@ -30,24 +30,32 @@ thus ignored as well as empty lines. The first valid line stores 2 unsigned
 integers that represent the image definition, i.e. the number of pixels per
 line and per column. Then each line stores 8 pixel components.
 
-If the image is a regular rendering in the visible part of the spectrum, the
-pixel components are actually 4 pairs of floating points data representing the
-pixel color encoded in the CIE 1931 XYZ color space and the per radiative path
-computation time. The first, second and third pair encode the estimated
-integrated radiance in W.sr^-1.m^-2 of the X, Y and Z pixel components,
-respectively. The first value of each pair is the expected value of the
-estimated radiance while the second one is its associated standard deviation.
-The fourth pair saves the estimate in microseconds of the per radiative path
-computation time and its standard error.
-
-If the image is an infrared rendering, the first and second pixel components
-store the expected value and the standard error, respectively, of the
-estimated brightness temperature in Kelvin. The third and fourth component
-save the expected value and standard deviation of the pixel radiance in
-W.sr^-1.m^-2.nm^-1. The fifth and sixth pixel components are unused. Finally
-the last 2 pixel components save, as for a regular rendering, the estimate in
+If the image is a regular rendering in the visible part of the spectrum
+(*-s* _cie_xyz_ option in *htrdr*(1)), the pixel components are actually 4
+pairs of floating points data representing the pixel color encoded in the CIE
+1931 XYZ color space and the per radiative path computation time. The first,
+second and third pairs encode the estimated integrated radiance in W/sr/m^2 of
+the X, Y and Z pixel components, respectively. The first value of each pair is
+the expected value of the estimated radiance while the second one is its
+associated standard deviation.  The fourth pair saves the estimate in
 microseconds of the per radiative path computation time and its standard
 error.
+
+If the image is an infrared rendering (*-s* *lw*=_wlen-min_,_wlen_max_ option
+in *htrdr*(1)), the first and second pixel components store the expected value
+and the standard error, respectively, of the estimated brightness temperature
+in Kelvin. The third and fourth components save the expected value and standard
+deviation of the pixel radiance that is either an integrated radiance in
+W/sr/m^2 or a spectral radiance in W/sr/m^2/nm whether this radiance is
+computed for a spectral range or for one wavelength. The fifth and sixth pixel
+components are unused. Finally the last 2 pixel components save, as for a
+regular rendering, the estimate in microseconds of the per radiative path
+computation time and its standard error.
+
+If it was generating from a shortwave rendering (*-s*
+*sw*=_wlen-min_,wlen-max_ option in *htrdr*(1)) the image is formatted as in
+longwave rendering mode exepted that the first and second pixel components are
+unused since no brightness temperature was evaluated in shortwave.
 
 Pixels are sorted line by line, with the origin defined at the top left corner
 of the image. With an image definition of N by M pixels, with N the number of

@@ -30,7 +30,13 @@ SYNOPSIS
 DESCRIPTION
 -----------
 *htrdr* is an image renderer of scenes composed of an atmospheric gas mixture,
-clouds, and a ground. Images can be rendered in the visible or the infrared
+clouds, and a ground. It evaluates the intensity incoming on each pixel of the
+sensor array. The underlying algorithm is based on a Monte-Carlo method: it
+consists in simulating a given number of optical paths originating from the
+camera, directed into the atmosphere, taking into account light absorption and
+scattering phenomena.
+
+Images can be rendered in the visible or the infrared
 part of the spectrum. It uses spectral data that should be provided for the
 pressure and temperature atmospheric vertical profile [1] (*-a* _atmosphere_),
 the liquid water content in suspension within the clouds stored in a *htcp*(5)
@@ -44,27 +50,28 @@ whose materials are listed in the *htrdr-material*(5) file provided through the
 *-M* option. Both, the clouds and the ground, can be infinitely repeated along
 the X and Y axis by setting the *-r* and the *-R* options, respectively.
 
-*htrdr* evaluates the intensity incoming on each pixel of the sensor array. The
-underlying algorithm is based on a Monte-Carlo method: it consists in
-simulating a given number of optical paths originating from the camera,
-directed into the atmosphere, taking into account light absorption and
-scattering phenomena. When rendering in the visible part of the spectrum, the
-computation is performed over the visible part of the spectrum in [380, 780]
+Spectral dimension can be integrated in many ways (*-s* option). By default,
+the computation is performed for the visible part of the spectrum in [380, 780]
 nanometers, for the three components of the CIE 1931 XYZ colorimetric space
 that are subsequently recombined in order to obtain the final color for each
 pixel, and finally the whole image of the scene as seen from the set
-observation position. In longwave, the rendering is performed for the range
-of wavelengths defined by the *-l* option. The estimated radiance per pixel is
-then converted to its brightness temperature and both are saved in the output
-image.
+observation position. The two other ways consist in explicitly defining the
+longwave or shortwave spectral range to handle and continuously sampling a
+wavelength in this range according to the Planck function for a reference
+temperature. Actually longwave and shortwave are keywords that mean that the
+source of radiation is whether external or internal to the medium,
+respectively. In shortwave, only the pixel radiance is evaluated and stored in
+the output image. In longwave this estimated radiance is then converted to its
+brightness temperature and both are saved in the image.
 
-In *htrdr* the spatial unit 1.0 corresponds to one meter, the estimated
-radiance is given in W.sr^-1.m^-2 and the temperatures are expressed in Kelvin.
-The results are written to the output file if the *-o* option is defined and
-the standard output otherwise. The output image is a list of raw ASCII data
-formatted with respect to the *htrdr-image*(5) file format.  Since *htrdr*
-relies on the Monte-Carlo method, each estimation is given with its numerical
-accuracy.
+In *htrdr* the spatial unit 1.0 corresponds to one meter and the temperatures
+are expressed in Kelvin. The estimated radiances are given in W/sr/m^2 excepted
+for monochromatic computations where the computed spectral radiance is defined
+in W/sr/m^2/nm. The results are written to the output file if the *-o* option
+is defined and the standard output otherwise. The output image is a list of raw
+ASCII data formatted with respect to the *htrdr-image*(5) file format.  Since
+*htrdr* relies on the Monte-Carlo method, each estimation is given with its
+numerical accuracy.
 
 During the simulation, *htrdr* dynamically loads/unloads cloud properties to
 handle clouds whose data that do not feat in main memory. *htrdr* also supports
@@ -146,10 +153,6 @@ OPTIONS
     brightness temperature for the submitted range of wavelengths. By default,
     *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
 
-*-l* __wlen-min__,__wlen-max__::
-  Switch in infrared rendering for the longwave interval in [__wlen-min__,
-  __wlen-max__] nanometers.
-
 *-R*::
   Infinitely repeat the _ground_ along the X and Y axis.
 
@@ -179,6 +182,44 @@ OPTIONS
 *-o* _output_::
   File where *htrdr* writes its _output_ data. If not defined, write results to
   standard output.
+
+*-s* <__spectral-parameter__:...>::
+  define the type and the range of the spectral integration. Available spectral
+  parameters are:
+
+  **cie_xyz**;;
+    the radiance is computed for the visible part of the spectrum in [380, 780]
+    nanometers with respect to the XYZ CIE 1931 tristimulus values. This is the
+    default comportment of *htrdr*.
+
+  **lw**=*_wlen-min_*,*_wlen-max_*;;
+    perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
+    wavelength range (wavelength must be provided in nanometers) according to
+    the Planck function for a reference temperature. If _wlen-min_ and
+    _wlen-max_ are equals the computation is monochromatic. *lw* means for
+    longwave but is here a code word that really means "computation of radiance
+    using the internal source of radiation": in other words, radiation is
+    emitted by the medium and its boundaries. Because the application is for
+    the terrestrial atmosphere, internal radiation is emitted in the thermal
+    longwave part of the electromagnetic spectrum. Therefore the default value
+    of the reference temperature used in the spectral sampling is fixed at 290
+    K.
+
+  **sw**=*_wlen-min_*,*_wlen-max_*;;
+    perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
+    wavelength range (wavelength must be provided in nanometers) according to
+    the Planck function for a reference temperature. If _wlen-min_ and
+    _wlen-max_ are equals the computation is monochromatic.  In the present
+    case, *sw* means that the source of radiation is external to the medium:
+    because the application is for the terrestrial atmosphere, the value of the
+    reference temperature is by default fixed at 5778 K, i.e. the blackbody
+    temperature of the Sun.
+
+  **Tref**=**_temperature_**;;
+    reference temperature of the Planck function used to continuously sample the
+    longwave/shortwave spectral range. In longwave, it is set to 290 K by
+    default while in shortwave its default value is the blackbody temperature
+    of the sun (i.e. 5778 K).
 
 *-T* _threshold_::
   Optical thickness used as threshold criteria to partition the properties of
@@ -237,13 +278,14 @@ PPM image [4]:
     $ htpp -o image.ppm output
 
 Render the previous scene in infrared for the wavelengths in [9200, 10000]
-nanometers:
+nanometers with a reference temperature of 300 Kelvin:
 
-    $ htrdr -l 9200,10000 -a gas.txt -m Mie.nc -g mountains.obj -R \
+    $ htrdr -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
       -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
+      -s lw=9200,1000:Tref=300
       -f -o output
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*

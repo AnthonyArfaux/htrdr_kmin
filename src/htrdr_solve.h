@@ -35,20 +35,20 @@ struct htrdr_estimate {
 };
 static const struct htrdr_estimate HTRDR_ESTIMATE_NULL;
 
-struct htrdr_pixel_sw {
+struct htrdr_pixel_xwave {
+  struct htrdr_estimate radiance; /* In W/m^2/sr */
+  struct htrdr_estimate radiance_temperature; /* In K */
+  struct htrdr_accum time; /* In microseconds */
+};
+static const struct htrdr_pixel_xwave HTRDR_PIXEL_XWAVE_NULL;
+
+struct htrdr_pixel_image {
   struct htrdr_estimate X; /* In W/m^2/sr */
   struct htrdr_estimate Y; /* In W/m^2/sr */
   struct htrdr_estimate Z; /* In W/m^2/sr */
   struct htrdr_accum time; /* In microseconds */
 };
-static const struct htrdr_pixel_sw HTRDR_PIXEL_SW_NULL;
-
-struct htrdr_pixel_lw {
-  struct htrdr_estimate radiance; /* In W/m^2/sr */
-  struct htrdr_estimate radiance_temperature; /* In K */
-  struct htrdr_accum time; /* In microseconds */
-};
-static const struct htrdr_pixel_lw HTRDR_PIXEL_LW_NULL;
+static const struct htrdr_pixel_image HTRDR_PIXEL_IMAGE_NULL;
 
 /* Forward declarations */
 struct htrdr;
@@ -118,6 +118,40 @@ htrdr_accum_get_estimation
     estimate->E = E;
     estimate->SE = SE;
   }
+}
+
+static INLINE size_t
+htrdr_spectral_type_get_pixsz(const enum htrdr_spectral_type type)
+{
+  size_t sz = 0;
+  switch(type) {
+    case HTRDR_SPECTRAL_LW: 
+    case HTRDR_SPECTRAL_SW:
+      sz = sizeof(struct htrdr_pixel_xwave);
+      break;
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      sz = sizeof(struct htrdr_pixel_image);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return sz;
+}
+
+static INLINE size_t
+htrdr_spectral_type_get_pixal(const enum htrdr_spectral_type type)
+{
+  size_t al = 0;
+  switch(type) {
+    case HTRDR_SPECTRAL_LW: 
+    case HTRDR_SPECTRAL_SW:
+      al = ALIGNOF(struct htrdr_pixel_xwave);
+      break;
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      al = ALIGNOF(struct htrdr_pixel_image);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return al;
 }
 
 #endif /* HTRDR_SOLVE_H */
