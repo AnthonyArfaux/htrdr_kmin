@@ -192,20 +192,20 @@ OPTIONS
     nanometers with respect to the XYZ CIE 1931 tristimulus values. This is the
     default comportment of *htrdr*.
 
-  **lw**=**_wlen-min_*,*_wlen-max_*;;
+  **lw**=*_wlen-min_*,*_wlen-max_*;;
     perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
     wavelength range (wavelength must be provided in nanometers) according to
     the Planck function for a reference temperature. If _wlen-min_ and
     _wlen-max_ are equals the computation is monochromatic. *lw* means for
     longwave but is here a code word that really means "computation of radiance
     using the internal source of radiation": in other words, radiation is
-    emitted by the medium and its boundaries. Because the application is mainly
-    for the terrestrial atmosphere, internal radiation is emitted in the
-    thermal longwave part of the electromagnetic spectrum. Therefore the
-    default value of the reference temperature used in the spectral sampling is
-    fixed at 290 K.
+    emitted by the medium and its boundaries. Because the application is for
+    the terrestrial atmosphere, internal radiation is emitted in the thermal
+    longwave part of the electromagnetic spectrum. Therefore the default value
+    of the reference temperature used in the spectral sampling is fixed at 290
+    K.
 
-  **sw**=**_wlen-min;;
+  **sw**=*_wlen-min_*,*_wlen-max_*;;
     perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
     wavelength range (wavelength must be provided in nanometers) according to
     the Planck function for a reference temperature. If _wlen-min_ and
