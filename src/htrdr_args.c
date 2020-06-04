@@ -323,6 +323,13 @@ parse_spectral_parameter(struct htrdr_args* args, const char* str)
       args->spectral_type = HTRDR_SPECTRAL_LW;
       res = parse_spectral_range(val, args->wlen_range);
       if(res != RES_OK) goto error;
+    } else if(!strcmp(key, "Tref")) {
+      res = cstr_to_double(val, &args->ref_temperature);
+      if(res == RES_OK && args->ref_temperature < 0) res = RES_BAD_ARG;
+      if(res != RES_OK) {
+        fprintf(stderr, "Invalid reference temperature Tref=%s.\n", val);
+        goto error;
+      }
     } else {
       fprintf(stderr, "Invalid spectral parameter `%s'.\n", key);
       res = RES_BAD_ARG;
@@ -532,6 +539,22 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
       "Missing the path toward the file of the Mie's data -- option '-m'\n");
     res = RES_BAD_ARG;
     goto error;
+  }
+
+  /* Setup default ref temperature if necessary */
+  if(args->ref_temperature <= 0) {
+    switch(args->spectral_type) {
+      case HTRDR_SPECTRAL_LW: 
+        args->ref_temperature = HTRDR_DEFAULT_LW_REF_TEMPERATURE;
+        break;
+      case HTRDR_SPECTRAL_SW:
+        args->ref_temperature = HTRDR_SUN_TEMPERATURE;
+        break;
+      case HTRDR_SPECTRAL_SW_CIE_XYZ:
+        args->ref_temperature = -1; /* Unused */
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
   }
 
 exit:

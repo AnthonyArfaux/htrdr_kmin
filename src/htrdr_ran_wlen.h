@@ -27,8 +27,6 @@ struct htrdr_ran_wlen;
 extern LOCAL_SYM res_T
 htrdr_ran_wlen_create
   (struct htrdr* htrdr,
-   /* range must be included in [200,1000] nm for solar or in [1000, 100000]
-    * nanometers for longwave (thermal)*/
    const double range[2], 
    /* # bands used to discretisze the spectral domain. HTRDR_WLEN_RAN_CONTINUE
     * <=> no discretisation */

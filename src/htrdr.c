@@ -428,6 +428,7 @@ htrdr_init
   htrdr->grid_max_definition[1] = args->grid_max_definition[1];
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
   htrdr->spectral_type = args->spectral_type;
+  htrdr->ref_temperature = args->ref_temperature;
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
@@ -524,20 +525,20 @@ htrdr_init
     if(res != RES_OK) goto error;
 
   } else {
-    double Tref; /* In Kelvin */
     size_t n;
 
-    switch(htrdr->spectral_type) {
-      case HTRDR_SPECTRAL_LW: Tref = 290; break;
-      case HTRDR_SPECTRAL_SW: Tref = 5778; /* Tsun */ break;
-      default: FATAL("Unreachable code.\n"); break;
+    if(htrdr->ref_temperature <= 0) {
+      htrdr_log_err(htrdr, "%s: invalid reference temperature %g K.\n",
+        FUNC_NAME, htrdr->ref_temperature);
+      res = RES_BAD_ARG;
+      goto error;
     }
 
     ASSERT(htrdr->wlen_range_m[0] <= htrdr->wlen_range_m[1]);
     n = (size_t)(spectral_range[1] - spectral_range[0]);
 
     res = htrdr_ran_wlen_create
-      (htrdr, spectral_range, n, Tref, &htrdr->ran_wlen);
+      (htrdr, spectral_range, n, htrdr->ref_temperature, &htrdr->ran_wlen);
     if(res != RES_OK) goto error;
   } 
 
@@ -763,66 +764,6 @@ compute_sky_min_band_len
     }
   }
   return min_band_len;
-}
-
-res_T
-brightness_temperature
-  (struct htrdr* htrdr,
-   const double lambda_min,
-   const double lambda_max,
-   const double radiance, /* In W/m2/sr/m */
-   double* temperature)
-{
-  const size_t MAX_ITER = 100;
-  const double epsilon_T = 1e-4; /* In K */
-  const double epsilon_B = radiance * 1e-8;
-  double T, T0, T1, T2;
-  double B, B0;
-  size_t i;
-  res_T res = RES_OK;
-  ASSERT(temperature && lambda_min <= lambda_max);
-
-  /* Search for a brightness temperature whose radiance is greater than or
-   * equal to the estimated radiance */
-  T2 = 200;
-  FOR_EACH(i, 0, MAX_ITER) {
-    const double B2 = planck(lambda_min, lambda_max, T2);
-    if(B2 >= radiance) break;
-    T2 *= 2;
-  }
-  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
-
-  B0 = T0 = T1 = 0;
-  FOR_EACH(i, 0, MAX_ITER) {
-    T = (T1+T2)*0.5;
-    B = planck(lambda_min, lambda_max, T);
-
-    if(B < radiance) {
-      T1 = T;
-    } else {
-      T2 = T;
-    }
-
-    if(fabs(T-T0) < epsilon_T || fabs(B-B0) < epsilon_B)
-      break;
-
-    T0 = T;
-    B0 = B;
-  }
-  if(i >= MAX_ITER) { res = RES_BAD_OP; goto error; }
-
-  *temperature = T;
-
-exit:
-  return res;
-error:
-  htrdr_log_err(htrdr,
-    "Could not compute the brightness temperature for the estimated radiance %g "
-    "averaged over [%g, %g] nanometers.\n",
-    radiance,
-    lambda_min*1e9,
-    lambda_max*1e9);
-  goto exit;
 }
 
 res_T

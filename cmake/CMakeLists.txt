@@ -103,6 +103,7 @@ set(HTRDR_FILES_SRC
   htrdr_ran_wlen.c
   htrdr_rectangle.c
   htrdr_slab.c
+  htrdr_spectral.c
   htrdr_sun.c)
 set(HTRDR_FILES_INC
   htrdr.h
@@ -117,6 +118,7 @@ set(HTRDR_FILES_INC
   htrdr_ran_wlen.h
   htrdr_rectangle.h
   htrdr_slab.h
+  htrdr_spectral.h
   htrdr_sun.h
   htrdr_solve.h)
 set(HTRDR_FILES_INC2 # Generated files

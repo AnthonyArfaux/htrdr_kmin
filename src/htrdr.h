@@ -17,6 +17,8 @@
 #ifndef HTRDR_H
 #define HTRDR_H
 
+#include "htrdr_spectral.h"
+
 #include <rsys/logger.h>
 #include <rsys/ref_count.h>
 #include <rsys/str.h>
@@ -29,12 +31,6 @@
 #else
   #define HTRDR(Func) htrdr_ ## Func
 #endif
-
-enum htrdr_spectral_type {
-  HTRDR_SPECTRAL_LW, /* Longwave */
-  HTRDR_SPECTRAL_SW, /* Shortwave */
-  HTRDR_SPECTRAL_SW_CIE_XYZ /* Shortwave wrt the CIE XYZ tristimulus */
-};
 
 /* Forward declarations */
 struct htsky;
@@ -64,6 +60,7 @@ struct htrdr {
   struct htsky* sky;
   enum htrdr_spectral_type spectral_type;
   double wlen_range_m[2]; /* Integration range in *meters* */
+  double ref_temperature; /* Reference temperature in Kelvin */
 
   size_t spp; /* #samples per pixel */
   size_t width; /* Image width */
