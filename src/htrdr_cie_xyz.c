@@ -164,7 +164,12 @@ sample_cie_xyz
   } else if(lambda_min <= lambda_2 && lambda_2 < lambda_max) {
     lambda = lambda_2;
   } else {
-    FATAL("Unexpected error.\n");
+    htrdr_log_warn(cie->htrdr,
+      "%s: cannot sample a wavelength in [%g, %g[. The possible wavelengths"
+      "were %g and %g.\n",
+      FUNC_NAME, lambda_min, lambda_max, lambda_1, lambda_2);
+    /* Arbitrarly choose the wavelength at the center of the sampled band */
+    lambda = (lambda_min + lambda_max)*0.5;
   }
 
   return lambda;
