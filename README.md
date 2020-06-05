@@ -59,12 +59,39 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.5
+
+#### New feature
+
+Add support of shortwave integration with respect to the Planck function for a
+reference temperature whose default value is the blackbody temperature of the
+sun. Actually this is the counterpart of the longwave integration introduced by
+the "infrared rendering" in the 0.4 version. The main difference is that the
+source of radiation is the sun rather than the medium and its boundaries.
+
+The option `-l` that enabled the infrared rendering is now replaced by the new
+`-s` option that controls the spectral integration that can be CIE XYZ (i.e.
+regular image rendering), longwave or shortwave.
+
+#### Fixes
+
+- Fix the returned sun radiance: the precomputed per spectral band solar
+  incoming flux is removed and the sun radiance is now retrieved by directly
+  evaluating the monochromatic Planck for the blackbody temperature of the sun.
+- Fix CIE XYZ spectral integration: the pdf used to sample the CIE tristimulus
+  values was not correctly handled in the Monte-Carlo weight.
+- Fix the longwave spectral integration: the Monte-Carlo weight was wrong
+  leading to overestimated temperatures.
+
 ### Version 0.4
 
+#### New features
+
 - Add support of infrared rendering: when defined, the new `-l` option setups
-  the range of long waves into which the rendering is performed. In infrared
+  the range of longwave into which the rendering is performed. In infrared
   rendering, each pixel stores the radiance per pixel and its associated
-  brightness temperature.
+  brightness temperature. Spectral integration is done with respect to the
+  Planck function for a reference temperature of 290 K.
 - The ground geometry can now have several materials whose data vary over the
   spectrum. These materials are listed in a new
   [htrdr-materials](https://gitlab.com/meso-star/htrdr/-/blob/master/doc/htrdr-materials.5.txt)
@@ -79,6 +106,9 @@ informations on CMake.
   center of the sampled spectral band. Consequently, high
   resolution data defined per wavelength (e.g. Mie's properties and the
   reflectivity of the materials) are now fully taken into account.
+
+#### Fixes
+
 - Fix a deadlock when `htrdr` was run through MPI.
 - Fix a memory leak: the output file was not closed on exit.
 
