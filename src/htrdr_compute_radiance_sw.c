@@ -109,6 +109,13 @@ scattering_hit_filter
       ASSERT(ctx->traversal_dst >= hit->distance[0]);
       ASSERT(ctx->traversal_dst <= hit->distance[1]);
 
+      /* Stop the ray whenever the traversal distance without any scattering
+       * event is too high. It means the maximum scattering coefficient has a
+       * very small value, and the returned radiance is null. This can only
+       * happen when the voxel has a [quasi] infinite length in the propagation
+       * direction. */
+      if(ctx->traversal_dst > 1e9) break;
+
       /* Compute the world space position where a collision may occur */
       pos[0] = org[0] + ctx->traversal_dst * dir[0];
       pos[1] = org[1] + ctx->traversal_dst * dir[1];
