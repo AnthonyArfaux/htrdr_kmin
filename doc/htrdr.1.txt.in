@@ -57,12 +57,11 @@ that are subsequently recombined in order to obtain the final color for each
 pixel, and finally the whole image of the scene as seen from the set
 observation position. The two other ways consist in explicitly defining the
 longwave or shortwave spectral range to handle and continuously sampling a
-wavelength in this range according to the Planck function for a reference
-temperature. Actually longwave and shortwave are keywords that mean that the
-source of radiation is whether external or internal to the medium,
-respectively. In shortwave, only the pixel radiance is evaluated and stored in
-the output image. In longwave this estimated radiance is then converted to its
-brightness temperature and both are saved in the image.
+wavelength in this range. Actually longwave and shortwave are keywords that
+mean that the source of radiation is whether external or internal to the
+medium, respectively. In shortwave, only the pixel radiance is evaluated and
+stored in the output image. In longwave this estimated radiance is then
+converted to its brightness temperature and both are saved in the image.
 
 In *htrdr* the spatial unit 1.0 corresponds to one meter and the temperatures
 are expressed in Kelvin. The estimated radiances are given in W/sr/m^2 excepted
@@ -199,11 +198,11 @@ OPTIONS
     _wlen-max_ are equals the computation is monochromatic. *lw* means for
     longwave but is here a code word that really means "computation of radiance
     using the internal source of radiation": in other words, radiation is
-    emitted by the medium and its boundaries. Because the application is for
-    the terrestrial atmosphere, internal radiation is emitted in the thermal
-    longwave part of the electromagnetic spectrum. Therefore the default value
-    of the reference temperature used in the spectral sampling is fixed at 290
-    K.
+    emitted by the medium and its boundaries (ground and space). Because the
+    application is for the terrestrial atmosphere, internal radiation is
+    emitted in the thermal longwave part of the electromagnetic spectrum.
+    Therefore the default value of the reference temperature used in the
+    spectral sampling is fixed at 290 K.
 
   **sw**=*_wlen-min_*,*_wlen-max_*;;
     perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
