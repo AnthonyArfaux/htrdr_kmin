@@ -117,6 +117,7 @@ set(HTRDR_FILES_INC
   htrdr_mtl.h
   htrdr_ran_wlen.h
   htrdr_rectangle.h
+  htrdr_sensor.h
   htrdr_slab.h
   htrdr_spectral.h
   htrdr_sun.h

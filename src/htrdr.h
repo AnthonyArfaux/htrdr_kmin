@@ -17,6 +17,7 @@
 #ifndef HTRDR_H
 #define HTRDR_H
 
+#include "htrdr_sensor.h"
 #include "htrdr_spectral.h"
 
 #include <rsys/logger.h>
@@ -54,7 +55,7 @@ struct htrdr {
   struct htrdr_cie_xyz* cie;
   struct htrdr_ran_wlen* ran_wlen;
 
-  struct htrdr_camera* cam;
+  struct htrdr_sensor sensor;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;

@@ -389,6 +389,34 @@ error:
   goto exit;
 }
 
+static res_T
+setup_sensor(struct htrdr* htrdr, const struct htrdr_args* args)
+{
+  double proj_ratio;
+  res_T res = RES_OK;
+  ASSERT(htrdr && args);
+
+  htrdr->sensor.type = args->sensor_type;
+
+  switch(args->sensor_type) {
+    case HTRDR_SENSOR_CAMERA:
+      proj_ratio =
+        (double)args->image.definition[0]
+      / (double)args->image.definition[1];
+      res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
+        args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y),
+        &htrdr->sensor.camera);
+      break;
+    case HTRDR_SENSOR_RECTANGLE: 
+      res = htrdr_rectangle_create(htrdr, args->rectangle.sz,
+        args->rectangle.pos, args->rectangle.tgt, args->rectangle.up,
+        &htrdr->sensor.rectangle);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return res;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -475,11 +503,7 @@ htrdr_init
     &htrdr->ground);
   if(res != RES_OK) goto error;
 
-  proj_ratio =
-    (double)args->image.definition[0]
-  / (double)args->image.definition[1];
-  res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
-    args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
+  res = setup_sensor(htrdr, args);
   if(res != RES_OK) goto error;
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);

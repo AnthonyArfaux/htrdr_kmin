@@ -16,6 +16,7 @@
 #ifndef HTRDR_ARGS_H
 #define HTRDR_ARGS_H
 
+#include "htrdr_sensor.h"
 #include "htrdr_spectral.h"
 #include "htrdr_cie_xyz.h"
 
@@ -60,6 +61,7 @@ struct htrdr_args {
   double wlen_range[2]; /* Spectral range of integration in nm */
   double ref_temperature; /* Planck reference temperature in Kelvin */
 
+  enum htrdr_sensor_type sensor_type;
   unsigned nthreads; /* Hint on the number of threads to use */
   int force_overwriting;
   int dump_vtk; /* Dump the loaded cloud properties in a VTK file */
@@ -98,6 +100,7 @@ struct htrdr_args {
   HTRDR_SPECTRAL_SW_CIE_XYZ, /* Spectral type */                               \
   HTRDR_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                          \
   -1, /* Reference temperature */                                              \
+  HTRDR_SENSOR_CAMERA, /* sensor type */                                       \
   (unsigned)~0, /* #threads */                                                 \
   0, /* Force overwriting */                                                   \
   0, /* dump VTK */                                                            \
