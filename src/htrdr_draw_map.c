@@ -628,7 +628,7 @@ draw_pixel_xwave
    const size_t ithread,
    const size_t ipix[2],
    const double pix_sz[2], /* Size of a pixel in the normalized image plane */
-   const struct htrdr_camera* cam,
+   const struct htrdr_sensor* sensor,
    const size_t spp,
    struct ssp_rng* rng,
    struct htrdr_pixel_xwave* pixel)
@@ -637,7 +637,7 @@ draw_pixel_xwave
   struct htrdr_accum time;
   size_t isamp;
   double temp_min, temp_max;
-  ASSERT(ipix && ipix && pix_sz && cam && rng && pixel);
+  ASSERT(ipix && ipix && pix_sz && sensor && rng && pixel);
   ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_LW 
       || htrdr->spectral_type == HTRDR_SPECTRAL_SW);
 
@@ -647,7 +647,6 @@ draw_pixel_xwave
 
   FOR_EACH(isamp, 0, spp) {
     struct time t0, t1;
-    double pix_samp[2];
     double ray_org[3];
     double ray_dir[3];
     double weight;
@@ -657,17 +656,14 @@ draw_pixel_xwave
     size_t iquad;
     double usec;
     double band_pdf;
+    res_T res = RES_OK;
 
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    /* Sample a position into the pixel, in the normalized image plane */
-    pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
-    pix_samp[1] = ((double)ipix[1] + ssp_rng_canonical(rng)) * pix_sz[1];
-
-    /* Generate a ray starting from the pinhole camera and passing through the
-     * pixel sample */
-    htrdr_camera_ray(cam, pix_samp, ray_org, ray_dir);
+    res = htrdr_sensor_sample_primary_ray(&htrdr->sensor, htrdr->ground, ipix,
+      pix_sz, rng, ray_org, ray_dir);
+    if(res != RES_OK) continue; /* Reject the current sample */
 
     r0 = ssp_rng_canonical(rng);
     r1 = ssp_rng_canonical(rng);
@@ -736,14 +732,14 @@ draw_tile
    const size_t tile_org[2], /* Origin of the tile in pixel space */
    const size_t tile_sz[2], /* Definition of the tile */
    const double pix_sz[2], /* Size of a pixel in the normalized image plane */
-   const struct htrdr_camera* cam,
+   const struct htrdr_sensor* sensor,
    const size_t spp, /* #samples per pixel */
    struct ssp_rng* rng,
    struct tile* tile)
 {
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
-  ASSERT(htrdr && tile_org && tile_sz && pix_sz && cam && spp && tile);
+  ASSERT(htrdr && tile_org && tile_sz && pix_sz && sensor && spp && tile);
   (void)tile_mcode;
   /* Adjust the #pixels to process them wrt a morton order */
   npixels = round_up_pow2(MMAX(tile_sz[0], tile_sz[1]));
@@ -770,10 +766,12 @@ draw_tile
     switch(htrdr->spectral_type) {
       case HTRDR_SPECTRAL_LW:
       case HTRDR_SPECTRAL_SW:
-        draw_pixel_xwave(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->xwave);
+        draw_pixel_xwave(htrdr, ithread, ipix, pix_sz, sensor, spp, rng, &pixel->xwave);
         break;
       case HTRDR_SPECTRAL_SW_CIE_XYZ:
-        draw_pixel_image(htrdr, ithread, ipix, pix_sz, cam, spp, rng, &pixel->image);
+        ASSERT(sensor->type == HTRDR_SENSOR_CAMERA); /* TODO handle this */
+        draw_pixel_image(htrdr, ithread, ipix, pix_sz, sensor->camera, spp,
+          rng, &pixel->image);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
@@ -784,7 +782,7 @@ draw_tile
 static res_T
 draw_image
   (struct htrdr* htrdr,
-   const struct htrdr_camera* cam,
+   const struct htrdr_sensor* sensor,
    const size_t width, /* Image width */
    const size_t height, /* Image height */
    const size_t spp,
@@ -802,7 +800,7 @@ draw_image
   enum pixel_format pixfmt;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && cam && spp && ntiles_adjusted && work && tiles);
+  ASSERT(htrdr && sensor && spp && ntiles_adjusted && work && tiles);
   ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
   ASSERT(width && height);
   (void)ntiles_x, (void)ntiles_y;
@@ -898,7 +896,7 @@ draw_image
 
     /* Launch the tile rendering */
     res_local = draw_tile(htrdr, (size_t)ithread, mcode, tile_org, tile_sz,
-      pix_sz, cam, spp, rng, tile);
+      pix_sz, sensor, spp, rng, tile);
 
     SSP(rng_proxy_ref_put(rng_proxy));
     SSP(rng_ref_put(rng));
@@ -949,9 +947,9 @@ error:
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_draw_radiance
+htrdr_draw_map
   (struct htrdr* htrdr,
-   const struct htrdr_camera* cam,
+   const struct htrdr_sensor* sensor,
    const size_t width,
    const size_t height,
    const size_t spp,
@@ -968,7 +966,7 @@ htrdr_draw_radiance
   double pix_sz[2];
   ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && cam && width && height);
+  ASSERT(htrdr && sensor && width && height);
   ASSERT(htrdr->mpi_rank != 0 || buf);
 
   list_init(&tiles);
@@ -1039,7 +1037,7 @@ htrdr_draw_radiance
 
     #pragma omp section
     {
-      draw_image(htrdr, cam, width, height, spp, ntiles_x, ntiles_y,
+      draw_image(htrdr, sensor, width, height, spp, ntiles_x, ntiles_y,
         ntiles_adjusted, pix_sz, &work, &tiles);
       /* The processes have no more work to do. Stop probing for thieves */
       ATOMIC_SET(&probe_thieves, 0);

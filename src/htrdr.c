@@ -25,6 +25,7 @@
 #include "htrdr_ground.h"
 #include "htrdr_mtl.h"
 #include "htrdr_ran_wlen.h"
+#include "htrdr_rectangle.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 
@@ -427,7 +428,6 @@ htrdr_init
    struct htrdr* htrdr)
 {
   struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
-  double proj_ratio;
   double sun_dir[3];
   double spectral_range[2];
   const char* output_name = NULL;
@@ -619,7 +619,8 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
   if(htrdr->sky) HTSKY(ref_put(htrdr->sky));
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
-  if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
+  if(htrdr->sensor.camera) htrdr_camera_ref_put(htrdr->sensor.camera);
+  if(htrdr->sensor.rectangle) htrdr_rectangle_ref_put(htrdr->sensor.rectangle);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
   if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
   if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
@@ -659,8 +660,8 @@ htrdr_run(struct htrdr* htrdr)
       }
     }
   } else {
-    res = htrdr_draw_radiance(htrdr, htrdr->cam, htrdr->width,
-      htrdr->height, htrdr->spp, htrdr->buf);
+    res = htrdr_draw_map(htrdr, &htrdr->sensor, htrdr->width, htrdr->height,
+      htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;

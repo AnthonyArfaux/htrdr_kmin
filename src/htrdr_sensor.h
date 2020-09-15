@@ -17,6 +17,12 @@
 #ifndef HTRDR_SENSOR_H
 #define HTRDR_SENSOR_H
 
+#include <rsys/rsys.h>
+
+/* Forward declarations */
+struct htrdr_ground;
+struct ssp_rng;
+
 enum htrdr_sensor_type {
   HTRDR_SENSOR_CAMERA,
   HTRDR_SENSOR_RECTANGLE
@@ -27,6 +33,16 @@ struct htrdr_sensor {
   struct htrdr_rectangle* rectangle;
   enum htrdr_sensor_type type;
 };
+
+extern LOCAL_SYM res_T
+htrdr_sensor_sample_primary_ray
+  (struct htrdr_sensor* sensor,
+   struct htrdr_ground* ground,
+   const size_t ipix[2],
+   const double pix_sz[2],
+   struct ssp_rng* rng,
+   double ray_org[3],
+   double ray_dir[3]);
 
 #endif /* HTRDR_SENSOR_H */
 

@@ -26,6 +26,7 @@ struct htrdr_rectangle {
   double axis_x[3];
   double axis_y[3];
 
+  double normal[3];
   double position[3]; /* Center of the rectangle */
   struct htrdr* htrdr;
   ref_T ref;
@@ -91,6 +92,7 @@ htrdr_rectangle_create
 
   d3_muld(rect->axis_x, x, sz[0]*0.5);
   d3_muld(rect->axis_y, y, sz[1]*0.5);
+  d3_set(rect->normal, z);
   d3_set(rect->position, pos);
 
 exit:
@@ -129,5 +131,12 @@ htrdr_rectangle_ref_put(struct htrdr_rectangle* rect)
 {
   ASSERT(rect);
   ref_put(&rect->ref, rectangle_release);
+}
+
+void
+htrdr_rectangle_get_normal(const struct htrdr_rectangle* rect, double normal[3])
+{
+  ASSERT(rect && normal);
+  d3_set(normal, rect->normal);
 }
 

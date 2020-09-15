@@ -94,7 +94,7 @@ set(HTRDR_FILES_SRC
   htrdr_cie_xyz.c
   htrdr_compute_radiance_sw.c
   htrdr_compute_radiance_lw.c
-  htrdr_draw_radiance.c
+  htrdr_draw_map.c
   htrdr_grid.c
   htrdr_ground.c
   htrdr_interface.c
@@ -102,6 +102,7 @@ set(HTRDR_FILES_SRC
   htrdr_mtl.c
   htrdr_ran_wlen.c
   htrdr_rectangle.c
+  htrdr_sensor.c
   htrdr_slab.c
   htrdr_spectral.c
   htrdr_sun.c)

@@ -45,5 +45,10 @@ htrdr_rectangle_sample_pos
    const double sample[2], /* In [0, 1[ */
    double pos[3]);
 
+extern LOCAL_SYM void
+htrdr_rectangle_get_normal
+  (const struct htrdr_rectangle* rect,
+   double normal[3]);
+
 #endif /* HTRDR_RECTANGLE_H */
 
