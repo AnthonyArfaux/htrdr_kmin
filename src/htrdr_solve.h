@@ -19,6 +19,13 @@
 
 #include <rsys/rsys.h>
 
+/* Define the radiance component */
+enum htrdr_radiance_cpnt_flag {
+  HTRDR_RADIANCE_DIRECT = BIT(0),
+  HTRDR_RADIANCE_DIFFUSE = BIT(1),
+  HTRDR_RADIANCE_ALL = HTRDR_RADIANCE_DIRECT | HTRDR_RADIANCE_DIFFUSE
+};
+
 /* Monte carlo accumulator */
 struct htrdr_accum {
   double sum_weights; /* Sum of Monte-Carlo weights */
@@ -62,6 +69,7 @@ htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    const size_t ithread,
    struct ssp_rng* rng,
+   const int cpnt_mask, /* Combination of enum htrdr_radiance_cpnt_flag */
    const double pos[3],
    const double dir[3],
    const double wlen, /* In nanometer */

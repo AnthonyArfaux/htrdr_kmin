@@ -561,8 +561,8 @@ draw_pixel_image
       iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
 
       /* Compute the radiance in W/m^2/sr/m */
-      weight = htrdr_compute_radiance_sw
-        (htrdr, ithread, rng, ray_org, ray_dir, wlen, iband, iquad);
+      weight = htrdr_compute_radiance_sw(htrdr, ithread, rng,
+        HTRDR_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
       pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
@@ -638,7 +638,8 @@ draw_pixel_xwave
   size_t isamp;
   double temp_min, temp_max;
   ASSERT(ipix && ipix && pix_sz && sensor && rng && pixel);
-  ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_LW 
+  ASSERT(sensor->type == HTRDR_SENSOR_CAMERA);
+  ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_LW
       || htrdr->spectral_type == HTRDR_SPECTRAL_SW);
 
   /* Reset the pixel accumulators */
@@ -661,7 +662,7 @@ draw_pixel_xwave
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    res = htrdr_sensor_sample_primary_ray(&htrdr->sensor, htrdr->ground, ipix,
+    res = htrdr_sensor_sample_primary_ray(sensor, htrdr->ground, ipix,
       pix_sz, rng, ray_org, ray_dir);
     if(res != RES_OK) continue; /* Reject the current sample */
 
@@ -683,13 +684,12 @@ draw_pixel_xwave
           ray_dir, wlen, iband, iquad);
         break;
       case HTRDR_SPECTRAL_SW:
-        weight = htrdr_compute_radiance_sw(htrdr, ithread, rng, ray_org,
-          ray_dir, wlen, iband, iquad);
+        weight = htrdr_compute_radiance_sw(htrdr, ithread, rng,
+          HTRDR_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
     ASSERT(weight >= 0);
-
     /* Importance sampling: correct weight with pdf */
     weight /= band_pdf; /* In W/m^2/sr */
 

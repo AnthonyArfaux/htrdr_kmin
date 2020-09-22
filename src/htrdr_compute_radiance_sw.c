@@ -252,6 +252,7 @@ htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    const size_t ithread,
    struct ssp_rng* rng,
+   const int cpnt_mask, /* Combination of enum htrdr_radiance_cpnt_flag */
    const double pos_in[3],
    const double dir_in[3],
    const double wlen, /* In nanometer */
@@ -309,12 +310,10 @@ htrdr_compute_radiance_sw
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  /* Add the directly contribution of the sun  */
-  if(htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
-    /* Add the direct contribution of the sun */
-    d2(range, 0, FLT_MAX);
-
+  if((cpnt_mask & HTRDR_RADIANCE_DIRECT) /* Handle direct contribuation */
+  && htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
     /* Check that the ray is not occlude along the submitted range */
+    d2(range, 0, FLT_MAX);
     HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, NULL, &s3d_hit_tmp));
     if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
       Tr = 0;
@@ -324,6 +323,9 @@ htrdr_compute_radiance_sw
       w = L_sun * Tr;
     }
   }
+
+  if((cpnt_mask & HTRDR_RADIANCE_DIFFUSE) == 0)
+    goto exit; /* Discard diffuse contribution */
 
   /* Radiative random walk */
   for(;;) {
@@ -458,6 +460,8 @@ htrdr_compute_radiance_sw
   }
   SSF(phase_ref_put(phase_hg));
   SSF(phase_ref_put(phase_rayleigh));
+
+exit:
   return w;
 }
 
