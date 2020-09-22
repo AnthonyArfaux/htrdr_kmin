@@ -135,8 +135,10 @@ dump_buffer
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
-  pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
-  pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
+  pixsz = htrdr_spectral_type_get_pixsz
+    (htrdr->spectral_type, htrdr->sensor.type);
+  pixal = htrdr_spectral_type_get_pixal
+    (htrdr->spectral_type, htrdr->sensor.type);
 
   htrdr_buffer_get_layout(buf, &layout);
   if(layout.elmt_size != pixsz || layout.alignment != pixal) {
@@ -590,8 +592,10 @@ htrdr_init
   /* Create the image buffer only on the master process; the image parts
    * rendered by the processes are gathered onto the master process. */
   if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
-    const size_t pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
-    const size_t pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
+    const size_t pixsz = htrdr_spectral_type_get_pixsz
+      (htrdr->spectral_type, htrdr->sensor.type);
+    const size_t pixal = htrdr_spectral_type_get_pixal
+      (htrdr->spectral_type, htrdr->sensor.type);
 
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */

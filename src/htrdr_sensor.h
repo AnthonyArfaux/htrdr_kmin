@@ -36,7 +36,7 @@ struct htrdr_sensor {
 
 extern LOCAL_SYM res_T
 htrdr_sensor_sample_primary_ray
-  (struct htrdr_sensor* sensor,
+  (const struct htrdr_sensor* sensor,
    struct htrdr_ground* ground,
    const size_t ipix[2],
    const double pix_sz[2],

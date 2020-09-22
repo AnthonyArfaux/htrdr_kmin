@@ -22,7 +22,9 @@
 #include "htrdr_camera.h"
 #include "htrdr_cie_xyz.h"
 #include "htrdr_ran_wlen.h"
+#include "htrdr_rectangle.h"
 #include "htrdr_solve.h"
+#include "htrdr_sun.h"
 
 #include <high_tune/htsky.h>
 
@@ -51,6 +53,7 @@ enum pixel_format {
 };
 
 union pixel {
+  struct htrdr_pixel_flux flux;
   struct htrdr_pixel_xwave xwave;
   struct htrdr_pixel_image image;
 };
@@ -172,6 +175,7 @@ tile_at
 static void
 write_tile_data
   (struct htrdr* htrdr,
+   const struct htrdr_sensor* sensor,
    struct htrdr_buffer* buf,
    const struct tile_data* tile_data)
 {
@@ -180,12 +184,13 @@ write_tile_data
   size_t irow_tile;
   size_t ncols_tile, nrows_tile;
   char* buf_mem;
-  ASSERT(htrdr && buf && tile_data);
-  (void)htrdr;
+  ASSERT(htrdr && sensor && buf && tile_data);
+  (void)htrdr, (void)sensor;
 
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
-  ASSERT(layout.elmt_size==htrdr_spectral_type_get_pixsz(htrdr->spectral_type));
+  ASSERT(layout.elmt_size
+      == htrdr_spectral_type_get_pixsz(htrdr->spectral_type, sensor->type));
 
   /* Compute the row/column of the tile origin into the buffer */
   icol = tile_data->x * (size_t)TILE_SIZE;
@@ -431,6 +436,7 @@ mpi_steal_work
 static res_T
 mpi_gather_tiles
   (struct htrdr* htrdr,
+   const struct htrdr_sensor* sensor,
    struct htrdr_buffer* buf,
    const size_t ntiles,
    struct list_node* tiles)
@@ -459,7 +465,7 @@ mpi_gather_tiles
 
     LIST_FOR_EACH(node, tiles) {
       struct tile* t = CONTAINER_OF(node, struct tile, node);
-      write_tile_data(htrdr, buf, &t->data);
+      write_tile_data(htrdr, sensor, buf, &t->data);
       ++itile;
     }
 
@@ -483,7 +489,7 @@ mpi_gather_tiles
       FOR_EACH(itile, itile, ntiles) {
         MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
           HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
-        write_tile_data(htrdr, buf, &tile->data);
+        write_tile_data(htrdr, sensor, buf, &tile->data);
       }
     }
   }
@@ -591,6 +597,112 @@ draw_pixel_image
   pixel->time = time;
 }
 
+static void
+draw_pixel_flux
+  (struct htrdr* htrdr,
+   const size_t ithread,
+   const size_t ipix[2],
+   const double pix_sz[2], /* Size of a pixel in the normalized image plane */
+   const struct htrdr_sensor* sensor,
+   const size_t spp,
+   struct ssp_rng* rng,
+   struct htrdr_pixel_flux* pixel)
+{
+  struct htrdr_accum flux;
+  struct htrdr_accum time;
+  size_t isamp;
+  ASSERT(ipix && ipix && pix_sz && sensor && rng && pixel);
+  ASSERT(sensor->type == HTRDR_SENSOR_RECTANGLE);
+  ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_LW
+      || htrdr->spectral_type == HTRDR_SPECTRAL_SW);
+
+  /* Reset the pixel accumulators */
+  flux = HTRDR_ACCUM_NULL;
+  time = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(isamp, 0, spp) {
+    struct time t0, t1;
+    double ray_org[3];
+    double ray_dir[3];
+    double weight;
+    double r0, r1, r2;
+    double wlen;
+    size_t iband;
+    size_t iquad;
+    double usec;
+    double band_pdf;
+    res_T res = RES_OK;
+
+    /* Begin the registration of the time spent in the realisation */
+    time_current(&t0);
+
+    res = htrdr_sensor_sample_primary_ray(&htrdr->sensor, htrdr->ground, ipix,
+      pix_sz, rng, ray_org, ray_dir);
+    if(res != RES_OK) continue; /* Reject the current sample */
+
+    r0 = ssp_rng_canonical(rng);
+    r1 = ssp_rng_canonical(rng);
+    r2 = ssp_rng_canonical(rng);
+
+    /* Sample a wavelength */
+    wlen = htrdr_ran_wlen_sample(htrdr->ran_wlen, r0, r1, &band_pdf);
+
+    /* Select the associated band and sample a quadrature point */
+    iband = htsky_find_spectral_band(htrdr->sky, wlen);
+    iquad = htsky_spectral_band_sample_quadrature(htrdr->sky, r2, iband);
+
+    if(htrdr->spectral_type == HTRDR_SPECTRAL_LW) {
+      weight = htrdr_compute_radiance_lw(htrdr, ithread, rng, ray_org,
+        ray_dir, wlen, iband, iquad);
+      weight *= PI / band_pdf; /* Transform weight from W/m^2/sr/m to W/m^2 */
+    } else {
+      double sun_dir[3];
+      double N[3];
+      double L_direct;
+      double L_diffuse;
+      double cos_N_sun_dir;
+      double sun_solid_angle;
+      ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_SW);
+
+      /* Compute direct contribution */
+      htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
+      L_direct = htrdr_compute_radiance_sw(htrdr, ithread, rng,
+        HTRDR_RADIANCE_DIRECT, ray_org, sun_dir, wlen, iband, iquad);
+
+      /* Compute diffuse contribution */
+      L_diffuse = htrdr_compute_radiance_sw(htrdr, ithread, rng,
+        HTRDR_RADIANCE_DIFFUSE, ray_org, ray_dir, wlen, iband, iquad);
+
+      htrdr_rectangle_get_normal(sensor->rectangle, N);
+      sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
+      cos_N_sun_dir = d3_dot(N, sun_dir);
+
+      /* Compute the weight in W/m^2/m */
+      weight = cos_N_sun_dir * sun_solid_angle * L_direct + PI * L_diffuse;
+
+      /* Importance sampling: correct weight with pdf */
+      weight /= band_pdf; /* In W/m^2 */
+    }
+
+    /* End the registration of the per realisation time */
+    time_sub(&t0, time_current(&t1), &t0);
+    usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+    /* Update the pixel accumulator of the flux */
+    flux.sum_weights += weight;
+    flux.sum_weights_sqr += weight*weight;
+    flux.nweights += 1;
+
+    /* Update the pixel accumulator of per realisation time */
+    time.sum_weights += usec;
+    time.sum_weights_sqr += usec*usec;
+    time.nweights += 1;
+  }
+
+  /* Save the per realisation integration time */
+  pixel->flux = flux;
+  pixel->time = time;
+}
 
 static INLINE double
 radiance_temperature
@@ -763,15 +875,24 @@ draw_tile
     ipix[1] = tile_org[1] + ipix_tile[1];
 
     /* Draw the pixel */
-    switch(htrdr->spectral_type) {
-      case HTRDR_SPECTRAL_LW:
-      case HTRDR_SPECTRAL_SW:
-        draw_pixel_xwave(htrdr, ithread, ipix, pix_sz, sensor, spp, rng, &pixel->xwave);
+    switch(sensor->type) {
+      case HTRDR_SENSOR_RECTANGLE:
+        draw_pixel_flux
+          (htrdr, ithread, ipix, pix_sz, sensor, spp, rng, &pixel->flux);
         break;
-      case HTRDR_SPECTRAL_SW_CIE_XYZ:
-        ASSERT(sensor->type == HTRDR_SENSOR_CAMERA); /* TODO handle this */
-        draw_pixel_image(htrdr, ithread, ipix, pix_sz, sensor->camera, spp,
-          rng, &pixel->image);
+      case HTRDR_SENSOR_CAMERA:
+        switch(htrdr->spectral_type) {
+          case HTRDR_SPECTRAL_LW:
+          case HTRDR_SPECTRAL_SW:
+            draw_pixel_xwave
+              (htrdr, ithread, ipix, pix_sz, sensor, spp, rng, &pixel->xwave);
+            break;
+          case HTRDR_SPECTRAL_SW_CIE_XYZ:
+            draw_pixel_image
+              (htrdr, ithread, ipix, pix_sz, sensor->camera, spp, rng, &pixel->image);
+            break;
+          default: FATAL("Unreachable code.\n"); break;
+        }
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
@@ -973,8 +1094,10 @@ htrdr_draw_map
   proc_work_init(htrdr->allocator, &work);
 
   if(htrdr->mpi_rank == 0) {
-    const size_t pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
-    const size_t pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
+    const size_t pixsz = htrdr_spectral_type_get_pixsz
+      (htrdr->spectral_type, sensor->type);
+    const size_t pixal = htrdr_spectral_type_get_pixal
+      (htrdr->spectral_type, sensor->type);
 
     htrdr_buffer_get_layout(buf, &layout);
     ASSERT(layout.width || layout.height || layout.elmt_size);
@@ -1055,7 +1178,7 @@ htrdr_draw_map
 
   /* Gather accum buffers from the group of processes */
   time_current(&t0);
-  res = mpi_gather_tiles(htrdr, buf, ntiles, &tiles);
+  res = mpi_gather_tiles(htrdr, sensor, buf, ntiles, &tiles);
   if(res != RES_OK) goto error;
   time_sub(&t0, time_current(&t1), &t0);
   time_dump(&t0, TIME_ALL, NULL, strbuf, sizeof(strbuf));
