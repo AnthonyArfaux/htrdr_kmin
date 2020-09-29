@@ -125,6 +125,7 @@ dump_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
    struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
    const char* stream_name,
    FILE* stream)
 {
@@ -150,25 +151,46 @@ dump_buffer
   fprintf(stream, "%lu %lu\n", layout.width, layout.height);
 
   if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
+  if(flux_acc) *flux_acc = HTRDR_ACCUM_NULL;
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
       struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
       const struct htrdr_accum* pix_time_acc = NULL;
 
-      if(htrdr->spectral_type != HTRDR_SPECTRAL_SW_CIE_XYZ){
-        const struct htrdr_pixel_xwave* pix = htrdr_buffer_at(buf, x, y);
-        fprintf(stream, "%g %g ",
-          pix->radiance_temperature.E, pix->radiance_temperature.SE);
-        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
-        fprintf(stream, "0 0 ");
+      if(htrdr->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+        const struct htrdr_pixel_flux* pix = htrdr_buffer_at(buf, x, y);
+        struct htrdr_estimate flux = HTRDR_ESTIMATE_NULL;
+
+        if(pix->flux.nweights == 0) {
+          fprintf(stream, "0 0 0 0 0 0 ");
+        } else {
+          htrdr_accum_get_estimation(&pix->flux, &flux);
+          fprintf(stream, "%g %g 0 0 0 0 ", flux.E, flux.SE);
+
+          if(flux_acc) {
+            flux_acc->sum_weights += pix->flux.sum_weights;
+            flux_acc->sum_weights_sqr += pix->flux.sum_weights_sqr;
+            flux_acc->nweights += pix->flux.nweights;
+          }
+        }
         pix_time_acc = &pix->time;
 
       } else {
-        const struct htrdr_pixel_image* pix = htrdr_buffer_at(buf, x, y);
-        fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
-        fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
-        fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
-        pix_time_acc = &pix->time;
+        if(htrdr->spectral_type != HTRDR_SPECTRAL_SW_CIE_XYZ){
+          const struct htrdr_pixel_xwave* pix = htrdr_buffer_at(buf, x, y);
+          fprintf(stream, "%g %g ",
+            pix->radiance_temperature.E, pix->radiance_temperature.SE);
+          fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+          fprintf(stream, "0 0 ");
+          pix_time_acc = &pix->time;
+
+        } else {
+          const struct htrdr_pixel_image* pix = htrdr_buffer_at(buf, x, y);
+          fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
+          fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
+          fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
+          pix_time_acc = &pix->time;
+        }
       }
 
       htrdr_accum_get_estimation(pix_time_acc, &pix_time);
@@ -669,9 +691,11 @@ htrdr_run(struct htrdr* htrdr)
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
+      struct htrdr_accum flux_acc = HTRDR_ACCUM_NULL;
       struct htrdr_estimate path_time;
+      struct htrdr_estimate flux;
 
-      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc,
+      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc, &flux_acc,
         str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
 
@@ -680,6 +704,14 @@ htrdr_run(struct htrdr* htrdr)
         "Time per radiative path (in micro seconds): %g +/- %g\n",
         path_time.E,
         path_time.SE);
+
+      if(htrdr->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+        htrdr_accum_get_estimation(&flux_acc, &flux);
+        htrdr_log(htrdr,
+          "Radiative flux density (in W/(external m^2)): %g +/- %g\n",
+          flux.E,
+          flux.SE);
+      }
     }
   }
 exit:
