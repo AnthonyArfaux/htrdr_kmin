@@ -50,10 +50,10 @@ rectangle_release(ref_T* ref)
 res_T
 htrdr_rectangle_create
   (struct htrdr* htrdr,
+   const double sz[2],
    const double pos[3],
    const double tgt[3],
-   const double up[2],
-   const double sz[2],
+   const double up[3],
    struct htrdr_rectangle** out_rect)
 {
   struct htrdr_rectangle* rect = NULL;
