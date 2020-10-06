@@ -664,18 +664,23 @@ draw_pixel_flux
       double sun_solid_angle;
       ASSERT(htrdr->spectral_type == HTRDR_SPECTRAL_SW);
 
-      /* Compute direct contribution */
+      /* Compute direct contribution if necessary */
       htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
-      L_direct = htrdr_compute_radiance_sw(htrdr, ithread, rng,
-        HTRDR_RADIANCE_DIRECT, ray_org, sun_dir, wlen, iband, iquad);
+      htrdr_rectangle_get_normal(sensor->rectangle, N);
+      cos_N_sun_dir = d3_dot(N, sun_dir);
+
+      if(cos_N_sun_dir <= 0) {
+        L_direct = 0;
+      } else {
+        L_direct = htrdr_compute_radiance_sw(htrdr, ithread, rng,
+          HTRDR_RADIANCE_DIRECT, ray_org, sun_dir, wlen, iband, iquad);
+      }
 
       /* Compute diffuse contribution */
       L_diffuse = htrdr_compute_radiance_sw(htrdr, ithread, rng,
         HTRDR_RADIANCE_DIFFUSE, ray_org, ray_dir, wlen, iband, iquad);
 
-      htrdr_rectangle_get_normal(sensor->rectangle, N);
       sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
-      cos_N_sun_dir = d3_dot(N, sun_dir);
 
       /* Compute the weight in W/m^2/m */
       weight = cos_N_sun_dir * sun_solid_angle * L_direct + PI * L_diffuse;
