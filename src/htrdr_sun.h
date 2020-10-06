@@ -43,8 +43,8 @@ htrdr_sun_set_direction
   (struct htrdr_sun* sun,
    const double direction[3]); /* Must be normalized */
 
-/* Return a direction that points *toward* the sun */
-extern LOCAL_SYM double*
+/* Return a pdf of the sampled dir */
+extern LOCAL_SYM double
 htrdr_sun_sample_direction
   (struct htrdr_sun* sun,
    struct ssp_rng* rng,
