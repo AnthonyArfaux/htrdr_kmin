@@ -458,10 +458,10 @@ htrdr_compute_radiance_sw
     d3_set(pos, pos_next);
     d3_set(dir, dir_next);
   }
-  SSF(phase_ref_put(phase_hg));
-  SSF(phase_ref_put(phase_rayleigh));
 
 exit:
+  SSF(phase_ref_put(phase_hg));
+  SSF(phase_ref_put(phase_rayleigh));
   return w;
 }
 
