@@ -156,7 +156,7 @@ htrdr_interface_create_bsdf
   res = mrumtl_fetch_brdf2(mat, wavelength, r, &brdf);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
-      "%s: error retreiving the MruMtl BRDF for the wavelength %g.\n",
+      "%s: error retrieving the MruMtl BRDF for the wavelength %g.\n",
       FUNC_NAME, wavelength);
     res = RES_BAD_ARG;
     goto error;
