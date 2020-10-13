@@ -28,6 +28,7 @@ struct ssp_rng;
 struct htrdr_interface {
   const struct mrumtl* mtl_front;
   const struct mrumtl* mtl_back;
+  const struct mrumtl* mtl_thin; /* != NULL <=> thin material */
 };
 static const struct htrdr_interface HTRDR_INTERFACE_NULL;
 

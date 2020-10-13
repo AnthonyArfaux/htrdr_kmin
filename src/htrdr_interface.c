@@ -123,33 +123,36 @@ htrdr_interface_create_bsdf
   res_T res = RES_OK;
   (void)pos;
   ASSERT(htrdr && pos && hit && out_bsdf);
-  ASSERT(interf && (interf->mtl_front || interf->mtl_back));
+  ASSERT(interf && (interf->mtl_front || interf->mtl_back || interf->mtl_thin));
 
   ASSERT(htrdr && interf && pos && dir && hit && out_bsdf);
   ASSERT(d3_is_normalized(dir));
 
-  d3_normalize(N, d3_set_f3(N, hit->normal));
+  if(interf->mtl_thin) {
+    mat = interf->mtl_thin;
+  } else {
+    d3_normalize(N, d3_set_f3(N, hit->normal));
+    hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
 
-  hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
-
-  /* Retrieve the brdf of the material on the other side of the hit side */
-  switch(hit_side) {
-    case BACK: mat = interf->mtl_front; break;
-    case FRONT: mat = interf->mtl_back; break;
-    default: FATAL("Unreachable code.\n");  break;
-  }
-
-  /* Due to numerical issue the hit side might be wrong and thus the fetched
-   * material might be undefined (e.g. semi-transparent materials). Handle this
-   * issue by fetching the other material. */
-  if(!mat) {
+    /* Retrieve the brdf of the material on the other side of the hit side */
     switch(hit_side) {
-      case BACK: mat = interf->mtl_back; break;
-      case FRONT: mat = interf->mtl_front; break;
+      case BACK: mat = interf->mtl_front; break;
+      case FRONT: mat = interf->mtl_back; break;
       default: FATAL("Unreachable code.\n");  break;
     }
+
+    /* Due to numerical issue the hit side might be wrong and thus the fetched
+     * material might be undefined (e.g. semi-transparent materials). Handle this
+     * issue by fetching the other material. */
+    if(!mat) {
+      switch(hit_side) {
+        case BACK: mat = interf->mtl_back; break;
+        case FRONT: mat = interf->mtl_front; break;
+        default: FATAL("Unreachable code.\n");  break;
+      }
+    }
+    ASSERT(mat);
   }
-  ASSERT(mat);
 
   r = ssp_rng_canonical(rng);
 

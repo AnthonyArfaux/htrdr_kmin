@@ -162,6 +162,7 @@ parse_shape_interface
 {
   struct str str;
   char* mtl_name_front = NULL;
+  char* mtl_name_thin = NULL;
   char* mtl_name_back = NULL;
   char* tk_ctx = NULL;
   res_T res = RES_OK;
@@ -181,7 +182,11 @@ parse_shape_interface
   /* Parse the name of the front/back faces */
   mtl_name_front = strtok_r(str_get(&str), ":", &tk_ctx);
   ASSERT(mtl_name_front); /* This can't be NULL */
+
+  /* Parse the back/thin material names */
+  mtl_name_thin = strtok_r(NULL, ":", &tk_ctx);
   mtl_name_back = strtok_r(NULL, ":", &tk_ctx);
+  if(!mtl_name_back) mtl_name_back = mtl_name_thin;
   if(!mtl_name_back) {
     htrdr_log_err(htrdr,
       "The material name of the shape back faces are missing `%s'.\n", name);
@@ -189,17 +194,28 @@ parse_shape_interface
     goto error;
   }
 
+  /* Fetch the interface material */
+  if(mtl_name_thin) {
+    interf->mtl_thin = htrdr_mtl_get(htrdr->mtl, mtl_name_thin);
+    if(!interf->mtl_thin) {
+      htrdr_log_err(htrdr,
+      "Invalid interface `%s:%s:%s'. "
+      "The material of the interface is unknown.\n",
+      mtl_name_front, mtl_name_thin, mtl_name_back);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
   /* Fetch the front/back materials */
   interf->mtl_front = htrdr_mtl_get(htrdr->mtl, mtl_name_front);
   interf->mtl_back = htrdr_mtl_get(htrdr->mtl, mtl_name_back);
-  if(!interf->mtl_front && !interf->mtl_back) {
-    htrdr_log_err(htrdr,
-      "Invalid interface `%s:%s'. "
-      "The front and the back materials are both uknown.\n",
-      mtl_name_front, mtl_name_back);
+  if(!interf->mtl_front && !interf->mtl_back && !interf->mtl_thin) {
+    htrdr_log_err(htrdr, "Invalid interface `%s'.\n", name);
     res = RES_BAD_ARG;
     goto error;
   }
+
 exit:
   str_release(&str);
   return res;
