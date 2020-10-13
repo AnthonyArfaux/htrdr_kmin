@@ -17,6 +17,7 @@
 #include "htrdr.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
+#include "htrdr_interface.h"
 #include "htrdr_rectangle.h"
 #include "htrdr_sensor.h"
 
@@ -77,8 +78,25 @@ sample_rectangle_ray
    * naïve "up" intersection. */
   HTRDR(ground_trace_ray(ground, ray_org, up_dir, range, NULL, &hit));
 
-  /* Reject the ray origin */
-  if(!S3D_HIT_NONE(&hit)) return RES_BAD_OP;
+  /* Up direction is occluded, check if the sample must be recjected */
+  if(!S3D_HIT_NONE(&hit)) {
+    struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+    const struct mrumtl* mat = NULL;
+    float wi[3];
+    float N[3];
+
+    /* Fetch the interface of the hit */
+    htrdr_ground_get_interface(ground, &hit, &interf);
+
+    /* Retrieve the material on the side of the incident direction */
+    f3_set_d3(wi, up_dir);
+    f3_normalize(N, hit.normal);
+    mat = f3_dot(wi, N) < 0 ? interf.mtl_front : interf.mtl_back;
+
+    /* Mat is NULL only for the external air. Reject the sample if the material
+     * is not null, i.e. the incident direction travels into the geometry */
+    if(mat != NULL) return RES_BAD_OP;
+  }
 
   /* Sample a ray direction */
   htrdr_rectangle_get_normal(rect, normal);
