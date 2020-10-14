@@ -161,6 +161,9 @@ parse_shape_interface
    struct htrdr_interface* interf)
 {
   struct str str;
+  char* mtl_name0 = NULL;
+  char* mtl_name1 = NULL;
+  char* mtl_name2 = NULL;
   char* mtl_name_front = NULL;
   char* mtl_name_thin = NULL;
   char* mtl_name_back = NULL;
@@ -179,14 +182,23 @@ parse_shape_interface
     goto error;
   }
 
-  /* Parse the name of the front/back faces */
-  mtl_name_front = strtok_r(str_get(&str), ":", &tk_ctx);
-  ASSERT(mtl_name_front); /* This can't be NULL */
+  /* Reset the interface */
+  memset(interf, 0, sizeof(*interf));
 
-  /* Parse the back/thin material names */
-  mtl_name_thin = strtok_r(NULL, ":", &tk_ctx);
-  mtl_name_back = strtok_r(NULL, ":", &tk_ctx);
-  if(!mtl_name_back) mtl_name_back = mtl_name_thin;
+  /* Parse the name of the front/back/thin materials */
+  mtl_name0 = strtok_r(str_get(&str), ":", &tk_ctx);
+  mtl_name1 = strtok_r(NULL, ":", &tk_ctx);
+  mtl_name2 = strtok_r(NULL, ":", &tk_ctx);
+  ASSERT(mtl_name0); /* This can't be NULL */
+  mtl_name_front = mtl_name0;
+  if(mtl_name2) {
+    mtl_name_thin = mtl_name1;
+    mtl_name_back = mtl_name2;
+  } else {
+    mtl_name_thin = NULL;
+    mtl_name_back = mtl_name1;
+  }
+
   if(!mtl_name_back) {
     htrdr_log_err(htrdr,
       "The material name of the shape back faces are missing `%s'.\n", name);
