@@ -62,6 +62,7 @@ sample_rectangle_ray
 {
   struct s3d_hit hit = S3D_HIT_NULL;
   double pix_samp[2];
+  const double up_dir[3] = {0,0,1};
   const double range[2] = {0, INF};
   double normal[3];
   ASSERT(rect && ground && ipix && pix_sz && rng && ray_org && ray_dir);
@@ -73,12 +74,8 @@ sample_rectangle_ray
   /* Retrieve the world space position of pix_samp */
   htrdr_rectangle_sample_pos(rect, pix_samp, ray_org);
 
-  /* Sample a ray direction */
-  htrdr_rectangle_get_normal(rect, normal);
-  ssp_ran_hemisphere_cos(rng, normal, ray_dir, NULL);
-
   /* Check that `ray_org' is not included into a geometry */
-  HTRDR(ground_trace_ray(ground, ray_org, ray_dir, range, NULL, &hit));
+  HTRDR(ground_trace_ray(ground, ray_org, up_dir, range, NULL, &hit));
 
   /* Up direction is occluded. Check if the sample must be rejected, i.e. does it
    * lies inside a geometry? */
@@ -89,21 +86,26 @@ sample_rectangle_ray
     float wi[3];
     float cos_wi_N;
 
-    /* Compute the cosine between the incident ray direction and the hit normal */
-    f3_set_d3(wi, ray_dir);
+    /* Compute the cosine between the up direction and the hit normal */
+    f3_set_d3(wi, up_dir);
     f3_normalize(N, hit.normal);
     cos_wi_N = f3_dot(wi, N);
 
     /* Fetch the hit interface and retrieve the material into which the ray was
      * traced */
     htrdr_ground_get_interface(ground, &hit, &interf);
-    mat = cos_wi_N ? interf.mtl_front : interf.mtl_back;
+    mat = cos_wi_N < 0 ? interf.mtl_front : interf.mtl_back;
 
     /* Reject the sample if the material is not null, i.e. the incident
      * direction do not travel into the external air and thus the challenged
      * position is not outside */
     if(mat != NULL) return RES_BAD_OP;
   }
+
+  /* Sample a ray direction */
+  htrdr_rectangle_get_normal(rect, normal);
+  ssp_ran_hemisphere_cos(rng, normal, ray_dir, NULL);
+
   return RES_OK;
 }
 
