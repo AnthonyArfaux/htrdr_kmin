@@ -34,8 +34,8 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
-"Render an image for scenes composed of an atmospheric gas mixture,\n"
-"clouds and a ground.\n\n");
+"Render an image or compute a flux map for scenes composed of an\n"
+"atmospheric gas mixture, clouds and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
@@ -71,7 +71,9 @@ print_help(const char* cmd)
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
   printf(
-"  -p <plane>     define a plane sensor.\n");
+"  -p <rectangle> switch in flux computation by defining the rectangular\n"
+"                 sensor onto wich the flux is computed. Refer to the\n"
+"                 htrdr man page for the list of rectangle options.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
