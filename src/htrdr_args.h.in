@@ -34,7 +34,7 @@ struct htrdr_args {
   const char* output;
 
   struct {
-    double pos[3]; /* Position */
+    double pos[3]; /* Center of the renctangle */
     double tgt[3]; /* Target */
     double up[3]; /* Up vector */
     double sz[2]; /* Plane size in world space */
@@ -80,10 +80,10 @@ struct htrdr_args {
   NULL, /* Cache filename */                                                   \
   NULL, /* Output filename */                                                  \
   {                                                                            \
-    {0, 0, 0}, /* plane position */                                            \
-    {0, 0, 1}, /* plane target */                                              \
-    {0, 1, 0}, /* plane up */                                                  \
-    {1, 1},    /* plane size */                                                \
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}, /* Rectangle center */               \
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}, /* Rectangle target */               \
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@}, /* Rectangle up */                    \
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}, /* Rectangle size */                  \
   }, {                                                                         \
     {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}, /* Camera position */                   \
     {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}, /* Camera target */                     \

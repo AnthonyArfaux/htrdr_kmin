@@ -20,7 +20,7 @@ htrdr(1)
 
 NAME
 ----
-htrdr - image renderer of cloudy atmospheres
+htrdr - simulate radiative transfert in cloudy atmospheres
 
 SYNOPSIS
 --------
@@ -29,48 +29,55 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*htrdr* is an image renderer of scenes composed of an atmospheric gas mixture,
-clouds, and a ground. It evaluates the intensity incoming on each pixel of the
-sensor array. The underlying algorithm is based on a Monte-Carlo method: it
-consists in simulating a given number of optical paths originating from the
-camera, directed into the atmosphere, taking into account light absorption and
-scattering phenomena.
+*htrdr* simulate radiative transfert in scenes composed of an atmospheric gas
+mixture, clouds, and a ground. It evaluates the intensity incoming on each
+pixel of the sensor array. The underlying algorithm is based on a Monte-Carlo
+method: it consists in simulating a given number of optical paths originating
+from the sensor, directed into the atmosphere, taking into account light
+absorption and scattering phenomena.
 
-Images can be rendered in the visible or the infrared
-part of the spectrum. It uses spectral data that should be provided for the
-pressure and temperature atmospheric vertical profile [1] (*-a* _atmosphere_),
-the liquid water content in suspension within the clouds stored in a *htcp*(5)
-file (*-c* _clouds_), and the optical properties of water droplets that have
-been obtained from a Mie code and formatted according to the *htmie*(5) file
-format (*-m* _mie_). The user also has to provide: the characteristics of the
-simulated camera (*-C* _camera_), the sensor definition (*-i* _image_), and the
-position of the sun (*-D* _azimuth_,_elevation_). It is also possible to
-provide an *htrdr-obj*(5) file representing the ground geometry (*-g* _ground_)
-whose materials are listed in the *htrdr-material*(5) file provided through the
-*-M* option. Both, the clouds and the ground, can be infinitely repeated along
-the X and Y axis by setting the *-r* and the *-R* options, respectively.
+Radiative transfert can be evaluated in the visible or the infrared part of the
+spectrum. It uses spectral data that should be provided for the pressure and
+temperature atmospheric vertical profile [1] (*-a* _atmosphere_), the liquid
+water content in suspension within the clouds stored in a *htcp*(5) file (*-c*
+_clouds_), and the optical properties of water droplets that have been obtained
+from a Mie code and formatted according to the *htmie*(5) file format (*-m*
+_mie_). The user also has to set the position of the sun (*-D*
+_azimuth_,_elevation_), the sensor type (*-C* _camera_ or *-p* _rectangle_) and
+its definition (*-i* _image_). It is also possible to provide an *htrdr-obj*(5)
+file representing the ground geometry (*-g* _ground_) whose materials are
+listed in the *htrdr-material*(5) file provided through the *-M* option. Both,
+the clouds and the ground, can be infinitely repeated along the X and Y axis by
+setting the *-r* and the *-R* options, respectively.
 
-Spectral dimension can be integrated in many ways (*-s* option). By default,
-the computation is performed for the visible part of the spectrum in [380, 780]
-nanometers, for the three components of the CIE 1931 XYZ colorimetric space
-that are subsequently recombined in order to obtain the final color for each
-pixel, and finally the whole image of the scene as seen from the set
-observation position. The two other ways consist in explicitly defining the
-longwave or shortwave spectral range to handle and continuously sampling a
-wavelength in this range. Actually longwave and shortwave are keywords that
-mean that the source of radiation is whether external or internal to the
-medium, respectively. In shortwave, only the pixel radiance is evaluated and
-stored in the output image. In longwave this estimated radiance is then
-converted to its brightness temperature and both are saved in the image.
+Two types of sensor are supported by *htrdr*. The camera (*-C* _camera_) is
+used to render an image of the scene from the given point of view while the
+rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
+
+Spectral dimension can be integrated in many ways (*-s* option). When rendering
+an image (*-C* _camera_), the computation is by default performed for the
+visible part of the spectrum in [380, 780] nanometers, for the three components
+of the CIE 1931 XYZ colorimetric space that are subsequently recombined in
+order to obtain the final color for each pixel, and finally the whole image of
+the scene as seen from the set observation position. The two other ways consist
+in explicitly defining the longwave or shortwave spectral range to handle and
+continuously sampling a wavelength in this range. Actually longwave and
+shortwave are keywords that mean that the source of radiation is whether
+external or internal to the medium, respectively. In shortwave rendering, only
+the pixel radiance is evaluated and stored in the output image. For longwave
+rendering this estimated radiance is then converted to its brightness
+temperature and both are saved in the image. When computing a flux map (*-p*
+_rectangle_), the per pixel flux is saved into the output map whether spectral
+domain is longwave or shortwave.
 
 In *htrdr* the spatial unit 1.0 corresponds to one meter and the temperatures
 are expressed in Kelvin. The estimated radiances are given in W/sr/m^2 excepted
 for monochromatic computations where the computed spectral radiance is defined
-in W/sr/m^2/nm. The results are written to the output file if the *-o* option
-is defined and the standard output otherwise. The output image is a list of raw
-ASCII data formatted with respect to the *htrdr-image*(5) file format.  Since
-*htrdr* relies on the Monte-Carlo method, each estimation is given with its
-numerical accuracy.
+in W/sr/m^2/nm. The fluxes are saved in W/m^2. The results are written to the
+output file if the *-o* option is defined and the standard output otherwise.
+The output image is a list of raw ASCII data formatted with respect to the
+*htrdr-image*(5) file format.  Since *htrdr* relies on the Monte-Carlo method,
+each estimation is given with its numerical accuracy.
 
 During the simulation, *htrdr* dynamically loads/unloads cloud properties to
 handle clouds whose data that do not feat in main memory. *htrdr* also supports
@@ -137,7 +144,7 @@ OPTIONS
   List short help and exit.
 
 *-i* <__image-parameter__:...>::
-  Define the image to render. Available image parameters are:
+  Define the sensor array. Available image parameters are:
 
   **def**=**_width_**x**_height_**;;
     Definition of the image. By default the image definition is
@@ -147,10 +154,9 @@ OPTIONS
     Number of samples per pixel estimation. In regular image rendering, a pixel
     will use "3 * _samples-count_" Monte-Carlo realisations, one set of
     _samples-count_ realisations for each X, Y and Z component of the CIE 1931
-    XYZ color space. In longwave rendering (*-l* option) only one set of
-    _samples-count_ is used to estimate the pixel radiance and the resulting
-    brightness temperature for the submitted range of wavelengths. By default,
-    *spp* is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+    XYZ color space. In shortwave/longwave rendering or flux computation, only
+    one set of _samples-count_ is used. By default, *spp* is set to
+    @HTRDR_ARGS_DEFAULT_IMG_SPP@.
 
 *-R*::
   Infinitely repeat the _ground_ along the X and Y axis.
@@ -182,8 +188,29 @@ OPTIONS
   File where *htrdr* writes its _output_ data. If not defined, write results to
   standard output.
 
+*-p* <__rectangle-parameter__:...>::
+  Switch in flux map computation. The flux is computed for the part of the
+  sensor that is outside any geometry. The rectangular sensor onto which the
+  flux is integrated is defined by the following parameters:
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Position of the center of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the rectangle, i.e. *tgt* - *pos* is the rectangle
+    normal. By default it is set to {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@}.
+
+  **sz**=**_width_**,**_height_**;;
+    Size of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}.
+
 *-s* <__spectral-parameter__:...>::
-  define the type and the range of the spectral integration. Available spectral
+  Define the type and the range of the spectral integration. Available spectral
   parameters are:
 
   **cie_xyz**;;
@@ -276,8 +303,8 @@ PPM image [4]:
       -f -o output
     $ htpp -o image.ppm output
 
-Render the previous scene in infrared for the wavelengths in [9200, 10000]
-nanometers with a reference temperature of 300 Kelvin:
+Render the previous scene in infrared for the wavelengths in [*9200*, *10000*]
+nanometers with a reference temperature of *300* Kelvin:
 
     $ htrdr -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
@@ -300,6 +327,21 @@ output and convert the resulting image in PPM before visualising it through the
       -O my_cache \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=1280x720:spp=1024 | htpp | feh -
+
+Compute the downward flux for the shortwave interval [*350*, *4000*] nanometers
+on a square of *100* meters side positionned at the origin at *1* meter height.
+The resolution of the flux map is *500* by *500* pixels and *1000* realisations
+is used to estimate the flux per pixel. It is saved in the *flux_map.txt* file
+even though this file already exists:
+
+    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g plane.obj -R \
+      -M materials.mtl \
+      -c clouds.htcp \
+      -O my_cache \
+      -p pos=0,0,1:tgt=0,0,2:up=0,1,0:sz=100,100 \
+      -i def=500x500:spp=1000 \
+      -s sw=350,4000 \
+      -f -o flux_map.txt
 
 Write into *output* the data structures used to partition the clouds
 properties. Use the *csplit*(1) Unix command to extract from *output* the list
