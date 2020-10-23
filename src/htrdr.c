@@ -423,6 +423,14 @@ setup_sensor(struct htrdr* htrdr, const struct htrdr_args* args)
 
   htrdr->sensor.type = args->sensor_type;
 
+  if(args->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ
+  && args->sensor_type != HTRDR_SENSOR_CAMERA) {
+    htrdr_log_err(htrdr, "the CIE 1931 XYZ spectral integration can be used "
+      "only with a camera sensor.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   switch(args->sensor_type) {
     case HTRDR_SENSOR_CAMERA:
       proj_ratio =
@@ -432,14 +440,19 @@ setup_sensor(struct htrdr* htrdr, const struct htrdr_args* args)
         args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y),
         &htrdr->sensor.camera);
       break;
-    case HTRDR_SENSOR_RECTANGLE: 
+    case HTRDR_SENSOR_RECTANGLE:
       res = htrdr_rectangle_create(htrdr, args->rectangle.sz,
         args->rectangle.pos, args->rectangle.tgt, args->rectangle.up,
         &htrdr->sensor.rectangle);
       break;
     default: FATAL("Unreachable code.\n"); break;
   }
+  if(res != RES_OK) goto error;
+
+exit:
   return res;
+error:
+  goto exit;
 }
 
 /*******************************************************************************
@@ -588,7 +601,7 @@ htrdr_init
     res = htrdr_ran_wlen_create
       (htrdr, spectral_range, n, htrdr->ref_temperature, &htrdr->ran_wlen);
     if(res != RES_OK) goto error;
-  } 
+  }
 
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
