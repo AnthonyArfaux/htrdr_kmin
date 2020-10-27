@@ -38,6 +38,7 @@ struct htsky;
 struct htrdr_args;
 struct htrdr_buffer;
 struct htrdr_cie_xyz;
+struct htrdr_materials;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct mutext;
@@ -50,7 +51,7 @@ struct htrdr {
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
-  struct htrdr_mtl* mtl;
+  struct htrdr_materials* mats;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
   struct htrdr_ran_wlen* ran_wlen;

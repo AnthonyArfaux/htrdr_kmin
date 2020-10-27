@@ -17,7 +17,7 @@
 #include "htrdr.h"
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
-#include "htrdr_mtl.h"
+#include "htrdr_materials.h"
 #include "htrdr_slab.h"
 
 #include <aw.h>
@@ -168,6 +168,9 @@ parse_shape_interface
   char* mtl_name_thin = NULL;
   char* mtl_name_back = NULL;
   char* tk_ctx = NULL;
+  int has_front = 0;
+  int has_thin = 0;
+  int has_back = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && name && interf);
 
@@ -201,29 +204,42 @@ parse_shape_interface
 
   if(!mtl_name_back) {
     htrdr_log_err(htrdr,
-      "The material name of the shape back faces are missing `%s'.\n", name);
+      "The back material name is missing `%s'.\n", name);
     res = RES_BAD_ARG;
     goto error;
   }
 
-  /* Fetch the interface material */
+  /* Fetch the interface material if any */
   if(mtl_name_thin) {
-    interf->mtl_thin = htrdr_mtl_get(htrdr->mtl, mtl_name_thin);
-    if(!interf->mtl_thin) {
+    has_thin = htrdr_materials_find_mtl
+      (htrdr->mats, mtl_name_thin, &interf->mtl_thin);
+    if(!has_thin) {
       htrdr_log_err(htrdr,
-      "Invalid interface `%s:%s:%s'. "
-      "The material of the interface is unknown.\n",
-      mtl_name_front, mtl_name_thin, mtl_name_back);
+        "Invalid interface `%s'. The interface material `%s' is unknown.\n",
+        name, mtl_name_thin);
       res = RES_BAD_ARG;
       goto error;
     }
   }
 
-  /* Fetch the front/back materials */
-  interf->mtl_front = htrdr_mtl_get(htrdr->mtl, mtl_name_front);
-  interf->mtl_back = htrdr_mtl_get(htrdr->mtl, mtl_name_back);
-  if(!interf->mtl_front && !interf->mtl_back && !interf->mtl_thin) {
-    htrdr_log_err(htrdr, "Invalid interface `%s'.\n", name);
+  /* Fetch the front material */
+  has_front = htrdr_materials_find_mtl
+    (htrdr->mats, mtl_name_front, &interf->mtl_front);
+  if(!has_front) {
+    htrdr_log_err(htrdr,
+      "Invalid interface `%s'. The front material `%s' is unknown.\n",
+      name, mtl_name_front);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  /* Fetch the back material */
+  has_back = htrdr_materials_find_mtl
+    (htrdr->mats, mtl_name_back, &interf->mtl_back);
+  if(!has_back) {
+    htrdr_log_err(htrdr,
+      "Invalid interface `%s'. The back material `%s' is unknown.\n",
+      name, mtl_name_back);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -232,7 +248,7 @@ exit:
   str_release(&str);
   return res;
 error:
-  interf->mtl_front = interf->mtl_back = NULL;
+  *interf = HTRDR_INTERFACE_NULL;
   goto exit;
 }
 

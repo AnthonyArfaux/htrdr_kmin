@@ -116,47 +116,50 @@ htrdr_interface_create_bsdf
   enum { FRONT, BACK };
   struct ssf_bsdf* bsdf = NULL;
   const struct mrumtl_brdf* brdf = NULL;
-  const struct mrumtl* mat = NULL;
+  const struct htrdr_mtl* mtl = NULL;
   double N[3];
   double r;
   int hit_side;
   res_T res = RES_OK;
   (void)pos;
   ASSERT(htrdr && pos && hit && out_bsdf);
-  ASSERT(interf && (interf->mtl_front || interf->mtl_back || interf->mtl_thin));
+  ASSERT(interf &&
+    (  interf->mtl_front.mrumtl
+    || interf->mtl_back.mrumtl
+    || interf->mtl_thin.mrumtl));
 
   ASSERT(htrdr && interf && pos && dir && hit && out_bsdf);
   ASSERT(d3_is_normalized(dir));
 
-  if(interf->mtl_thin) {
-    mat = interf->mtl_thin;
+  if(interf->mtl_thin.mrumtl) {
+    mtl = &interf->mtl_thin;
   } else {
     d3_normalize(N, d3_set_f3(N, hit->normal));
     hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
 
     /* Retrieve the brdf of the material on the other side of the hit side */
     switch(hit_side) {
-      case BACK: mat = interf->mtl_front; break;
-      case FRONT: mat = interf->mtl_back; break;
+      case BACK: mtl = &interf->mtl_front; break;
+      case FRONT: mtl = &interf->mtl_back; break;
       default: FATAL("Unreachable code.\n");  break;
     }
 
     /* Due to numerical issue the hit side might be wrong and thus the fetched
      * material might be undefined (e.g. semi-transparent materials). Handle this
      * issue by fetching the other material. */
-    if(!mat) {
+    if(!mtl->mrumtl) {
       switch(hit_side) {
-        case BACK: mat = interf->mtl_back; break;
-        case FRONT: mat = interf->mtl_front; break;
+        case BACK: mtl = &interf->mtl_back; break;
+        case FRONT: mtl = &interf->mtl_front; break;
         default: FATAL("Unreachable code.\n");  break;
       }
     }
-    ASSERT(mat);
+    ASSERT(mtl->mrumtl);
   }
 
   r = ssp_rng_canonical(rng);
 
-  res = mrumtl_fetch_brdf2(mat, wavelength, r, &brdf);
+  res = mrumtl_fetch_brdf2(mtl->mrumtl, wavelength, r, &brdf);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
       "%s: error retrieving the MruMtl BRDF for the wavelength %g.\n",

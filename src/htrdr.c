@@ -23,7 +23,7 @@
 #include "htrdr_cie_xyz.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
-#include "htrdr_mtl.h"
+#include "htrdr_materials.h"
 #include "htrdr_ran_wlen.h"
 #include "htrdr_rectangle.h"
 #include "htrdr_sun.h"
@@ -532,7 +532,7 @@ htrdr_init
 
   /* Materials are necessary only if a ground geometry is defined */
   if(args->filename_obj) {
-    res = htrdr_mtl_create(htrdr, args->filename_mtl, &htrdr->mtl);
+    res = htrdr_materials_create(htrdr, args->filename_mtl, &htrdr->mats);
     if(res != RES_OK) goto error;
   }
 
@@ -661,7 +661,7 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->sensor.camera) htrdr_camera_ref_put(htrdr->sensor.camera);
   if(htrdr->sensor.rectangle) htrdr_rectangle_ref_put(htrdr->sensor.rectangle);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
-  if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
+  if(htrdr->mats) htrdr_materials_ref_put(htrdr->mats);
   if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
   if(htrdr->ran_wlen) htrdr_ran_wlen_ref_put(htrdr->ran_wlen);
   if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);

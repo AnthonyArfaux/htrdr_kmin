@@ -81,7 +81,7 @@ sample_rectangle_ray
    * lies inside a geometry? */
   if(!S3D_HIT_NONE(&hit)) {
     struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
-    const struct mrumtl* mat = NULL;
+    const struct htrdr_mtl* mtl = NULL;
     float N[3]; /* Normalized normal of the hit */
     float wi[3];
     float cos_wi_N;
@@ -94,12 +94,11 @@ sample_rectangle_ray
     /* Fetch the hit interface and retrieve the material into which the ray was
      * traced */
     htrdr_ground_get_interface(ground, &hit, &interf);
-    mat = cos_wi_N < 0 ? interf.mtl_front : interf.mtl_back;
+    mtl = cos_wi_N < 0 ? &interf.mtl_front : &interf.mtl_back;
 
-    /* Reject the sample if the material is not null, i.e. the incident
-     * direction do not travel into the external air and thus the challenged
-     * position is not outside */
-    if(mat != NULL) return RES_BAD_OP;
+    /* Reject the sample if the incident direction do not travel into the
+     * external air */
+    if(strcmp("air", mtl->name)) return RES_BAD_OP;
   }
 
   /* Sample a ray direction */

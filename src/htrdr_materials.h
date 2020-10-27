@@ -14,31 +14,40 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_MTL_H
-#define HTRDR_MTL_H
+#ifndef HTRDR_MATERIALS_H
+#define HTRDR_MATERIALS_H
 
-struct htrdr_mtl;
+#include <rsys/rsys.h>
+
+struct htrdr_materials;
 struct mrumtl;
 
+struct htrdr_mtl {
+  const char* name;
+  const struct mrumtl* mrumtl;
+};
+static const struct htrdr_mtl HTRDR_MTL_NULL;
+
 extern LOCAL_SYM res_T
-htrdr_mtl_create
+htrdr_materials_create
   (struct htrdr* htrdr,
    const char* filename,
-   struct htrdr_mtl** mtl);
+   struct htrdr_materials** mats);
 
 extern LOCAL_SYM void
-htrdr_mtl_ref_get
-  (struct htrdr_mtl* mtl);
+htrdr_materials_ref_get
+  (struct htrdr_materials* mats);
 
 extern LOCAL_SYM void
-htrdr_mtl_ref_put
-  (struct htrdr_mtl* mtl);
+htrdr_materials_ref_put
+  (struct htrdr_materials* mats);
 
-/* Return NULL if the material name does not exist */
-extern const struct mrumtl*
-htrdr_mtl_get
-  (struct htrdr_mtl* mtl,
-   const char* mtl_name);
+/* Return 1 if the material exist and 0 otherwise */
+extern LOCAL_SYM int
+htrdr_materials_find_mtl
+  (struct htrdr_materials* mats,
+   const char* mtl_name,
+   struct htrdr_mtl* mtl);
 
-#endif /* HTRDR_MTL_H */
+#endif /* HTRDR_MATERIALS_H */
 

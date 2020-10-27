@@ -28,7 +28,7 @@ find_package(AW 2.0 REQUIRED)
 find_package(HTSky 0.2 REQUIRED)
 find_package(MruMtl 0.0 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
-find_package(RSys 0.7 REQUIRED)
+find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.7.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
@@ -103,7 +103,7 @@ set(HTRDR_FILES_SRC
   htrdr_ground.c
   htrdr_interface.c
   htrdr_main.c
-  htrdr_mtl.c
+  htrdr_materials.c
   htrdr_ran_wlen.c
   htrdr_rectangle.c
   htrdr_sensor.c
@@ -119,7 +119,7 @@ set(HTRDR_FILES_INC
   htrdr_grid.h
   htrdr_ground.h
   htrdr_interface.h
-  htrdr_mtl.h
+  htrdr_materials.h
   htrdr_ran_wlen.h
   htrdr_rectangle.h
   htrdr_sensor.h

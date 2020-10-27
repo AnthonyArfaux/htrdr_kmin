@@ -17,6 +17,7 @@
 #ifndef HTRDR_INTERFACE_H
 #define HTRDR_INTERFACE_H
 
+#include "htrdr_materials.h"
 #include <star/ssf.h>
 
 /* Forward declaration of external data type */
@@ -26,9 +27,9 @@ struct ssf_bsdf;
 struct ssp_rng;
 
 struct htrdr_interface {
-  const struct mrumtl* mtl_front;
-  const struct mrumtl* mtl_back;
-  const struct mrumtl* mtl_thin; /* != NULL <=> thin material */
+  struct htrdr_mtl mtl_front;
+  struct htrdr_mtl mtl_back;
+  struct htrdr_mtl mtl_thin; /* != NULL <=> thin material */
 };
 static const struct htrdr_interface HTRDR_INTERFACE_NULL;
 

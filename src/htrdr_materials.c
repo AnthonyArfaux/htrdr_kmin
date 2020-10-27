@@ -17,7 +17,7 @@
 #define _POSIX_C_SOURCE 200112L /* strtok_r and wordexp support */
 
 #include "htrdr.h"
-#include "htrdr_mtl.h"
+#include "htrdr_materials.h"
 
 #include <modradurb/mrumtl.h>
 
@@ -43,7 +43,7 @@
 #define HTABLE_KEY_FUNCTOR_EQ str_eq
 #include <rsys/hash_table.h>
 
-struct htrdr_mtl {
+struct htrdr_materials {
   struct htable_name2mtl name2mtl;
   struct htrdr* htrdr;
   ref_T ref;
@@ -54,7 +54,7 @@ struct htrdr_mtl {
  ******************************************************************************/
 static res_T
 parse_material
-  (struct htrdr_mtl* mtl,
+  (struct htrdr_materials* mats,
    struct txtrdr* txtrdr,
    struct str* str) /* Scratch string */
 {
@@ -65,14 +65,14 @@ parse_material
   int err = 0;
   int wexp_is_allocated = 0;
   res_T res = RES_OK;
-  ASSERT(mtl && txtrdr);
+  ASSERT(mats && txtrdr);
 
   tk = strtok_r(txtrdr_get_line(txtrdr), " \t", &tk_ctx);
   ASSERT(tk);
 
   res = str_set(str, tk);
   if(res != RES_OK) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s:%lu: could not copy the material name `%s' -- %s.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr), tk,
       res_to_cstr(res));
@@ -81,7 +81,7 @@ parse_material
 
   tk = strtok_r(NULL, "", &tk_ctx);
   if(!tk) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s:%lu: missing the MruMtl file for the material `%s'.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
       str_cget(str));
@@ -91,7 +91,7 @@ parse_material
 
   err = wordexp(tk, &wexp, 0);
   if(err) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s:%lu: error in word expension of the mrumtl path.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr));
     res = RES_BAD_ARG;
@@ -100,7 +100,7 @@ parse_material
   wexp_is_allocated = 1;
 
   if(wexp.we_wordc < 1) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s:%lu: missing the MruMtl file for the material `%s'.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
       str_cget(str));
@@ -108,23 +108,26 @@ parse_material
     goto error;
   }
 
-  res = mrumtl_create
-    (&mtl->htrdr->logger, mtl->htrdr->allocator, mtl->htrdr->verbose, &mrumtl);
-  if(res != RES_OK) {
-    htrdr_log_err(mtl->htrdr,
-      "%s:%lu: error creating the MruMtl loader for the material `%s'-- %s.\n",
-      txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
-      str_cget(str), res_to_cstr(res));
-    goto error;
+  /*  Parse the mrumtl file if any */
+  if(strcmp(wexp.we_wordv[0], "none")) {
+    res = mrumtl_create(&mats->htrdr->logger, mats->htrdr->allocator,
+      mats->htrdr->verbose, &mrumtl);
+    if(res != RES_OK) {
+      htrdr_log_err(mats->htrdr,
+        "%s:%lu: error creating the MruMtl loader for the material `%s'-- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        str_cget(str), res_to_cstr(res));
+      goto error;
+    }
+
+    res = mrumtl_load(mrumtl, wexp.we_wordv[0]);
+    if(res != RES_OK) goto error;
   }
 
-  res = mrumtl_load(mrumtl, wexp.we_wordv[0]);
-  if(res != RES_OK) goto error;
-
   /* Register the material */
-  res = htable_name2mtl_set(&mtl->name2mtl, str, &mrumtl);
+  res = htable_name2mtl_set(&mats->name2mtl, str, &mrumtl);
   if(res != RES_OK) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s:%lu: could not register the material `%s' -- %s.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
       str_cget(str), res_to_cstr(res));
@@ -132,7 +135,7 @@ parse_material
   }
 
   if(wexp.we_wordc > 1) {
-    htrdr_log_warn(mtl->htrdr, "%s:%lu: unexpected text `%s'.\n",
+    htrdr_log_warn(mats->htrdr, "%s:%lu: unexpected text `%s'.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
       wexp.we_wordv[1]);
   }
@@ -147,20 +150,20 @@ error:
 
 static res_T
 parse_materials_list
-  (struct htrdr_mtl* mtl,
+  (struct htrdr_materials* mats,
    const char* filename,
    const char* func_name)
 {
   struct txtrdr* txtrdr = NULL;
   struct str str;
   res_T res = RES_OK;
-  ASSERT(mtl && filename && func_name);
+  ASSERT(mats && filename && func_name);
 
-  str_init(mtl->htrdr->allocator, &str);
+  str_init(mats->htrdr->allocator, &str);
 
-  res = txtrdr_file(mtl->htrdr->allocator, filename, '#', &txtrdr);
+  res = txtrdr_file(mats->htrdr->allocator, filename, '#', &txtrdr);
   if(res != RES_OK) {
-    htrdr_log_err(mtl->htrdr,
+    htrdr_log_err(mats->htrdr,
       "%s: could not create the text reader for the material file `%s' -- %s.\n",
       func_name, filename, res_to_cstr(res));
     goto error;
@@ -169,7 +172,7 @@ parse_materials_list
   for(;;) {
     res = txtrdr_read_line(txtrdr);
     if(res != RES_OK) {
-      htrdr_log_err(mtl->htrdr,
+      htrdr_log_err(mats->htrdr,
         "%s: error reading a line in the material file `%s' -- %s.\n",
         func_name, filename, res_to_cstr(res));
       goto error;
@@ -177,7 +180,7 @@ parse_materials_list
 
     if(!txtrdr_get_cline(txtrdr)) break;
 
-    res = parse_material(mtl, txtrdr, &str);
+    res = parse_material(mats, txtrdr, &str);
     if(res != RES_OK) goto error;
   }
 
@@ -193,89 +196,101 @@ static void
 mtl_release(ref_T* ref)
 {
   struct htable_name2mtl_iterator it, it_end;
-  struct htrdr_mtl* mtl;
+  struct htrdr_materials* mats;
   ASSERT(ref);
-  mtl = CONTAINER_OF(ref, struct htrdr_mtl, ref);
+  mats = CONTAINER_OF(ref, struct htrdr_materials, ref);
 
-  htable_name2mtl_begin(&mtl->name2mtl, &it);
-  htable_name2mtl_end(&mtl->name2mtl, &it_end);
+  htable_name2mtl_begin(&mats->name2mtl, &it);
+  htable_name2mtl_end(&mats->name2mtl, &it_end);
   while(!htable_name2mtl_iterator_eq(&it, &it_end)) {
     struct mrumtl* mrumtl = *htable_name2mtl_iterator_data_get(&it);
-    MRUMTL(ref_put(mrumtl));
+    /* The mrumtl can be NULL for semi transparent materials */
+    if(mrumtl) MRUMTL(ref_put(mrumtl));
     htable_name2mtl_iterator_next(&it);
   }
-  htable_name2mtl_release(&mtl->name2mtl);
-  MEM_RM(mtl->htrdr->allocator, mtl);
+  htable_name2mtl_release(&mats->name2mtl);
+  MEM_RM(mats->htrdr->allocator, mats);
 }
 
 /*******************************************************************************
  * Local symbol
  ******************************************************************************/
 res_T
-htrdr_mtl_create
+htrdr_materials_create
   (struct htrdr* htrdr,
    const char* filename,
-   struct htrdr_mtl** out_mtl)
+   struct htrdr_materials** out_mtl)
 {
-  struct htrdr_mtl* mtl = NULL;
+  struct htrdr_materials* mats = NULL;
   res_T res = RES_OK;
   ASSERT(htrdr && filename && out_mtl);
 
-  mtl = MEM_CALLOC(htrdr->allocator, 1, sizeof(*mtl));
-  if(!mtl) {
+  mats = MEM_CALLOC(htrdr->allocator, 1, sizeof(*mats));
+  if(!mats) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
-      "%s: could not allocate the mtl data structure -- %s.\n",
+      "%s: could not allocate the mats data structure -- %s.\n",
       FUNC_NAME, res_to_cstr(res));
     goto error;
   }
-  ref_init(&mtl->ref);
-  mtl->htrdr = htrdr;
-  htable_name2mtl_init(htrdr->allocator, &mtl->name2mtl);
+  ref_init(&mats->ref);
+  mats->htrdr = htrdr;
+  htable_name2mtl_init(htrdr->allocator, &mats->name2mtl);
 
-  res = parse_materials_list(mtl, filename, FUNC_NAME);
+  res = parse_materials_list(mats, filename, FUNC_NAME);
   if(res != RES_OK) goto error;
 
 exit:
-  if(out_mtl) *out_mtl = mtl;
+  if(out_mtl) *out_mtl = mats;
   return res;
 error:
-  if(mtl) {
-    htrdr_mtl_ref_put(mtl);
-    mtl = NULL;
+  if(mats) {
+    htrdr_materials_ref_put(mats);
+    mats = NULL;
   }
   goto exit;
 }
 
 void
-htrdr_mtl_ref_get(struct htrdr_mtl* mtl)
+htrdr_materials_ref_get(struct htrdr_materials* mats)
 {
-  ASSERT(mtl);
-  ref_get(&mtl->ref);
+  ASSERT(mats);
+  ref_get(&mats->ref);
 }
 
 void
-htrdr_mtl_ref_put(struct htrdr_mtl* mtl)
+htrdr_materials_ref_put(struct htrdr_materials* mats)
 {
-  ASSERT(mtl);
-  ref_put(&mtl->ref, mtl_release);
+  ASSERT(mats);
+  ref_put(&mats->ref, mtl_release);
 }
 
-const struct mrumtl*
-htrdr_mtl_get(struct htrdr_mtl* mtl, const char* name)
+int
+htrdr_materials_find_mtl
+  (struct htrdr_materials* mats,
+   const char* name,
+   struct htrdr_mtl* mtl)
 {
   struct str str;
-  struct mrumtl** pmrumtl = NULL;
-  struct mrumtl* mrumtl = NULL;
-  ASSERT(mtl && name);
+  struct htable_name2mtl_iterator it, it_end;
+  int found = 0;
+  ASSERT(mats && name && mtl);
 
-  str_init(mtl->htrdr->allocator, &str);
+  str_init(mats->htrdr->allocator, &str);
   CHK(str_set(&str, name) == RES_OK);
 
-  pmrumtl = htable_name2mtl_find(&mtl->name2mtl, &str);
-  if(pmrumtl) mrumtl = *pmrumtl;
-
+  htable_name2mtl_find_iterator(&mats->name2mtl, &str, &it);
+  htable_name2mtl_end(&mats->name2mtl, &it_end);
+  if(htable_name2mtl_iterator_eq(&it, &it_end)) { /* No material found */
+    *mtl = HTRDR_MTL_NULL;
+    found = 0;
+  } else {
+    mtl->name = str_cget(htable_name2mtl_iterator_key_get(&it));
+    mtl->mrumtl = *htable_name2mtl_iterator_data_get(&it);
+    found = 1;
+  }
   str_release(&str);
-  return mrumtl;
+
+  return found;
 }
 
