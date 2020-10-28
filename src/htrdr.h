@@ -60,6 +60,7 @@ struct htrdr {
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
+  const char* sky_mtl_name;
   enum htrdr_spectral_type spectral_type;
   double wlen_range_m[2]; /* Integration range in *meters* */
   double ref_temperature; /* Reference temperature in Kelvin */

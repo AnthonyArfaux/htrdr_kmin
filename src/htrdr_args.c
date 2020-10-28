@@ -65,6 +65,10 @@ print_help(const char* cmd)
   printf(
 "  -m MIE         file of Mie's data.\n");
   printf(
+"  -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
+"                 Its default value is `%s'.\n",
+    HTRDR_ARGS_DEFAULT.sky_mtl_name);
+  printf(
 "  -O CACHE       name of the cache file used to store/restore the sky\n"
 "                 data.\n");
   printf(
@@ -531,7 +535,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:O:o:p:Rrs:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:n:O:o:p:Rrs:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
        case 'C':
@@ -555,6 +559,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         break;
       case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
+      case 'n': args->sky_mtl_name = optarg; break;
       case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;
       case 'p':

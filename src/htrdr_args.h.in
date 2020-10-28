@@ -32,6 +32,7 @@ struct htrdr_args {
   const char* filename_mtl; /* Path of the materials */
   const char* cache;
   const char* output;
+  const char* sky_mtl_name;
 
   struct {
     double pos[3]; /* Center of the renctangle */
@@ -79,6 +80,7 @@ struct htrdr_args {
   NULL, /* Mtl filename */                                                     \
   NULL, /* Cache filename */                                                   \
   NULL, /* Output filename */                                                  \
+  @HTRDR_ARGS_DEFAULT_SKY_MTL_NAME@, /* Sky mtl name */                        \
   {                                                                            \
     {@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}, /* Rectangle center */               \
     {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}, /* Rectangle target */               \

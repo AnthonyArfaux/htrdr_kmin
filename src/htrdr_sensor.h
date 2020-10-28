@@ -20,7 +20,7 @@
 #include <rsys/rsys.h>
 
 /* Forward declarations */
-struct htrdr_ground;
+struct htrdr;
 struct ssp_rng;
 
 enum htrdr_sensor_type {
@@ -37,7 +37,7 @@ struct htrdr_sensor {
 extern LOCAL_SYM res_T
 htrdr_sensor_sample_primary_ray
   (const struct htrdr_sensor* sensor,
-   struct htrdr_ground* ground,
+   struct htrdr* htrdr,
    const size_t ipix[2],
    const double pix_sz[2],
    struct ssp_rng* rng,

@@ -53,7 +53,7 @@ sample_camera_ray
 static res_T
 sample_rectangle_ray
   (struct htrdr_rectangle* rect,
-   struct htrdr_ground* ground,
+   struct htrdr* htrdr,
    const size_t ipix[2],
    const double pix_sz[2],
    struct ssp_rng* rng,
@@ -65,7 +65,7 @@ sample_rectangle_ray
   const double up_dir[3] = {0,0,1};
   const double range[2] = {0, INF};
   double normal[3];
-  ASSERT(rect && ground && ipix && pix_sz && rng && ray_org && ray_dir);
+  ASSERT(rect && htrdr && ipix && pix_sz && rng && ray_org && ray_dir);
 
   /* Sample a position into the pixel, in the normalized image plane */
   pix_samp[0] = ((double)ipix[0] + ssp_rng_canonical(rng)) * pix_sz[0];
@@ -75,7 +75,7 @@ sample_rectangle_ray
   htrdr_rectangle_sample_pos(rect, pix_samp, ray_org);
 
   /* Check that `ray_org' is not included into a geometry */
-  HTRDR(ground_trace_ray(ground, ray_org, up_dir, range, NULL, &hit));
+  HTRDR(ground_trace_ray(htrdr->ground, ray_org, up_dir, range, NULL, &hit));
 
   /* Up direction is occluded. Check if the sample must be rejected, i.e. does it
    * lies inside a geometry? */
@@ -93,12 +93,11 @@ sample_rectangle_ray
 
     /* Fetch the hit interface and retrieve the material into which the ray was
      * traced */
-    htrdr_ground_get_interface(ground, &hit, &interf);
+    htrdr_ground_get_interface(htrdr->ground, &hit, &interf);
     mtl = cos_wi_N < 0 ? &interf.mtl_front : &interf.mtl_back;
 
-    /* Reject the sample if the incident direction do not travel into the
-     * external air */
-    if(strcmp("air", mtl->name)) return RES_BAD_OP;
+    /* Reject the sample if the incident direction do not travel into the sky */
+    if(strcmp(mtl->name, htrdr->sky_mtl_name) != 0) return RES_BAD_OP;
   }
 
   /* Sample a ray direction */
@@ -114,7 +113,7 @@ sample_rectangle_ray
 res_T
 htrdr_sensor_sample_primary_ray
   (const struct htrdr_sensor* sensor,
-   struct htrdr_ground* ground,
+   struct htrdr* htrdr,
    const size_t ipix[2],
    const double pix_sz[2],
    struct ssp_rng* rng,
@@ -127,8 +126,8 @@ htrdr_sensor_sample_primary_ray
       res = sample_camera_ray(sensor->camera, ipix, pix_sz, rng, ray_org, ray_dir);
       break;
     case HTRDR_SENSOR_RECTANGLE:
-      res = sample_rectangle_ray(sensor->rectangle, ground, ipix, pix_sz, rng,
-        ray_org, ray_dir);
+      res = sample_rectangle_ray(sensor->rectangle, htrdr, ipix,
+        pix_sz, rng, ray_org, ray_dir);
       break;
     default: FATAL("Unreachable code.\n"); break;
   }

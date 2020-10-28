@@ -636,7 +636,7 @@ draw_pixel_flux
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    res = htrdr_sensor_sample_primary_ray(&htrdr->sensor, htrdr->ground, ipix,
+    res = htrdr_sensor_sample_primary_ray(&htrdr->sensor, htrdr, ipix,
       pix_sz, rng, ray_org, ray_dir);
     if(res != RES_OK) continue; /* Reject the current sample */
 
@@ -779,7 +779,7 @@ draw_pixel_xwave
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    res = htrdr_sensor_sample_primary_ray(sensor, htrdr->ground, ipix,
+    res = htrdr_sensor_sample_primary_ray(sensor, htrdr, ipix,
       pix_sz, rng, ray_org, ray_dir);
     if(res != RES_OK) continue; /* Reject the current sample */
 

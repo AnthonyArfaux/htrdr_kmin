@@ -494,6 +494,7 @@ htrdr_init
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
   htrdr->spectral_type = args->spectral_type;
   htrdr->ref_temperature = args->ref_temperature;
+  htrdr->sky_mtl_name = args->sky_mtl_name;
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
