@@ -59,6 +59,13 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.5.1
+
+- Fix the `undefined strtok_r symbol` issue exhibited by some GCC versions that
+  leads to memory corruption and segmentation fault when parsing the ground
+  interfaces.
+- Fix typos in the man pages.
+
 ### Version 0.5
 
 #### New feature
