@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 200112L /* strtok_r support */
+
 #include "htrdr.h"
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
@@ -32,6 +34,8 @@
 #include <rsys/hash_table.h>
 
 #include <star/s3d.h>
+
+#include <string.h> /* strtok_r */
 
 /* Define the hash table that maps an Obj vertex id to its position into the
  * vertex buffer */
