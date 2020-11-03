@@ -31,9 +31,15 @@
 #include <string.h>
 #include <wordexp.h>
 
+struct mtl {
+  struct mrumtl* mrumtl;
+  double temperature; /* In Kelvin */
+};
+static const struct mtl MTL_NULL = {NULL, -1};
+
 /* Generate the hash table that maps a material name to its data */
 #define HTABLE_NAME name2mtl
-#define HTABLE_DATA struct mrumtl*
+#define HTABLE_DATA struct mtl
 #define HTABLE_KEY struct str
 #define HTABLE_KEY_FUNCTOR_INIT str_init
 #define HTABLE_KEY_FUNCTOR_RELEASE str_release
@@ -61,7 +67,7 @@ parse_material
   wordexp_t wexp;
   char* tk = NULL;
   char* tk_ctx = NULL;
-  struct mrumtl* mrumtl = NULL;
+  struct mtl mtl = MTL_NULL;
   int err = 0;
   int wexp_is_allocated = 0;
   res_T res = RES_OK;
@@ -111,7 +117,7 @@ parse_material
   /*  Parse the mrumtl file if any */
   if(strcmp(wexp.we_wordv[0], "none")) {
     res = mrumtl_create(&mats->htrdr->logger, mats->htrdr->allocator,
-      mats->htrdr->verbose, &mrumtl);
+      mats->htrdr->verbose, &mtl.mrumtl);
     if(res != RES_OK) {
       htrdr_log_err(mats->htrdr,
         "%s:%lu: error creating the MruMtl loader for the material `%s'-- %s.\n",
@@ -120,12 +126,34 @@ parse_material
       goto error;
     }
 
-    res = mrumtl_load(mrumtl, wexp.we_wordv[0]);
+    res = mrumtl_load(mtl.mrumtl, wexp.we_wordv[0]);
     if(res != RES_OK) goto error;
   }
 
+  if(wexp.we_wordc < 2) {
+    if(mtl.mrumtl) {
+      htrdr_log_err(mats->htrdr,
+        "%s:%lu: missing temperature for the material `%s'.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        str_cget(str));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  } else {
+    /* Parse the temperature */
+    res = cstr_to_double(wexp.we_wordv[1], &mtl.temperature);
+    if(res != RES_OK) {
+      htrdr_log_err(mats->htrdr,
+        "%s:%lu: error parsing the temperature `%s' for the material `%s' "
+        "-- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        wexp.we_wordv[1], str_cget(str), res_to_cstr(res));
+      goto error;
+    }
+  }
+
   /* Register the material */
-  res = htable_name2mtl_set(&mats->name2mtl, str, &mrumtl);
+  res = htable_name2mtl_set(&mats->name2mtl, str, &mtl);
   if(res != RES_OK) {
     htrdr_log_err(mats->htrdr,
       "%s:%lu: could not register the material `%s' -- %s.\n",
@@ -134,17 +162,17 @@ parse_material
     goto error;
   }
 
-  if(wexp.we_wordc > 1) {
+  if(wexp.we_wordc > 2) {
     htrdr_log_warn(mats->htrdr, "%s:%lu: unexpected text `%s'.\n",
       txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
-      wexp.we_wordv[1]);
+      wexp.we_wordv[2]);
   }
 
 exit:
   if(wexp_is_allocated) wordfree(&wexp);
   return res;
 error:
-  if(mrumtl) MRUMTL(ref_put(mrumtl));
+  if(mtl.mrumtl) MRUMTL(ref_put(mtl.mrumtl));
   goto exit;
 }
 
@@ -193,7 +221,7 @@ error:
 }
 
 static void
-mtl_release(ref_T* ref)
+materials_release(ref_T* ref)
 {
   struct htable_name2mtl_iterator it, it_end;
   struct htrdr_materials* mats;
@@ -203,9 +231,9 @@ mtl_release(ref_T* ref)
   htable_name2mtl_begin(&mats->name2mtl, &it);
   htable_name2mtl_end(&mats->name2mtl, &it_end);
   while(!htable_name2mtl_iterator_eq(&it, &it_end)) {
-    struct mrumtl* mrumtl = *htable_name2mtl_iterator_data_get(&it);
+    struct mtl* mtl = htable_name2mtl_iterator_data_get(&it);
     /* The mrumtl can be NULL for semi transparent materials */
-    if(mrumtl) MRUMTL(ref_put(mrumtl));
+    if(mtl->mrumtl) MRUMTL(ref_put(mtl->mrumtl));
     htable_name2mtl_iterator_next(&it);
   }
   htable_name2mtl_release(&mats->name2mtl);
@@ -262,19 +290,19 @@ void
 htrdr_materials_ref_put(struct htrdr_materials* mats)
 {
   ASSERT(mats);
-  ref_put(&mats->ref, mtl_release);
+  ref_put(&mats->ref, materials_release);
 }
 
 int
 htrdr_materials_find_mtl
   (struct htrdr_materials* mats,
    const char* name,
-   struct htrdr_mtl* mtl)
+   struct htrdr_mtl* htrdr_mtl)
 {
   struct str str;
   struct htable_name2mtl_iterator it, it_end;
   int found = 0;
-  ASSERT(mats && name && mtl);
+  ASSERT(mats && name && htrdr_mtl);
 
   str_init(mats->htrdr->allocator, &str);
   CHK(str_set(&str, name) == RES_OK);
@@ -282,11 +310,14 @@ htrdr_materials_find_mtl
   htable_name2mtl_find_iterator(&mats->name2mtl, &str, &it);
   htable_name2mtl_end(&mats->name2mtl, &it_end);
   if(htable_name2mtl_iterator_eq(&it, &it_end)) { /* No material found */
-    *mtl = HTRDR_MTL_NULL;
+    *htrdr_mtl = HTRDR_MTL_NULL;
     found = 0;
   } else {
-    mtl->name = str_cget(htable_name2mtl_iterator_key_get(&it));
-    mtl->mrumtl = *htable_name2mtl_iterator_data_get(&it);
+    struct mtl* mtl = htable_name2mtl_iterator_data_get(&it);
+    ASSERT(mtl != NULL);
+    htrdr_mtl->name = str_cget(htable_name2mtl_iterator_key_get(&it));
+    htrdr_mtl->mrumtl = mtl->mrumtl;
+    htrdr_mtl->temperature = mtl->temperature;
     found = 1;
   }
   str_release(&str);

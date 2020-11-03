@@ -45,5 +45,12 @@ htrdr_interface_create_bsdf
    struct s3d_hit* hit,
    struct ssf_bsdf** bsdf);
 
+extern LOCAL_SYM double
+htrdr_interface_fetch_temperature
+  (struct htrdr* htrdr,
+   const struct htrdr_interface* interf,
+   const double dir[3], /* Normalized incoming direction */
+   struct s3d_hit* hit);
+
 #endif /* HTRDR_INTERFACE_H */
 

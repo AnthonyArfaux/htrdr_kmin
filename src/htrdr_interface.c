@@ -98,42 +98,21 @@ error:
   goto exit;
 }
 
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-res_T
-htrdr_interface_create_bsdf
-  (struct htrdr* htrdr,
-   const struct htrdr_interface* interf,
-   const size_t ithread,
-   const double wavelength,
-   const double pos[3],
+static const struct htrdr_mtl*
+interface_fetch_mtl
+  (const struct htrdr_interface* interf,
    const double dir[3],
-   struct ssp_rng* rng,
-   struct s3d_hit* hit,
-   struct ssf_bsdf** out_bsdf)
+   struct s3d_hit* hit)
 {
-  enum { FRONT, BACK };
-  struct ssf_bsdf* bsdf = NULL;
-  const struct mrumtl_brdf* brdf = NULL;
   const struct htrdr_mtl* mtl = NULL;
-  double N[3];
-  double r;
-  int hit_side;
-  res_T res = RES_OK;
-  (void)pos;
-  ASSERT(htrdr && pos && hit && out_bsdf);
-  ASSERT(interf &&
-    (  interf->mtl_front.mrumtl
-    || interf->mtl_back.mrumtl
-    || interf->mtl_thin.mrumtl));
-
-  ASSERT(htrdr && interf && pos && dir && hit && out_bsdf);
-  ASSERT(d3_is_normalized(dir));
+  enum { FRONT, BACK };
+  ASSERT(interf && dir && hit && !S3D_HIT_NONE(hit));
 
   if(interf->mtl_thin.mrumtl) {
     mtl = &interf->mtl_thin;
   } else {
+    double N[3];
+    int hit_side;
     d3_normalize(N, d3_set_f3(N, hit->normal));
     hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
 
@@ -156,6 +135,40 @@ htrdr_interface_create_bsdf
     }
     ASSERT(mtl->mrumtl);
   }
+
+  return mtl;
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+htrdr_interface_create_bsdf
+  (struct htrdr* htrdr,
+   const struct htrdr_interface* interf,
+   const size_t ithread,
+   const double wavelength,
+   const double pos[3],
+   const double dir[3],
+   struct ssp_rng* rng,
+   struct s3d_hit* hit,
+   struct ssf_bsdf** out_bsdf)
+{
+  struct ssf_bsdf* bsdf = NULL;
+  const struct mrumtl_brdf* brdf = NULL;
+  const struct htrdr_mtl* mtl = NULL;
+  double r;
+  res_T res = RES_OK;
+  (void)pos;
+  ASSERT(interf &&
+    (  interf->mtl_front.mrumtl
+    || interf->mtl_back.mrumtl
+    || interf->mtl_thin.mrumtl));
+  ASSERT(htrdr && interf && pos && dir && hit && out_bsdf);
+  ASSERT(d3_is_normalized(dir) && !S3D_HIT_NONE(hit));
+
+  mtl = interface_fetch_mtl(interf, dir, hit);
+  ASSERT(mtl != NULL);
 
   r = ssp_rng_canonical(rng);
 
@@ -189,5 +202,27 @@ exit:
 error:
   if(bsdf) { SSF(bsdf_ref_put(bsdf)); bsdf = NULL; }
   goto exit;
+}
+
+double
+htrdr_interface_fetch_temperature
+  (struct htrdr* htrdr,
+   const struct htrdr_interface* interf,
+   const double dir[3],
+   struct s3d_hit* hit)
+{
+  const struct htrdr_mtl* mtl = NULL;
+
+  ASSERT(interf &&
+    (  interf->mtl_front.mrumtl
+    || interf->mtl_back.mrumtl
+    || interf->mtl_thin.mrumtl));
+  ASSERT(htrdr && interf && dir && hit);
+  ASSERT(d3_is_normalized(dir) && !S3D_HIT_NONE(hit));
+
+  mtl = interface_fetch_mtl(interf, dir, hit);
+  ASSERT(mtl != NULL);
+
+  return mtl->temperature;
 }
 

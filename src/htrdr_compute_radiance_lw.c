@@ -253,10 +253,16 @@ htrdr_compute_radiance_lw
       SSF(bsdf_ref_put(bsdf));
 
       if(ssp_rng_canonical(rng) >= bounce_reflectivity) { /* Absorbed at boundary */
+#if 0
         /* Retrieve the temperature of the interface. Anyway, since we do not
          * have this data yet, we use the temperature of the sky at the current
          * position as the temperature of the surface. */
         temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
+#else
+        /* Retrieve the temperature of the interface. */
+        temperature = htrdr_interface_fetch_temperature
+          (htrdr, &interf, dir, &s3d_hit);
+#endif
         if(temperature <= 0) {
           w = 0;
         } else {

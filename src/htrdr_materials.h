@@ -25,6 +25,7 @@ struct mrumtl;
 struct htrdr_mtl {
   const char* name;
   const struct mrumtl* mrumtl;
+  double temperature;
 };
 static const struct htrdr_mtl HTRDR_MTL_NULL;
 
