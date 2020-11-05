@@ -107,7 +107,7 @@ print_help(const char* cmd)
 "Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free\n"
 "software released under the GNU GPL license, version 3 or later. You\n"
 "are free to change or redistribute it under certain conditions\n"
-"<http://gnu.org/licenses/gpl.html>\n");
+"<http://gnu.org/licenses/gpl.html>.\n");
 }
 
 static INLINE res_T

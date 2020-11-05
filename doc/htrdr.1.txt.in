@@ -170,6 +170,10 @@ OPTIONS
 *-m* _mie_::
   Path toward a *htmie*(5) file defining the optical properties of water
   droplets.
+ 
+*-n* _sky-mtl_::
+  Name of the material representing the sky in the *htrdr-materials*(5) file.
+  By default, _sky-mtl_ is @HTRDR_ARGS_DEFAULT_SKY_MTL_NAME@.
 
 *-O* _cache_::
   File used to cache the sky data. If the _cache_ file does not exists, it is
