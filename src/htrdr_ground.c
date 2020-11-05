@@ -541,6 +541,7 @@ htrdr_ground_create
 
   if(!obj_filename) goto exit;
 
+  htrdr_log(ground->htrdr, "Loading ground geometry from `%s'.\n",obj_filename);
   time_current(&t0);
   res = setup_ground(ground, obj_filename);
   if(res != RES_OK) goto error;

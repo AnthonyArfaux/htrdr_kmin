@@ -27,6 +27,7 @@
 #include "htrdr_ran_wlen.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
+#include "htrdr_version.h"
 
 #include <rsys/cstr.h>
 #include <rsys/mem_allocator.h>
@@ -432,6 +433,9 @@ htrdr_init
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
+
+  htrdr_log(htrdr, "Number of processes: %d\n", htrdr->mpi_nprocs);
+  htrdr_log(htrdr, "Number of per process threads: %u\n", htrdr->nthreads);
 
   if(!args->output) {
     htrdr->output = stdout;
