@@ -544,7 +544,7 @@ htrdr_init
     res = htrdr_ran_wlen_create
       (htrdr, spectral_range, n, htrdr->ref_temperature, &htrdr->ran_wlen);
     if(res != RES_OK) goto error;
-  } 
+  }
 
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
