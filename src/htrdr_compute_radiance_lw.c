@@ -228,6 +228,7 @@ htrdr_compute_radiance_lw
     /* Scattering at a surface */
     } else {
       struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+      const struct htrdr_mtl* mtl = NULL;
       struct ssf_bsdf* bsdf = NULL;
       double bounce_reflectivity = 0;
       double N[3];
@@ -235,10 +236,10 @@ htrdr_compute_radiance_lw
       ASSERT(ctx.event_type == EVENT_NONE);
       ASSERT(!S3D_HIT_NONE(&s3d_hit));
 
-      /* Fetch the hit interface and build its BSDF */
+      /* Fetch the hit interface materal and build its BSDF */
       htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
-      HTRDR(interface_create_bsdf
-        (htrdr, &interf, ithread, wlen, pos_next, dir, rng, &s3d_hit, &bsdf));
+      mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
+      HTRDR(mtl_create_bsdf(htrdr, mtl, ithread, wlen, rng, &bsdf));
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
@@ -253,25 +254,11 @@ htrdr_compute_radiance_lw
       SSF(bsdf_ref_put(bsdf));
 
       if(ssp_rng_canonical(rng) >= bounce_reflectivity) { /* Absorbed at boundary */
-#if 0
-        /* Retrieve the temperature of the interface. Anyway, since we do not
-         * have this data yet, we use the temperature of the sky at the current
-         * position as the temperature of the surface. */
-        temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
-#else
-        /* Retrieve the temperature of the interface. */
-        temperature = htrdr_interface_fetch_temperature
-          (htrdr, &interf, dir, &s3d_hit);
-#endif
-        if(temperature <= 0) {
-          w = 0;
-        } else {
-          /* weight is planck integrated over the spectral sub-interval */
-          w = planck_monochromatic(wlen_m, temperature);
-        }
+        temperature = mtl->temperature; /* Fetch mtl temperature */
+        /* Weight is planck integrated over the spectral sub-interval */
+        w = temperature > 0 ? planck_monochromatic(wlen_m, temperature) : 0;
         break;
       }
-
       s3d_hit_prev = s3d_hit;
     }
     d3_set(pos, pos_next);

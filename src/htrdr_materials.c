@@ -20,8 +20,11 @@
 #include "htrdr_materials.h"
 
 #include <modradurb/mrumtl.h>
+#include <star/ssf.h>
+#include <star/ssp.h>
 
 #include <rsys/cstr.h>
+#include <rsys/double3.h>
 #include <rsys/hash_table.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/ref_count.h>
@@ -240,6 +243,75 @@ materials_release(ref_T* ref)
   MEM_RM(mats->htrdr->allocator, mats);
 }
 
+static res_T
+create_bsdf_diffuse
+  (struct htrdr* htrdr,
+   const struct mrumtl_brdf* brdf,
+   const size_t ithread,
+   struct ssf_bsdf** out_bsdf)
+{
+  struct ssf_bsdf* bsdf = NULL;
+  double reflectivity = 0;
+  res_T res = RES_OK;
+  ASSERT(htrdr && brdf && out_bsdf);
+  ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_LAMBERTIAN);
+  ASSERT(ithread < htrdr->nthreads);
+
+  res = ssf_bsdf_create
+    (&htrdr->lifo_allocators[ithread], &ssf_lambertian_reflection, &bsdf);
+  if(res != RES_OK) goto error;
+
+  reflectivity = mrumtl_brdf_lambertian_get_reflectivity(brdf);
+  res = ssf_lambertian_reflection_setup(bsdf, reflectivity);
+  if(res != RES_OK) goto error;
+
+exit:
+  *out_bsdf = bsdf;
+  return res;
+error:
+   if(bsdf) { SSF(bsdf_ref_put(bsdf)); bsdf = NULL; }
+  goto exit;
+}
+
+static res_T
+create_bsdf_specular
+  (struct htrdr* htrdr,
+   const struct mrumtl_brdf* brdf,
+   const size_t ithread,
+   struct ssf_bsdf** out_bsdf)
+{
+  struct ssf_bsdf* bsdf = NULL;
+  struct ssf_fresnel* fresnel = NULL;
+  double reflectivity = 0;
+  res_T res = RES_OK;
+  ASSERT(htrdr && brdf && out_bsdf);
+  ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_SPECULAR);
+  ASSERT(ithread < htrdr->nthreads);
+
+  res = ssf_bsdf_create
+    (&htrdr->lifo_allocators[ithread], &ssf_specular_reflection, &bsdf);
+  if(res != RES_OK) goto error;
+
+  res = ssf_fresnel_create
+    (&htrdr->lifo_allocators[ithread], &ssf_fresnel_constant, &fresnel);
+  if(res != RES_OK) goto error;
+
+  reflectivity = mrumtl_brdf_specular_get_reflectivity(brdf);
+  res =  ssf_fresnel_constant_setup(fresnel, reflectivity);
+  if(res != RES_OK) goto error;
+
+  res = ssf_specular_reflection_setup(bsdf, fresnel);
+  if(res != RES_OK) goto error;
+
+exit:
+  if(fresnel) SSF(fresnel_ref_put(fresnel));
+  *out_bsdf = bsdf;
+  return res;
+error:
+  if(bsdf) { SSF(bsdf_ref_put(bsdf)); bsdf = NULL; }
+  goto exit;
+}
+
 /*******************************************************************************
  * Local symbol
  ******************************************************************************/
@@ -323,5 +395,55 @@ htrdr_materials_find_mtl
   str_release(&str);
 
   return found;
+}
+
+res_T
+htrdr_mtl_create_bsdf
+  (struct htrdr* htrdr,
+   const struct htrdr_mtl* mtl,
+   const size_t ithread,
+   const double wavelength,
+   struct ssp_rng* rng,
+   struct ssf_bsdf** out_bsdf)
+{
+  struct ssf_bsdf* bsdf = NULL;
+  const struct mrumtl_brdf* brdf = NULL;
+  double r;
+  res_T res = RES_OK;
+  ASSERT(htrdr && mtl && wavelength && rng && out_bsdf);
+  ASSERT(ithread < htrdr->nthreads);
+
+  r = ssp_rng_canonical(rng);
+
+  res = mrumtl_fetch_brdf2(mtl->mrumtl, wavelength, r, &brdf);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "%s: error retrieving the MruMtl BRDF for the wavelength %g.\n",
+      FUNC_NAME, wavelength);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(mrumtl_brdf_get_type(brdf)) {
+    case MRUMTL_BRDF_LAMBERTIAN:
+      res = create_bsdf_diffuse(htrdr, brdf, ithread, &bsdf);
+      break;
+    case MRUMTL_BRDF_SPECULAR:
+      res = create_bsdf_specular(htrdr, brdf, ithread, &bsdf);
+      break;
+    default: FATAL("Unreachable code.\n");  break;
+  }
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr, "%s: could not create the BSDF -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  *out_bsdf = bsdf;
+  return res;
+error:
+  if(bsdf) { SSF(bsdf_ref_put(bsdf)); bsdf = NULL; }
+  goto exit;
 }
 

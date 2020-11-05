@@ -383,11 +383,12 @@ htrdr_compute_radiance_sw
     /* Sample the scattering direction */
     if(surface_scattering) { /* Scattering at a surface */
       struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+      const struct htrdr_mtl* mtl = NULL;
 
-      /* Fetch the hit interface and build its BSDF */
+      /* Fetch the hit interface materal and build its BSDF */
       htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
-      HTRDR(interface_create_bsdf
-        (htrdr, &interf, ithread, wlen, pos_next, dir, rng, &s3d_hit, &bsdf));
+      mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
+      HTRDR(mtl_create_bsdf(htrdr, mtl, ithread, wlen, rng, &bsdf));
 
       /* Revert the normal if necessary to match the SSF convention */
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));

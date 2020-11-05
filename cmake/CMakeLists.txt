@@ -102,7 +102,6 @@ set(HTRDR_FILES_SRC
   htrdr_draw_map.c
   htrdr_grid.c
   htrdr_ground.c
-  htrdr_interface.c
   htrdr_main.c
   htrdr_materials.c
   htrdr_ran_wlen.c

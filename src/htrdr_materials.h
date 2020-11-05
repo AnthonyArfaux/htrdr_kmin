@@ -19,8 +19,12 @@
 
 #include <rsys/rsys.h>
 
+/* Forward declarations */
 struct htrdr_materials;
 struct mrumtl;
+struct s3d_hit;
+struct ssf_bsdf;
+struct ssp_rng;
 
 struct htrdr_mtl {
   const char* name;
@@ -49,6 +53,15 @@ htrdr_materials_find_mtl
   (struct htrdr_materials* mats,
    const char* mtl_name,
    struct htrdr_mtl* mtl);
+
+extern LOCAL_SYM res_T
+htrdr_mtl_create_bsdf
+  (struct htrdr* htrdr,
+   const struct htrdr_mtl* mtl,
+   const size_t ithread,
+   const double wavelength,
+   struct ssp_rng* rng,
+   struct ssf_bsdf** bsdf);
 
 #endif /* HTRDR_MATERIALS_H */
 

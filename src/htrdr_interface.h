@@ -18,7 +18,8 @@
 #define HTRDR_INTERFACE_H
 
 #include "htrdr_materials.h"
-#include <star/ssf.h>
+#include <star/s3d.h>
+#include <rsys/double3.h>
 
 /* Forward declaration of external data type */
 struct mrumtl;
@@ -33,24 +34,49 @@ struct htrdr_interface {
 };
 static const struct htrdr_interface HTRDR_INTERFACE_NULL;
 
-extern LOCAL_SYM res_T
-htrdr_interface_create_bsdf
-  (struct htrdr* htrdr,
-   const struct htrdr_interface* interf,
-   const size_t ithread,
-   const double wavelength,
-   const double pos[3],
-   const double dir[3], /* Normalized incoming direction */
-   struct ssp_rng* rng,
-   struct s3d_hit* hit,
-   struct ssf_bsdf** bsdf);
+static INLINE const struct htrdr_mtl*
+htrdr_interface_fetch_hit_mtl
+  (const struct htrdr_interface* interf,
+   const double dir[3], /* Incoming ray */
+   struct s3d_hit* hit)
+{
+  const struct htrdr_mtl* mtl = NULL;
+  enum { FRONT, BACK };
+  ASSERT(interf && dir && d3_is_normalized(dir) && hit && !S3D_HIT_NONE(hit));
+  ASSERT(interf->mtl_front.mrumtl
+    || interf->mtl_back.mrumtl
+    || interf->mtl_thin.mrumtl);
 
-extern LOCAL_SYM double
-htrdr_interface_fetch_temperature
-  (struct htrdr* htrdr,
-   const struct htrdr_interface* interf,
-   const double dir[3], /* Normalized incoming direction */
-   struct s3d_hit* hit);
+  if(interf->mtl_thin.mrumtl) {
+    mtl = &interf->mtl_thin;
+  } else {
+    double N[3];
+    int hit_side;
+    d3_normalize(N, d3_set_f3(N, hit->normal));
+    hit_side = d3_dot(N, dir) < 0 ? FRONT : BACK;
+
+    /* Retrieve the brdf of the material on the *other side* of the hit side */
+    switch(hit_side) {
+      case BACK: mtl = &interf->mtl_front; break;
+      case FRONT: mtl = &interf->mtl_back; break;
+      default: FATAL("Unreachable code.\n");  break;
+    }
+
+    /* Due to numerical issue the hit side might be wrong and thus the fetched
+     * material might be undefined (e.g. semi-transparent materials). Handle this
+     * issue by fetching the other material. */
+    if(!mtl->mrumtl) {
+      switch(hit_side) {
+        case BACK: mtl = &interf->mtl_back; break;
+        case FRONT: mtl = &interf->mtl_front; break;
+        default: FATAL("Unreachable code.\n");  break;
+      }
+    }
+    ASSERT(mtl->mrumtl);
+  }
+
+  return mtl;
+}
 
 #endif /* HTRDR_INTERFACE_H */
 
