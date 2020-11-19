@@ -67,5 +67,12 @@ htrdr_ground_trace_ray
    const struct s3d_hit* prev_hit,/* Previous hit. Avoid self hit. May be NULL*/
    struct s3d_hit* hit);
 
+extern LOCAL_SYM res_T
+htrdr_ground_find_closest_point
+  (struct htrdr_ground* ground,
+   const double position[3],
+   const double radius,
+   struct s3d_hit* hit);
+
 #endif /* HTRDR_GROUND_H */
 

@@ -252,6 +252,7 @@ htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    const size_t ithread,
    struct ssp_rng* rng,
+   const int cpnt_mask, /* Combination of enum htrdr_radiance_cpnt_flag */
    const double pos_in[3],
    const double dir_in[3],
    const double wlen, /* In nanometer */
@@ -276,7 +277,6 @@ htrdr_compute_radiance_sw
   double r; /* Random number */
   double wo[3]; /* -dir */
   double pdf;
-  double sun_solid_angle;
   double Tr; /* Overall transmissivity */
   double Tr_abs; /* Absorption transmissivity */
   double L_sun; /* Sun radiance in W.m^-2.sr^-1 */
@@ -304,17 +304,14 @@ htrdr_compute_radiance_sw
    * default "ecrad_opt_prot.txt" file provided by the HTGOP project. */
   htsky_get_spectral_band_bounds(htrdr->sky, iband, band_bounds);
   ASSERT(band_bounds[0] <= wlen  && wlen <= band_bounds[1]);
-  sun_solid_angle = htrdr_sun_get_solid_angle(htrdr->sun);
   L_sun = htrdr_sun_get_radiance(htrdr->sun, wlen);
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  /* Add the directly contribution of the sun  */
-  if(htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
-    /* Add the direct contribution of the sun */
-    d2(range, 0, FLT_MAX);
-
+  if((cpnt_mask & HTRDR_RADIANCE_DIRECT) /* Handle direct contribuation */
+  && htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
     /* Check that the ray is not occlude along the submitted range */
+    d2(range, 0, FLT_MAX);
     HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, NULL, &s3d_hit_tmp));
     if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
       Tr = 0;
@@ -325,10 +322,19 @@ htrdr_compute_radiance_sw
     }
   }
 
+  if((cpnt_mask & HTRDR_RADIANCE_DIFFUSE) == 0)
+    goto exit; /* Discard diffuse contribution */
+
   /* Radiative random walk */
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
+    struct ssf_bsdf* bsdf = NULL;
+    struct ssf_phase* phase;
+    double N[3];
     double bounce_reflectivity = 1;
+    double sun_dir_pdf;
+    int surface_scattering = 0; /* Define if hit a surface */
+    int bsdf_type = 0;
 
     /* Find the first intersection with a surface */
     d2(range, 0, DBL_MAX);
@@ -372,57 +378,30 @@ htrdr_compute_radiance_sw
       (htrdr, rng, HTSKY_Ka, iband, iquad, pos, dir, range);
     if(Tr_abs <= 0) break;
 
-    /* Sample a sun direction */
-    htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
-    d2(range, 0, FLT_MAX);
+    surface_scattering = SVX_HIT_NONE(&svx_hit);
 
-    s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
-
-    /* Check that the sun is visible from the new position */
-    HTRDR(ground_trace_ray
-      (htrdr->ground, pos_next, sun_dir, range, &s3d_hit_prev, &s3d_hit_tmp));
-
-    /* Compute the sun transmissivity */
-    if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
-      Tr = 0;
-    } else {
-      Tr = transmissivity
-        (htrdr, rng, HTSKY_Kext, iband, iquad, pos_next, sun_dir, range);
-    }
-
-    /* Scattering at a surface */
-    if(SVX_HIT_NONE(&svx_hit)) {
+    /* Sample the scattering direction */
+    if(surface_scattering) { /* Scattering at a surface */
       struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
-      struct ssf_bsdf* bsdf = NULL;
-      double N[3];
-      int type;
+      const struct htrdr_mtl* mtl = NULL;
 
-      /* Fetch the hit interface and build its BSDF */
+      /* Fetch the hit interface materal and build its BSDF */
       htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
-      HTRDR(interface_create_bsdf
-        (htrdr, &interf, ithread, wlen, pos_next, dir, rng, &s3d_hit, &bsdf));
+      mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
+      HTRDR(mtl_create_bsdf(htrdr, mtl, ithread, wlen, rng, &bsdf));
 
+      /* Revert the normal if necessary to match the SSF convention */
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
 
+      /* Sample scattering direction */
       bounce_reflectivity = ssf_bsdf_sample
-        (bsdf, rng, wo, N, dir_next, &type, &pdf);
-      if(!(type & SSF_REFLECTION)) { /* Handle only reflections */
+        (bsdf, rng, wo, N, dir_next, &bsdf_type, &pdf);
+      if(!(bsdf_type & SSF_REFLECTION)) { /* Handle only reflections */
         bounce_reflectivity = 0;
       }
 
-      if(d3_dot(N, sun_dir) < 0) { /* Below the ground */
-        R = 0;
-      } else {
-        R = ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
-      }
-
-      /* Release the BSDF */
-      SSF(bsdf_ref_put(bsdf));
-
-    /* Scattering in the medium */
-    } else {
-      struct ssf_phase* phase;
+    } else { /* Scattering in a volume */
       double ks_particle; /* Scattering coefficient of the particles */
       double ks_gas; /* Scattering coefficient of the gaz */
       double ks; /* Overall scattering coefficient */
@@ -440,22 +419,74 @@ htrdr_compute_radiance_sw
         phase = phase_hg;
       }
 
+      /* Sample scattering direction */
       ssf_phase_sample(phase, rng, wo, dir_next, NULL);
-      R = ssf_phase_eval(phase, wo, sun_dir);
+      ssf_phase_ref_get(phase);
+    }
+
+    /* Sample the direction of the direct contribution */
+    if(surface_scattering && (bsdf_type & SSF_SPECULAR)) {
+      if(!htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir_next)) {
+        R = 0; /* No direct lightning */
+      } else {
+        sun_dir[0] = dir_next[0];
+        sun_dir[1] = dir_next[1];
+        sun_dir[2] = dir_next[2];
+        R = d3_dot(N, sun_dir)<0/* Below the ground*/ ? 0 : bounce_reflectivity;
+      }
+      sun_dir_pdf = 1.0;
+    } else {
+      /* Sample a sun direction */
+      sun_dir_pdf = htrdr_sun_sample_direction(htrdr->sun, rng, sun_dir);
+      if(surface_scattering) {
+        R = d3_dot(N, sun_dir) < 0/* Below the ground */
+          ? 0 : ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
+      } else {
+        R = ssf_phase_eval(phase, wo, sun_dir);
+      }
+    }
+
+    /* The direct contribution to the scattering point is not null so we need
+     * to compute the transmissivity from sun to scatt pt */
+    if(R <= 0) {
+      Tr = 0;
+    } else {
+      /* Check that the sun is visible from the new position */
+      d2(range, 0, FLT_MAX);
+      s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
+      HTRDR(ground_trace_ray
+        (htrdr->ground, pos_next, sun_dir, range, &s3d_hit_prev, &s3d_hit_tmp));
+
+      /* Compute the sun transmissivity */
+      if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
+        Tr = 0;
+      } else {
+        Tr = transmissivity
+          (htrdr, rng, HTSKY_Kext, iband, iquad, pos_next, sun_dir, range);
+      }
+    }
+
+    /* Release the scattering function */
+    if(surface_scattering) {
+      SSF(bsdf_ref_put(bsdf));
+    } else {
+      SSF(phase_ref_put(phase));
     }
 
     /* Update the MC weight */
     ksi *= Tr_abs;
-    w += ksi * L_sun * sun_solid_angle * Tr * R;
+    w += ksi * L_sun * Tr * R / sun_dir_pdf;
 
     /* Russian roulette wrt surface scattering */
-    if(SVX_HIT_NONE(&svx_hit) && ssp_rng_canonical(rng) >= bounce_reflectivity)
+    if(surface_scattering && ssp_rng_canonical(rng) >= bounce_reflectivity)
       break;
 
     /* Setup the next random walk state */
     d3_set(pos, pos_next);
     d3_set(dir, dir_next);
   }
+
+exit:
   SSF(phase_ref_put(phase_hg));
   SSF(phase_ref_put(phase_rayleigh));
   return w;

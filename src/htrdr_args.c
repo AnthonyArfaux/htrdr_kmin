@@ -34,8 +34,8 @@ print_help(const char* cmd)
   ASSERT(cmd);
   printf("Usage: %s [OPION]... -a ATMOSPHERE\n", cmd);
   printf(
-"Render an image for scenes composed of an atmospheric gas mixture,\n"
-"clouds and a ground.\n\n");
+"Render an image or compute a flux map for scenes composed of an\n"
+"atmospheric gas mixture, clouds and a ground.\n\n");
   printf(
 "  -a ATMOSPHERE  gas optical properties of the atmosphere.\n");
   printf(
@@ -65,11 +65,19 @@ print_help(const char* cmd)
   printf(
 "  -m MIE         file of Mie's data.\n");
   printf(
+"  -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
+"                 Its default value is `%s'.\n",
+    HTRDR_ARGS_DEFAULT.sky_mtl_name);
+  printf(
 "  -O CACHE       name of the cache file used to store/restore the sky\n"
 "                 data.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
+  printf(
+"  -p <rectangle> switch in flux computation by defining the rectangular\n"
+"                 sensor onto wich the flux is computed. Refer to the\n"
+"                 htrdr man page for the list of rectangle options.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
@@ -99,7 +107,7 @@ print_help(const char* cmd)
 "Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier. htrdr is free\n"
 "software released under the GNU GPL license, version 3 or later. You\n"
 "are free to change or redistribute it under certain conditions\n"
-"<http://gnu.org/licenses/gpl.html>\n");
+"<http://gnu.org/licenses/gpl.html>.\n");
 }
 
 static INLINE res_T
@@ -259,6 +267,62 @@ exit:
 error:
   goto exit;
 }
+
+static res_T
+parse_rectangle_parameter(struct htrdr_args* args, const char* str)
+{
+  char buf[128];
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+  ASSERT(args);
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the rectangle option string `%s'.\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  /* pos=0,0,10.1; key <- pos, val <- 0,0,10 */
+  key = strtok_r(buf, "=", &ctx);
+  val = strtok_r(NULL, "", &ctx);
+
+  if(!val) {
+    fprintf(stderr, "Missing value to the rectangle option `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  #define PARSE(Name, Func) {                                                  \
+    if(RES_OK != (res = Func)) {                                               \
+      fprintf(stderr, "Invalid rectangle "Name" `%s'.\n", val);                \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+  if(!strcmp(key, "pos")) {
+    PARSE("position", parse_doubleX(val, args->rectangle.pos, 3));
+  } else if(!strcmp(key, "tgt")) {
+    PARSE("target", parse_doubleX(val, args->rectangle.tgt, 3));
+  } else if(!strcmp(key, "up")) {
+    PARSE("up vector", parse_doubleX(val, args->rectangle.up, 3));
+  } else if(!strcmp(key, "sz")) {
+    PARSE("size", parse_doubleX(val, args->rectangle.sz, 2));
+  } else {
+    fprintf(stderr, "Invalid rectangle parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  #undef PARSE
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+
 
 static res_T
 parse_spectral_range(const char* str, double wlen_range[2])
@@ -471,10 +535,11 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
     }
   }
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:O:o:Rrs:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:n:O:o:p:Rrs:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
        case 'C':
+        args->sensor_type = HTRDR_SENSOR_CAMERA;
         res = parse_multiple_parameters
           (args, optarg, parse_camera_parameter);
         break;
@@ -494,8 +559,14 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
         break;
       case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
+      case 'n': args->sky_mtl_name = optarg; break;
       case 'O': args->cache = optarg; break;
       case 'o': args->output = optarg; break;
+      case 'p':
+        args->sensor_type = HTRDR_SENSOR_RECTANGLE;
+        res = parse_multiple_parameters
+          (args, optarg, parse_rectangle_parameter);
+        break;
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;
       case 's':
@@ -544,7 +615,7 @@ htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
   /* Setup default ref temperature if necessary */
   if(args->ref_temperature <= 0) {
     switch(args->spectral_type) {
-      case HTRDR_SPECTRAL_LW: 
+      case HTRDR_SPECTRAL_LW:
         args->ref_temperature = HTRDR_DEFAULT_LW_REF_TEMPERATURE;
         break;
       case HTRDR_SPECTRAL_SW:

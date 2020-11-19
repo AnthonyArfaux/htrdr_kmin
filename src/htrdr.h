@@ -17,6 +17,7 @@
 #ifndef HTRDR_H
 #define HTRDR_H
 
+#include "htrdr_sensor.h"
 #include "htrdr_spectral.h"
 
 #include <rsys/logger.h>
@@ -37,6 +38,7 @@ struct htsky;
 struct htrdr_args;
 struct htrdr_buffer;
 struct htrdr_cie_xyz;
+struct htrdr_materials;
 struct htrdr_rectangle;
 struct mem_allocator;
 struct mutext;
@@ -49,15 +51,16 @@ struct htrdr {
   struct s3d_device* s3d;
 
   struct htrdr_ground* ground;
-  struct htrdr_mtl* mtl;
+  struct htrdr_materials* mats;
   struct htrdr_sun* sun;
   struct htrdr_cie_xyz* cie;
   struct htrdr_ran_wlen* ran_wlen;
 
-  struct htrdr_camera* cam;
+  struct htrdr_sensor sensor;
   struct htrdr_buffer* buf;
 
   struct htsky* sky;
+  const char* sky_mtl_name;
   enum htrdr_spectral_type spectral_type;
   double wlen_range_m[2]; /* Integration range in *meters* */
   double ref_temperature; /* Reference temperature in Kelvin */

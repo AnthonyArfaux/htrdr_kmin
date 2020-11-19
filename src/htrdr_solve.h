@@ -19,6 +19,13 @@
 
 #include <rsys/rsys.h>
 
+/* Define the radiance component */
+enum htrdr_radiance_cpnt_flag {
+  HTRDR_RADIANCE_DIRECT = BIT(0),
+  HTRDR_RADIANCE_DIFFUSE = BIT(1),
+  HTRDR_RADIANCE_ALL = HTRDR_RADIANCE_DIRECT | HTRDR_RADIANCE_DIFFUSE
+};
+
 /* Monte carlo accumulator */
 struct htrdr_accum {
   double sum_weights; /* Sum of Monte-Carlo weights */
@@ -42,6 +49,12 @@ struct htrdr_pixel_xwave {
 };
 static const struct htrdr_pixel_xwave HTRDR_PIXEL_XWAVE_NULL;
 
+struct htrdr_pixel_flux {
+  struct htrdr_accum flux;
+  struct htrdr_accum time;
+};
+static const struct htrdr_pixel_flux HTRDR_PIXEL_FLUX;
+
 struct htrdr_pixel_image {
   struct htrdr_estimate X; /* In W/m^2/sr */
   struct htrdr_estimate Y; /* In W/m^2/sr */
@@ -62,6 +75,7 @@ htrdr_compute_radiance_sw
   (struct htrdr* htrdr,
    const size_t ithread,
    struct ssp_rng* rng,
+   const int cpnt_mask, /* Combination of enum htrdr_radiance_cpnt_flag */
    const double pos[3],
    const double dir[3],
    const double wlen, /* In nanometer */
@@ -81,9 +95,9 @@ htrdr_compute_radiance_lw
    const size_t iquad); /* Index of the quadrature point into the band */
 
 extern LOCAL_SYM res_T
-htrdr_draw_radiance
+htrdr_draw_map
   (struct htrdr* htrdr,
-   const struct htrdr_camera* cam,
+   const struct htrdr_sensor* sensor,
    const size_t width, /* Image width */
    const size_t height, /* Image height */
    const size_t spp, /* #samples per pixel, i.e. #realisations */
@@ -121,35 +135,49 @@ htrdr_accum_get_estimation
 }
 
 static INLINE size_t
-htrdr_spectral_type_get_pixsz(const enum htrdr_spectral_type type)
+htrdr_spectral_type_get_pixsz
+  (const enum htrdr_spectral_type spectral_type,
+   const enum htrdr_sensor_type sensor_type)
 {
   size_t sz = 0;
-  switch(type) {
-    case HTRDR_SPECTRAL_LW: 
-    case HTRDR_SPECTRAL_SW:
-      sz = sizeof(struct htrdr_pixel_xwave);
-      break;
-    case HTRDR_SPECTRAL_SW_CIE_XYZ:
-      sz = sizeof(struct htrdr_pixel_image);
-      break;
-    default: FATAL("Unreachable code.\n"); break;
+  if(sensor_type == HTRDR_SENSOR_RECTANGLE) {
+    sz = sizeof(struct htrdr_pixel_flux);
+  } else {
+    ASSERT(sensor_type == HTRDR_SENSOR_CAMERA);
+    switch(spectral_type) {
+      case HTRDR_SPECTRAL_LW:
+      case HTRDR_SPECTRAL_SW:
+        sz = sizeof(struct htrdr_pixel_xwave);
+        break;
+      case HTRDR_SPECTRAL_SW_CIE_XYZ:
+        sz = sizeof(struct htrdr_pixel_image);
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
   }
   return sz;
 }
 
 static INLINE size_t
-htrdr_spectral_type_get_pixal(const enum htrdr_spectral_type type)
+htrdr_spectral_type_get_pixal
+  (const enum htrdr_spectral_type spectral_type,
+   const enum htrdr_sensor_type sensor_type)
 {
   size_t al = 0;
-  switch(type) {
-    case HTRDR_SPECTRAL_LW: 
-    case HTRDR_SPECTRAL_SW:
-      al = ALIGNOF(struct htrdr_pixel_xwave);
-      break;
-    case HTRDR_SPECTRAL_SW_CIE_XYZ:
-      al = ALIGNOF(struct htrdr_pixel_image);
-      break;
-    default: FATAL("Unreachable code.\n"); break;
+  if(sensor_type == HTRDR_SENSOR_RECTANGLE) {
+    al = ALIGNOF(struct htrdr_pixel_flux);
+  } else {
+    ASSERT(sensor_type == HTRDR_SENSOR_CAMERA);
+    switch(spectral_type) {
+      case HTRDR_SPECTRAL_LW:
+      case HTRDR_SPECTRAL_SW:
+        al = ALIGNOF(struct htrdr_pixel_xwave);
+        break;
+      case HTRDR_SPECTRAL_SW_CIE_XYZ:
+        al = ALIGNOF(struct htrdr_pixel_image);
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
   }
   return al;
 }

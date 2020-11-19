@@ -28,7 +28,7 @@ htrdr_rectangle_create
    const double sz[2], /* Size of the rectangle along its local X and Y axis */
    const double pos[3], /* World space position of the rectangle center */
    const double tgt[3], /* Vector orthognal to the rectangle plane */
-   const double up[2], /* vector orthogonal to the rectangle X axis */
+   const double up[3], /* vector orthogonal to the rectangle X axis */
    struct htrdr_rectangle** rect);
 
 extern LOCAL_SYM void
@@ -44,6 +44,11 @@ htrdr_rectangle_sample_pos
   (const struct htrdr_rectangle* rect,
    const double sample[2], /* In [0, 1[ */
    double pos[3]);
+
+extern LOCAL_SYM void
+htrdr_rectangle_get_normal
+  (const struct htrdr_rectangle* rect,
+   double normal[3]);
 
 #endif /* HTRDR_RECTANGLE_H */
 

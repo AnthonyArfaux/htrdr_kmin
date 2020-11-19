@@ -14,31 +14,35 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_MTL_H
-#define HTRDR_MTL_H
+#ifndef HTRDR_SENSOR_H
+#define HTRDR_SENSOR_H
 
-struct htrdr_mtl;
-struct mrumtl;
+#include <rsys/rsys.h>
+
+/* Forward declarations */
+struct htrdr;
+struct ssp_rng;
+
+enum htrdr_sensor_type {
+  HTRDR_SENSOR_CAMERA,
+  HTRDR_SENSOR_RECTANGLE
+};
+
+struct htrdr_sensor {
+  struct htrdr_camera* camera;
+  struct htrdr_rectangle* rectangle;
+  enum htrdr_sensor_type type;
+};
 
 extern LOCAL_SYM res_T
-htrdr_mtl_create
-  (struct htrdr* htrdr,
-   const char* filename,
-   struct htrdr_mtl** mtl);
+htrdr_sensor_sample_primary_ray
+  (const struct htrdr_sensor* sensor,
+   struct htrdr* htrdr,
+   const size_t ipix[2],
+   const double pix_sz[2],
+   struct ssp_rng* rng,
+   double ray_org[3],
+   double ray_dir[3]);
 
-extern LOCAL_SYM void
-htrdr_mtl_ref_get
-  (struct htrdr_mtl* mtl);
-
-extern LOCAL_SYM void
-htrdr_mtl_ref_put
-  (struct htrdr_mtl* mtl);
-
-/* Return NULL if the material name does not exist */
-extern const struct mrumtl*
-htrdr_mtl_get
-  (struct htrdr_mtl* mtl,
-   const char* mtl_name);
-
-#endif /* HTRDR_MTL_H */
+#endif /* HTRDR_SENSOR_H */
 

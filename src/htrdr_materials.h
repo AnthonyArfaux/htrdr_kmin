@@ -14,54 +14,54 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_SUN_H
-#define HTRDR_SUN_H
+#ifndef HTRDR_MATERIALS_H
+#define HTRDR_MATERIALS_H
 
 #include <rsys/rsys.h>
 
-/* Forward declaration */
-struct htrdr;
-struct htrdr_sun;
+/* Forward declarations */
+struct htrdr_materials;
+struct mrumtl;
+struct s3d_hit;
+struct ssf_bsdf;
 struct ssp_rng;
 
+struct htrdr_mtl {
+  const char* name;
+  const struct mrumtl* mrumtl;
+  double temperature;
+};
+static const struct htrdr_mtl HTRDR_MTL_NULL;
+
 extern LOCAL_SYM res_T
-htrdr_sun_create
+htrdr_materials_create
   (struct htrdr* htrdr,
-   struct htrdr_sun** out_sun);
+   const char* filename,
+   struct htrdr_materials** mats);
 
 extern LOCAL_SYM void
-htrdr_sun_ref_get
-  (struct htrdr_sun* sun);
+htrdr_materials_ref_get
+  (struct htrdr_materials* mats);
 
 extern LOCAL_SYM void
-htrdr_sun_ref_put
-  (struct htrdr_sun* sun);
+htrdr_materials_ref_put
+  (struct htrdr_materials* mats);
 
-/* Setup the direction *toward* the sun "center" */
-extern LOCAL_SYM void
-htrdr_sun_set_direction
-  (struct htrdr_sun* sun,
-   const double direction[3]); /* Must be normalized */
-
-/* Return a pdf of the sampled dir */
-extern LOCAL_SYM double
-htrdr_sun_sample_direction
-  (struct htrdr_sun* sun,
-   struct ssp_rng* rng,
-   double dir[3]);
-
-extern LOCAL_SYM double
-htrdr_sun_get_solid_angle
-  (const struct htrdr_sun* sun);
-
-extern LOCAL_SYM double /* W/m^2/sr/m */
-htrdr_sun_get_radiance
-  (const struct htrdr_sun* sun,
-   const double wavelength);
-
+/* Return 1 if the material exist and 0 otherwise */
 extern LOCAL_SYM int
-htrdr_sun_is_dir_in_solar_cone
-  (const struct htrdr_sun* sun,
-   const double dir[3]);
+htrdr_materials_find_mtl
+  (struct htrdr_materials* mats,
+   const char* mtl_name,
+   struct htrdr_mtl* mtl);
 
-#endif /* HTRDR_SUN_H */
+extern LOCAL_SYM res_T
+htrdr_mtl_create_bsdf
+  (struct htrdr* htrdr,
+   const struct htrdr_mtl* mtl,
+   const size_t ithread,
+   const double wavelength,
+   struct ssp_rng* rng,
+   struct ssf_bsdf** bsdf);
+
+#endif /* HTRDR_MATERIALS_H */
+

@@ -19,7 +19,7 @@
 #include "htrdr.h"
 #include "htrdr_interface.h"
 #include "htrdr_ground.h"
-#include "htrdr_mtl.h"
+#include "htrdr_materials.h"
 #include "htrdr_slab.h"
 
 #include <aw.h>
@@ -165,9 +165,16 @@ parse_shape_interface
    struct htrdr_interface* interf)
 {
   struct str str;
+  char* mtl_name0 = NULL;
+  char* mtl_name1 = NULL;
+  char* mtl_name2 = NULL;
   char* mtl_name_front = NULL;
+  char* mtl_name_thin = NULL;
   char* mtl_name_back = NULL;
   char* tk_ctx = NULL;
+  int has_front = 0;
+  int has_thin = 0;
+  int has_back = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && name && interf);
 
@@ -182,33 +189,70 @@ parse_shape_interface
     goto error;
   }
 
-  /* Parse the name of the front/back faces */
-  mtl_name_front = strtok_r(str_get(&str), ":", &tk_ctx);
-  ASSERT(mtl_name_front); /* This can't be NULL */
-  mtl_name_back = strtok_r(NULL, ":", &tk_ctx);
+  /* Reset the interface */
+  memset(interf, 0, sizeof(*interf));
+
+  /* Parse the name of the front/back/thin materials */
+  mtl_name0 = strtok_r(str_get(&str), ":", &tk_ctx);
+  mtl_name1 = strtok_r(NULL, ":", &tk_ctx);
+  mtl_name2 = strtok_r(NULL, ":", &tk_ctx);
+  ASSERT(mtl_name0); /* This can't be NULL */
+  mtl_name_front = mtl_name0;
+  if(mtl_name2) {
+    mtl_name_thin = mtl_name1;
+    mtl_name_back = mtl_name2;
+  } else {
+    mtl_name_thin = NULL;
+    mtl_name_back = mtl_name1;
+  }
+
   if(!mtl_name_back) {
     htrdr_log_err(htrdr,
-      "The material name of the shape back faces are missing `%s'.\n", name);
+      "The back material name is missing `%s'.\n", name);
     res = RES_BAD_ARG;
     goto error;
   }
 
-  /* Fetch the front/back materials */
-  interf->mtl_front = htrdr_mtl_get(htrdr->mtl, mtl_name_front);
-  interf->mtl_back = htrdr_mtl_get(htrdr->mtl, mtl_name_back);
-  if(!interf->mtl_front && !interf->mtl_back) {
+  /* Fetch the interface material if any */
+  if(mtl_name_thin) {
+    has_thin = htrdr_materials_find_mtl
+      (htrdr->mats, mtl_name_thin, &interf->mtl_thin);
+    if(!has_thin) {
+      htrdr_log_err(htrdr,
+        "Invalid interface `%s'. The interface material `%s' is unknown.\n",
+        name, mtl_name_thin);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
+  /* Fetch the front material */
+  has_front = htrdr_materials_find_mtl
+    (htrdr->mats, mtl_name_front, &interf->mtl_front);
+  if(!has_front) {
     htrdr_log_err(htrdr,
-      "Invalid interface `%s:%s'. "
-      "The front and the back materials are both uknown.\n",
-      mtl_name_front, mtl_name_back);
+      "Invalid interface `%s'. The front material `%s' is unknown.\n",
+      name, mtl_name_front);
     res = RES_BAD_ARG;
     goto error;
   }
+
+  /* Fetch the back material */
+  has_back = htrdr_materials_find_mtl
+    (htrdr->mats, mtl_name_back, &interf->mtl_back);
+  if(!has_back) {
+    htrdr_log_err(htrdr,
+      "Invalid interface `%s'. The back material `%s' is unknown.\n",
+      name, mtl_name_back);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
 exit:
   str_release(&str);
   return res;
 error:
-  interf->mtl_front = interf->mtl_back = NULL;
+  *interf = HTRDR_INTERFACE_NULL;
   goto exit;
 }
 
@@ -649,3 +693,61 @@ error:
   goto exit;
 }
 
+res_T
+htrdr_ground_find_closest_point
+  (struct htrdr_ground* ground,
+   const double pos[3],
+   const double radius,
+   struct s3d_hit* hit)
+{
+  float query_pos[3];
+  float query_radius;
+  float ground_sz[3];
+  res_T res = RES_OK;
+  ASSERT(ground && pos && hit);
+
+  if(!ground->view) { /* No ground geometry */
+    *hit = S3D_HIT_NULL;
+    goto exit;
+  }
+
+  query_radius = (float)radius;
+  f3_set_d3(query_pos, pos);
+
+  if(ground->repeat) {
+    float translation[2] = {0, 0};
+    int64_t xy[2];
+    ground_sz[0] = ground->upper[0] - ground->lower[0];
+    ground_sz[1] = ground->upper[1] - ground->lower[1];
+    ground_sz[2] = ground->upper[2] - ground->lower[2];
+
+    /* Define the 2D index of the current ground instance. (0,0) is the index
+     * of the non instantiated ground */
+    xy[0] = (int64_t)floor((query_pos[0] - ground->lower[0]) / ground_sz[0]);
+    xy[1] = (int64_t)floor((query_pos[1] - ground->lower[1]) / ground_sz[1]);
+
+    /* Define the translation along the X and Y axis from world space to local
+     * ground geometry space */
+    translation[0] = -(float)xy[0] * ground_sz[0];
+    translation[1] = -(float)xy[1] * ground_sz[1];
+
+    /* Transform the query pos in local ground geometry space */
+    query_pos[0] += translation[0];
+    query_pos[1] += translation[1];
+  }
+
+  /* Closest point query */
+  res = s3d_scene_view_closest_point
+    (ground->view, query_pos, query_radius, NULL, hit);
+  if(res != RES_OK) {
+    htrdr_log_err(ground->htrdr,
+      "%s: could not query the closest point to the ground geometry -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}

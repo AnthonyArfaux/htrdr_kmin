@@ -23,8 +23,9 @@
 #include "htrdr_cie_xyz.h"
 #include "htrdr_camera.h"
 #include "htrdr_ground.h"
-#include "htrdr_mtl.h"
+#include "htrdr_materials.h"
 #include "htrdr_ran_wlen.h"
+#include "htrdr_rectangle.h"
 #include "htrdr_sun.h"
 #include "htrdr_solve.h"
 #include "htrdr_version.h"
@@ -125,6 +126,7 @@ dump_buffer
   (struct htrdr* htrdr,
    struct htrdr_buffer* buf,
    struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
    const char* stream_name,
    FILE* stream)
 {
@@ -135,8 +137,10 @@ dump_buffer
   ASSERT(htrdr && buf && stream_name && stream);
   (void)stream_name;
 
-  pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
-  pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
+  pixsz = htrdr_spectral_type_get_pixsz
+    (htrdr->spectral_type, htrdr->sensor.type);
+  pixal = htrdr_spectral_type_get_pixal
+    (htrdr->spectral_type, htrdr->sensor.type);
 
   htrdr_buffer_get_layout(buf, &layout);
   if(layout.elmt_size != pixsz || layout.alignment != pixal) {
@@ -148,25 +152,46 @@ dump_buffer
   fprintf(stream, "%lu %lu\n", layout.width, layout.height);
 
   if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
+  if(flux_acc) *flux_acc = HTRDR_ACCUM_NULL;
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
       struct htrdr_estimate pix_time = HTRDR_ESTIMATE_NULL;
       const struct htrdr_accum* pix_time_acc = NULL;
 
-      if(htrdr->spectral_type != HTRDR_SPECTRAL_SW_CIE_XYZ){
-        const struct htrdr_pixel_xwave* pix = htrdr_buffer_at(buf, x, y);
-        fprintf(stream, "%g %g ",
-          pix->radiance_temperature.E, pix->radiance_temperature.SE);
-        fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
-        fprintf(stream, "0 0 ");
+      if(htrdr->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+        const struct htrdr_pixel_flux* pix = htrdr_buffer_at(buf, x, y);
+        struct htrdr_estimate flux = HTRDR_ESTIMATE_NULL;
+
+        if(pix->flux.nweights == 0) {
+          fprintf(stream, "0 0 0 0 0 0 ");
+        } else {
+          htrdr_accum_get_estimation(&pix->flux, &flux);
+          fprintf(stream, "%g %g 0 0 0 0 ", flux.E, flux.SE);
+
+          if(flux_acc) {
+            flux_acc->sum_weights += pix->flux.sum_weights;
+            flux_acc->sum_weights_sqr += pix->flux.sum_weights_sqr;
+            flux_acc->nweights += pix->flux.nweights;
+          }
+        }
         pix_time_acc = &pix->time;
 
       } else {
-        const struct htrdr_pixel_image* pix = htrdr_buffer_at(buf, x, y);
-        fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
-        fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
-        fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
-        pix_time_acc = &pix->time;
+        if(htrdr->spectral_type != HTRDR_SPECTRAL_SW_CIE_XYZ){
+          const struct htrdr_pixel_xwave* pix = htrdr_buffer_at(buf, x, y);
+          fprintf(stream, "%g %g ",
+            pix->radiance_temperature.E, pix->radiance_temperature.SE);
+          fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+          fprintf(stream, "0 0 ");
+          pix_time_acc = &pix->time;
+
+        } else {
+          const struct htrdr_pixel_image* pix = htrdr_buffer_at(buf, x, y);
+          fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
+          fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
+          fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
+          pix_time_acc = &pix->time;
+        }
       }
 
       htrdr_accum_get_estimation(pix_time_acc, &pix_time);
@@ -390,6 +415,47 @@ error:
   goto exit;
 }
 
+static res_T
+setup_sensor(struct htrdr* htrdr, const struct htrdr_args* args)
+{
+  double proj_ratio;
+  res_T res = RES_OK;
+  ASSERT(htrdr && args);
+
+  htrdr->sensor.type = args->sensor_type;
+
+  if(args->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ
+  && args->sensor_type != HTRDR_SENSOR_CAMERA) {
+    htrdr_log_err(htrdr, "the CIE 1931 XYZ spectral integration can be used "
+      "only with a camera sensor.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(args->sensor_type) {
+    case HTRDR_SENSOR_CAMERA:
+      proj_ratio =
+        (double)args->image.definition[0]
+      / (double)args->image.definition[1];
+      res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
+        args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y),
+        &htrdr->sensor.camera);
+      break;
+    case HTRDR_SENSOR_RECTANGLE:
+      res = htrdr_rectangle_create(htrdr, args->rectangle.sz,
+        args->rectangle.pos, args->rectangle.tgt, args->rectangle.up,
+        &htrdr->sensor.rectangle);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -400,7 +466,6 @@ htrdr_init
    struct htrdr* htrdr)
 {
   struct htsky_args htsky_args = HTSKY_ARGS_DEFAULT;
-  double proj_ratio;
   double sun_dir[3];
   double spectral_range[2];
   const char* output_name = NULL;
@@ -430,6 +495,7 @@ htrdr_init
   htrdr->grid_max_definition[2] = args->grid_max_definition[2];
   htrdr->spectral_type = args->spectral_type;
   htrdr->ref_temperature = args->ref_temperature;
+  htrdr->sky_mtl_name = args->sky_mtl_name;
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
@@ -471,7 +537,7 @@ htrdr_init
 
   /* Materials are necessary only if a ground geometry is defined */
   if(args->filename_obj) {
-    res = htrdr_mtl_create(htrdr, args->filename_mtl, &htrdr->mtl);
+    res = htrdr_materials_create(htrdr, args->filename_mtl, &htrdr->mats);
     if(res != RES_OK) goto error;
   }
 
@@ -479,11 +545,7 @@ htrdr_init
     &htrdr->ground);
   if(res != RES_OK) goto error;
 
-  proj_ratio =
-    (double)args->image.definition[0]
-  / (double)args->image.definition[1];
-  res = htrdr_camera_create(htrdr, args->camera.pos, args->camera.tgt,
-    args->camera.up, proj_ratio, MDEG2RAD(args->camera.fov_y), &htrdr->cam);
+  res = setup_sensor(htrdr, args);
   if(res != RES_OK) goto error;
 
   res = htrdr_sun_create(htrdr, &htrdr->sun);
@@ -570,8 +632,10 @@ htrdr_init
   /* Create the image buffer only on the master process; the image parts
    * rendered by the processes are gathered onto the master process. */
   if(!htrdr->dump_vtk && htrdr->mpi_rank == 0) {
-    const size_t pixsz = htrdr_spectral_type_get_pixsz(htrdr->spectral_type);
-    const size_t pixal = htrdr_spectral_type_get_pixal(htrdr->spectral_type);
+    const size_t pixsz = htrdr_spectral_type_get_pixsz
+      (htrdr->spectral_type, htrdr->sensor.type);
+    const size_t pixal = htrdr_spectral_type_get_pixal
+      (htrdr->spectral_type, htrdr->sensor.type);
 
     res = htrdr_buffer_create(htrdr,
       args->image.definition[0], /* Width */
@@ -599,9 +663,10 @@ htrdr_release(struct htrdr* htrdr)
   if(htrdr->ground) htrdr_ground_ref_put(htrdr->ground);
   if(htrdr->sky) HTSKY(ref_put(htrdr->sky));
   if(htrdr->sun) htrdr_sun_ref_put(htrdr->sun);
-  if(htrdr->cam) htrdr_camera_ref_put(htrdr->cam);
+  if(htrdr->sensor.camera) htrdr_camera_ref_put(htrdr->sensor.camera);
+  if(htrdr->sensor.rectangle) htrdr_rectangle_ref_put(htrdr->sensor.rectangle);
   if(htrdr->buf) htrdr_buffer_ref_put(htrdr->buf);
-  if(htrdr->mtl) htrdr_mtl_ref_put(htrdr->mtl);
+  if(htrdr->mats) htrdr_materials_ref_put(htrdr->mats);
   if(htrdr->cie) htrdr_cie_xyz_ref_put(htrdr->cie);
   if(htrdr->ran_wlen) htrdr_ran_wlen_ref_put(htrdr->ran_wlen);
   if(htrdr->output && htrdr->output != stdout) fclose(htrdr->output);
@@ -639,14 +704,16 @@ htrdr_run(struct htrdr* htrdr)
       }
     }
   } else {
-    res = htrdr_draw_radiance(htrdr, htrdr->cam, htrdr->width,
-      htrdr->height, htrdr->spp, htrdr->buf);
+    res = htrdr_draw_map(htrdr, &htrdr->sensor, htrdr->width, htrdr->height,
+      htrdr->spp, htrdr->buf);
     if(res != RES_OK) goto error;
     if(htrdr->mpi_rank == 0) {
       struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
+      struct htrdr_accum flux_acc = HTRDR_ACCUM_NULL;
       struct htrdr_estimate path_time;
+      struct htrdr_estimate flux;
 
-      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc,
+      res = dump_buffer(htrdr, htrdr->buf, &path_time_acc, &flux_acc,
         str_cget(&htrdr->output_name), htrdr->output);
       if(res != RES_OK) goto error;
 
@@ -655,6 +722,14 @@ htrdr_run(struct htrdr* htrdr)
         "Time per radiative path (in micro seconds): %g +/- %g\n",
         path_time.E,
         path_time.SE);
+
+      if(htrdr->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+        htrdr_accum_get_estimation(&flux_acc, &flux);
+        htrdr_log(htrdr,
+          "Radiative flux density (in W/(external m^2)): %g +/- %g\n",
+          flux.E,
+          flux.SE);
+      }
     }
   }
 exit:

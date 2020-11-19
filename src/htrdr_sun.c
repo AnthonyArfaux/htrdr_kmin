@@ -105,7 +105,7 @@ htrdr_sun_set_direction(struct htrdr_sun* sun, const double dir[3])
   d33_basis(sun->frame, dir);
 }
 
-double*
+double
 htrdr_sun_sample_direction
   (struct htrdr_sun* sun,
    struct ssp_rng* rng,
@@ -113,7 +113,8 @@ htrdr_sun_sample_direction
 {
   ASSERT(sun && rng && dir);
   ssp_ran_sphere_cap_uniform_local(rng, sun->cos_half_angle, dir, NULL);
-  return d33_muld3(dir, sun->frame, dir);
+  d33_muld3(dir, sun->frame, dir);
+  return 1.0 / htrdr_sun_get_solid_angle(sun);
 }
 
 double

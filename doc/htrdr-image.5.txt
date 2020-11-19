@@ -30,32 +30,40 @@ thus ignored as well as empty lines. The first valid line stores 2 unsigned
 integers that represent the image definition, i.e. the number of pixels per
 line and per column. Then each line stores 8 pixel components.
 
-If the image is a regular rendering in the visible part of the spectrum
-(*-s* _cie_xyz_ option in *htrdr*(1)), the pixel components are actually 4
-pairs of floating points data representing the pixel color encoded in the CIE
-1931 XYZ color space and the per radiative path computation time. The first,
-second and third pairs encode the estimated integrated radiance in W/sr/m^2 of
-the X, Y and Z pixel components, respectively. The first value of each pair is
-the expected value of the estimated radiance while the second one is its
-associated standard deviation.  The fourth pair saves the estimate in
+If the image is a regular rendering in the visible part of the spectrum (*-C*
+_camera_ and *-s* _cie_xyz_ options in *htrdr*(1)), the pixel components are
+actually 4 pairs of floating points data representing the pixel color encoded
+in the CIE 1931 XYZ color space and the per radiative path computation time.
+The first, second and third pairs encode the estimated integrated radiance in
+W/sr/m^2 of the X, Y and Z pixel components, respectively. The first value of
+each pair is the expected value of the estimated radiance while the second one
+is its associated standard deviation. The fourth pair saves the estimate in
 microseconds of the per radiative path computation time and its standard
 error.
 
-If the image is an infrared rendering (*-s* *lw*=_wlen-min_,_wlen_max_ option
-in *htrdr*(1)), the first and second pixel components store the expected value
-and the standard error, respectively, of the estimated brightness temperature
-in Kelvin. The third and fourth components save the expected value and standard
-deviation of the pixel radiance that is either an integrated radiance in
-W/sr/m^2 or a spectral radiance in W/sr/m^2/nm whether this radiance is
-computed for a spectral range or for one wavelength. The fifth and sixth pixel
-components are unused. Finally the last 2 pixel components save, as for a
-regular rendering, the estimate in microseconds of the per radiative path
-computation time and its standard error.
+If the image is an infrared rendering (*-C* _camera_ and *-s*
+*lw*=_wlen-min_,_wlen_max_ options in *htrdr*(1)), the first and second pixel
+components store the expected value and the standard error, respectively, of
+the estimated brightness temperature in Kelvin. The third and fourth
+components save the expected value and standard deviation of the pixel
+radiance that is either an integrated radiance in W/sr/m^2 or a spectral
+radiance in W/sr/m^2/nm whether this radiance is computed for a spectral range
+or for one wavelength. The fifth and sixth pixel components are unused.
+Finally the last 2 pixel components save, as for a regular rendering, the
+estimate in microseconds of the per radiative path computation time and its
+standard error.
 
-If it was generating from a shortwave rendering (*-s*
-*sw*=_wlen-min_,wlen-max_ option in *htrdr*(1)) the image is formatted as in
+If it was generating from a shortwave rendering (*-C* _camera_ and *-s*
+*sw*=_wlen-min_,wlen-max_ options in *htrdr*(1)) the image is formatted as in
 longwave rendering mode exepted that the first and second pixel components are
 unused since no brightness temperature was evaluated in shortwave.
+
+For flux computations (*-p* _rectangle_ option in *htrdr*(1)), the first and
+second pixel component stores the expected value and the standard error of the
+pixel flux in W/m^2 for the part of the pixel that is outside any geometry. As
+previously, the seventh and eighth pixel components store the estimate of the
+radiative path computation time in microseconds and its standard error. The
+remaining components, i.e. the components 3 to 6, are unused.
 
 Pixels are sorted line by line, with the origin defined at the top left corner
 of the image. With an image definition of N by M pixels, with N the number of

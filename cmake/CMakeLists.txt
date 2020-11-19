@@ -28,7 +28,7 @@ find_package(AW 2.0 REQUIRED)
 find_package(HTSky 0.2 REQUIRED)
 find_package(MruMtl 0.0 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
-find_package(RSys 0.7 REQUIRED)
+find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.7.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.8 REQUIRED)
@@ -67,10 +67,15 @@ set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0")
 set(HTRDR_ARGS_DEFAULT_CAMERA_TGT "0,1,0")
 set(HTRDR_ARGS_DEFAULT_CAMERA_UP  "0,0,1")
 set(HTRDR_ARGS_DEFAULT_CAMERA_FOV "70")
+set(HTRDR_ARGS_DEFAULT_RECTANGLE_POS "0,0,0")
+set(HTRDR_ARGS_DEFAULT_RECTANGLE_TGT "0,0,1")
+set(HTRDR_ARGS_DEFAULT_RECTANGLE_UP "0,1,0")
+set(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ "1,1")
 set(HTRDR_ARGS_DEFAULT_IMG_WIDTH "320")
 set(HTRDR_ARGS_DEFAULT_IMG_HEIGHT "240")
 set(HTRDR_ARGS_DEFAULT_IMG_SPP "1")
 set(HTRDR_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1")
+set(HTRDR_ARGS_DEFAULT_SKY_MTL_NAME "\"air\"")
 
 configure_file(${HTRDR_SOURCE_DIR}/htrdr_version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/htrdr_version.h @ONLY)
@@ -94,14 +99,14 @@ set(HTRDR_FILES_SRC
   htrdr_cie_xyz.c
   htrdr_compute_radiance_sw.c
   htrdr_compute_radiance_lw.c
-  htrdr_draw_radiance.c
+  htrdr_draw_map.c
   htrdr_grid.c
   htrdr_ground.c
-  htrdr_interface.c
   htrdr_main.c
-  htrdr_mtl.c
+  htrdr_materials.c
   htrdr_ran_wlen.c
   htrdr_rectangle.c
+  htrdr_sensor.c
   htrdr_slab.c
   htrdr_spectral.c
   htrdr_sun.c)
@@ -114,9 +119,10 @@ set(HTRDR_FILES_INC
   htrdr_grid.h
   htrdr_ground.h
   htrdr_interface.h
-  htrdr_mtl.h
+  htrdr_materials.h
   htrdr_ran_wlen.h
   htrdr_rectangle.h
+  htrdr_sensor.h
   htrdr_slab.h
   htrdr_spectral.h
   htrdr_sun.h
