@@ -59,6 +59,27 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.6
+
+#### New features
+
+- Add support of flux map computation for both shortwave and longwave. The flux
+  is computed for the part of the flux map lying outside any geometry. The new
+  command line option `-p` defines the rectangle in the scene onto which the
+  flux is going to be integrated. The flux map resolution and the realisations
+  count per pixel is controlled by the `-i` option.
+- Add support of thin materials, i.e. materials without geometric thickness as
+  for instance the leaves of the trees.
+- Add the temperature property to the materials and used it as the limit
+  condition during longwave computations. Previously, the surface temperatures
+  were fetched from the atmosphere at the given surface position.
+- Add the `-n` option to fix the name of the material defining the atmosphere.
+
+#### Fix
+
+- In shortwave, fix how direct contribution is handled for purely specular
+  BRDF.
+
 ### Version 0.5.1
 
 - Fix the `undefined strtok_r symbol` issue exhibited by some GCC versions that
