@@ -63,7 +63,7 @@ sample_rectangle_ray
   struct s3d_hit hit = S3D_HIT_NULL;
   double pix_samp[2];
   const double up_dir[3] = {0,0,1};
-  const double range[2] = {0, INF};
+  const double range[2] = {0, DBL_MAX};
   double normal[3];
   ASSERT(rect && htrdr && ipix && pix_sz && rng && ray_org && ray_dir);
 
