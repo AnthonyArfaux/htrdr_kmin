@@ -405,8 +405,7 @@ init_mpi(struct htrdr* htrdr)
     goto error;
   }
 
-  if(htrdr->mpi_nprocs != 1)
-    mpi_print_proc_info(htrdr);
+  mpi_print_proc_info(htrdr);
 
 exit:
   return res;
@@ -499,9 +498,6 @@ htrdr_init
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
-
-  htrdr_log(htrdr, "Number of processes: %d\n", htrdr->mpi_nprocs);
-  htrdr_log(htrdr, "Number of per process threads: %u\n", htrdr->nthreads);
 
   if(!args->output) {
     htrdr->output = stdout;
