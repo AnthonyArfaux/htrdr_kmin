@@ -308,9 +308,9 @@ htrdr_compute_radiance_sw
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  if((cpnt_mask & HTRDR_RADIANCE_DIRECT) /* Handle direct contribuation */
+  if((cpnt_mask & HTRDR_RADIANCE_DIRECT) /* Handle direct contribation */
   && htrdr_sun_is_dir_in_solar_cone(htrdr->sun, dir)) {
-    /* Check that the ray is not occlude along the submitted range */
+    /* Check that the ray is not occluded along the submitted range */
     d2(range, 0, FLT_MAX);
     HTRDR(ground_trace_ray(htrdr->ground, pos, dir, range, NULL, &s3d_hit_tmp));
     if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
@@ -366,10 +366,16 @@ htrdr_compute_radiance_sw
     /* Negate the incoming dir to match the convention of the SSF library */
     d3_minus(wo, dir);
 
+    /* Define if the scattering occurs at a surface */
+    surface_scattering = SVX_HIT_NONE(&svx_hit);
+
     /* Compute the new position */
     pos_next[0] = pos[0] + dir[0]*scattering_ctx.traversal_dst;
     pos_next[1] = pos[1] + dir[1]*scattering_ctx.traversal_dst;
     pos_next[2] = pos[2] + dir[2]*scattering_ctx.traversal_dst;
+
+    /* Define the previous hit surface used to avoid self hit */
+    s3d_hit_prev = surface_scattering ? s3d_hit : S3D_HIT_NULL;
 
     /* Define the absorption transmissivity from the current position to the
      * next position */
@@ -377,8 +383,6 @@ htrdr_compute_radiance_sw
     Tr_abs = transmissivity
       (htrdr, rng, HTSKY_Ka, iband, iquad, pos, dir, range);
     if(Tr_abs <= 0) break;
-
-    surface_scattering = SVX_HIT_NONE(&svx_hit);
 
     /* Sample the scattering direction */
     if(surface_scattering) { /* Scattering at a surface */
@@ -453,7 +457,6 @@ htrdr_compute_radiance_sw
     } else {
       /* Check that the sun is visible from the new position */
       d2(range, 0, FLT_MAX);
-      s3d_hit_prev = SVX_HIT_NONE(&svx_hit) ? s3d_hit : S3D_HIT_NULL;
       HTRDR(ground_trace_ray
         (htrdr->ground, pos_next, sun_dir, range, &s3d_hit_prev, &s3d_hit_tmp));
 
