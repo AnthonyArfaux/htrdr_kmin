@@ -59,6 +59,11 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.6.1
+
+- Fix the self-intersection issue in shortwave computations introduced by
+  the 0.6 version.
+
 ### Version 0.6
 
 #### New features
