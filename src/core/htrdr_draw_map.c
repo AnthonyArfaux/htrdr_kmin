@@ -537,6 +537,7 @@ draw_map
   ASSERT(htrdr && check_draw_map_args(args) && buf_layout && work && tiles);
   ASSERT(ntiles_x && ntiles_y && ntiles_adjusted >= ntiles_x*ntiles_y);
   ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
+  (void)ntiles_x, (void)ntiles_y;
 
   res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
   if(res != RES_OK) {
