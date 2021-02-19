@@ -15,12 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr.h"
-#include "htrdr_c.h"
-#include "htrdr_interface.h"
-#include "htrdr_ground.h"
-#include "htrdr_solve.h"
-#include "htrdr_sun.h"
+#include "atmosphere/htrdr_atmosphere_c.h"
+#include "atmosphere/htrdr_atmosphere_ground.h"
+#include "atmosphere/htrdr_atmosphere_sun.h"
+
+#include "core/htrdr_interface.h"
 
 #include <high_tune/htsky.h>
 
@@ -213,7 +212,7 @@ transmissivity_hit_filter
 
 static double
 transmissivity
-  (struct htrdr* htrdr,
+  (struct htrdr_atmosphere* cmd,
    struct ssp_rng* rng,
    const enum htsky_property prop,
    const size_t iband,
@@ -225,17 +224,17 @@ transmissivity
   struct svx_hit svx_hit;
   struct transmissivity_context transmissivity_ctx = TRANSMISSION_CONTEXT_NULL;
 
-  ASSERT(htrdr && rng && pos && dir && range);
+  ASSERT(cmd && rng && pos && dir && range);
 
   transmissivity_ctx.rng = rng;
-  transmissivity_ctx.sky = htrdr->sky;
+  transmissivity_ctx.sky = cmd->sky;
   transmissivity_ctx.iband = iband;
   transmissivity_ctx.iquad = iquad;
   transmissivity_ctx.Ts = ssp_ran_exp(rng, 1); /* Sample an optical thickness */
   transmissivity_ctx.prop = prop;
 
   /* Compute the transmissivity */
-  HTSKY(trace_ray(htrdr->sky, pos, dir, range, NULL,
+  HTSKY(trace_ray(cmd->sky, pos, dir, range, NULL,
     transmissivity_hit_filter, &transmissivity_ctx, iband, iquad, &svx_hit));
 
   if(SVX_HIT_NONE(&svx_hit)) {
@@ -292,13 +291,13 @@ atmosphere_compute_radiance_sw
 
   /* Create the Henyey-Greenstein phase function */
   CHK(RES_OK == ssf_phase_create
-    (htrdr_get_lifo_allocator(cmd->htrdr, ithread),
+    (htrdr_get_thread_allocator(cmd->htrdr, ithread),
      &ssf_phase_hg,
      &phase_hg));
 
   /* Create the Rayleigh phase function */
   CHK(RES_OK == ssf_phase_create
-    (htrdr_get_lifo_allocator(cmd->htrdr, ithread),
+    (htrdr_get_thread_allocator(cmd->htrdr, ithread),
      &ssf_phase_rayleigh,
      &phase_rayleigh));
 
@@ -316,11 +315,12 @@ atmosphere_compute_radiance_sw
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  if((cpnt_mask & HTRDR_RADIANCE_DIRECT) /* Handle direct contribation */
+  if((cpnt_mask & ATMOSPHERE_RADIANCE_DIRECT) /* Handle direct contribation */
   && htrdr_atmosphere_sun_is_dir_in_solar_cone(cmd->sun, dir)) {
     /* Check that the ray is not occluded along the submitted range */
     d2(range, 0, FLT_MAX);
-    HTRDR(ground_trace_ray(cmd->ground, pos, dir, range, NULL, &s3d_hit_tmp));
+    HTRDR(atmosphere_ground_trace_ray
+      (cmd->ground, pos, dir, range, NULL, &s3d_hit_tmp));
     if(!S3D_HIT_NONE(&s3d_hit_tmp)) {
       Tr = 0;
     } else {
@@ -330,7 +330,7 @@ atmosphere_compute_radiance_sw
     }
   }
 
-  if((cpnt_mask & HTRDR_RADIANCE_DIFFUSE) == 0)
+  if((cpnt_mask & ATMOSPHERE_RADIANCE_DIFFUSE) == 0)
     goto exit; /* Discard diffuse contribution */
 
   /* Radiative random walk */
@@ -346,7 +346,7 @@ atmosphere_compute_radiance_sw
 
     /* Find the first intersection with a surface */
     d2(range, 0, DBL_MAX);
-    HTRDR(ground_trace_ray
+    HTRDR(atmosphere_ground_trace_ray
       (cmd->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
 
     /* Sample an optical thickness */
@@ -398,9 +398,9 @@ atmosphere_compute_radiance_sw
       const struct htrdr_mtl* mtl = NULL;
 
       /* Fetch the hit interface materal and build its BSDF */
-      htrdr_ground_get_interface(cmd->ground, &s3d_hit, &interf);
+      htrdr_atmosphere_ground_get_interface(cmd->ground, &s3d_hit, &interf);
       mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
-      HTRDR(mtl_create_bsdf(cmd, mtl, ithread, wlen, rng, &bsdf));
+      HTRDR(mtl_create_bsdf(cmd->htrdr, mtl, ithread, wlen, rng, &bsdf));
 
       /* Revert the normal if necessary to match the SSF convention */
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
@@ -449,7 +449,8 @@ atmosphere_compute_radiance_sw
       sun_dir_pdf = 1.0;
     } else {
       /* Sample a sun direction */
-      sun_dir_pdf = htrdr_sun_sample_direction(cmd->sun, rng, sun_dir);
+      sun_dir_pdf = htrdr_atmosphere_sun_sample_direction
+        (cmd->sun, rng, sun_dir);
       if(surface_scattering) {
         R = d3_dot(N, sun_dir) < 0/* Below the ground */
           ? 0 : ssf_bsdf_eval(bsdf, wo, N, sun_dir) * d3_dot(N, sun_dir);
@@ -465,7 +466,7 @@ atmosphere_compute_radiance_sw
     } else {
       /* Check that the sun is visible from the new position */
       d2(range, 0, FLT_MAX);
-      HTRDR(ground_trace_ray
+      HTRDR(atmosphere_ground_trace_ray
         (cmd->ground, pos_next, sun_dir, range, &s3d_hit_prev, &s3d_hit_tmp));
 
       /* Compute the sun transmissivity */

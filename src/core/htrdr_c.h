@@ -35,7 +35,11 @@ enum htrdr_mpi_message {
   HTRDR_MPI_TILE_DATA
 };
 
+struct s3d_device;
+
 struct htrdr {
+  struct s3d_device* s3d;
+
   unsigned nthreads; /* #threads of the process */
 
   int mpi_rank; /* Rank of the process in the MPI group */

@@ -15,8 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr_atmosphere_c.h"
-#include "htrdr_atmosphere_sun.h"
+#include "atmosphere/htrdr_atmosphere_c.h"
+#include "atmosphere/htrdr_atmosphere_sun.h"
+
+#include "core/htrdr.h"
+#include "core/htrdr_log.h"
 
 #include <rsys/algorithm.h>
 #include <rsys/double33.h>
@@ -47,7 +50,7 @@ release_sun(ref_T* ref)
   ASSERT(ref);
   sun = CONTAINER_OF(ref, struct htrdr_atmosphere_sun, ref);
   htrdr = sun->htrdr;
-  MEM_RM(htrdr_allocator(htrdr), sun);
+  MEM_RM(htrdr_get_allocator(htrdr), sun);
   htrdr_ref_put(htrdr);
 }
 

@@ -27,7 +27,7 @@ struct ssp_rng;
 
 extern LOCAL_SYM res_T
 htrdr_atmosphere_sun_create
-  (struct htrdr_atmosphere* sun,
+  (struct htrdr* htrdr,
    struct htrdr_atmosphere_sun** out_sun);
 
 extern LOCAL_SYM void

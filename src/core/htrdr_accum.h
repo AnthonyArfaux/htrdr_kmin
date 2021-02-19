@@ -19,6 +19,7 @@
 #define HTRDR_ACCUM_H
 
 #include <rsys/rsys.h>
+#include <rsys/math.h>
 
 /* Monte carlo accumulator */
 struct htrdr_accum {

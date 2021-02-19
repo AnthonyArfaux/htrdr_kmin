@@ -24,7 +24,6 @@
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
 
-#include <getopt.h>
 #include <string.h>
 
 /*******************************************************************************

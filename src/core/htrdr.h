@@ -136,6 +136,10 @@ HTRDR_API int
 htrdr_get_verbosity_level
   (const struct htrdr* htrdr);
 
+HTRDR_API struct s3d_device*
+htrdr_get_s3d
+  (struct htrdr* htrdr);
+
 HTRDR_API res_T
 htrdr_open_output_stream
   (struct htrdr* htrdr,

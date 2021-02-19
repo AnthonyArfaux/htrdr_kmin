@@ -49,12 +49,14 @@ typedef void
 
 struct htrdr_draw_map_args {
   htrdr_draw_pixel_T draw_pixel;
+  struct ssp_rng* rng;
   size_t spp; /* Samples per pixel */
   void* context; /* User defined data */
 };
 
 #define HTRDR_DRAW_MAP_ARGS_NULL__ {                                           \
   NULL, /* Draw pixel functor */                                               \
+  NULL, /* Random Number Generator */                                          \
   0, /* #Samples per pixel */                                                  \
   NULL /* User defined data */                                                 \
 }
@@ -66,7 +68,7 @@ struct htrdr;
 struct htrdr_buffer;
 
 static INLINE int
-htrdr_draw_pixel_args_check(struct htrdr_draw_pixel_args* args)
+htrdr_draw_pixel_args_check(const struct htrdr_draw_pixel_args* args)
 {
   return args
       && args->pixel_normalized_size[0] > 0

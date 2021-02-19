@@ -24,6 +24,7 @@
 struct htrdr;
 struct htrdr_atmosphere_ground;
 struct htrdr_interface;
+struct htrdr_materials;
 struct s3d_hit;
 struct ssf_bsdf;
 
@@ -31,6 +32,7 @@ extern LOCAL_SYM res_T
 htrdr_atmosphere_ground_create
   (struct htrdr* htrdr,
    const char* obj_filename, /* May be NULL <=> No ground geometry */
+   struct htrdr_materials* mats, /* May be NULL if no ground geometry */
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_atmosphere_ground** ground);
 

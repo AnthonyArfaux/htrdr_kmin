@@ -15,13 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr_atmosphere_args.h"
+#include "atmosphere/htrdr_atmosphere_args.h"
+
+#include <rsys/cstr.h>
+
+#include <getopt.h>
 
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
 static void
-print_help_atmosphere(const char* cmd)
+print_help(const char* cmd)
 {
   ASSERT(cmd);
   printf("Usage: %s [<opions>] -a GAS\n", cmd);
@@ -46,7 +50,7 @@ print_help_atmosphere(const char* cmd)
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sun_elevation);
   printf(
 "  -d             dump volumetric acceleration structures to OUTPUT\n"
-"                 and exit.\n");"
+"                 and exit.\n");
   printf(
 "  -f             overwrite the OUTPUT file if it already exists.\n");
   printf(
@@ -65,8 +69,8 @@ print_help_atmosphere(const char* cmd)
 "                 Its default value is `%s'.\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sky_mtl_name);
   printf(
-"  -O CACHE       filenaname of the cache file used to store/restore the
-                  volumetric data. By default do not use any cache.\n");
+"  -O CACHE       filenaname of the cache file used to store/restore the\n"
+"                 volumetric data. By default do not use any cache.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
 "                 written to standard output.\n");
@@ -184,7 +188,6 @@ htrdr_atmosphere_args_init
    char** argv)
 {
   int opt;
-  int i;
   res_T res = RES_OK;
   ASSERT(args && argc && argv);
 
@@ -204,7 +207,7 @@ htrdr_atmosphere_args_init
       case 'g': args->filename_obj = optarg; break;
       case 'h':
         print_help(argv[0]);
-        htrdr_args_release(args);
+        htrdr_atmosphere_args_release(args);
         args->quit = 1;
         goto exit;
       case 'i':
@@ -213,8 +216,8 @@ htrdr_atmosphere_args_init
       case 'M': args->filename_mtl = optarg; break;
       case 'm': args->filename_mie = optarg; break;
       case 'n': args->sky_mtl_name = optarg; break;
-      case 'O': args->cache = optarg; break;
-      case 'o': args->output = optarg; break;
+      case 'O': args->filename_cache = optarg; break;
+      case 'o': args->filename_output = optarg; break;
       case 'p':
         args->sensor_type = HTRDR_SENSOR_RECTANGLE;
         res = htrdr_args_rectangle_parse(&args->sensor.rectangle, optarg);
@@ -222,7 +225,7 @@ htrdr_atmosphere_args_init
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;
       case 's':
-        res = htrdr_args_spectral_parse(&args->sensor.spectral, optarg);
+        res = htrdr_args_spectral_parse(&args->spectral, optarg);
         break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
@@ -264,16 +267,16 @@ htrdr_atmosphere_args_init
   }
 
   /* Setup default ref temperature if necessary */
-  if(args->ref_temperature <= 0) {
-    switch(args->spectral_type) {
+  if(args->spectral.ref_temperature <= 0) {
+    switch(args->spectral.spectral_type) {
       case HTRDR_SPECTRAL_LW:
-        args->ref_temperature = HTRDR_DEFAULT_LW_REF_TEMPERATURE;
+        args->spectral.ref_temperature = HTRDR_DEFAULT_LW_REF_TEMPERATURE;
         break;
       case HTRDR_SPECTRAL_SW:
-        args->ref_temperature = HTRDR_SUN_TEMPERATURE;
+        args->spectral.ref_temperature = HTRDR_SUN_TEMPERATURE;
         break;
       case HTRDR_SPECTRAL_SW_CIE_XYZ:
-        args->ref_temperature = -1; /* Unused */
+        args->spectral.ref_temperature = -1; /* Unused */
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
@@ -282,7 +285,14 @@ htrdr_atmosphere_args_init
 exit:
   return res;
 error:
-  htrdr_args_release(args);
+  htrdr_atmosphere_args_release(args);
   goto exit;
+}
+
+void
+htrdr_atmosphere_args_release(struct htrdr_atmosphere_args* args)
+{
+  ASSERT(args);
+  *args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
 }
 

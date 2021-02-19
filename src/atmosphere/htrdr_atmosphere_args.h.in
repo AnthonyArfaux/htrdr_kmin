@@ -18,8 +18,12 @@
 #ifndef HTRDR_ATMOSPHERE_ARGS_H
 #define HTRDR_ATMOSPHERE_ARGS_H
 
-#include "htrdr_args.h"
+#include "core/htrdr_args.h"
+#include "core/htrdr_sensor.h"
+
 #include <rsys/rsys.h>
+
+#include <limits.h> /* UINT_MAX support */
 
 struct htrdr_atmosphere_args {
   const char* filename_gas; /* Path of the gas file */
@@ -70,7 +74,7 @@ struct htrdr_atmosphere_args {
   NULL, /* Cache filename */                                                   \
   NULL, /* Output filename */                                                  \
                                                                                \
-  @HTRDR_ARGS_DEFAULT_SKY_MTL_NAME@, /* Sky mtl name */                        \
+  @HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@, /* Sky mtl name */             \
                                                                                \
   {HTRDR_ARGS_CAMERA_DEFAULT__}, /* Sensor */                                  \
   HTRDR_SENSOR_CAMERA, /* Sensor type */                                       \
@@ -81,7 +85,7 @@ struct htrdr_atmosphere_args {
   0, /* Sun azimuth */                                                         \
   90, /* Sun elevation */                                                      \
                                                                                \
-  @HTRDR_ARGS_ATMOPSHERE_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                 \
+  @HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                 \
   {UINT_MAX, UINT_MAX, UINT_MAX}, /* Maximum definition of the grid */         \
                                                                                \
   0, /* Repeat clouds */                                                       \
@@ -102,7 +106,7 @@ htrdr_atmosphere_args_init
    int argc,
    char** argv);
 
-extern LOCAL_SYM res_T
+extern LOCAL_SYM void
 htrdr_atmosphere_args_release
   (struct htrdr_atmosphere_args* args);
 

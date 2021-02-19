@@ -18,11 +18,13 @@
 #ifndef HTRDR_ATMOSPHERE_C_H
 #define HTRDR_ATMOSPHERE_C_H
 
-#include "htrdr_accum.h"
+#include "core/htrdr_accum.h"
+#include "core/htrdr_sensor.h"
+#include "core/htrdr_spectral.h"
 
 #include <rsys/ref_count.h>
 #include <rsys/rsys.h>
-#include <rsys/string.h>
+#include <rsys/str.h>
 
 /* Define the radiance component */
 enum atmosphere_radiance_cpnt_flag {
@@ -32,6 +34,14 @@ enum atmosphere_radiance_cpnt_flag {
     ATMOSPHERE_RADIANCE_DIRECT
   | ATMOSPHERE_RADIANCE_DIFFUSE
 };
+
+struct atmosphere_pixel_format {
+  size_t size; /* In bytes */
+  size_t alignment; /* Power of two, in Bytes */
+};
+#define ATMOSPHERE_PIXEL_FORMAT_NULL__ {0, 0}
+static const struct atmosphere_pixel_format ATMOSPHERE_PIXEL_FORMAT_NULL =
+  ATMOSPHERE_PIXEL_FORMAT_NULL__;
 
 struct atmosphere_pixel_xwave {
   struct htrdr_estimate radiance; /* In W/m^2/sr */
@@ -79,11 +89,9 @@ struct htrdr_atmosphere_args;
 struct htrdr_buffer;
 struct htrdr_cie_xyz;
 struct htrdr_materials;
-struct s3d_device;
+struct htrdr_ran_wlen;
 
 struct htrdr_atmosphere {
-  struct s3d_device* s3d;
-
   struct htrdr_atmosphere_ground* ground;
   struct htrdr_atmosphere_sun* sun;
   struct htrdr_materials* mats;
@@ -115,12 +123,17 @@ struct htrdr_atmosphere {
   struct htrdr* htrdr;
 };
 
+extern LOCAL_SYM void
+atmosphere_get_pixel_format
+  (const struct htrdr_atmosphere* cmd,
+   struct atmosphere_pixel_format* fmt);
+
 extern LOCAL_SYM res_T
 atmosphere_draw_map
   (struct htrdr_atmosphere* cmd);
 
 /* Return the shortwave radiance in W/m^2/sr/m */
-extern LOCAL_SYM res_T
+extern LOCAL_SYM double
 atmosphere_compute_radiance_sw
   (struct htrdr_atmosphere* cmd,
    const size_t ithread,
@@ -133,7 +146,7 @@ atmosphere_compute_radiance_sw
    const size_t iquad);
 
 /* Return the longwave radiance in W/m^2/sr/m */
-extern LOCAL_SYM res_T
+extern LOCAL_SYM double
 atmosphere_compute_radiance_lw
   (struct htrdr_atmosphere* cmd,
    const size_t ithread,

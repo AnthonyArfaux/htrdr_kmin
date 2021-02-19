@@ -15,7 +15,29 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr_draw_map.h"
+#include "atmosphere/htrdr_atmosphere_c.h"
+#include "atmosphere/htrdr_atmosphere_ground.h"
+#include "atmosphere/htrdr_atmosphere_sun.h"
+
+#include "core/htrdr.h"
+#include "core/htrdr_buffer.h"
+#include "core/htrdr_camera.h"
+#include "core/htrdr_cie_xyz.h"
+#include "core/htrdr_draw_map.h"
+#include "core/htrdr_interface.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_ran_wlen.h"
+#include "core/htrdr_rectangle.h"
+
+#include <high_tune/htsky.h>
+
+#include <star/s3d.h>
+#include <star/ssp.h>
+
+#include <rsys/clock_time.h>
+#include <rsys/str.h>
+
+#include <string.h>
 
 /*******************************************************************************
  * Helper functions
@@ -45,7 +67,8 @@ sample_rectangle_ray
   htrdr_rectangle_sample_pos(rect, pix_samp, ray_org);
 
   /* Check that `ray_org' is not included into a geometry */
-  HTRDR(ground_trace_ray(cmd->ground, ray_org, up_dir, range, NULL, &hit));
+  HTRDR(atmosphere_ground_trace_ray
+    (cmd->ground, ray_org, up_dir, range, NULL, &hit));
 
   /* Up direction is occluded. Check if the sample must be rejected, i.e. does it
    * lies inside a geometry? */
@@ -63,7 +86,7 @@ sample_rectangle_ray
 
     /* Fetch the hit interface and retrieve the material into which the ray was
      * traced */
-    htrdr_ground_get_interface(cmd->ground, &hit, &interf);
+    htrdr_atmosphere_ground_get_interface(cmd->ground, &hit, &interf);
     mtl = cos_wi_N < 0 ? &interf.mtl_front : &interf.mtl_back;
 
     /* Reject the sample if the incident direction do not travel into the sky */
@@ -80,15 +103,16 @@ sample_rectangle_ray
 static void
 draw_pixel_image
   (struct htrdr* htrdr,
-   struct htrdr_draw_pixel_args* args,
+   const struct htrdr_draw_pixel_args* args,
    void* data)
 {
   struct htrdr_accum XYZ[3]; /* X, Y, and Z */
   struct htrdr_accum time;
   struct htrdr_atmosphere* cmd;
-  struct htrdr_pixel_image* pixel = data;
+  struct atmosphere_pixel_image* pixel = data;
   size_t ichannel;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
+  (void)htrdr;
 
   cmd = args->context;
   ASSERT(cmd);
@@ -147,7 +171,7 @@ draw_pixel_image
 
       /* Compute the radiance in W/m^2/sr/m */
       weight = atmosphere_compute_radiance_sw(cmd, args->ithread, args->rng,
-        HTRDR_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
+        ATMOSPHERE_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
       pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
@@ -185,9 +209,10 @@ draw_pixel_flux
   struct htrdr_accum flux;
   struct htrdr_accum time;
   struct htrdr_atmosphere* cmd;
-  struct htrdr_pixel_flux* pixel = data;
+  struct atmosphere_pixel_flux* pixel = data;
   size_t isamp;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
+  (void)htrdr;
 
   cmd = args->context;
   ASSERT(cmd);
@@ -199,7 +224,7 @@ draw_pixel_flux
   flux = HTRDR_ACCUM_NULL;
   time = HTRDR_ACCUM_NULL;
 
-  FOR_EACH(isamp, 0, spp) {
+  FOR_EACH(isamp, 0, args->spp) {
     struct time t0, t1;
     double ray_org[3];
     double ray_dir[3];
@@ -215,13 +240,13 @@ draw_pixel_flux
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    res = sample_rectangle_ray(cmd, htrdr->sensor.rectangle, args->pixel_coord,
+    res = sample_rectangle_ray(cmd, cmd->sensor.rectangle, args->pixel_coord,
       args->pixel_normalized_size, args->rng, ray_org, ray_dir);
     if(res != RES_OK) continue; /* Reject the current sample */
 
-    r0 = ssp_rng_canonical(rng);
-    r1 = ssp_rng_canonical(rng);
-    r2 = ssp_rng_canonical(rng);
+    r0 = ssp_rng_canonical(args->rng);
+    r1 = ssp_rng_canonical(args->rng);
+    r2 = ssp_rng_canonical(args->rng);
 
     /* Sample a wavelength */
     wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
@@ -244,7 +269,7 @@ draw_pixel_flux
       ASSERT(cmd->spectral_type == HTRDR_SPECTRAL_SW);
 
       /* Compute direct contribution if necessary */
-      htrdr_sun_sample_direction(cmd->sun, rng, sun_dir);
+      htrdr_atmosphere_sun_sample_direction(cmd->sun, args->rng, sun_dir);
       htrdr_rectangle_get_normal(cmd->sensor.rectangle, N);
       cos_N_sun_dir = d3_dot(N, sun_dir);
 
@@ -252,15 +277,15 @@ draw_pixel_flux
         L_direct = 0;
       } else {
         L_direct = atmosphere_compute_radiance_sw(cmd, args->ithread,
-          args->rng, HTRDR_RADIANCE_DIRECT, ray_org, sun_dir, wlen, iband,
+          args->rng, ATMOSPHERE_RADIANCE_DIRECT, ray_org, sun_dir, wlen, iband,
           iquad);
       }
 
       /* Compute diffuse contribution */
       L_diffuse = atmosphere_compute_radiance_sw(cmd, args->ithread, args->rng,
-        HTRDR_RADIANCE_DIFFUSE, ray_org, ray_dir, wlen, iband, iquad);
+        ATMOSPHERE_RADIANCE_DIFFUSE, ray_org, ray_dir, wlen, iband, iquad);
 
-      sun_solid_angle = htrdr_sun_get_solid_angle(cmd->sun);
+      sun_solid_angle = htrdr_atmosphere_sun_get_solid_angle(cmd->sun);
 
       /* Compute the weight in W/m^2/m */
       weight = cos_N_sun_dir * sun_solid_angle * L_direct + PI * L_diffuse;
@@ -297,10 +322,12 @@ draw_pixel_xwave
 {
   struct htrdr_accum radiance;
   struct htrdr_accum time;
-  struct htrdr_pixel_xwave* pixel = data;
+  struct htrdr_atmosphere* cmd;
+  struct atmosphere_pixel_xwave* pixel = data;
   size_t isamp;
   double temp_min, temp_max;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
+  (void)htrdr;
 
   cmd = args->context;
   ASSERT(cmd->sensor.type == HTRDR_SENSOR_CAMERA);
@@ -311,7 +338,7 @@ draw_pixel_xwave
   radiance = HTRDR_ACCUM_NULL;
   time = HTRDR_ACCUM_NULL;
 
-  FOR_EACH(isamp, 0, spp) {
+  FOR_EACH(isamp, 0, args->spp) {
     struct time t0, t1;
     double pix_samp[2];
     double ray_org[3];
@@ -323,7 +350,6 @@ draw_pixel_xwave
     size_t iquad;
     double usec;
     double band_pdf;
-    res_T res = RES_OK;
 
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
@@ -338,9 +364,9 @@ draw_pixel_xwave
      * pixel sample */
     htrdr_camera_ray(cmd->sensor.camera, pix_samp, ray_org, ray_dir);
 
-    r0 = ssp_rng_canonical(rng);
-    r1 = ssp_rng_canonical(rng);
-    r2 = ssp_rng_canonical(rng);
+    r0 = ssp_rng_canonical(args->rng);
+    r1 = ssp_rng_canonical(args->rng);
+    r2 = ssp_rng_canonical(args->rng);
 
     /* Sample a wavelength */
     wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
@@ -350,14 +376,14 @@ draw_pixel_xwave
     iquad = htsky_spectral_band_sample_quadrature(cmd->sky, r2, iband);
 
     /* Compute the spectral radiance in W/m^2/sr/m */
-    switch(htrdr->spectral_type) {
+    switch(cmd->spectral_type) {
       case HTRDR_SPECTRAL_LW:
         weight = atmosphere_compute_radiance_lw(cmd, args->ithread, args->rng,
           ray_org, ray_dir, wlen, iband, iquad);
         break;
       case HTRDR_SPECTRAL_SW:
         weight = atmosphere_compute_radiance_sw(cmd, args->ithread, args->rng,
-          HTRDR_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
+          ATMOSPHERE_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
@@ -388,7 +414,7 @@ draw_pixel_xwave
 
   /* Compute the brightness_temperature of the pixel and estimate its standard
    * error if the sources were in the medium (<=> longwave) */
-  if(htrdr->spectral_type == HTRDR_SPECTRAL_LW) {
+  if(cmd->spectral_type == HTRDR_SPECTRAL_LW) {
     const double wlen_min = cmd->wlen_range_m[0];
     const double wlen_max = cmd->wlen_range_m[1];
     pixel->radiance_temperature.E = htrdr_radiance_temperature
@@ -403,7 +429,7 @@ draw_pixel_xwave
 
 static INLINE void
 setup_draw_map_args_rectangle
-  (const struct htrdr_atmosphere* cmd,
+  (struct htrdr_atmosphere* cmd,
    struct htrdr_draw_map_args* args)
 {
   ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_RECTANGLE && args);
@@ -415,7 +441,7 @@ setup_draw_map_args_rectangle
 
 static INLINE void
 setup_draw_map_args_camera
-  (const struct htrdr_atmosphere* cmd,
+  (struct htrdr_atmosphere* cmd,
    struct htrdr_draw_map_args* args)
 {
   ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_CAMERA && args);
@@ -436,6 +462,118 @@ setup_draw_map_args_camera
   }
 }
 
+static INLINE void
+dump_accum
+  (const struct htrdr_accum* acc, /* Accum to dump */
+   struct htrdr_accum* out_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(acc && stream);
+
+  if(acc->nweights == 0) {
+    fprintf(stream, "0 0 ");
+  } else {
+    struct htrdr_estimate estimate = HTRDR_ESTIMATE_NULL;
+
+    htrdr_accum_get_estimation(acc, &estimate);
+    fprintf(stream, "%g %g ", estimate.E, estimate.SE);
+
+    if(out_acc) {
+      out_acc->sum_weights += acc->sum_weights;
+      out_acc->sum_weights_sqr += acc->sum_weights_sqr;
+      out_acc->nweights += acc->nweights;
+    }
+  }
+}
+
+static INLINE void
+dump_pixel_flux
+  (const struct atmosphere_pixel_flux* pix,
+   struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(pix && stream);
+  dump_accum(&pix->flux, flux_acc, stream);
+  fprintf(stream, "0 0 0 0 ");
+  dump_accum(&pix->time, time_acc, stream);
+  fprintf(stream, "\n");
+}
+
+static INLINE void
+dump_pixel_image
+  (const struct atmosphere_pixel_image* pix,
+   struct htrdr_accum* time_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(pix && stream);
+  fprintf(stream, "%g %g ", pix->X.E, pix->X.SE);
+  fprintf(stream, "%g %g ", pix->Y.E, pix->Y.SE);
+  fprintf(stream, "%g %g ", pix->Z.E, pix->Z.SE);
+  dump_accum(&pix->time, time_acc, stream);
+  fprintf(stream, "\n");
+}
+
+static INLINE void
+dump_pixel_xwave
+  (const struct atmosphere_pixel_xwave* pix,
+   struct htrdr_accum* time_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(pix && stream);
+  fprintf(stream, "%g %g %f %f 0 0 ",
+    pix->radiance_temperature.E,
+    pix->radiance_temperature.SE,
+    pix->radiance.E,
+    pix->radiance.SE);
+  dump_accum(&pix->time, time_acc, stream);
+  fprintf(stream, "\n");
+}
+
+static res_T
+dump_buffer
+  (struct htrdr_atmosphere* cmd,
+   struct htrdr_buffer* buf,
+   struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
+   FILE* stream)
+{
+  struct atmosphere_pixel_format pixfmt;
+  struct htrdr_buffer_layout layout;
+  size_t x, y;
+  ASSERT(cmd && buf && stream);
+
+  atmosphere_get_pixel_format(cmd, &pixfmt);
+  htrdr_buffer_get_layout(buf, &layout);
+  CHK(pixfmt.size == layout.elmt_size);
+
+  fprintf(stream, "%lu %lu\n", layout.width, layout.height);
+
+  if(time_acc) *time_acc = HTRDR_ACCUM_NULL;
+  if(flux_acc) *flux_acc = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(y, 0, layout.height) {
+    FOR_EACH(x, 0, layout.width) {
+      void* pix_raw = htrdr_buffer_at(buf, x, y);
+      ASSERT(IS_ALIGNED(pix_raw, pixfmt.alignment));
+
+      if(cmd->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+        const struct atmosphere_pixel_flux* pix = pix_raw;
+        dump_pixel_flux(pix, time_acc, flux_acc, stream);
+      } else if(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+        const struct atmosphere_pixel_image* pix = pix_raw;
+        dump_pixel_image(pix, time_acc, stream);
+      } else {
+        const struct atmosphere_pixel_xwave* pix = pix_raw;
+        dump_pixel_xwave(pix, time_acc, stream);
+      }
+    }
+    fprintf(stream, "\n");
+  }
+
+  return RES_OK;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -447,6 +585,7 @@ atmosphere_draw_map(struct htrdr_atmosphere* cmd)
   struct htrdr_accum flux_acc = HTRDR_ACCUM_NULL;
   struct htrdr_estimate path_time;
   struct htrdr_estimate flux;
+  res_T res = RES_OK;
   ASSERT(cmd);
 
   args.spp = cmd->spp;
@@ -465,11 +604,10 @@ atmosphere_draw_map(struct htrdr_atmosphere* cmd)
   if(res != RES_OK) goto error;
 
   /* No more to do on non master processes */
-  if(htrdr_mpi_rank(cmd->htrdr) != 0) goto exit;
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
   /* Write buffer to output */
-  res = dump_buffer(cmd->htrdr, cmd->buf, &path_time_acc, &flux_acc,
-    str_cget(&cmd->output_name), cmd->output);
+  res = dump_buffer(cmd, cmd->buf, &path_time_acc, &flux_acc, cmd->output);
   if(res != RES_OK) goto error;
 
   htrdr_accum_get_estimation(&path_time_acc, &path_time);
@@ -477,7 +615,7 @@ atmosphere_draw_map(struct htrdr_atmosphere* cmd)
     "Time per radiative path (in micro seconds): %g +/- %g\n",
     path_time.E, path_time.SE);
 
-  if(htrdr->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+  if(cmd->sensor.type == HTRDR_SENSOR_RECTANGLE) {
     htrdr_accum_get_estimation(&flux_acc, &flux);
     htrdr_log(cmd->htrdr,
       "Radiative flux density (in W/(external m^2)): %g +/- %g\n",

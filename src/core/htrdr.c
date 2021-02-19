@@ -244,6 +244,7 @@ release_htrdr(ref_T* ref)
   struct htrdr* htrdr = CONTAINER_OF(ref, struct htrdr, ref);
   ASSERT(ref);
 
+  if(htrdr->s3d) S3D(device_ref_put(htrdr->s3d));
   release_mpi(htrdr);
   if(htrdr->lifo_allocators) {
     size_t i;
@@ -308,11 +309,11 @@ htrdr_create
   size_t ithread;
   int nthreads_max;
   res_T res = RES_OK;
-  ASSERT(args && htrdr);
+  ASSERT(args && out_htrdr);
 
   allocator = mem_allocator ? mem_allocator : &mem_default_allocator;
-  htrdr = MEM_CALLOC(allocator, 0, sizeof(*htrdr));
-  if(htrdr) {
+  htrdr = MEM_CALLOC(allocator, 1, sizeof(*htrdr));
+  if(!htrdr) {
     fprintf(stderr, HTRDR_LOG_ERROR_PREFIX
       "Could not allocate the htrdr data structure.\n");
     res = RES_MEM_ERR;
@@ -328,6 +329,17 @@ htrdr_create
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
+
+  /* Disable the Star-3D verbosity since the Embree backend prints some messages
+   * on stdout rather than stderr. This is annoying since stdout may be used by
+   * htrdr to write output data */
+  res = s3d_device_create(&htrdr->logger, htrdr->allocator, 0, &htrdr->s3d);
+  if(res != RES_OK) {
+    htrdr_log_err(htrdr,
+      "%s: could not create the Star-3D device -- %s.\n",
+      FUNC_NAME, res_to_cstr(res));
+    goto error;
+  }
 
   htrdr->lifo_allocators = MEM_CALLOC
     (htrdr->allocator, htrdr->nthreads, sizeof(*htrdr->lifo_allocators));
@@ -422,6 +434,13 @@ htrdr_get_verbosity_level(const struct htrdr* htrdr)
 {
   ASSERT(htrdr);
   return htrdr->verbose;
+}
+
+struct s3d_device*
+htrdr_get_s3d(struct htrdr* htrdr)
+{
+  ASSERT(htrdr);
+  return htrdr->s3d;
 }
 
 const char*

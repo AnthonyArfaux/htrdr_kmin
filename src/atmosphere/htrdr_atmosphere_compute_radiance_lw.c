@@ -15,11 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr.h"
-#include "htrdr_c.h"
-#include "htrdr_interface.h"
-#include "htrdr_ground.h"
-#include "htrdr_solve.h"
+#include "atmosphere/htrdr_atmosphere_c.h"
+#include "atmosphere/htrdr_atmosphere_ground.h"
+
+#include "core/htrdr.h"
+#include "core/htrdr_interface.h"
 
 #include <high_tune/htsky.h>
 
@@ -132,8 +132,8 @@ hit_filter
  * Local functions
  ******************************************************************************/
 double
-htrdr_compute_radiance_lw
-  (struct htrdr* htrdr,
+atmosphere_compute_radiance_lw
+  (struct htrdr_atmosphere* cmd,
    const size_t ithread,
    struct ssp_rng* rng,
    const double pos_in[3],
@@ -158,13 +158,16 @@ htrdr_compute_radiance_lw
   double g;
   double w = 0; /* Weight */
 
-  ASSERT(htrdr && rng && pos_in && dir_in && ithread < htrdr->nthreads);
+  ASSERT(cmd && rng && pos_in && dir_in);
+  ASSERT(ithread < htrdr_get_threads_count(cmd->htrdr));
 
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
-    (&htrdr->lifo_allocators[ithread], &ssf_phase_hg, &phase_hg));
+    (htrdr_get_thread_allocator(cmd->htrdr, ithread), 
+     &ssf_phase_hg, 
+     &phase_hg));
   g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
-    (htrdr->sky, wlen);
+    (cmd->sky, wlen);
   SSF(phase_hg_setup(phase_hg, g));
 
   /* Initialise the random walk */
@@ -180,20 +183,20 @@ htrdr_compute_radiance_lw
 
     /* Setup the remaining fields of the hit filter context */
     ctx.rng = rng;
-    ctx.htsky = htrdr->sky;
+    ctx.htsky = cmd->sky;
     ctx.iband = iband;
     ctx.iquad = iquad;
 
     /* Found the first intersection with the surface geometry */
-    HTRDR(ground_trace_ray
-      (htrdr->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
+    HTRDR(atmosphere_ground_trace_ray
+      (cmd->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
 
     /* Fit the ray range to the surface distance along the ray */
     range[0] = 0;
     range[1] = s3d_hit.distance;
 
     /* Trace a ray into the participating media */
-    HTSKY(trace_ray(htrdr->sky, pos, dir, range, NULL,
+    HTSKY(trace_ray(cmd->sky, pos, dir, range, NULL,
       hit_filter, &ctx, iband, iquad, &svx_hit));
 
     /* No scattering and no surface reflection.
@@ -211,9 +214,9 @@ htrdr_compute_radiance_lw
     /* Absorption event. Stop the realisation */
     if(ctx.event_type == EVENT_ABSORPTION) {
       ASSERT(!SVX_HIT_NONE(&svx_hit));
-      temperature = htsky_fetch_temperature(htrdr->sky, pos_next);
+      temperature = htsky_fetch_temperature(cmd->sky, pos_next);
       /* weight is planck integrated over the spectral sub-interval */
-      w = planck_monochromatic(wlen_m, temperature);
+      w = htrdr_planck_monochromatic(wlen_m, temperature);
       break;
     }
 
@@ -238,9 +241,9 @@ htrdr_compute_radiance_lw
       ASSERT(!S3D_HIT_NONE(&s3d_hit));
 
       /* Fetch the hit interface materal and build its BSDF */
-      htrdr_ground_get_interface(htrdr->ground, &s3d_hit, &interf);
+      htrdr_atmosphere_ground_get_interface(cmd->ground, &s3d_hit, &interf);
       mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
-      HTRDR(mtl_create_bsdf(htrdr, mtl, ithread, wlen, rng, &bsdf));
+      HTRDR(mtl_create_bsdf(cmd->htrdr, mtl, ithread, wlen, rng, &bsdf));
 
       d3_normalize(N, d3_set_f3(N, s3d_hit.normal));
       if(d3_dot(N, wo) < 0) d3_minus(N, N);
@@ -257,7 +260,7 @@ htrdr_compute_radiance_lw
       if(ssp_rng_canonical(rng) >= bounce_reflectivity) { /* Absorbed at boundary */
         temperature = mtl->temperature; /* Fetch mtl temperature */
         /* Weight is planck integrated over the spectral sub-interval */
-        w = temperature > 0 ? planck_monochromatic(wlen_m, temperature) : 0;
+        w = temperature>0 ? htrdr_planck_monochromatic(wlen_m, temperature) : 0;
         break;
       }
       s3d_hit_prev = s3d_hit;

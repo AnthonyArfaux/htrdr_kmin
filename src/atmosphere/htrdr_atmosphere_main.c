@@ -15,9 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr.h"
-#include "htrdr_atmosphere.h"
-#include "htrdr_atmosphere_args.h"
+#include "atmosphere/htrdr_atmosphere.h"
+#include "atmosphere/htrdr_atmosphere_args.h"
+
+#include "core/htrdr.h"
+
+#include <rsys/mem_allocator.h>
 
 int
 main(int argc, char** argv)
@@ -33,9 +36,9 @@ main(int argc, char** argv)
   res = htrdr_mpi_init(argc, argv);
   if(res != RES_OK) goto error;
 
-  res = htrdr_atmosphere_args_init(&cmd.args, argc, argv);
+  res = htrdr_atmosphere_args_init(&cmd_args, argc, argv);
   if(res != RES_OK) goto error;
-  if(args.quit) goto exit;
+  if(cmd_args.quit) goto exit;
 
   htrdr_args.nthreads = cmd_args.nthreads;
   htrdr_args.verbose = cmd_args.verbose;

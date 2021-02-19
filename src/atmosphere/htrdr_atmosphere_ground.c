@@ -17,13 +17,17 @@
 
 #define _POSIX_C_SOURCE 200112L /* strtok_r support */
 
-#include "htrdr.h"
-#include "htrdr_interface.h"
-#include "htrdr_atmosphere_ground.h"
-#include "htrdr_materials.h"
-#include "htrdr_slab.h"
+#include "atmosphere/htrdr_atmosphere_ground.h"
+
+#include "core/htrdr.h"
+#include "core/htrdr_interface.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_materials.h"
+#include "core/htrdr_slab.h"
 
 #include <aw.h>
+#include <star/s3d.h>
+
 #include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_double.h>
@@ -33,8 +37,7 @@
 #include <rsys/float2.h>
 #include <rsys/float3.h>
 #include <rsys/hash_table.h>
-
-#include <star/s3d.h>
+#include <rsys/ref_count.h>
 
 #include <string.h> /* strtok_r */
 
@@ -162,6 +165,7 @@ trace_ground
 static res_T
 parse_shape_interface
   (struct htrdr* htrdr,
+   struct htrdr_materials* mats,
    const char* name,
    struct htrdr_interface* interf)
 {
@@ -177,9 +181,9 @@ parse_shape_interface
   int has_thin = 0;
   int has_back = 0;
   res_T res = RES_OK;
-  ASSERT(htrdr && name && interf);
+  ASSERT(htrdr && mats && name && interf);
 
-  str_init(htrdr->allocator, &str);
+  str_init(htrdr_get_allocator(htrdr), &str);
 
   /* Locally copy the string to parse */
   res = str_set(&str, name);
@@ -216,8 +220,7 @@ parse_shape_interface
 
   /* Fetch the interface material if any */
   if(mtl_name_thin) {
-    has_thin = htrdr_materials_find_mtl
-      (htrdr->mats, mtl_name_thin, &interf->mtl_thin);
+    has_thin = htrdr_materials_find_mtl(mats, mtl_name_thin, &interf->mtl_thin);
     if(!has_thin) {
       htrdr_log_err(htrdr,
         "Invalid interface `%s'. The interface material `%s' is unknown.\n",
@@ -228,8 +231,7 @@ parse_shape_interface
   }
 
   /* Fetch the front material */
-  has_front = htrdr_materials_find_mtl
-    (htrdr->mats, mtl_name_front, &interf->mtl_front);
+  has_front = htrdr_materials_find_mtl(mats, mtl_name_front, &interf->mtl_front);
   if(!has_front) {
     htrdr_log_err(htrdr,
       "Invalid interface `%s'. The front material `%s' is unknown.\n",
@@ -239,8 +241,7 @@ parse_shape_interface
   }
 
   /* Fetch the back material */
-  has_back = htrdr_materials_find_mtl
-    (htrdr->mats, mtl_name_back, &interf->mtl_back);
+  has_back = htrdr_materials_find_mtl(mats, mtl_name_back, &interf->mtl_back);
   if(!has_back) {
     htrdr_log_err(htrdr,
       "Invalid interface `%s'. The back material `%s' is unknown.\n",
@@ -256,7 +257,6 @@ error:
   *interf = HTRDR_INTERFACE_NULL;
   goto exit;
 }
-
 static res_T
 setup_mesh
   (struct htrdr* htrdr,
@@ -389,7 +389,7 @@ create_s3d_shape
   mesh.positions = positions;
   mesh.indices = indices;
 
-  res = s3d_shape_create_mesh(htrdr->s3d, &shape);
+  res = s3d_shape_create_mesh(htrdr_get_s3d(htrdr), &shape);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "Error creating a Star-3D shape -- %s.\n",
       res_to_cstr(res));
@@ -429,7 +429,10 @@ error:
 }
 
 static res_T
-setup_ground(struct htrdr_atmosphere_ground* ground, const char* obj_filename)
+setup_ground
+  (struct htrdr_atmosphere_ground* ground,
+   struct htrdr_materials* mats,
+   const char* obj_filename)
 {
   struct aw_obj_desc desc;
   struct htable_vertex vertices;
@@ -441,21 +444,24 @@ setup_ground(struct htrdr_atmosphere_ground* ground, const char* obj_filename)
   size_t iusemtl;
 
   res_T res = RES_OK;
-  ASSERT(obj_filename);
+  ASSERT(ground && mats && obj_filename);
 
-  htable_vertex_init(ground->htrdr->allocator, &vertices);
-  darray_double_init(ground->htrdr->allocator, &positions);
-  darray_size_t_init(ground->htrdr->allocator, &indices);
+  htable_vertex_init(htrdr_get_allocator(ground->htrdr), &vertices);
+  darray_double_init(htrdr_get_allocator(ground->htrdr), &positions);
+  darray_size_t_init(htrdr_get_allocator(ground->htrdr), &indices);
 
-  res = aw_obj_create(&ground->htrdr->logger, ground->htrdr->allocator,
-    ground->htrdr->verbose, &obj);
+  res = aw_obj_create
+    (htrdr_get_logger(ground->htrdr),
+     htrdr_get_allocator(ground->htrdr),
+     htrdr_get_verbosity_level(ground->htrdr),
+     &obj);
   if(res != RES_OK) {
     htrdr_log_err(ground->htrdr, "Could not create the obj loader -- %s.\n",
       res_to_cstr(res));
     goto error;
   }
 
-  res = s3d_scene_create(ground->htrdr->s3d, &scene);
+  res = s3d_scene_create(htrdr_get_s3d(ground->htrdr), &scene);
   if(res != RES_OK) {
     htrdr_log_err(ground->htrdr, "Could not create the Star-3D scene -- %s.\n",
       res_to_cstr(res));
@@ -483,7 +489,7 @@ setup_ground(struct htrdr_atmosphere_ground* ground, const char* obj_filename)
 
     AW(obj_get_mtl(obj, iusemtl , &mtl));
 
-    res = parse_shape_interface(ground->htrdr, mtl.name, &interf);
+    res = parse_shape_interface(ground->htrdr, mats, mtl.name, &interf);
     if(res != RES_OK) goto error;
 
     res = setup_mesh
@@ -552,7 +558,7 @@ release_ground(ref_T* ref)
   if(ground->view) S3D(scene_view_ref_put(ground->view));
   htable_interface_release(&ground->interfaces);
   htrdr = ground->htrdr;
-  MEM_RM(ground->htrdr->allocator, ground);
+  MEM_RM(htrdr_get_allocator(ground->htrdr), ground);
   htrdr_ref_put(htrdr);
 }
 
@@ -563,6 +569,7 @@ res_T
 htrdr_atmosphere_ground_create
   (struct htrdr* htrdr,
    const char* obj_filename, /* May be NULL */
+   struct htrdr_materials* mats, /* May be NULL */
    const int repeat_ground, /* Infinitely repeat the ground in X and Y */
    struct htrdr_atmosphere_ground** out_ground)
 {
@@ -584,15 +591,20 @@ htrdr_atmosphere_ground_create
   ground->repeat = repeat_ground;
   f3_splat(ground->lower, (float)INF);
   f3_splat(ground->upper,-(float)INF);
-  htable_interface_init(ground->htrdr->allocator, &ground->interfaces);
+  htable_interface_init(htrdr_get_allocator(htrdr), &ground->interfaces);
   htrdr_ref_get(htrdr);
   ground->htrdr = htrdr;
 
   if(!obj_filename) goto exit;
 
+  if(!mats) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   htrdr_log(ground->htrdr, "Loading ground geometry from `%s'.\n",obj_filename);
   time_current(&t0);
-  res = setup_ground(ground, obj_filename);
+  res = setup_ground(ground, mats, obj_filename);
   if(res != RES_OK) goto error;
   time_sub(&t0, time_current(&t1), &t0);
   time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
