@@ -1,5 +1,6 @@
-/*Spectralt (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
- * Copyright (C) 2018, 2019 CNRS, Université Paul Sabatier
+/*Spectralt (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019 Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

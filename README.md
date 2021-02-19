@@ -191,13 +191,15 @@ regular image rendering), longwave or shortwave.
 - Fix a possible invalid memory access to cloud data leading to segmentation
   faults.
 
+## Copyright notice
+
+Copyright (C) 2018, 2019, 2020, 2021 [|Meso|Star>](http://www.meso-star.com).
+Copyright (C) 2018, 2019, 2021 CNRS.
+Copyright (C) 2018, 2019 Université Paul Sabatier.
+
 ## License
 
-Copyright (C) 2018, 2019, 2020 [|Meso|Star>](http://www.meso-star.com)
-<contact@meso-star.com>. Copyright (C) 2018, 2019 Centre National de la
-Recherche Scientifique (CNRS), Université Paul Sabatier
-<contact-edstar@laplace.univ-tlse.fr>. htrdr is free software released under
-the GPL v3+ license: GNU GPL version 3 or later. You are welcome to
-redistribute it under certain conditions; refer to the COPYING file for
-details.
+htrdr is free software released under the GPL v3+ license: GNU GPL version 3 or
+later. You are welcome to redistribute it under certain conditions; refer to
+the COPYING file for details.
 
