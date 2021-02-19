@@ -19,6 +19,7 @@
 #include "atmosphere/htrdr_atmosphere_args.h"
 
 #include "core/htrdr.h"
+#include "core/htrdr_log.h"
 
 #include <rsys/mem_allocator.h>
 
@@ -30,7 +31,8 @@ htrdr_atmosphere_main(int argc, char** argv)
   struct htrdr_atmosphere_args cmd_args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
   struct htrdr_atmosphere* cmd = NULL;
-  size_t memsz;
+  const size_t memsz_begin = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  size_t memsz_end;
   int is_mpi_init = 0;
   int err = 0;
   res_T res = RES_OK;
@@ -48,7 +50,7 @@ htrdr_atmosphere_main(int argc, char** argv)
 
   htrdr_args.nthreads = cmd_args.nthreads;
   htrdr_args.verbose = cmd_args.verbose;
-  res = htrdr_create(NULL, &htrdr_args, &htrdr);
+  res = htrdr_create(&mem_default_allocator, &htrdr_args, &htrdr);
   if(res != RES_OK) goto error;
 
   if(cmd_args.dump_volumetric_acceleration_structure 
@@ -69,8 +71,11 @@ exit:
   if(cmd) htrdr_atmosphere_ref_put(cmd);
 
   /* Check memory leaks */
-  if((memsz = mem_allocated_size()) != 0) {
-    fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);
+  memsz_end = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  if(memsz_begin != memsz_end) {
+    ASSERT(memsz_end >= memsz_begin);
+    fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n", 
+      (unsigned long)(memsz_end - memsz_begin));
     err = -1;
   }
   return err;
