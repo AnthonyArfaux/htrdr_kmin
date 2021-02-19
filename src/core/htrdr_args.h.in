@@ -84,24 +84,28 @@ static const struct htrdr_args_spectral HTRDR_ARGS_SPECTRAL_DEFAULT =
 /*******************************************************************************
  * Exported functions
  ******************************************************************************/
-HTRDR_API res_T
+BEGIN_DECLS 
+
+HTRDR_CORE_API res_T
 htrdr_args_camera_parse
   (struct htrdr_args_camera* cam, 
    const char* str);
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_args_rectangle_parse
   (struct htrdr_args_rectangle* rect,
    const char* str);
  
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_args_image_parse
   (struct htrdr_args_image* img,
    const char* str);
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_args_spectral_parse
   (struct htrdr_args_spectral* spectral,
    const char* str);
+
+END_DECLS
 
 #endif /* HTRDR_ARGS_H */

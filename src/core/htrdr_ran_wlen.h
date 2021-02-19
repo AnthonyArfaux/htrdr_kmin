@@ -29,7 +29,7 @@ struct htrdr_ran_wlen;
 
 BEGIN_DECLS
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_ran_wlen_create
   (struct htrdr* htrdr,
    const double range[2], 
@@ -39,16 +39,16 @@ htrdr_ran_wlen_create
    const double ref_temperature, /* Reference temperature */
    struct htrdr_ran_wlen** wlen_ran);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_ran_wlen_ref_get
   (struct htrdr_ran_wlen* wlen_ran);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_ran_wlen_ref_put
   (struct htrdr_ran_wlen* wlen_ran);
 
 /* Return a wavelength in nanometer */
-HTRDR_API double
+HTRDR_CORE_API double
 htrdr_ran_wlen_sample
   (const struct htrdr_ran_wlen* wlen_ran,
    const double r0, /* Canonical number in [0, 1[ */

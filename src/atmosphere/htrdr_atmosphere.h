@@ -18,6 +18,7 @@
 #ifndef HTRDR_ATMOSPHERE_H
 #define HTRDR_ATMOSPHERE_H
 
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /* Forward declarations */
@@ -25,23 +26,32 @@ struct htrdr;
 struct htrdr_atmosphere;
 struct htrdr_atmosphere_args;
 
-extern LOCAL_SYM res_T
+BEGIN_DECLS
+
+HTRDR_API res_T
 htrdr_atmosphere_create
   (struct htrdr* htrdr,
    const struct htrdr_atmosphere_args* args,
    struct htrdr_atmosphere** cmd);
 
-extern LOCAL_SYM void
+HTRDR_API void
 htrdr_atmosphere_ref_get
   (struct htrdr_atmosphere* cmd);
 
-extern LOCAL_SYM void
+HTRDR_API void
 htrdr_atmosphere_ref_put
   (struct htrdr_atmosphere* cmd);
 
-extern LOCAL_SYM res_T
+HTRDR_API res_T
 htrdr_atmosphere_run
   (struct htrdr_atmosphere* cmd);
+
+HTRDR_API int
+htrdr_atmosphere_main
+  (int argc,
+   char** argv);
+
+END_DECLS
 
 #endif /* HTRDR_ATMOSPHERE_H */
 

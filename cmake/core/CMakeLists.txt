@@ -125,17 +125,14 @@ endif()
 
 set_target_properties(htrdr-core PROPERTIES
   COMPILE_FLAGS "${OpenMP_C_FLAGS}"
-  DEFINE_SYMBOL HTRDR_SHARED_BUILD
+  DEFINE_SYMBOL HTRDR_CORE_SHARED_BUILD
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})
-
-# Main command
-add_executable(htrdr ${HTRDR_SOURCE_DIR}/core/htrdr_main.c)
 
 ################################################################################
 # Define output & install directories
 ################################################################################
-install(TARGETS htrdr htrdr-core
+install(TARGETS htrdr-core
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

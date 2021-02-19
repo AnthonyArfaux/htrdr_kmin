@@ -15,44 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_CAMERA_H
-#define HTRDR_CAMERA_H
+#include "atmosphere/htrdr_atmosphere.h"
 
-#include "core/htrdr.h"
-#include <rsys/rsys.h>
-
-/* Forward declarations */
-struct htrdr;
-struct htrdr_camera;
-
-BEGIN_DECLS
-
-HTRDR_CORE_API res_T
-htrdr_camera_create
-  (struct htrdr* htrdr,
-   const double position[3],
-   const double target[3],
-   const double up[3],
-   const double proj_ratio, /* Width / Height */
-   const double fov, /* In radian */
-   struct htrdr_camera** cam);
-
-HTRDR_CORE_API void
-htrdr_camera_ref_get
-  (struct htrdr_camera* cam);
-
-HTRDR_CORE_API void
-htrdr_camera_ref_put
-  (struct htrdr_camera* cam);
-
-HTRDR_CORE_API void
-htrdr_camera_ray
-  (const struct htrdr_camera* cam,
-   const double sample[2], /* In [0, 1[ */
-   double ray_org[3],
-   double ray_dir[3]);
-
-END_DECLS
-
-#endif /* HTRDR_CAMERA_H */
-
+int
+main(int argc, char** argv)
+{
+  return htrdr_atmosphere_main(argc, argv);
+}

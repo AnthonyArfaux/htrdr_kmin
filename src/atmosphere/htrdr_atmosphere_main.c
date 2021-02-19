@@ -23,18 +23,24 @@
 #include <rsys/mem_allocator.h>
 
 int
-main(int argc, char** argv)
+htrdr_atmosphere_main(int argc, char** argv)
 {
+  char cmd_name[] = "htrdr-atmosphere";
   struct htrdr_args htrdr_args = HTRDR_ARGS_DEFAULT;
   struct htrdr_atmosphere_args cmd_args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
   struct htrdr_atmosphere* cmd = NULL;
   size_t memsz;
+  int is_mpi_init = 0;
   int err = 0;
   res_T res = RES_OK;
 
+  /* Overwrite command name */
+  argv[0] = cmd_name;
+
   res = htrdr_mpi_init(argc, argv);
   if(res != RES_OK) goto error;
+  is_mpi_init = 1;
 
   res = htrdr_atmosphere_args_init(&cmd_args, argc, argv);
   if(res != RES_OK) goto error;
@@ -57,8 +63,8 @@ main(int argc, char** argv)
   if(res != RES_OK) goto error;
 
 exit:
-  htrdr_mpi_finalize();
   htrdr_atmosphere_args_release(&cmd_args);
+  if(is_mpi_init) htrdr_mpi_finalize();
   if(htrdr) htrdr_ref_put(htrdr);
   if(cmd) htrdr_atmosphere_ref_put(cmd);
 
@@ -69,6 +75,7 @@ exit:
   }
   return err;
 error:
-  err = - 1;
+  err = -1;
   goto exit;
 }
+

@@ -42,7 +42,7 @@ struct htrdr_buffer;
 
 BEGIN_DECLS
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_buffer_create
   (struct htrdr* htrdr,
    const size_t width,
@@ -52,24 +52,24 @@ htrdr_buffer_create
    const size_t alignment, /* Alignement of the buffer */
    struct htrdr_buffer** buf);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_buffer_ref_get
   (struct htrdr_buffer* buf);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_buffer_ref_put
   (struct htrdr_buffer* buf);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_buffer_get_layout
   (const struct htrdr_buffer* buf,
    struct htrdr_buffer_layout* layout);
 
-HTRDR_API void*
+HTRDR_CORE_API void*
 htrdr_buffer_get_data
   (struct htrdr_buffer* buf);
 
-HTRDR_API void*
+HTRDR_CORE_API void*
 htrdr_buffer_at
   (struct htrdr_buffer* buf,
    const size_t x,

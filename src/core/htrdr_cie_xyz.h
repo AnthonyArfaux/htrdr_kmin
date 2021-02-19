@@ -30,37 +30,37 @@ struct htrdr_cie_xyz;
 
 BEGIN_DECLS
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in  [380, 780] nanometers */
    const size_t nbands, /* # bands used to discretisze the CIE tristimulus s*/
    struct htrdr_cie_xyz** cie);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_cie_xyz_ref_get
   (struct htrdr_cie_xyz* cie);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_cie_xyz_ref_put
   (struct htrdr_cie_xyz* cie);
 
 /* Return a wavelength in nanometer */
-HTRDR_API double
+HTRDR_CORE_API double
 htrdr_cie_xyz_sample_X
   (struct htrdr_cie_xyz* cie,
    const double r0, const double r1, /* Canonical numbers in [0, 1[ */
    double* pdf); /* In nm^-1. May be NULL */
 
 /* Return a wavelength in nanometer */
-HTRDR_API double
+HTRDR_CORE_API double
 htrdr_cie_xyz_sample_Y
   (struct htrdr_cie_xyz* cie,
    const double r0, const double r1, /* Canonical number in [0, 1[ */
    double* pdf); /* In nm^-1. May be NULL */
 
 /* Return a wavelength in nanometer */
-HTRDR_API double
+HTRDR_CORE_API double
 htrdr_cie_xyz_sample_Z
   (struct htrdr_cie_xyz* cie,
    const double r0, const double r1, /* Canonical number in [0, 1[ */

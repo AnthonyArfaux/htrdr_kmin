@@ -22,6 +22,14 @@
 #include <stdio.h>
 
 /* Library symbol management */
+#if defined(HTRDR_CORE_SHARED_BUILD) /* Build shared library */
+  #define HTRDR_CORE_API extern EXPORT_SYM
+#elif defined(HTRDR_CORE_STATIC) /* Use/build static library */
+  #define HTRDR_CORE_API extern LOCAL_SYM
+#else /* Use shared library */
+  #define HTRDR_CORE_API extern IMPORT_SYM
+#endif
+
 #if defined(HTRDR_SHARED_BUILD) /* Build shared library */
   #define HTRDR_API extern EXPORT_SYM
 #elif defined(HTRDR_STATIC) /* Use/build static library */
@@ -78,69 +86,69 @@ BEGIN_DECLS
 
 /* Initialize the MPI execution environment. Must be called priorly to any MPI
  * invocation, e.g. at the beginning of the main function */
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_mpi_init
   (int argc,
    char** argv);
 
 /* Terminate the MPI execution environment */
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_mpi_finalize
   (void);
 
 /*******************************************************************************
  * HTRDR api
  ******************************************************************************/
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_create
   (struct mem_allocator* allocator,
    const struct htrdr_args* args,
    struct htrdr** htrdr);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_ref_get
   (struct htrdr* htrdr);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_ref_put
   (struct htrdr* htrdr);
 
 /* Return the number of threads used by the process */
-HTRDR_API size_t
+HTRDR_CORE_API size_t
 htrdr_get_threads_count
   (const struct htrdr* htrdr);
 
 /* Return the number of running processes for the current htrdr instance */
-HTRDR_API size_t
+HTRDR_CORE_API size_t
 htrdr_get_procs_count
   (const struct htrdr* htrdr);
 
-HTRDR_API int
+HTRDR_CORE_API int
 htrdr_get_mpi_rank
   (const struct htrdr* htrdr);
 
-HTRDR_API struct mem_allocator*
+HTRDR_CORE_API struct mem_allocator*
 htrdr_get_allocator
   (struct htrdr* htrdr);
 
-HTRDR_API struct mem_allocator*
+HTRDR_CORE_API struct mem_allocator*
 htrdr_get_thread_allocator
   (struct htrdr* htrdr,
    const size_t ithread);
 
-HTRDR_API struct logger*
+HTRDR_CORE_API struct logger*
 htrdr_get_logger
   (struct htrdr* htrdr);
 
-HTRDR_API int
+HTRDR_CORE_API int
 htrdr_get_verbosity_level
   (const struct htrdr* htrdr);
 
-HTRDR_API struct s3d_device*
+HTRDR_CORE_API struct s3d_device*
 htrdr_get_s3d
   (struct htrdr* htrdr);
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_open_output_stream
   (struct htrdr* htrdr,
    const char* filename,
@@ -149,13 +157,13 @@ htrdr_open_output_stream
    FILE** out_fp);
 
 /* TODO do not expose publicly this function(?) */
-HTRDR_API const char*
+HTRDR_CORE_API const char*
 htrdr_mpi_error_string
   (struct htrdr* htrdr,
    const int mpi_err);
 
 /* TODO replace them by regular log message */
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_fprintf
   (struct htrdr* htrdr,
    FILE* stream,
@@ -167,7 +175,7 @@ htrdr_fprintf
   ;
 
 /* TODO remove this */
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_fflush
   (struct htrdr* htrdr,
    FILE* stream);

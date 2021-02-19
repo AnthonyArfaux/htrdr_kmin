@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "core/htrdr.h"
+#include "atmosphere/htrdr_atmosphere.h"
 #include "core/htrdr_version.h"
 
 #include <string.h>
@@ -65,12 +65,14 @@ main(int argc, char** argv)
 
   if(argc < 2) {
     print_usage(argv[0]);
+    err = -1;
     goto error;
   }
 
   /* Atmosphere mode */
   if(!strcmp(argv[1], "atmosphere")) { 
-    /* TODO */
+    err = htrdr_atmosphere_main(argc-1, argv+1);
+    if(err) goto error;
 
   /* Combustion mode */
   } else if(!strcmp(argv[1], "combustion")) {
@@ -94,13 +96,13 @@ main(int argc, char** argv)
   } else {
     fprintf(stderr, "Unknown option: %s\n", argv[1]);
     print_usage(argv[0]);
+    err = -1;
     goto error;
   }
 
 exit:
   return err;
 error:
-  err = -1;
   goto exit;
 }
 

@@ -80,7 +80,7 @@ rcmake_prepend_path(HTRDR_ATMOSPHERE_FILES_INC ${HTRDR_SOURCE_DIR}/atmosphere)
 rcmake_prepend_path(HTRDR_ATMOSPHERE_FILES_INC2 ${HTRDR_BUILD_DIR}/atmosphere)
 
 # Atmosphere library
-add_executable(htrdr-atmosphere
+add_library(htrdr-atmosphere SHARED
   ${HTRDR_ATMOSPHERE_FILES_SRC}
   ${HTRDR_ATMOSPHERE_FILES_INC}
   ${HTRDR_ATMOSPHERE_FILES_INC2})
@@ -89,6 +89,11 @@ target_link_libraries(htrdr-atmosphere htrdr-core HTSky RSys Star3D StarSF StarS
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr-atmosphere m)
 endif()
+
+set_target_properties(htrdr-atmosphere PROPERTIES
+  DEFINE_SYMBOL HTRDR_SHARED_BUILD
+  VERSION ${VERSION}
+  SOVERSION ${VERSION_MAJOR})
 
 ################################################################################
 # Define output & install directories

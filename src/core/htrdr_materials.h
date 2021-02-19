@@ -38,28 +38,28 @@ static const struct htrdr_mtl HTRDR_MTL_NULL = HTRDR_MTL_NULL__;
 
 BEGIN_DECLS
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_materials_create
   (struct htrdr* htrdr,
    const char* filename,
    struct htrdr_materials** mats);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_materials_ref_get
   (struct htrdr_materials* mats);
 
-HTRDR_API void
+HTRDR_CORE_API void
 htrdr_materials_ref_put
   (struct htrdr_materials* mats);
 
 /* Return 1 if the material exist and 0 otherwise */
-HTRDR_API int
+HTRDR_CORE_API int
 htrdr_materials_find_mtl
   (struct htrdr_materials* mats,
    const char* mtl_name,
    struct htrdr_mtl* mtl);
 
-HTRDR_API res_T
+HTRDR_CORE_API res_T
 htrdr_mtl_create_bsdf
   (struct htrdr* htrdr,
    const struct htrdr_mtl* mtl,
