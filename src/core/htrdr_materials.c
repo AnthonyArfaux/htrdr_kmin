@@ -17,9 +17,9 @@
 
 #define _POSIX_C_SOURCE 200112L /* strtok_r and wordexp support */
 
-#include "htrdr.h"
-#include "htrdr_log.h"
-#include "htrdr_materials.h"
+#include "core/htrdr.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_materials.h"
 
 #include <modradurb/mrumtl.h>
 #include <star/ssf.h>

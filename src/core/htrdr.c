@@ -17,11 +17,11 @@
 
 #define _POSIX_C_SOURCE 200809L /* stat.st_time support */
 
-#include "htrdr.h"
-#include "htrdr_c.h"
-#include "htrdr_args.h"
-#include "htrdr_log.h"
-#include "htrdr_version.h"
+#include "core/htrdr.h"
+#include "core/htrdr_c.h"
+#include "core/htrdr_args.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_version.h"
 
 #include <rsys/cstr.h>
 #include <rsys/mem_allocator.h>

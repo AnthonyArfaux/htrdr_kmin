@@ -17,10 +17,9 @@
 
 #define _POSIX_C_SOURCE 2 /* strtok_r support */
 
-#include "htrdr.h"
-
-#include "htrdr_args.h"
-#include "htrdr_version.h"
+#include "core/htrdr.h"
+#include "core/htrdr_args.h"
+#include "core/htrdr_version.h"
 
 #include <rsys/cstr.h>
 #include <rsys/double3.h>

@@ -18,7 +18,7 @@
 #ifndef HTRDR_SPECTRAL_H
 #define HTRDR_SPECTRAL_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 
 #include <rsys/rsys.h>
 #include <rsys/math.h> /* PI support */

@@ -16,7 +16,7 @@
 #ifndef HTRDR_CIE_XYZ_H
 #define HTRDR_CIE_XYZ_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /* Wavelength boundaries of the CIE XYZ color space in nanometers */

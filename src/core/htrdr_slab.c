@@ -15,9 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr.h"
-#include "htrdr_log.h"
-#include "htrdr_slab.h"
+#include "core/htrdr.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_slab.h"
 
 #include <rsys/cstr.h>
 #include <math.h>

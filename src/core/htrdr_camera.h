@@ -18,7 +18,7 @@
 #ifndef HTRDR_CAMERA_H
 #define HTRDR_CAMERA_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /* Forward declarations */

@@ -18,7 +18,7 @@
 #ifndef HTRDR_LOG_H
 #define HTRDR_LOG_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 #define HTRDR_LOG_INFO_PREFIX "\x1b[1m\x1b[32m>\x1b[0m "

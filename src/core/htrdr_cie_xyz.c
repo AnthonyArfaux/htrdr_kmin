@@ -15,10 +15,10 @@
 
 #define _POSIX_C_SOURCE 200112L /* nextafter */
 
-#include "htrdr.h"
-#include "htrdr_c.h"
-#include "htrdr_cie_xyz.h"
-#include "htrdr_log.h"
+#include "core/htrdr.h"
+#include "core/htrdr_c.h"
+#include "core/htrdr_cie_xyz.h"
+#include "core/htrdr_log.h"
 
 #include <high_tune/htsky.h>
 

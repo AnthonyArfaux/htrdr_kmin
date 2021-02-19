@@ -19,6 +19,7 @@ cmake_minimum_required(VERSION 3.1)
 project(htrdr C)
 
 set(HTRDR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
+set(HTRDR_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 7)

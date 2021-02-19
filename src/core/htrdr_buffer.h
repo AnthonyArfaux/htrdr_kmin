@@ -18,7 +18,7 @@
 #ifndef HTRDR_BUFFER_H
 #define HTRDR_BUFFER_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /*

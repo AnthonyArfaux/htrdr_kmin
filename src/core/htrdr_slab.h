@@ -18,7 +18,7 @@
 #ifndef HTRDR_SLAB_H
 #define HTRDR_SLAB_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /* Forward declaration */

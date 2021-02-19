@@ -18,7 +18,7 @@
 #ifndef HTRDR_INTERFACE_H
 #define HTRDR_INTERFACE_H
 
-#include "htrdr_materials.h"
+#include "core/htrdr_materials.h"
 #include <star/s3d.h>
 #include <rsys/double3.h>
 

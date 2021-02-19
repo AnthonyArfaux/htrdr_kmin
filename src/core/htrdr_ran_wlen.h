@@ -18,7 +18,7 @@
 #ifndef HTRDR_RAN_WLEN_H
 #define HTRDR_RAN_WLEN_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 #define HTRDR_WLEN_RAN_CONTINUE 0

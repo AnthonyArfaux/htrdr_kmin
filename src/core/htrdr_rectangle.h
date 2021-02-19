@@ -18,7 +18,7 @@
 #ifndef HTRDR_RECTANGLE_H
 #define HTRDR_RECTANGLE_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 /* Forwar declarations */

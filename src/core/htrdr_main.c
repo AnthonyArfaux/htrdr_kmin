@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "htrdr.h"
-#include "htrdr_version.h"
+#include "core/htrdr.h"
+#include "core/htrdr_version.h"
 
 #include <string.h>
 

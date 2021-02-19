@@ -15,10 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 project(htrdr-core C)
-
-message(STATUS "${HTRDR_SOURCE_DIR}")
 
 ################################################################################
 # Check dependencies
@@ -48,9 +46,9 @@ include_directories(
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
   ${HTSky}
-  ${HTRDR_SOURCE_DIR}/core
-  ${MPI_INCLUDE_PATH}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${HTRDR_BUILD_DIR}
+  ${HTRDR_SOURCE_DIR}
+  ${MPI_INCLUDE_PATH})
 
 ################################################################################
 # Generate files
@@ -68,9 +66,9 @@ set(HTRDR_ARGS_DEFAULT_IMG_HEIGHT "240")
 set(HTRDR_ARGS_DEFAULT_IMG_SPP "1")
 
 configure_file(${HTRDR_SOURCE_DIR}/core/htrdr_args.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/htrdr_args.h @ONLY)
+  ${HTRDR_BUILD_DIR}/core/htrdr_args.h @ONLY)
 configure_file(${HTRDR_SOURCE_DIR}/core/htrdr_version.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/htrdr_version.h @ONLY)
+  ${HTRDR_BUILD_DIR}/core/htrdr_version.h @ONLY)
 
 ################################################################################
 # Configure and define targets
@@ -111,7 +109,7 @@ set(HTRDR_CORE_FILES_INC2 # Generated files
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_CORE_FILES_SRC ${HTRDR_SOURCE_DIR}/core)
 rcmake_prepend_path(HTRDR_CORE_FILES_INC ${HTRDR_SOURCE_DIR}/core)
-rcmake_prepend_path(HTRDR_CORE_FILES_INC2 ${CMAKE_CURRENT_BINARY_DIR})
+rcmake_prepend_path(HTRDR_CORE_FILES_INC2 ${HTRDR_BUILD_DIR}/core)
 
 # Core library
 add_library(htrdr-core SHARED

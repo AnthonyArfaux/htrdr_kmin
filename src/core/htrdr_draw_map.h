@@ -18,7 +18,7 @@
 #ifndef HTRDR_DRAW_MAP_H
 #define HTRDR_DRAW_MAP_H
 
-#include "htrdr.h"
+#include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 struct htrdr_draw_pixel_args {
