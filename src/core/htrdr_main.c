@@ -17,6 +17,8 @@
 #include "htrdr.h"
 #include "htrdr_version.h"
 
+#include <string.h>
+
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -24,7 +26,7 @@ static void
 print_usage(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [--version] [--help] <mode> [<args>].\n");
+  printf("Usage: %s [--version] [--help] <mode> [<args>].\n", cmd);
 }
 
 static void
@@ -41,14 +43,14 @@ print_help(const char* cmd)
 "  --help         display this help and exit.\n");
   printf("\n");
 
-  printf("These are %s available modes:\n");
+  printf("These are %s available modes:\n", cmd);
+  printf("\n");
   printf(
 "  atmosphere     Radiative transfer computations in a cloudy atmosphere.\n");
   printf(
 "  combustion     Radiative transfer computations in a combustion medium.\n");
   printf("\n");
 
-  htrdr_fprint_copyright(cmd, stdout);
   htrdr_fprint_license(cmd, stdout);
 }
 
@@ -80,13 +82,11 @@ main(int argc, char** argv)
       HTRDR_VERSION_MAJOR,
       HTRDR_VERSION_MINOR,
       HTRDR_VERSION_PATCH);
-    args->quit = 1;
     goto exit;
 
   /* Help */
   } else if(!strcmp(argv[1], "--help")) {
-    print_usage(argv[0]);
-    args->quit = 1;
+    print_help(argv[0]);
     goto exit;
 
   /* Fallback */

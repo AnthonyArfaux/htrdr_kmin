@@ -16,6 +16,7 @@
 
 #include "htrdr.h"
 #include "htrdr_camera.h"
+#include "htrdr_log.h"
 
 #include <rsys/double3.h>
 #include <rsys/mem_allocator.h>

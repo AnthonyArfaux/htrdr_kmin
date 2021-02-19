@@ -17,6 +17,7 @@
 #define _POSIX_C_SOURCE 200112L /* strtok_r and wordexp support */
 
 #include "htrdr.h"
+#include "htrdr_log.h"
 #include "htrdr_materials.h"
 
 #include <modradurb/mrumtl.h>
@@ -119,8 +120,11 @@ parse_material
 
   /*  Parse the mrumtl file if any */
   if(strcmp(wexp.we_wordv[0], "none")) {
-    res = mrumtl_create(&mats->htrdr->logger, htrdr_get_allocator(mats->htrdr),
-      mats->htrdr->verbose, &mtl.mrumtl);
+    res = mrumtl_create
+      (htrdr_get_logger(mats->htrdr),
+       htrdr_get_allocator(mats->htrdr),
+       htrdr_get_verbosity_level(mats->htrdr),
+       &mtl.mrumtl);
     if(res != RES_OK) {
       htrdr_log_err(mats->htrdr,
         "%s:%lu: error creating the MruMtl loader for the material `%s'-- %s.\n",
@@ -258,9 +262,8 @@ create_bsdf_diffuse
   res_T res = RES_OK;
   ASSERT(htrdr && brdf && out_bsdf);
   ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_LAMBERTIAN);
-  ASSERT(ithread < htrdr->nthreads);
 
-  res = ssf_bsdf_create(htrdr_get_lifo_allocator(htrdr, ithread),
+  res = ssf_bsdf_create(htrdr_get_thread_allocator(htrdr, ithread),
     &ssf_lambertian_reflection, &bsdf);
   if(res != RES_OK) goto error;
 
@@ -290,11 +293,10 @@ create_bsdf_specular
   res_T res = RES_OK;
   ASSERT(htrdr && brdf && out_bsdf);
   ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_SPECULAR);
-  ASSERT(ithread < htrdr->nthreads);
 
-  allocator = htrdr_get_lifo_allocator(htrdr, ithread);
+  allocator = htrdr_get_thread_allocator(htrdr, ithread);
 
-  res = ssf_bsdf_create(allocator &ssf_specular_reflection, &bsdf);
+  res = ssf_bsdf_create(allocator, &ssf_specular_reflection, &bsdf);
   if(res != RES_OK) goto error;
 
   res = ssf_fresnel_create(allocator, &ssf_fresnel_constant, &fresnel);
@@ -381,7 +383,7 @@ htrdr_materials_find_mtl
   int found = 0;
   ASSERT(mats && name && htrdr_mtl);
 
-  str_init(htrdr_get_allocator(htrdr), &str);
+  str_init(htrdr_get_allocator(mats->htrdr), &str);
   CHK(str_set(&str, name) == RES_OK);
 
   htable_name2mtl_find_iterator(&mats->name2mtl, &str, &it);
@@ -416,7 +418,6 @@ htrdr_mtl_create_bsdf
   double r;
   res_T res = RES_OK;
   ASSERT(htrdr && mtl && wavelength && rng && out_bsdf);
-  ASSERT(ithread < htrdr->nthreads);
 
   r = ssp_rng_canonical(rng);
 

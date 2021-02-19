@@ -16,7 +16,9 @@
 #define _POSIX_C_SOURCE 200112L /* nextafter */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_cie_xyz.h"
+#include "htrdr_log.h"
 
 #include <high_tune/htsky.h>
 
@@ -293,11 +295,10 @@ res_T
 htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in [380, 780] nanometers */
-   const size_t bands_count, /* # bands used to discretisze the CIE tristimulus */
+   const size_t bands_count, /* # bands used to discretize the CIE tristimulus */
    struct htrdr_cie_xyz** out_cie)
 {
   struct htrdr_cie_xyz* cie = NULL;
-  double min_band_len = 0;
   size_t nbands = bands_count;
   res_T res = RES_OK;
   ASSERT(htrdr && range && nbands && out_cie);
@@ -311,24 +312,15 @@ htrdr_cie_xyz_create
     goto error;
   }
   ref_init(&cie->ref);
-  darray_double_init(htrdr->allocator, &cie->cdf_X);
-  darray_double_init(htrdr->allocator, &cie->cdf_Y);
-  darray_double_init(htrdr->allocator, &cie->cdf_Z);
+  darray_double_init(htrdr_get_allocator(htrdr), &cie->cdf_X);
+  darray_double_init(htrdr_get_allocator(htrdr), &cie->cdf_Y);
+  darray_double_init(htrdr_get_allocator(htrdr), &cie->cdf_Z);
   cie->range[0] = range[0];
   cie->range[1] = range[1];
   htrdr_ref_get(htrdr);
   cie->htrdr = htrdr;
 
-  min_band_len = compute_sky_min_band_len(cie->htrdr->sky, range);
   cie->band_len = (range[1] - range[0]) / (double)nbands;
-
-  /* Adjust the band length to ensure that each sky spectral interval is
-   * overlapped by at least one band */
-  if(cie->band_len > min_band_len) {
-    cie->band_len = min_band_len;
-    nbands = (size_t)ceil((range[1] - range[0]) / cie->band_len);
-    printf("%lu\n", nbands);
-  }
 
   res = setup_cie_xyz(cie, FUNC_NAME, nbands);
   if(res != RES_OK) goto error;

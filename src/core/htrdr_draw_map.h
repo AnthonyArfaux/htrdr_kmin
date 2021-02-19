@@ -44,7 +44,7 @@ typedef void
 (*htrdr_draw_pixel_T)
   (struct htrdr* htrdr,
    const struct htrdr_draw_pixel_args* args,
-   void* pixel) /* Output data */
+   void* pixel); /* Output data */
 
 struct htrdr_draw_map_args {
   htrdr_draw_pixel_T draw_pixel;
@@ -80,10 +80,10 @@ htrdr_draw_pixel_args_check(struct htrdr_draw_pixel_args* args)
 BEGIN_DECLS
 
 HTRDR_API res_T
-htrdr_draw_map_args
+htrdr_draw_map
   (struct htrdr* htrdr,
    const struct htrdr_draw_map_args* args,
-   struct htrdr_buffer* buf;
+   struct htrdr_buffer* buf);
 
 END_DECLS
 

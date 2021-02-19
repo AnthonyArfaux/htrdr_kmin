@@ -14,27 +14,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* nanosleep && nextafter */
+#define _POSIX_C_SOURCE 200112L /* nanosleep  */
 
 #include "htrdr.h"
 #include "htrdr_c.h"
 #include "htrdr_buffer.h"
-#include "htrdr_camera.h"
-#include "htrdr_cie_xyz.h"
 #include "htrdr_draw_map.h"
-#include "htrdr_ran_wlen.h"
-#include "htrdr_rectangle.h"
-#include "htrdr_solve.h"
-#include "htrdr_sun.h"
+#include "htrdr_log.h"
 
-#include <high_tune/htsky.h>
-
-#include <rsys/algorithm.h>
 #include <rsys/clock_time.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_u32.h>
+#include <rsys/list.h>
 #include <rsys/math.h>
+#include <rsys/morton.h>
 #include <rsys/mutex.h>
+#include <rsys/ref_count.h>
+
 #include <star/ssp.h>
 
 #include <omp.h>
@@ -47,18 +43,6 @@
 #define TILE_MCODE_NULL UINT32_MAX
 #define TILE_SIZE 32 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
-
-enum pixel_format {
-  PIXEL_FLUX,
-  PIXEL_IMAGE,
-  PIXEL_XWAVE
-};
-
-union pixel {
-  struct htrdr_pixel_flux flux;
-  struct htrdr_pixel_xwave xwave;
-  struct htrdr_pixel_image image;
-};
 
 /* Tile of row ordered image pixels */
 struct tile {
@@ -124,7 +108,7 @@ tile_create
   const size_t buf_sz = TILE_SIZE*TILE_SIZE*pixel_size;
   ASSERT(allocator);
   ASSERT(IS_ALIGNED(pixel_size, pixel_alignment));
-  ASSERT(is_pow2(pixel_alignment));
+  ASSERT(IS_POW2(pixel_alignment));
 
   tile = MEM_ALLOC_ALIGNED(allocator, tile_sz + buf_sz, 16);
   if(!tile) goto error;
@@ -147,20 +131,19 @@ error:
   goto exit;
 }
 
-static FINLINE union pixel*
+static FINLINE void*
 tile_at
   (struct tile* tile,
    const size_t x, /* In tile space */
    const size_t y) /* In tile space */
 {
   ASSERT(tile && x < TILE_SIZE && y < TILE_SIZE);
-  return tile->data.pixels + (y*TILE_SIZE + x)*tile->data.pixsz;
+  return (void*)(tile->data.pixels + (y*TILE_SIZE + x)*tile->data.pixsz);
 }
 
 static void
 write_tile_data
   (struct htrdr* htrdr,
-   const struct htrdr_sensor* sensor,
    struct htrdr_buffer* buf,
    const struct tile_data* tile_data)
 {
@@ -170,8 +153,8 @@ write_tile_data
   size_t ncols_tile, nrows_tile;
   size_t tile_pitch;
   char* buf_mem;
-  ASSERT(htrdr && sensor && buf && tile_data);
-  (void)htrdr, (void)sensor;
+  ASSERT(htrdr && buf && tile_data);
+  (void)htrdr;
 
   htrdr_buffer_get_layout(buf, &layout);
   buf_mem = htrdr_buffer_get_data(buf);
@@ -193,7 +176,7 @@ write_tile_data
     char* dst_tile_row = buf_row + icol * layout.elmt_size;
     const char* src_tile_row = tile_data->pixels + irow_tile*tile_pitch;
 
-    memcpy(dst_tile_row, src_tile_row, tile_pitch);
+    memcpy(dst_tile_row, src_tile_row, ncols_tile*tile_data->pixsz);
   }
 }
 
@@ -412,7 +395,6 @@ mpi_steal_work
 static res_T
 mpi_gather_tiles
   (struct htrdr* htrdr,
-   const struct htrdr_sensor* sensor,
    struct htrdr_buffer* buf,
    const size_t ntiles,
    struct list_node* tiles)
@@ -447,22 +429,20 @@ mpi_gather_tiles
 
     LIST_FOR_EACH(node, tiles) {
       struct tile* t = CONTAINER_OF(node, struct tile, node);
-      write_tile_data(htrdr, sensor, buf, &t->data);
+      write_tile_data(htrdr, buf, &t->data);
       ++itile;
     }
 
     if(itile != ntiles) {
-      enum pixel_format pixfmt;
       ASSERT(htrdr->mpi_nprocs > 1);
 
       /* Create a temporary tile to receive the tile data computed by the
        * concurrent MPI processes */
-      pixfmt = spectral_type_to_pixfmt(htrdr->spectral_type);
       tile = tile_create(htrdr->allocator, layout.elmt_size, layout.alignment);
       if(!tile) {
         res = RES_MEM_ERR;
         htrdr_log_err(htrdr,
-          "could not allocate the temporary tile used to gather the process "
+          "Could not allocate the temporary tile used to gather the process "
           "output data -- %s.\n", res_to_cstr(res));
         goto error;
       }
@@ -471,7 +451,7 @@ mpi_gather_tiles
       FOR_EACH(itile, itile, ntiles) {
         MPI(Recv(&tile->data, (int)msg_sz, MPI_CHAR, MPI_ANY_SOURCE,
           HTRDR_MPI_TILE_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
-        write_tile_data(htrdr, sensor, buf, &tile->data);
+        write_tile_data(htrdr, buf, &tile->data);
       }
     }
   }
@@ -489,7 +469,7 @@ draw_tile
    const struct htrdr_draw_map_args* args,
    const size_t ithread,
    const int64_t tile_mcode, /* For debug only */
-   const size_t tile_org[2], /* Origin of the tile in pixel space */
+   const uint16_t tile_org[2], /* Origin of the tile in pixel space */
    const size_t tile_sz[2], /* Definition of the tile */
    const double pix_sz[2], /* Size of a pixel in the normalized image plane */
    struct ssp_rng* rng,
@@ -498,7 +478,8 @@ draw_tile
   struct htrdr_draw_pixel_args pix_args = HTRDR_DRAW_PIXEL_ARGS_NULL;
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
-  ASSERT(htrdr && tile_org && tile_sz && pix_sz && sensor && spp && tile);
+  ASSERT(htrdr && tile_org && tile_sz && pix_sz && rng && tile);
+  ASSERT(check_draw_map_args(args));
   (void)tile_mcode;
 
   /* Adjust the #pixels to process them wrt a morton order */
@@ -514,11 +495,11 @@ draw_tile
   pix_args.context = args->context;
 
   FOR_EACH(mcode, 0, npixels) {
-    union pixel* pixel;
-    size_t ipix_tile[2]; /* Pixel coord in the tile */
-    size_t ipix[2]; /* Pixel coord in the buffer */
+    void* pixel = NULL;
+    uint16_t ipix_tile[2]; /* Pixel coord in the tile */
+    ASSERT(mcode <= UINT32_MAX);
 
-    morton_xy_decode_u16(mcode, ipix_tile);
+    morton_xy_decode_u16((uint32_t)mcode, ipix_tile);
     if(ipix_tile[0] >= tile_sz[0] || ipix_tile[1] >= tile_sz[1])
       continue; /* Pixel is out of tile */
 
@@ -526,11 +507,11 @@ draw_tile
     pixel = tile_at(tile, ipix_tile[0], ipix_tile[1]);
 
     /* Compute the pixel coordinate */
-    pix_args.pixel_coord[0] = tile_org[0] + ipix_tile[0];
-    pix_args.pixel_coord[1] = tile_org[1] + ipix_tile[1];
+    pix_args.pixel_coord[0] = (size_t)(tile_org[0] + ipix_tile[0]);
+    pix_args.pixel_coord[1] = (size_t)(tile_org[1] + ipix_tile[1]);
 
     /* Invoque the draw pixel functor */
-    args->draw_pixel(htrdr, &pix_args, pixel.data);
+    args->draw_pixel(htrdr, &pix_args, pixel);
   }
   return RES_OK;
 }
@@ -559,7 +540,7 @@ draw_map
 
   res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "could not create the RNG used to sample a process "
+    htrdr_log_err(htrdr, "Could not create the RNG used to sample a process "
       "to steal -- %s.\n", res_to_cstr((res_T)res));
     goto error;
   }
@@ -624,8 +605,8 @@ draw_map
     tile->data.y = (uint16_t)tile_org[1];
 
     /* Define the tile origin in pixel space */
-    tile_org[0] *= TILE_SIZE;
-    tile_org[1] *= TILE_SIZE;
+    tile_org[0] = (uint16_t)(tile_org[0] * TILE_SIZE);
+    tile_org[1] = (uint16_t)(tile_org[1] * TILE_SIZE);
 
     /* Compute the size of the tile clamped by the borders of the buffer */
     tile_sz[0] = MMIN(TILE_SIZE, buf_layout->width - tile_org[0]);
@@ -699,7 +680,7 @@ error:
 res_T
 htrdr_draw_map
   (struct htrdr* htrdr,
-   struct htrdr_draw_map_args* args,
+   const struct htrdr_draw_map_args* args,
    struct htrdr_buffer* buf)
 {
   char strbuf[128];
@@ -723,20 +704,20 @@ htrdr_draw_map
   proc_work_init(htrdr->allocator, &work);
 
   /* Compute the overall number of tiles */
-  ntiles_x = (width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
-  ntiles_y = (height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles_x = (layout.width + (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
+  ntiles_y = (layout.height+ (TILE_SIZE-1)/*ceil*/)/TILE_SIZE;
   ntiles = ntiles_x * ntiles_y;
 
   /* Compute the pixel size in the normalized image plane */
-  pix_sz[0] = 1.0 / (double)width;
-  pix_sz[1] = 1.0 / (double)height;
+  pix_sz[0] = 1.0 / (double)layout.width;
+  pix_sz[1] = 1.0 / (double)layout.height;
 
   /* Adjust the #tiles for the morton-encoding procedure */
   ntiles_adjusted = round_up_pow2(MMAX(ntiles_x, ntiles_y));
   ntiles_adjusted *= ntiles_adjusted;
 
   /* Define the initial number of tiles of the current process */
-  proc_ntiles_adjusted = ntiles_ajusted / (size_t)htrdr->mpi_nprocs;
+  proc_ntiles_adjusted = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
   if(htrdr->mpi_rank == 0) { /* Affect the remaining tiles to the master proc */
     proc_ntiles_adjusted +=
       ntiles_adjusted - proc_ntiles_adjusted*(size_t)htrdr->mpi_nprocs;
@@ -786,7 +767,7 @@ htrdr_draw_map
 
   /* Gather accum buffers from the group of processes */
   time_current(&t0);
-  res = mpi_gather_tiles(htrdr, sensor, buf, ntiles, &tiles);
+  res = mpi_gather_tiles(htrdr, buf, ntiles, &tiles);
   if(res != RES_OK) goto error;
   time_sub(&t0, time_current(&t1), &t0);
   time_dump(&t0, TIME_ALL, NULL, strbuf, sizeof(strbuf));

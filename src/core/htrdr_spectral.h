@@ -31,7 +31,20 @@ enum htrdr_spectral_type {
   HTRDR_SPECTRAL_SW_CIE_XYZ /* Shortwave wrt the CIE XYZ tristimulus */
 };
 
+/* Forwar declaration */
 struct htrdr;
+
+static FINLINE double /* In nanometer */
+htrdr_wavenumber_to_wavelength(const double nu/*In cm^-1*/)
+{
+  return 1.e7 / nu;
+}
+
+static FINLINE double /* In cm^-1 */
+wavelength_to_wavenumber(const double lambda/*In nanometer*/)
+{
+  return htrdr_wavenumber_to_wavelength(lambda);
+}
 
 static INLINE double
 htrdr_wiebelt(const double v)
@@ -127,7 +140,7 @@ htrdr_planck
   }
 }
 
-BEGIN_DECL
+BEGIN_DECLS
 
 HTRDR_API res_T
 htrdr_brightness_temperature
@@ -143,8 +156,8 @@ htrdr_radiance_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */
    const double lambda_max, /* In meters */
-   const double radiance) /* In W/m^2/sr */
+   const double radiance); /* In W/m^2/sr */
 
-END_DECL
+END_DECLS
 
 #endif /* HTRDR_SPECTRAL_H */

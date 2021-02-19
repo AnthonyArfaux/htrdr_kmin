@@ -75,9 +75,10 @@ parse_fov(const char* str, double* out_fov)
 }
 
 static res_T
-parse_image_parameter(struct htrdr_args_image* img, const char* str)
+parse_image_parameter(void* args, const char* str)
 {
   char buf[128];
+  struct htrdr_args_image* img = args;
   char* key;
   char* val;
   char* ctx;
@@ -136,14 +137,15 @@ error:
 }
 
 static res_T
-parse_camera_parameter(struct htrdr_args_camera* cam, const char* str)
+parse_camera_parameter(void* args, const char* str)
 {
   char buf[128];
+  struct htrdr_args_camera* cam = args;
   char* key;
   char* val;
   char* ctx;
   res_T res = RES_OK;
-  ASSERT(cam);
+  ASSERT(cam && str);
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
     fprintf(stderr,
@@ -175,7 +177,7 @@ parse_camera_parameter(struct htrdr_args_camera* cam, const char* str)
   } else if(!strcmp(key, "up")) {
     PARSE("up vector", parse_doubleX(val, cam->up, 3));
   } else if(!strcmp(key, "fov")) {
-    PARSE("field-of-view", parse_fov(val, cam->fov_y));
+    PARSE("field-of-view", parse_fov(val, &cam->fov_y));
   } else {
     fprintf(stderr, "Invalid camera parameter `%s'.\n", key);
     res = RES_BAD_ARG;
@@ -189,14 +191,15 @@ error:
 }
 
 static res_T
-parse_rectangle_parameter(struct htrdr_args_rectangle* rect, const char* str)
+parse_rectangle_parameter(void* args, const char* str)
 {
   char buf[128];
+  struct htrdr_args_rectangle* rect = args;
   char* key;
   char* val;
   char* ctx;
   res_T res = RES_OK;
-  ASSERT(rect);
+  ASSERT(rect && str);
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
     fprintf(stderr,
@@ -239,7 +242,7 @@ parse_rectangle_parameter(struct htrdr_args_rectangle* rect, const char* str)
 exit:
   return res;
 error:
-  goto EXIT;
+  goto exit;
 }
 
 static res_T
@@ -267,14 +270,15 @@ error:
 }
 
 static res_T
-parse_spectral_parameter(struct htrdr_args_spectral* args, const char* str)
+parse_spectral_parameter(void* ptr, const char* str)
 {
   char buf[128];
+  struct htrdr_args_spectral* args = ptr;
   char* key;
   char* val;
   char* ctx;
   res_T res = RES_OK;
-  ASSERT(args);
+  ASSERT(args && str);
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
     fprintf(stderr,
@@ -327,9 +331,9 @@ error:
 
 static res_T
 parse_multiple_parameters
-  (struct htrdr_args* args,
+  (void* args,
    const char* str,
-   res_T (*parse_parameter)(struct htrdr_args* args, const char* str))
+   res_T (*parse_parameter)(void* args, const char* str))
 {
   char buf[512];
   char* tk;
@@ -358,62 +362,33 @@ error:
 }
 
 /*******************************************************************************
- * Local functions
+ * Exported functions
  ******************************************************************************/
 res_T
-htrdr_args_init(struct htrdr_args* args, int argc, char** argv)
+htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
 {
-  res_T res = RES_OK;
-  ASSERT(args && argc && argv);
-  *args = HTRDR_ARGS_DEFAULT;
-
-  /* Atmosphere mode */
-  if(!strcmp(argv[1], "atmosphere")) {
-    args->mode_type = HTRDR_ATMOSPHERE;
-    res = parse_atmosphere_options(args, argc, argv);
-    if(res != RES_OK) goto error;
-
-  /* Combustion mode */
-  } else if(!strcmp(argv[1], "combustion")) {
-    args->mode_type = HTRDR_COMBUSTION;
-    res = parse_combustion_options(args, argc, argv);
-    if(res != RES_OK) goto error;
-
-  /* Version */
-  } else if(!strcmp(argv[1], "--version")) {
-    printf("%s version %d.%d.%d\n",
-      argv[0],
-      HTRDR_VERSION_MAJOR,
-      HTRDR_VERSION_MINOR,
-      HTRDR_VERSION_PATCH);
-    args->quit = 1;
-    goto exit;
-
-  /* Help */
-  } else if(!strcmp(argv[1], "--help")) {
-    print_usage(argv[0]);
-    args->quit = 1;
-    goto exit;
-
-  /* Fallback */
-  } else {
-    fprintf(stderr, "Unknown option: %s\n", argv[1]);
-    print_usage(argv[0]);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-
-exit:
-  return res;
-error:
-  htrdr_args_release(args);
-  goto exit;
+  if(!cam || !str) return RES_BAD_ARG;
+  return parse_multiple_parameters(cam, str, parse_camera_parameter);
 }
 
-void
-htrdr_args_release(struct htrdr_args* args)
+res_T
+htrdr_args_rectangle_parse(struct htrdr_args_rectangle* rect, const char* str)
 {
-  ASSERT(args);
-  *args = HTRDR_ARGS_DEFAULT;
+  if(!rect || !str) return RES_BAD_ARG;
+  return parse_multiple_parameters(rect, str, parse_rectangle_parameter);
+}
+ 
+res_T
+htrdr_args_image_parse(struct htrdr_args_image* img, const char* str)
+{
+  if(!img || !str) return RES_BAD_ARG;
+  return parse_multiple_parameters(img, str, parse_image_parameter);
+}
+
+res_T
+htrdr_args_spectral_parse(struct htrdr_args_spectral* spectral, const char* str)
+{
+  if(!spectral || !str) return RES_BAD_ARG;
+  return parse_multiple_parameters(spectral, str, parse_spectral_parameter);
 }
 

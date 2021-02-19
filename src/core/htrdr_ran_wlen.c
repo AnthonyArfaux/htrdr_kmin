@@ -18,7 +18,9 @@
 
 #include "htrdr.h"
 #include "htrdr_c.h"
+#include "htrdr_log.h"
 #include "htrdr_ran_wlen.h"
+#include "htrdr_spectral.h"
 
 #include <high_tune/htsky.h>
 
@@ -84,15 +86,18 @@ setup_wlen_ran_cdf
     double lambda_lo = wlen_ran->range[0] + (double)i * wlen_ran->band_len;
     double lambda_hi = MMIN(lambda_lo + wlen_ran->band_len, wlen_ran->range[1]);
     ASSERT(lambda_lo<= lambda_hi);
-    ASSERT(lambda_lo > wlen_ran->range[0] || eq_eps(lambda_lo, wlen_ran->range[0], 1.e-6));
-    ASSERT(lambda_lo < wlen_ran->range[1] || eq_eps(lambda_lo, wlen_ran->range[1], 1.e-6));
+    ASSERT(lambda_lo > wlen_ran->range[0]
+        || eq_eps(lambda_lo, wlen_ran->range[0], 1.e-6));
+    ASSERT(lambda_lo < wlen_ran->range[1]
+        || eq_eps(lambda_lo, wlen_ran->range[1], 1.e-6));
 
     /* Convert from nanometer to meter */
     lambda_lo *= 1.e-9;
     lambda_hi *= 1.e-9;
 
     /* Compute the probability of the current band */
-    pdf[i] = blackbody_fraction(lambda_lo, lambda_hi, wlen_ran->ref_temperature);
+    pdf[i] = htrdr_blackbody_fraction
+      (lambda_lo, lambda_hi, wlen_ran->ref_temperature);
 
     /* Update the norm */
     sum += pdf[i];
@@ -158,7 +163,7 @@ wlen_ran_sample_continue
   /* Setup the dichotomy search */
   lambda_m_min = range_m[0];
   lambda_m_max = range_m[1];
-  bf_min_max = blackbody_fraction
+  bf_min_max = htrdr_blackbody_fraction
     (range_m[0], range_m[1], wlen_ran->ref_temperature);
 
   /* Numerically search the lambda corresponding to the submitted canonical
@@ -166,7 +171,8 @@ wlen_ran_sample_continue
   FOR_EACH(i, 0, MAX_ITER) {
     double r_test;
     lambda_m = (lambda_m_min + lambda_m_max) * 0.5;
-    bf = blackbody_fraction(range_m[0], lambda_m, wlen_ran->ref_temperature);
+    bf = htrdr_blackbody_fraction
+      (range_m[0], lambda_m, wlen_ran->ref_temperature);
 
     r_test = bf / bf_min_max;
     if(r_test < r) {
@@ -191,8 +197,8 @@ wlen_ran_sample_continue
 
   if(pdf) {
     const double Tref = wlen_ran->ref_temperature;
-    const double B_lambda = planck(lambda_m, lambda_m, Tref);
-    const double B_mean = planck(range_m[0], range_m[1], Tref);
+    const double B_lambda = htrdr_planck(lambda_m, lambda_m, Tref);
+    const double B_mean = htrdr_planck(range_m[0], range_m[1], Tref);
     *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
   }
 
@@ -279,7 +285,6 @@ htrdr_ran_wlen_create
    struct htrdr_ran_wlen** out_wlen_ran)
 {
   struct htrdr_ran_wlen* wlen_ran = NULL;
-  double min_band_len = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && range && out_wlen_ran && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
@@ -304,19 +309,10 @@ htrdr_ran_wlen_create
   wlen_ran->ref_temperature = ref_temperature;
   wlen_ran->nbands = nbands;
 
-  min_band_len = compute_sky_min_band_len(wlen_ran->htrdr->sky, wlen_ran->range);
-
   if(nbands == HTRDR_WLEN_RAN_CONTINUE) {
     wlen_ran->band_len = 0;
   } else {
     wlen_ran->band_len = (range[1] - range[0]) / (double)wlen_ran->nbands;
-
-    /* Adjust the band length to ensure that each sky spectral interval is
-     * overlapped by at least one band */
-    if(wlen_ran->band_len > min_band_len) {
-      wlen_ran->band_len = min_band_len;
-      wlen_ran->nbands = (size_t)ceil((range[1] - range[0]) / wlen_ran->band_len);
-    }
 
     res = setup_wlen_ran_cdf(wlen_ran, FUNC_NAME);
     if(res != RES_OK) goto error;

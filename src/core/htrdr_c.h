@@ -58,78 +58,12 @@ struct htrdr {
   ref_T ref;
 };
 
-/* In nanometer */
-static FINLINE double
-wavenumber_to_wavelength(const double nu/*In cm^-1*/)
-{
-  return 1.e7 / nu;
-}
-
-/* In cm^-1 */
-static FINLINE double
-wavelength_to_wavenumber(const double lambda/*In nanometer*/)
-{
-  return wavenumber_to_wavelength(lambda);
-}
-
-static INLINE uint64_t
-morton3D_encode_u21(const uint32_t u21)
-{
-  uint64_t u64 = u21 & ((1<<21) - 1);
-  ASSERT(u21 <= ((1 << 21) - 1));
-  u64 = (u64 | (u64 << 32)) & 0xFFFF00000000FFFF;
-  u64 = (u64 | (u64 << 16)) & 0x00FF0000FF0000FF;
-  u64 = (u64 | (u64 << 8))  & 0xF00F00F00F00F00F;
-  u64 = (u64 | (u64 << 4))  & 0x30C30C30C30C30C3;
-  u64 = (u64 | (u64 << 2))  & 0x9249249249249249;
-  return u64;
-}
-
-static INLINE uint32_t
-morton3D_decode_u21(const uint64_t u64)
-{
-  uint64_t tmp = (u64 & 0x9249249249249249);
-  tmp = (tmp | (tmp >> 2))  & 0x30C30C30C30C30C3;
-  tmp = (tmp | (tmp >> 4))  & 0xF00F00F00F00F00F;
-  tmp = (tmp | (tmp >> 8))  & 0x00FF0000FF0000FF;
-  tmp = (tmp | (tmp >> 16)) & 0xFFFF00000000FFFF;
-  tmp = (tmp | (tmp >> 32)) & 0x00000000FFFFFFFF;
-  ASSERT(tmp <= ((1<<21)-1));
-  return (uint32_t)tmp;
-}
-
-static INLINE uint64_t
-morton_xyz_encode_u21(const uint32_t xyz[3])
-{
-  return (morton3D_encode_u21(xyz[0]) << 2)
-       | (morton3D_encode_u21(xyz[1]) << 1)
-       | (morton3D_encode_u21(xyz[2]) << 0);
-}
-
-static INLINE void
-morton_xyz_decode_u21(const uint64_t code, uint32_t xyz[3])
-{
-  ASSERT(xyz && code < ((1ull << 63)-1));
-  xyz[0] = (uint32_t)morton3D_decode_u21(code >> 2);
-  xyz[1] = (uint32_t)morton3D_decode_u21(code >> 1);
-  xyz[2] = (uint32_t)morton3D_decode_u21(code >> 0);
-}
+extern LOCAL_SYM void
+setup_logger
+  (struct htrdr* htrdr);
 
 /* Return the minimum length in nanometer of the sky spectral bands
  * clamped to in [range[0], range[1]]. */
-extern LOCAL_SYM double
-compute_sky_min_band_len
-  (struct htsky* sky,
-   const double range[2]);
-
-extern LOCAL_SYM  res_T
-open_output_stream
-  (struct htrdr* htrdr,
-   const char* filename,
-   const int read, /* Enable read access */
-   int force_overwrite,
-   FILE** out_fp);
-
 extern LOCAL_SYM void
 send_mpi_progress
   (struct htrdr* htrdr,

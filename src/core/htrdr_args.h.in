@@ -19,6 +19,7 @@
 #define HTRDR_ARGS_H
 
 #include "htrdr_cie_xyz.h"
+#include "htrdr_spectral.h"
 
 #include <rsys/rsys.h>
 

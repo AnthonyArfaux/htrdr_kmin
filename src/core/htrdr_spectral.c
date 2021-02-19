@@ -15,6 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_log.h"
 #include "htrdr_spectral.h"
 
 /*******************************************************************************
@@ -104,7 +105,7 @@ htrdr_radiance_temperature
      radiance_avg,
      &temperature);
   if(res != RES_OK) {
-    htrdr_log_warn(cmd->htrdr,
+    htrdr_log_warn(htrdr,
       "Could not compute the brightness temperature for the radiance %g.\n",
        radiance_avg);
     temperature = 0;

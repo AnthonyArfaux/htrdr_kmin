@@ -15,6 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_log.h"
 #include "htrdr_rectangle.h"
 
 #include <rsys/double3.h>

@@ -16,7 +16,9 @@
 
 #include "htrdr.h"
 #include "htrdr_buffer.h"
+#include "htrdr_log.h"
 
+#include <rsys/math.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/ref_count.h>
 
@@ -43,8 +45,8 @@ buffer_release(ref_T* ref)
   struct htrdr* htrdr = NULL;
   ASSERT(ref);
   buf = CONTAINER_OF(ref, struct htrdr_buffer, ref);
-  if(buf->mem) MEM_RM(buf->htrdr->allocator, buf->mem);
   htrdr = buf->htrdr;
+  if(buf->mem) MEM_RM(htrdr_get_allocator(htrdr), buf->mem);
   MEM_RM(htrdr_get_allocator(htrdr), buf);
   htrdr_ref_put(htrdr);
 }
@@ -110,7 +112,7 @@ htrdr_buffer_create
   buf->htrdr = htrdr;
 
   memsz = buf->pitch * buf->height;
-  buf->mem = MEM_ALLOC_ALIGNED(htrdr->allocator, memsz, align);
+  buf->mem = MEM_ALLOC_ALIGNED(htrdr_get_allocator(htrdr), memsz, align);
   if(!buf->mem) {
     res = RES_MEM_ERR;
     goto error;

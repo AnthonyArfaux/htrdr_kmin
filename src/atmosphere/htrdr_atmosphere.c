@@ -38,6 +38,72 @@ static const struct pixel_format PIXEL_FORMAT_NULL = PIXEL_FORMAT_NULL__;
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static double
+compute_sky_min_band_len(struct htsky* sky, const double range[2])
+{
+  double min_band_len = DBL_MAX;
+  size_t nbands;
+  ASSERT(sky && range && range[0] <= range[1]);
+
+  nbands = htsky_get_spectral_bands_count(sky);
+
+  if(eq_eps(range[0], range[1], 1.e-6)) {
+    ASSERT(nbands == 1);
+    min_band_len = 0;
+  } else {
+    size_t i = 0;
+
+    /* Compute the length of the current band clamped to the submitted range */
+    FOR_EACH(i, 0, nbands) {
+      const size_t iband = htsky_get_spectral_band_id(sky, i);
+      double wlens[2];
+      HTSKY(get_spectral_band_bounds(sky, iband, wlens));
+
+      /* Adjust band boundaries to the submitted range */
+      wlens[0] = MMAX(wlens[0], range[0]);
+      wlens[1] = MMIN(wlens[1], range[1]);
+
+      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
+    }
+  }
+  return min_band_len;
+}
+
+/* Compute the number of fixed size bands used to discretized the spectral
+ * range */
+static size_t
+compute_spectral_bands_count(const struct htrdr_atmosphere* cmd)
+{
+  double wlen_range[2];
+  double wlen_size;
+  const size_t nbands;
+  const double band_len;
+  const double band_len_max;
+  ASSERT(cmd);
+
+  /* Compute size of the spectral range in nanometers */
+  wlen_range[0] = cmd->wlen_range_m[0]*1.e9;
+  wlen_range[1] = cmd->wlen_range_m[1]*1.e9;
+  wlen_range_size = wlen_range[1] - wlen_range[0];
+
+  /* Define as many intervals as wavelengths count in the spectral range */
+  nbands = (size_t)rint(wlen_range_size);
+
+  /* Compute the size in nanometers of an interval */
+  band_len = wlen_range_size / (double)nbands;
+
+  /* Compute the minimum band length of the sky spectral data and define it
+   * as the maximum length that the bands can have */
+  band_len_max = compute_sky_min_band_len(cmd->sky, wlen_range);
+
+  /* Adjust the bands count to ensure that each sky spectral interval is
+   * overlapped by at least one band */
+  if(band_len > band_len_max) {
+    nbands = (size_t)ceil(wlen_range_size / band_len_max);
+  }
+  return nbands
+}
+
 static enum htsky_spectral_type
 htrdr_to_sky_spectral_type(const enum htrdr_spectral_type type)
 {
@@ -347,6 +413,7 @@ htrdr_atmosphere_create
   double sun_dir[3];
   double spectral_range[2];
   const char* output_name = NULL;
+  size_t nintervals; /* #bands used to discretized the spectral curve */
   res_T res = RES_OK;
   ASSERT(htrdr && args && out_cmd);
 
@@ -451,27 +518,22 @@ htrdr_atmosphere_create
   cmd->wlen_range_m[0] = spectral_range[0]*1e-9; /* Convert in meters */
   cmd->wlen_range_m[1] = spectral_range[1]*1e-9; /* Convert in meters */
 
+  /* Compute the number of fixed sized bands used to descrised to the spectral
+   * data */
+  nintervals = compute_spectral_bands_count(cmd);
+
   if(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
-    size_t n;
-    n = (size_t)(spectral_range[1] - spectral_range[0]);
-    res = htrdr_cie_xyz_create(htrdr, spectral_range, n, &cmd->cie);
+    res = htrdr_cie_xyz_create(htrdr, spectral_range, nintervals, &cmd->cie);
     if(res != RES_OK) goto error;
-
   } else {
-    size_t n;
-
     if(cmd->ref_temperature <= 0) {
       htrdr_log_err(htrdr, "%s: invalid reference temperature %g K.\n",
         FUNC_NAME, cmd->ref_temperature);
       res = RES_BAD_ARG;
       goto error;
     }
-
-    ASSERT(cmd->wlen_range_m[0] <= cmd->wlen_range_m[1]);
-    n = (size_t)(spectral_range[1] - spectral_range[0]);
-
     res = htrdr_ran_wlen_create
-      (htrdr, spectral_range, n, cmd->ref_temperature, &cmd->ran_wlen);
+      (htrdr, spectral_range, nintervals, cmd->ref_temperature, &cmd->ran_wlen);
     if(res != RES_OK) goto error;
   }
 

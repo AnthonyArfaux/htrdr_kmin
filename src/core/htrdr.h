@@ -39,6 +39,7 @@
 #endif
 
 /* Forward declarations */
+struct htrdr_buffer;
 struct mem_allocator;
 struct mutex;
 
@@ -82,7 +83,7 @@ htrdr_mpi_init
    char** argv);
 
 /* Terminate the MPI execution environment */
-HTRDR_API res_T
+HTRDR_API void
 htrdr_mpi_finalize
   (void);
 
@@ -103,12 +104,6 @@ HTRDR_API void
 htrdr_ref_put
   (struct htrdr* htrdr);
 
-HTRDR_API void
-htrdr_draw_map
-  (struct htrdr* htrdr,
-   const struct htrdr_draw_map_args* args,
-   struct htrdr_buffer* buffer);
-
 /* Return the number of threads used by the process */
 HTRDR_API size_t
 htrdr_get_threads_count
@@ -117,7 +112,7 @@ htrdr_get_threads_count
 /* Return the number of running processes for the current htrdr instance */
 HTRDR_API size_t
 htrdr_get_procs_count
-  (const struct
+  (const struct htrdr* htrdr);
 
 HTRDR_API int
 htrdr_get_mpi_rank
@@ -125,12 +120,20 @@ htrdr_get_mpi_rank
 
 HTRDR_API struct mem_allocator*
 htrdr_get_allocator
-  (const struct htrdr* htrdr);
+  (struct htrdr* htrdr);
 
 HTRDR_API struct mem_allocator*
-htrdr_get_lifo_allocator
-  (const struct htrdr* htrdr,
+htrdr_get_thread_allocator
+  (struct htrdr* htrdr,
    const size_t ithread);
+
+HTRDR_API struct logger*
+htrdr_get_logger
+  (struct htrdr* htrdr);
+
+HTRDR_API int
+htrdr_get_verbosity_level
+  (const struct htrdr* htrdr);
 
 HTRDR_API res_T
 htrdr_open_output_stream

@@ -237,7 +237,7 @@ error:
   goto exit;
 }
 
-void
+static void
 release_htrdr(ref_T* ref)
 {
   struct htrdr* htrdr = CONTAINER_OF(ref, struct htrdr, ref);
@@ -251,7 +251,6 @@ release_htrdr(ref_T* ref)
     }
     MEM_RM(htrdr->allocator, htrdr->lifo_allocators);
   }
-  str_release(&htrdr->output_name);
   logger_release(&htrdr->logger);
 
   MEM_RM(htrdr->allocator, htrdr);
@@ -264,6 +263,7 @@ res_T
 htrdr_mpi_init(int argc, char** argv)
 {
   char str[MPI_MAX_ERROR_STRING];
+  int thread_support;
   int len;
   int err = 0;
   res_T res = RES_OK;
@@ -290,7 +290,7 @@ error:
   goto exit;
 }
 
-res_T
+void
 htrdr_mpi_finalize(void)
 {
   MPI_Finalize();
@@ -323,10 +323,7 @@ htrdr_create
   htrdr->verbose = args->verbose;
   htrdr->nthreads = MMIN(args->nthreads, (unsigned)nthreads_max);
 
-  logger_init(htrdr->allocator, &htrdr->logger);
-  logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, NULL);
-  logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
-  logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
+  setup_logger(htrdr);
 
   res = init_mpi(htrdr);
   if(res != RES_OK) goto error;
@@ -388,7 +385,7 @@ size_t
 htrdr_get_procs_count(const struct htrdr* htrdr)
 {
   ASSERT(htrdr);
-  return htrdr->mpi_nprocs;
+  return (size_t)htrdr->mpi_nprocs;
 }
 
 int
@@ -399,17 +396,31 @@ htrdr_get_mpi_rank(const struct htrdr* htrdr)
 }
 
 struct mem_allocator*
-htrdr_get_allocator(const struct htrdr* htrdr)
+htrdr_get_allocator(struct htrdr* htrdr)
 {
   ASSERT(htrdr);
   return htrdr->allocator;
 }
 
 struct mem_allocator*
-htrdr_get_lifo_allocator(const struct htrdr* htrdr, const unsigned ithread)
+htrdr_get_thread_allocator(struct htrdr* htrdr, const size_t ithread)
 {
   ASSERT(htrdr && ithread < htrdr_get_threads_count(htrdr));
-  return htrdr->lifo_allocators[ithread];
+  return htrdr->lifo_allocators + ithread;
+}
+
+struct logger*
+htrdr_get_logger(struct htrdr* htrdr)
+{
+  ASSERT(htrdr);
+  return &htrdr->logger;
+}
+
+int
+htrdr_get_verbosity_level(const struct htrdr* htrdr)
+{
+  ASSERT(htrdr);
+  return htrdr->verbose;
 }
 
 const char*
@@ -505,39 +516,6 @@ htrdr_fflush(struct htrdr* htrdr, FILE* stream)
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
-double
-compute_sky_min_band_len
-  (struct htsky* sky,
-   const double range[2])
-{
-  double min_band_len = DBL_MAX;
-  size_t nbands;
-  ASSERT(sky && range && range[0] <= range[1]);
-
-  nbands = htsky_get_spectral_bands_count(sky);
-
-  if(eq_eps(range[0], range[1], 1.e-6)) {
-    ASSERT(nbands == 1);
-    min_band_len = 0;
-  } else {
-    size_t i = 0;
-
-    /* Compute the length of the current band clamped to the submitted range */
-    FOR_EACH(i, 0, nbands) {
-      const size_t iband = htsky_get_spectral_band_id(sky, i);
-      double wlens[2];
-      HTSKY(get_spectral_band_bounds(sky, iband, wlens));
-
-      /* Adjust band boundaries to the submitted range */
-      wlens[0] = MMAX(wlens[0], range[0]);
-      wlens[1] = MMIN(wlens[1], range[1]);
-
-      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
-    }
-  }
-  return min_band_len;
-}
-
 void
 send_mpi_progress
   (struct htrdr* htrdr, const enum htrdr_mpi_message msg, int32_t percent)

@@ -16,6 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "htrdr.h"
+#include "htrdr_c.h"
 #include "htrdr_log.h"
 
 #include <rsys/logger.h>
@@ -98,4 +99,16 @@ htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
     log_msg(htrdr, LOG_WARNING, msg, vargs_list);
     va_end(vargs_list);
   }
+}
+
+/*******************************************************************************
+ * Local function
+ ******************************************************************************/
+void
+setup_logger(struct htrdr* htrdr)
+{
+  logger_init(htrdr->allocator, &htrdr->logger);
+  logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, NULL);
+  logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
+  logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
 }
