@@ -389,21 +389,24 @@ htrdr_atmosphere_create
     if(res != RES_OK) goto error;
   }
 
-  /* Create the image buffer only on the master process; the image parts
-   * rendered by the processes are gathered onto the master process. */
-  if(!cmd->dump_volumetric_acceleration_structure
-   && htrdr_get_mpi_rank(htrdr) == 0) {
+
+  if(!cmd->dump_volumetric_acceleration_structure) {
     struct atmosphere_pixel_format pixfmt = ATMOSPHERE_PIXEL_FORMAT_NULL;
     atmosphere_get_pixel_format(cmd, &pixfmt);
 
-    res = htrdr_buffer_create(htrdr,
-      args->image.definition[0], /* Width */
-      args->image.definition[1], /* Height */
-      args->image.definition[0] * pixfmt.size, /* Pitch */
-      pixfmt.size, /* Size of a pixel */
-      pixfmt.alignment, /* Alignment of a pixel */
-      &cmd->buf);
-    if(res != RES_OK) goto error;
+    /* Setup the buffer layout */
+    cmd->buf_layout.width = args->image.definition[0];
+    cmd->buf_layout.height = args->image.definition[1];
+    cmd->buf_layout.pitch = args->image.definition[0] * pixfmt.size;
+    cmd->buf_layout.elmt_size = pixfmt.size;
+    cmd->buf_layout.alignment = pixfmt.alignment;
+
+    /* Create the image buffer only on the master process; the image parts
+     * rendered by the others processes are gathered onto the master process */
+    if(htrdr_get_mpi_rank(htrdr) == 0) {
+      res = htrdr_buffer_create(htrdr, &cmd->buf_layout, &cmd->buf);
+      if(res != RES_OK) goto error;
+    }
   }
 
 exit:

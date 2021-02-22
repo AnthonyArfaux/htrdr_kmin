@@ -19,6 +19,8 @@
 #define HTRDR_DRAW_MAP_H
 
 #include "core/htrdr.h"
+#include "core/htrdr_buffer.h"
+
 #include <rsys/rsys.h>
 
 struct htrdr_draw_pixel_args {
@@ -49,6 +51,7 @@ typedef void
 
 struct htrdr_draw_map_args {
   htrdr_draw_pixel_T draw_pixel;
+  struct htrdr_buffer_layout buffer_layout;
   struct ssp_rng* rng;
   size_t spp; /* Samples per pixel */
   void* context; /* User defined data */
@@ -56,16 +59,13 @@ struct htrdr_draw_map_args {
 
 #define HTRDR_DRAW_MAP_ARGS_NULL__ {                                           \
   NULL, /* Draw pixel functor */                                               \
+  HTRDR_BUFFER_LAYOUT_NULL__, /* Layout of the destination buffer */           \
   NULL, /* Random Number Generator */                                          \
   0, /* #Samples per pixel */                                                  \
   NULL /* User defined data */                                                 \
 }
 static const struct htrdr_draw_map_args HTRDR_DRAW_MAP_ARGS_NULL =
   HTRDR_DRAW_MAP_ARGS_NULL__;
-
-/* Forward declarations */
-struct htrdr;
-struct htrdr_buffer;
 
 static INLINE int
 htrdr_draw_pixel_args_check(const struct htrdr_draw_pixel_args* args)
@@ -86,7 +86,7 @@ HTRDR_CORE_API res_T
 htrdr_draw_map
   (struct htrdr* htrdr,
    const struct htrdr_draw_map_args* args,
-   struct htrdr_buffer* buf);
+   struct htrdr_buffer* buf); /* May be NULL for non master processes */
 
 END_DECLS
 

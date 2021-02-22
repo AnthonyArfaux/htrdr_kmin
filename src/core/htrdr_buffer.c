@@ -24,13 +24,8 @@
 #include <rsys/ref_count.h>
 
 struct htrdr_buffer {
+  struct htrdr_buffer_layout layout;
   char* mem;
-
-  size_t width;
-  size_t height;
-  size_t pitch;
-  size_t elmtsz;
-  size_t align;
 
   struct htrdr* htrdr;
   ref_T ref;
@@ -58,42 +53,16 @@ buffer_release(ref_T* ref)
 res_T
 htrdr_buffer_create
   (struct htrdr* htrdr,
-   const size_t width,
-   const size_t height,
-   const size_t pitch,
-   const size_t elmtsz,
-   const size_t align,
+   const struct htrdr_buffer_layout* layout,
    struct htrdr_buffer** out_buf)
 {
   struct htrdr_buffer* buf = NULL;
   size_t memsz = 0;
   res_T res = RES_OK;
-  ASSERT(htrdr && out_buf);
+  ASSERT(htrdr && layout && out_buf);
 
-  if(!width || !height) {
-    htrdr_log_err(htrdr, "invalid buffer definition %lux%lu.\n",
-      (unsigned long)width, (unsigned long)height);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  if(pitch < width*elmtsz) {
-    htrdr_log_err(htrdr,
-      "invalid buffer pitch `%lu' wrt the buffer width `%lu'. "
-      "The buffer pitch cannot be less than the buffer width.\n",
-      (unsigned long)pitch, (unsigned long)width);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  if(!elmtsz) {
-    htrdr_log_err(htrdr,
-      "the size of the buffer's elements cannot be null.\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  if(!IS_POW2(align)) {
-    htrdr_log_err(htrdr,
-      "invalid buffer alignment `%lu'. It must be a power of 2.\n",
-      (unsigned long)align);
+  if(!htrdr_buffer_layout_check(layout)) {
+    htrdr_log_err(htrdr, "Invalid buffer memory layout.\n");
     res = RES_BAD_ARG;
     goto error;
   }
@@ -104,16 +73,13 @@ htrdr_buffer_create
     goto error;
   }
   ref_init(&buf->ref);
-  buf->width = width;
-  buf->height = height;
-  buf->pitch = pitch;
-  buf->elmtsz = elmtsz;
-  buf->align = align;
+  buf->layout = *layout;
   htrdr_ref_get(htrdr);
   buf->htrdr = htrdr;
 
-  memsz = buf->pitch * buf->height;
-  buf->mem = MEM_ALLOC_ALIGNED(htrdr_get_allocator(htrdr), memsz, align);
+  memsz = buf->layout.pitch * buf->layout.height;
+  buf->mem = MEM_ALLOC_ALIGNED
+    (htrdr_get_allocator(htrdr), memsz, buf->layout.alignment);
   if(!buf->mem) {
     res = RES_MEM_ERR;
     goto error;
@@ -150,11 +116,7 @@ htrdr_buffer_get_layout
    struct htrdr_buffer_layout* layout)
 {
   ASSERT(buf && layout);
-  layout->width = buf->width;
-  layout->height = buf->height;
-  layout->pitch = buf->pitch;
-  layout->elmt_size = buf->elmtsz;
-  layout->alignment = buf->align;
+  *layout = buf->layout;
 }
 
 void*
@@ -167,7 +129,7 @@ htrdr_buffer_get_data(struct htrdr_buffer* buf)
 void*
 htrdr_buffer_at(struct htrdr_buffer* buf, const size_t x, const size_t y)
 {
-  ASSERT(buf && x < buf->width && y < buf->height);
-  return buf->mem + y*buf->pitch + x*buf->elmtsz;
+  ASSERT(buf && x < buf->layout.width && y < buf->layout.height);
+  return buf->mem + y*buf->layout.pitch + x*buf->layout.elmt_size;
 }
 

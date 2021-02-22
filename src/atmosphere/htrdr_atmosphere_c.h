@@ -19,6 +19,7 @@
 #define HTRDR_ATMOSPHERE_C_H
 
 #include "core/htrdr_accum.h"
+#include "core/htrdr_buffer.h"
 #include "core/htrdr_sensor.h"
 #include "core/htrdr_spectral.h"
 
@@ -99,7 +100,9 @@ struct htrdr_atmosphere {
   struct htrdr_ran_wlen* ran_wlen;
 
   struct htrdr_sensor sensor;
-  struct htrdr_buffer* buf;
+
+  struct htrdr_buffer_layout buf_layout;
+  struct htrdr_buffer* buf; /* NULL on non master processes */
 
   struct htsky* sky;
   const char* sky_mtl_name;

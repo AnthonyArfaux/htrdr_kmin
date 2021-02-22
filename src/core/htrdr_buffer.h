@@ -19,6 +19,8 @@
 #define HTRDR_BUFFER_H
 
 #include "core/htrdr.h"
+
+#include <rsys/math.h>
 #include <rsys/rsys.h>
 
 /*
@@ -36,6 +38,30 @@ struct htrdr_buffer_layout {
 static const struct htrdr_buffer_layout HTRDR_BUFFER_LAYOUT_NULL =
   HTRDR_BUFFER_LAYOUT_NULL__;
 
+static INLINE int
+htrdr_buffer_layout_eq
+  (const struct htrdr_buffer_layout* a,
+   const struct htrdr_buffer_layout* b)
+{
+  ASSERT(a && b);
+  return a->width == b->width
+      && a->height == b->height
+      && a->pitch == b->pitch
+      && a->elmt_size == b->elmt_size
+      && a->alignment == b->alignment;
+}
+
+static INLINE int
+htrdr_buffer_layout_check(const struct htrdr_buffer_layout* layout)
+{
+  return layout
+      && layout->width
+      && layout->height
+      && layout->elmt_size
+      && layout->width*layout->elmt_size <= layout->pitch
+      && IS_POW2(layout->alignment);
+}
+
 /* Forward declarations */
 struct htrdr;
 struct htrdr_buffer;
@@ -45,11 +71,7 @@ BEGIN_DECLS
 HTRDR_CORE_API res_T
 htrdr_buffer_create
   (struct htrdr* htrdr,
-   const size_t width,
-   const size_t height,
-   const size_t pitch, /* #Bytes between 2 consecutive line */
-   const size_t elmt_size, /* Size of an element in the buffer */
-   const size_t alignment, /* Alignement of the buffer */
+   const struct htrdr_buffer_layout* layout,
    struct htrdr_buffer** buf);
 
 HTRDR_CORE_API void

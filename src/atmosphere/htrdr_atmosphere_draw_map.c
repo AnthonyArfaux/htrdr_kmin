@@ -435,6 +435,7 @@ setup_draw_map_args_rectangle
   ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_RECTANGLE && args);
   *args = HTRDR_DRAW_MAP_ARGS_NULL;
   args->draw_pixel = draw_pixel_flux;
+  args->buffer_layout = cmd->buf_layout;
   args->spp = cmd->spp;
   args->context = cmd;
 }
@@ -447,6 +448,7 @@ setup_draw_map_args_camera
   ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_CAMERA && args);
 
   *args = HTRDR_DRAW_MAP_ARGS_NULL;
+  args->buffer_layout = cmd->buf_layout;
   args->spp = cmd->spp;
   args->context = cmd;
 
