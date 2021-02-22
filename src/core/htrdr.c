@@ -60,6 +60,19 @@ mpi_thread_support_string(const int val)
   }
 }
 
+static const char*
+mpi_error_string(struct htrdr* htrdr, const int mpi_err)
+{
+  const int ithread = omp_get_thread_num();
+  char* str;
+  int strlen_err;
+  int err;
+  ASSERT(htrdr && (size_t)ithread < htrdr->nthreads);
+  str = htrdr->mpi_err_str + ithread*MPI_MAX_ERROR_STRING;
+  err = MPI_Error_string(mpi_err, str, &strlen_err);
+  return err == MPI_SUCCESS ? str : "Invalid MPI error";
+}
+
 static void
 release_mpi(struct htrdr* htrdr)
 {
@@ -167,7 +180,7 @@ init_mpi(struct htrdr* htrdr)
   if(err != MPI_SUCCESS) {
     htrdr_log_err(htrdr,
       "could not determine the MPI rank of the calling process -- %s.\n",
-      htrdr_mpi_error_string(htrdr, err));
+      mpi_error_string(htrdr, err));
     res = RES_UNKNOWN_ERR;
     goto error;
   }
@@ -176,7 +189,7 @@ init_mpi(struct htrdr* htrdr)
   if(err != MPI_SUCCESS) {
     htrdr_log_err(htrdr,
       "could retrieve the size of the MPI group -- %s.\n",
-      htrdr_mpi_error_string(htrdr, err));
+      mpi_error_string(htrdr, err));
     res = RES_UNKNOWN_ERR;
     goto error;
   }
@@ -443,19 +456,6 @@ htrdr_get_s3d(struct htrdr* htrdr)
   return htrdr->s3d;
 }
 
-const char*
-htrdr_mpi_error_string(struct htrdr* htrdr, const int mpi_err)
-{
-  const int ithread = omp_get_thread_num();
-  char* str;
-  int strlen_err;
-  int err;
-  ASSERT(htrdr && (size_t)ithread < htrdr->nthreads);
-  str = htrdr->mpi_err_str + ithread*MPI_MAX_ERROR_STRING;
-  err = MPI_Error_string(mpi_err, str, &strlen_err);
-  return err == MPI_SUCCESS ? str : "Invalid MPI error";
-}
-
 res_T
 htrdr_open_output_stream
   (struct htrdr* htrdr,
@@ -509,28 +509,6 @@ error:
     CHK(close(fd) == 0);
   }
   goto exit;
-}
-
-
-void
-htrdr_fprintf(struct htrdr* htrdr, FILE* stream, const char* msg, ...)
-{
-  ASSERT(htrdr && msg);
-  if(htrdr->mpi_rank == 0) {
-    va_list vargs_list;
-    va_start(vargs_list, msg);
-    vfprintf(stream, msg, vargs_list);
-    va_end(vargs_list);
-  }
-}
-
-void
-htrdr_fflush(struct htrdr* htrdr, FILE* stream)
-{
-  ASSERT(htrdr);
-  if(htrdr->mpi_rank == 0) {
-    fflush(stream);
-  }
 }
 
 /*******************************************************************************
@@ -601,19 +579,17 @@ print_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
   if(htrdr->mpi_nprocs == 1) {
     switch(msg) {
       case HTRDR_MPI_PROGRESS_RENDERING:
-        htrdr_fprintf(htrdr, stderr, "\033[2K\rRendering: %3d%%",
-          htrdr->mpi_progress_render[0]);
+        htrdr_log(htrdr, "\33[2K\r"); /* Erase the line */
+        htrdr_log(htrdr, "Rendering: %3d%%\r", htrdr->mpi_progress_render[0]);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }
-    htrdr_fflush(htrdr, stderr);
   } else {
     int iproc;
     FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
       switch(msg) {
         case HTRDR_MPI_PROGRESS_RENDERING:
-          htrdr_fprintf(htrdr, stderr,
-            "\033[2K\rProcess %d -- rendering: %3d%%%c",
+          htrdr_log(htrdr, "Process %d -- rendering: %3d%%%c",
             iproc, htrdr->mpi_progress_render[iproc],
             iproc == htrdr->mpi_nprocs - 1 ? '\r' : '\n');
           break;
@@ -629,7 +605,13 @@ clear_mpi_progress(struct htrdr* htrdr, const enum htrdr_mpi_message msg)
   ASSERT(htrdr);
   (void)msg;
   if(htrdr->mpi_nprocs > 1) {
-    htrdr_fprintf(htrdr, stderr, "\033[%dA", htrdr->mpi_nprocs-1);
+    int iproc;
+    FOR_EACH(iproc, 0, htrdr->mpi_nprocs) {
+      htrdr_log(htrdr, "\33[2K\r"); /* Erase the line */
+      if(iproc != htrdr->mpi_nprocs-1) {
+        htrdr_log(htrdr, "\033[1A\r"); /* Move up */
+      }
+    }
   }
 }
 

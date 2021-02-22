@@ -156,31 +156,6 @@ htrdr_open_output_stream
    int force_overwrite,
    FILE** out_fp);
 
-/* TODO do not expose publicly this function(?) */
-HTRDR_CORE_API const char*
-htrdr_mpi_error_string
-  (struct htrdr* htrdr,
-   const int mpi_err);
-
-/* TODO replace them by regular log message */
-HTRDR_CORE_API void
-htrdr_fprintf
-  (struct htrdr* htrdr,
-   FILE* stream,
-   const char* msg,
-   ...)
-#ifdef COMPILER_GCC
-  __attribute((format(printf, 3, 4)))
-#endif
-  ;
-
-/* TODO remove this */
-HTRDR_CORE_API void
-htrdr_fflush
-  (struct htrdr* htrdr,
-   FILE* stream);
-
-
 END_DECLS
 
 #endif /* HTRDR_H */
