@@ -1,5 +1,7 @@
-// Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
-// Copyright (C) 2018-2019 CNRS, Université Paul Sabatier
+// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+// Copyright (C) 2018, 2019, 2021 CNRS
+// Copyright (C) 2018, 2019 Université Paul Sabatier
+//                          (contact-edstar@laplace.univ-tlse.fr)
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,26 +17,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 :toc:
 
-htrdr(1)
-========
+htrdr-atmosphere(1)
+===================
 
 NAME
 ----
-htrdr - simulate radiative transfert in cloudy atmospheres
+htrdr-atmosphere - simulate radiative transfert in cloudy atmospheres
 
 SYNOPSIS
 --------
 [verse]
-*htrdr* [_option_]... -a _atmosphere_
+*htrdr-atmosphere* [_option_]... -a _atmosphere_
 
 DESCRIPTION
 -----------
-*htrdr* simulate radiative transfert in scenes composed of an atmospheric gas
-mixture, clouds, and a ground. It evaluates the intensity incoming on each
-pixel of the sensor array. The underlying algorithm is based on a Monte-Carlo
-method: it consists in simulating a given number of optical paths originating
-from the sensor, directed into the atmosphere, taking into account light
-absorption and scattering phenomena.
+*htrdr-atmosphere* simulate radiative transfert in scenes composed of an
+atmospheric gas mixture, clouds, and a ground. It evaluates the intensity
+incoming on each pixel of the sensor array. The underlying algorithm is based
+on a Monte-Carlo method: it consists in simulating a given number of optical
+paths originating from the sensor, directed into the atmosphere, taking into
+account light absorption and scattering phenomena.
 
 Radiative transfert can be evaluated in the visible or the infrared part of the
 spectrum. It uses spectral data that should be provided for the pressure and
@@ -50,9 +52,9 @@ listed in the *htrdr-material*(5) file provided through the *-M* option. Both,
 the clouds and the ground, can be infinitely repeated along the X and Y axis by
 setting the *-r* and the *-R* options, respectively.
 
-Two types of sensor are supported by *htrdr*. The camera (*-C* _camera_) is
-used to render an image of the scene from the given point of view while the
-rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
+Two types of sensor are supported by *htrdr-atmosphere*. The camera (*-C*
+_camera_) is used to render an image of the scene from the given point of view
+while the rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
 
 Spectral dimension can be integrated in many ways (*-s* option). When rendering
 an image (*-C* _camera_), the computation is by default performed for the
@@ -70,21 +72,22 @@ temperature and both are saved in the image. When computing a flux map (*-p*
 _rectangle_), the per pixel flux is saved into the output map whether spectral
 domain is longwave or shortwave.
 
-In *htrdr* the spatial unit 1.0 corresponds to one meter and the temperatures
-are expressed in Kelvin. The estimated radiances are given in W/sr/m^2 excepted
-for monochromatic computations where the computed spectral radiance is defined
-in W/sr/m^2/nm. The fluxes are saved in W/m^2. The results are written to the
-output file if the *-o* option is defined and the standard output otherwise.
-The output image is a list of raw ASCII data formatted with respect to the
-*htrdr-image*(5) file format.  Since *htrdr* relies on the Monte-Carlo method,
-each estimation is given with its numerical accuracy.
+In *htrdr-atmosphere* the spatial unit 1.0 corresponds to one meter and the
+temperatures are expressed in Kelvin. The estimated radiances are given in
+W/sr/m^2 excepted for monochromatic computations where the computed spectral
+radiance is defined in W/sr/m^2/nm. The fluxes are saved in W/m^2. The results
+are written to the output file if the *-o* option is defined and the standard
+output otherwise.  The output image is a list of raw ASCII data formatted with
+respect to the *htrdr-image*(5) file format.  Since *htrdr-atmosphere* relies
+on the Monte-Carlo method, each estimation is given with its numerical
+accuracy.
 
-During the simulation, *htrdr* dynamically loads/unloads cloud properties to
-handle clouds whose data that do not feat in main memory. *htrdr* also supports
-shared memory parallelism and relies on the Message Passing Interface
-specification [3] to parallelise its computations in a distributed memory
-environment; it can thus be run either directly or through a MPI process
-launcher like *mpirun*(1).
+During the simulation, *htrdr-atmosphere* dynamically loads/unloads cloud
+properties to handle clouds whose data that do not feat in main memory.
+*htrdr-atmosphere* also supports shared memory parallelism and relies on the
+Message Passing Interface specification [3] to parallelise its computations in
+a distributed memory environment; it can thus be run either directly or through
+a MPI process launcher like *mpirun*(1).
 
 OPTIONS
 -------
@@ -184,13 +187,13 @@ OPTIONS
   of the pre-processing step. If _cache_ contains data generated from input
   files that are not the ones submitted on the command line, an error is
   notified and the execution is stopped, avoiding the use of wrong cached data.
-  Note that when the cache is used, *htrdr* ignores the arguments used to
-  parametrise the structures partitioning the sky data, i.e. the *-T* and *-V*
-  options.
+  Note that when the cache is used, *htrdr-atmosphere* ignores the arguments
+  used to parametrise the structures partitioning the sky data, i.e. the *-T*
+  and *-V* options.
 
 *-o* _output_::
-  File where *htrdr* writes its _output_ data. If not defined, write results to
-  standard output.
+  File where *htrdr-atmosphere* writes its _output_ data. If not defined, write
+  results to standard output.
 
 *-p* <__rectangle-parameter__:...>::
   Switch in flux map computation. The flux is computed for the part of the
@@ -220,7 +223,7 @@ OPTIONS
   **cie_xyz**;;
     the radiance is computed for the visible part of the spectrum in [380, 780]
     nanometers with respect to the XYZ CIE 1931 tristimulus values. This is the
-    default comportment of *htrdr*.
+    default comportment of *htrdr-atmosphere*.
 
   **lw**=*_wlen-min_*,*_wlen-max_*;;
     perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
@@ -267,10 +270,7 @@ OPTIONS
   file is used (option *-O*).
 
 *-v*::
-  Make *htrdr* verbose.
-
-*--version*::
-  Display version information and exit.
+  Make *htrdr-atmosphere* verbose.
 
 EXAMPLES
 --------
@@ -285,7 +285,7 @@ component is estimated with *64* Monte-Carlo realisations. The resulting image
 is written to *output* excepted if the file already exists; in this case an
 error is notified, the program stops and the *output* file remains unchanged:
 
-    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
+    $ htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
       -M materials.mtl \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
@@ -299,7 +299,7 @@ image to *output* even though the file already exists. Finally, use the
 *htpp*(1) command to convert the *htrdr-image*(5) saved in output in a regular
 PPM image [4]:
 
-    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R \
+    $ htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
       -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
@@ -310,7 +310,7 @@ PPM image [4]:
 Render the previous scene in infrared for the wavelengths in [*9200*, *10000*]
 nanometers with a reference temperature of *300* Kelvin:
 
-    $ htrdr -a gas.txt -m Mie.nc -g mountains.obj -R \
+    $ htrdr-atmosphere -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
       -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
@@ -325,7 +325,7 @@ number of samples per pixel component to *1024*. Write results on standard
 output and convert the resulting image in PPM before visualising it through the
 *feh*(1) image viewer:
 
-    $ htrdr -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
+    $ htrdr-atmosphere -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
       -c clouds.htcp \
       -O my_cache \
@@ -338,7 +338,7 @@ The resolution of the flux map is *500* by *500* pixels and *1000* realisations
 is used to estimate the flux per pixel. It is saved in the *flux_map.txt* file
 even though this file already exists:
 
-    $ htrdr -D0,90 -a gas.txt -m Mie.nc -g plane.obj -R \
+    $ htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g plane.obj -R \
       -M materials.mtl \
       -c clouds.htcp \
       -O my_cache \
@@ -353,13 +353,13 @@ of the generated grids and save each of them in a specific VTK file whose name
 is *cloud_grid_*<__NUM__>*.vtk with __NUM__ in [0, N-1] where N is the number
 of grids written into *output*:
 
-    $ htrdr -a gas.txt -m Mie.nc -c clouds.htcp -d -f -o output
+    $ htrdr-atmosphere -a gas.txt -m Mie.nc -c clouds.htcp -d -f -o output
     $ csplit -f cloud_grid_ -b %02d.vtk -z --suppress-matched output /^---$/ {*}
 
-Use *mpirun*(1) to launch *htrdr* on several hosts defined in the *my_hosts*
-file. Make the clouds infinite along the X and Y axis:
+Use *mpirun*(1) to launch *htrdr-atmosphere* on several hosts defined in the
+*my_hosts* file. Make the clouds infinite along the X and Y axis:
 
-    $ mpirun --hostfile my_hosts htrdr \
+    $ mpirun --hostfile my_hosts htrdr-atmosphere \
       -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
       -c clouds.htcp -r \
@@ -378,12 +378,17 @@ NOTES
 
 COPYRIGHT
 ---------
-Copyright &copy; 2018, 2019, 2020 |Meso|Star> <contact@meso-star.com>.
-Copyright &copy; 2018, 2019 CNRS, Université Paul Sabatier
-<contact-edstar@laplace.univ-tlse.fr>. *htrdr* is free software released under
-the GPLv3+ license: GNU GPL version 3 or later
-<https://gnu.org/licenses/gpl.html>. You are free to change and redistribute
-it. There is NO WARRANTY, to the extent permitted by law.
+Copyright $copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
+Copyright &copy; 2018, 2019, 2021 CNRS
+Copyright &copy; 2018, 2019 Université Paul Sabatier
+<contact-edstar@laplace.univ-tlse.fr>.
+
+LICENSE
+-------
+
+*htrdr-atmosphere* is free software released under the GPLv3+ license: GNU GPL
+version 3 or later <https://gnu.org/licenses/gpl.html>. You are free to change
+and redistribute it. There is NO WARRANTY, to the extent permitted by law.
 
 SEE ALSO
 --------
@@ -393,6 +398,7 @@ SEE ALSO
 *htcp*(5),
 *htmie*(5),
 *htpp*(1),
+*htrdr*(1),
 *htrdr-image*(5),
 *htrdr-materials*(5)
 *htrdr-obj*(5)

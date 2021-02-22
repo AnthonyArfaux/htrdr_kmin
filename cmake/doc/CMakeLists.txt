@@ -29,7 +29,7 @@ endif()
 ################################################################################
 # Copy doc files
 ################################################################################
-set(MAN_NAMES htrdr-image.5 htrdr-materials.5 htrdr-obj.5)
+set(MAN_NAMES htrdr.1 htrdr-image.5 htrdr-materials.5 htrdr-obj.5)
 
 set(MAN_FILES)
 foreach(_name IN LISTS MAN_NAMES)
@@ -45,9 +45,9 @@ foreach(_name IN LISTS MAN_NAMES)
 endforeach()
 add_custom_target(man-copy ALL DEPENDS ${MAN_FILES})
 
-configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr.1.txt.in
-  ${CMAKE_CURRENT_BINARY_DIR}/htrdr.1.txt @ONLY)
-list(APPEND MAN_NAMES htrdr.1)
+configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr-atmosphere.1.txt.in
+  ${CMAKE_CURRENT_BINARY_DIR}/htrdr-atmosphere.1.txt @ONLY)
+list(APPEND MAN_NAMES htrdr-atmosphere.1)
 
 ################################################################################
 # ROFF man pages

@@ -32,7 +32,7 @@ set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 add_subdirectory(core)
 add_subdirectory(atmosphere)
 add_subdirectory(commands)
-#add_subdirectory(doc)
+add_subdirectory(doc)
 
 ################################################################################
 # Define output & install directories
