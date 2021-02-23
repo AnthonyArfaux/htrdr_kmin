@@ -782,7 +782,7 @@ htrdr_draw_map
 
   if(htrdr->mpi_rank == 0) {
     update_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
-    fprintf(stderr, "\n"); /* Add a new line after the progress statuses */
+    htrdr_log(htrdr, "\n"); /* Add a new line after the progress statuses */
   }
 
   time_sub(&t0, time_current(&t1), &t0);
