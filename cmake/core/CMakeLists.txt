@@ -74,12 +74,13 @@ configure_file(${HTRDR_SOURCE_DIR}/core/htrdr_version.h.in
 # Configure and define targets
 ################################################################################
 set(HTRDR_CORE_FILES_SRC
+  htrdr.c
   htrdr_args.c
   htrdr_buffer.c
-  htrdr.c
   htrdr_camera.c
   htrdr_cie_xyz.c
   htrdr_draw_map.c
+  htrdr_geometry.c
   htrdr_log.c
   htrdr_materials.c
   htrdr_ran_wlen.c
@@ -87,13 +88,14 @@ set(HTRDR_CORE_FILES_SRC
   htrdr_slab.c
   htrdr_spectral.c)
 set(HTRDR_CORE_FILES_INC
+  htrdr.h
   htrdr_accum.h
   htrdr_buffer.h
   htrdr_camera.h
   htrdr_c.h
   htrdr_cie_xyz.h
   htrdr_draw_map.h
-  htrdr.h
+  htrdr_geometry.c
   htrdr_interface.h
   htrdr_log.h
   htrdr_materials.h
