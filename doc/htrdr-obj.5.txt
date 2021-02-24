@@ -1,5 +1,7 @@
-// Copyright (C) 2018, 2019, 2020 |Meso|Star> (contact@meso-star.com)
-// Copyright (C) 2018-2019 CNRS, Université Paul Sabatier
+// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+// Copyright (C) 2018, 2019, 2021 CNRS
+// Copyright (C) 2018, 2019 Université Paul Sabatier
+//                          (contact-edstar@laplace.univ-tlse.fr)
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,12 +29,14 @@ DESCRIPTION
 A *htrdr-obj* file is a regular OBJ [1] composed only of triangular meshes.
 Each triangle must be included in a material group as defined by the 'usemtl'
 directive. The name of the material group must be of the form
-"<__front-mtl-name__>:<__back-mtl-name__>", where <__front-mtl-name__> and
-<__back-mtl-name__> are strings separated by a colon (:) defining the name of
-the front and back facing materials, respectively. These names can be composed
-of any characters expected for spaces and tabulations. Note that regarding the
-*htrdr*(1) convention, a triangle side is said "front facing" when its
-vertices are clock-wise ordered. 
+"<__front-mtl-name__>:[<__interface-mtl-name__>:]<__back-mtl-name__>", where
+<__front-mtl-name__>, <__interface-mtl-name__> and <__back-mtl-name__> are
+strings separated by a colon (:) defining the name of the front, interface,
+and back facing materials, respectively. The interface material name is
+optionnal: it is used for thin geometries, i.e. geometries with no thickness.
+Material names can be composed of any characters expected for spaces and
+tabulations. Note that regarding the *htrdr*(1) convention, a triangle side is
+said "front facing" when its vertices are clock-wise ordered. 
 
 Note that to be a valid *htrdr-obj*(5) file for *htrdr*(1), the front and the
 back facing names must reference a material listed in *htrdr-materials*(5)

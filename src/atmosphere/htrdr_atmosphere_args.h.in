@@ -1,0 +1,113 @@
+/* Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019, Université Paul Sabatier
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#ifndef HTRDR_ATMOSPHERE_ARGS_H
+#define HTRDR_ATMOSPHERE_ARGS_H
+
+#include "core/htrdr_args.h"
+#include "core/htrdr_sensor.h"
+
+#include <rsys/rsys.h>
+
+#include <limits.h> /* UINT_MAX support */
+
+struct htrdr_atmosphere_args {
+  const char* filename_gas; /* Path of the gas file */
+  const char* filename_les; /* Path of the HTCP file */
+  const char* filename_mie; /* Path of the Mie properties */
+  const char* filename_obj; /* Path of the ground geometry */
+  const char* filename_mtl; /* Path of the ground materials */
+
+  const char* filename_cache; /* Path of the file to store/restore cached data */
+  const char* filename_output; /* Name of the output file */
+
+  const char* sky_mtl_name; /* Name of the sky material */
+
+  union {
+    struct htrdr_args_camera camera; /* Pinhole Camera */
+    struct htrdr_args_rectangle rectangle; /* Flux map */
+  } sensor;
+  enum htrdr_sensor_type sensor_type;
+
+  struct htrdr_args_image image; /* Output Image */
+  struct htrdr_args_spectral spectral; /* Spectral domain */
+
+  double sun_azimuth; /* In degrees */
+  double sun_elevation; /* In degrees */
+
+  /* Parameters of the volumetric acceleration data structures */
+  double optical_thickness; /* Threshold used during octree building */
+  unsigned grid_max_definition[3]; /* Maximum definition of the grid */
+
+  int repeat_clouds; /* Make the clouds infinite in X and Y */
+  int repeat_ground; /* Make the ground infinite in X and Y */
+
+  /* Miscellaneous parameters */
+  unsigned nthreads; /* Hint on the number of threads to use */
+  int force_overwriting;
+  int dump_volumetric_acceleration_structure;
+  int verbose; /* Verbosity level */
+  int quit; /* Stop the command */
+};
+
+#define HTRDR_ATMOSPHERE_ARGS_DEFAULT__ {                                      \
+  NULL, /* Gas filename */                                                     \
+  NULL, /* LES filename */                                                     \
+  NULL, /* Mie filename */                                                     \
+  NULL, /* Obj filename */                                                     \
+  NULL, /* Mtl filename */                                                     \
+                                                                               \
+  NULL, /* Cache filename */                                                   \
+  NULL, /* Output filename */                                                  \
+                                                                               \
+  @HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@, /* Sky mtl name */             \
+                                                                               \
+  {HTRDR_ARGS_CAMERA_DEFAULT__}, /* Sensor */                                  \
+  HTRDR_SENSOR_CAMERA, /* Sensor type */                                       \
+                                                                               \
+  HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
+  HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral */                                \
+                                                                               \
+  0, /* Sun azimuth */                                                         \
+  90, /* Sun elevation */                                                      \
+                                                                               \
+  @HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                 \
+  {UINT_MAX, UINT_MAX, UINT_MAX}, /* Maximum definition of the grid */         \
+                                                                               \
+  0, /* Repeat clouds */                                                       \
+  0, /* Repeat ground */                                                       \
+                                                                               \
+  UINT_MAX, /* #threads */                                                     \
+  0, /* Force overwriting */                                                   \
+  0, /* dump volumetric acceleration structure */                              \
+  0, /* Verbose flag */                                                        \
+  0  /* Stop the command */                                                    \
+}
+static const struct htrdr_atmosphere_args HTRDR_ATMOSPHERE_ARGS_DEFAULT =
+  HTRDR_ATMOSPHERE_ARGS_DEFAULT__;
+
+extern LOCAL_SYM res_T
+htrdr_atmosphere_args_init
+  (struct htrdr_atmosphere_args* args,
+   int argc,
+   char** argv);
+
+extern LOCAL_SYM void
+htrdr_atmosphere_args_release
+  (struct htrdr_atmosphere_args* args);
+
+#endif /* HTRDR_ATMOSPHERE_ARGS_H */

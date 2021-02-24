@@ -16,29 +16,35 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.1)
-project(htrdr C)
+project(htrdr-commands C)
 
-set(HTRDR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
-set(HTRDR_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
-
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 7)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+include_directories(${HTRDR_BUILD_DIR} ${HTRDR_SOURCE_DIR})
 
 ################################################################################
-# Add sub projects
+# Check dependencies
 ################################################################################
-add_subdirectory(core)
-add_subdirectory(atmosphere)
-add_subdirectory(commands)
-add_subdirectory(doc)
+find_package(RSys 0.11 REQUIRED)
+include_directories(${RSys_INCLUDE_DIR})
+
+################################################################################
+# Configure and define targets
+################################################################################
+add_executable(htrdr_cmd ${HTRDR_SOURCE_DIR}/commands/htrdr_cmd.c)
+target_link_libraries(htrdr_cmd htrdr-atmosphere)
+set_target_properties(htrdr_cmd PROPERTIES
+  OUTPUT_NAME htrdr)
+
+add_executable(htrdr_atmosphere_cmd 
+  ${HTRDR_SOURCE_DIR}/commands/htrdr_atmosphere_cmd.c)
+target_link_libraries(htrdr_atmosphere_cmd htrdr-atmosphere)
+set_target_properties(htrdr_atmosphere_cmd PROPERTIES 
+  OUTPUT_NAME htrdr-atmosphere)
 
 ################################################################################
 # Define output & install directories
 ################################################################################
-set(HTRDR_FILES_DOC
-  ${PROJECT_SOURCE_DIR}/../COPYING
-  ${PROJECT_SOURCE_DIR}/../README.md)
-install(FILES ${HTRDR_FILES_DOC} DESTINATION share/doc/htrdr)
+install(TARGETS htrdr_cmd htrdr_atmosphere_cmd
+  ARCHIVE DESTINATION bin
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
 
