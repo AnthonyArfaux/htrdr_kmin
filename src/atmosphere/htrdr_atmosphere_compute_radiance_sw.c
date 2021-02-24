@@ -315,7 +315,7 @@ atmosphere_compute_radiance_sw
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
 
-  if((cpnt_mask & ATMOSPHERE_RADIANCE_DIRECT) /* Handle direct contribation */
+  if((cpnt_mask & ATMOSPHERE_RADIANCE_DIRECT) /* Handle direct contribution */
   && htrdr_atmosphere_sun_is_dir_in_solar_cone(cmd->sun, dir)) {
     /* Check that the ray is not occluded along the submitted range */
     d2(range, 0, FLT_MAX);
