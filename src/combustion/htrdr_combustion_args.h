@@ -23,6 +23,27 @@
 
 #include <limits.h> /* UINT_MAX support */
 
+enum htrdr_combustion_args_grid_definition_type {
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_FIXED,
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_AUTO,
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_TYPES_COUNT__
+};
+
+struct htrdr_combustion_args_grid_definition {
+  union {
+    unsigned hint; /* Hint on the grid definition to eval */
+    unsigned fixed[3]; /* Fixed grid definition along the 3 axis */
+  } definition;
+  enum htrdr_combustion_args_grid_definition_type type;
+};
+#define HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__ {                      \
+  {256},                                                                       \
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_AUTO                                   \
+}
+static const struct htrdr_combustion_args_grid_definition
+HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT =
+ HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__;
+
 struct htrdr_combustion_args {
   const char* filename_geom; /* Obj of the combustion chamber */
   const char* filename_tetra; /* Volumetric mesh of the medium */
@@ -43,9 +64,7 @@ struct htrdr_combustion_args {
   double gyration_radius_prefactor;
   double fractal_dimension;
 
-  unsigned grid_max_definition[3]; /* Fixed grid definition along the 3 axes */
-  unsigned auto_grid_definition_hint; /* Hint on the grid definition to eval */
-  int auto_grid_definition; /* Switch between auto and fixed grid definition */
+  struct htrdr_combustion_args_grid_definition grid;
 
   double optical_thickness; /* Threshold used during octree building */
 
@@ -77,9 +96,7 @@ struct htrdr_combustion_args {
   1.30, /* Gyration radius prefactor */                                        \
   1.80, /* Fractal dimension */                                                \
                                                                                \
-  {256, 256, 256}, /* Acceleration grid max definition */                      \
-  256, /* Hint on grid Definition in 'auto grid definition' mode */            \
-  1, /* Enable/disable 'auto grid definition' mode */                          \
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__,                             \
                                                                                \
   1, /* Optical thickness */                                                   \
                                                                                \

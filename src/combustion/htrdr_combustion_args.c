@@ -17,6 +17,7 @@
 
 #include "combustion/htrdr_combustion_args.h"
 
+#include <rsys/cstr.h>
 #include <getopt.h>
 
 /*******************************************************************************
@@ -27,7 +28,7 @@ print_help(const char* cmd)
 {
   ASSERT(cmd);
   printf(
-"Usage: %s [<options>] -l <laser> -r REFRACT_IDS -m TETRAHEDRA -p THERMOPROPS\n",
+"Usage: %s [<options>] -l <laser> -m TETRAHEDRA -p THERMOPROPS -r REFRACT_IDS\n",
     cmd);
   printf(
 "Render a monochromatic image within a sooting flame described according\n"
@@ -82,11 +83,11 @@ print_help(const char* cmd)
 "  -t NTHREADS    hint on the number of threads to use. By default use\n"
 "                 as many threads as CPU cores.\n");
   printf(
-"  -V <DEFINITION|X,Y,Z>\n"
-"                 maximum definition of the volumetric acceleration\n"
-"                 grids along the 3 axis. Its default value is\n"
-"                 [%u, %u, %u].\n", 
-    SPLIT3(HTRDR_COMBUSTION_ARGS_DEFAULT.grid_max_definition));
+"  -V <HINT|X,Y,Z>\n"
+"                 definition of the volumetric acceleration grids along\n"
+"                 the 3 axis. By default it is computed automatically\n"
+"                 with a hint on the expected definition set to %u.\n",
+    HTRDR_COMBUSTION_ARGS_DEFAULT.grid.definition.hint);
   printf(
 "  -v             make the command verbose.\n");
   printf(
@@ -100,6 +101,51 @@ print_help(const char* cmd)
   htrdr_fprint_license(cmd, stdout);
 }
 
+static res_T
+parse_grid_definition
+  (struct htrdr_combustion_args_grid_definition* grid_def,
+   const char* str)
+{
+  unsigned def[3];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(grid_def && str);
+
+  res = cstr_to_list_uint(str, ',', def, &len, 3);
+  if(res == RES_OK && len == 2) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid grid definition `%s'.\n", str);
+    goto error;
+  }
+
+  if(len == 1) {
+    if(!def[0]) {
+      fprintf(stderr, "Invalid null grid definition %u.\n", def[0]);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    grid_def->type = HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_AUTO;
+    grid_def->definition.hint = def[0];
+
+  } else {
+    if(!def[0] || !def[1] || !def[2]) {
+      fprintf(stderr,
+        "Invalid null grid definition [%u, %u, %u].\n", SPLIT3(def));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    grid_def->type = HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_FIXED;
+    grid_def->definition.fixed[0] = def[0];
+    grid_def->definition.fixed[1] = def[1];
+    grid_def->definition.fixed[2] = def[2];
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -109,6 +155,7 @@ htrdr_combustion_args_init
    int argc,
    char** argv)
 {
+  int laser_is_defined = 0;
   int opt;
   res_T res = RES_OK;
   ASSERT(args && argc && argv);
@@ -117,12 +164,59 @@ htrdr_combustion_args_init
 
   while((opt = getopt(argc, argv, "C:dF:fG:g:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
     switch(opt) {
-      /* TODO parse the options */
+      case 'C':
+        res = htrdr_args_camera_parse(&args->camera, optarg);
+        break;
+      case 'd':
+        args->dump_volumetric_acceleration_structure = 1;
+        break;
+      case 'F':
+        res = cstr_to_double(optarg, &args->fractal_dimension);
+        if(res == RES_OK && args->fractal_dimension <= 0)
+          res = RES_BAD_ARG;
+        break;
+      case 'f': args->force_overwriting = 1; break;
+      case 'G':
+        res = cstr_to_double(optarg, &args->gyration_radius_prefactor);
+        if(res == RES_OK && args->gyration_radius_prefactor <= 0)
+          res = RES_BAD_ARG;
+        break;
+      case 'g':
+        args->filename_geom = optarg;
+        break;
       case 'h':
         print_help(argv[0]);
         htrdr_combustion_args_release(args);
         args->quit = 1;
         goto exit;
+      case 'i':
+        res = htrdr_args_image_parse(&args->image, optarg);
+        break;
+      case 'l':
+        res = htrdr_args_rectangle_parse(&args->laser, optarg);
+        laser_is_defined = 1;
+        break;
+      case 'm': args->filename_tetra = optarg; break;
+      case 'N': args->precompute_normals = 1; break;
+      case 'O': args->filename_cache = optarg; break;
+      case 'o': args->filename_output = optarg; break;
+      case 'p': args->filename_therm_props = optarg; break;
+      case 'r': args->filename_refract_ids = optarg; break;
+      case 'T':
+        res = cstr_to_double(optarg, &args->optical_thickness);
+        if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
+        break;
+      case 't': /* Submit an hint on the number of threads to use */
+        res = cstr_to_uint(optarg, &args->nthreads);
+        if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
+        break;
+      case 'V':
+        res = parse_grid_definition(&args->grid, optarg);
+        break;
+      case 'v': args->verbose = 1; break;
+      case 'w': 
+        res = cstr_to_double(optarg, &args->wavelength);
+        break;
       default: res = RES_BAD_ARG; break;
     }
     if(res != RES_OK) {
@@ -132,6 +226,27 @@ htrdr_combustion_args_init
       }
       goto error;
     }
+  }
+
+  if(!laser_is_defined) {
+    fprintf(stderr, "Missing the laser definition -- option '-l'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!args->filename_tetra) {
+    fprintf(stderr, "Missing the volumetric mesh -- option '-m'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!args->filename_therm_props) {
+    fprintf(stderr, "Missing the thermodynamic properties -- option '-p'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!args->filename_refract_ids) {
+    fprintf(stderr, "Missing the refractive indices -- option '-r'\n");
+    res = RES_BAD_ARG;
+    goto error;
   }
 
 exit:
