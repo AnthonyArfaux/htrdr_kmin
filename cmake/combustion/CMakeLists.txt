@@ -47,9 +47,11 @@ include_directories(
 # Configure and define targets
 ################################################################################
 set(HTRDR_COMBUSTION_FILES_SRC
-  htrdr_combustion_args.c)
+  htrdr_combustion_args.c
+  htrdr_combustion_main.c)
 
 set(HTRDR_COMBUSTION_FILES_INC
+  htrdr_combustion.h
   htrdr_combustion_args.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'

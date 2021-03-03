@@ -16,6 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "atmosphere/htrdr_atmosphere.h"
+#include "combustion/htrdr_combustion.h"
 #include "core/htrdr_version.h"
 
 #include <string.h>
@@ -76,7 +77,8 @@ main(int argc, char** argv)
 
   /* Combustion mode */
   } else if(!strcmp(argv[1], "combustion")) {
-    /* TODO */
+    err = htrdr_combustion_main(argc-1, argv+1);
+    if(err) goto error;
 
   /* Version */
   } else if(!strcmp(argv[1], "--version")) {
