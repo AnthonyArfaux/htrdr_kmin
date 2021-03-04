@@ -231,6 +231,25 @@ error:
   goto exit;
 }
 
+static res_T
+dump_volumetric_acceleration_structure(struct htrdr_combustion* cmd)
+{
+  struct atrstm_dump_svx_octree_args args = ATRSTM_DUMP_SVX_OCTREE_ARGS_DEFAULT;
+  res_T res = RES_OK;
+  ASSERT(cmd);
+
+  /* Nothing to do on non master process */
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
+
+  res = atrstm_dump_svx_octree(cmd->medium, &args, cmd->output);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 static void
 combustion_release(ref_T* ref)
 {
@@ -317,6 +336,25 @@ htrdr_combustion_ref_put(struct htrdr_combustion* cmd)
 {
   ASSERT(cmd);
   ref_put(&cmd->ref, combustion_release);
+}
+
+res_T
+htrdr_combustion_run(struct htrdr_combustion* cmd)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd);
+
+  if(cmd->dump_volumetric_acceleration_structure) {
+    res = dump_volumetric_acceleration_structure(cmd);
+    if(res != RES_OK) goto error;
+  } else {
+    /* TODO */
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 /*******************************************************************************

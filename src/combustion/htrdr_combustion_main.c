@@ -62,7 +62,8 @@ htrdr_combustion_main(int argc, char** argv)
   res = htrdr_combustion_create(htrdr, &cmd_args, &cmd);
   if(res != RES_OK) goto error;
 
-  /* TODO run the command */
+  res = htrdr_combustion_run(cmd);
+  if(res != RES_OK) goto error;
 
 exit:
   htrdr_combustion_args_release(&cmd_args);

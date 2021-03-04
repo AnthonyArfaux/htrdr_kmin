@@ -41,6 +41,10 @@ HTRDR_API void
 htrdr_combustion_ref_put
   (struct htrdr_combustion* cmd);
 
+HTRDR_API res_T
+htrdr_combustion_run
+  (struct htrdr_combustion* cmd);
+
 HTRDR_API int
 htrdr_combustion_main
   (int argc,
