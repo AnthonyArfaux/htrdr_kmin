@@ -45,13 +45,14 @@ HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT =
  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__;
 
 struct htrdr_combustion_args {
-  const char* filename_geom; /* Obj of the combustion chamber */
-  const char* filename_tetra; /* Volumetric mesh of the medium */
-  const char* filename_therm_props; /* Termodynamic properties of the medium */
-  const char* filename_refract_ids; /* Refractive indices in the medium */
+  struct htrdr_args_geometry geom; /* Combustion chamber geometry */
 
-  const char* filename_cache; /* Path of the file to store/restore cached data */
-  const char* filename_output; /* Name of the output file */
+  const char* path_tetra; /* Volumetric mesh of the medium */
+  const char* path_therm_props; /* Termodynamic properties of the medium */
+  const char* path_refract_ids; /* Refractive indices in the medium */
+
+  const char* path_cache; /* Path of the file to store/restore cached data */
+  const char* path_output; /* Name of the output file */
 
   struct htrdr_args_camera camera; /* Pinhole Camera */
 
@@ -78,13 +79,14 @@ struct htrdr_combustion_args {
 };
 
 #define HTRDR_COMBUSTION_ARGS_DEFAULT__ {                                      \
-  NULL, /* Geom filename */                                                    \
-  NULL, /* Tetra filename */                                                   \
-  NULL, /* Therm props filename */                                             \
-  NULL, /* Refractive ids filename */                                          \
+  HTRDR_ARGS_GEOMETRY_NULL__,                                                  \
                                                                                \
-  NULL, /* Cache filename */                                                   \
-  NULL, /* Output filename */                                                  \
+  NULL, /* Tetra path */                                                       \
+  NULL, /* Therm props path */                                                 \
+  NULL, /* Refractive ids path */                                              \
+                                                                               \
+  NULL, /* Cache path */                                                       \
+  NULL, /* Output path */                                                      \
                                                                                \
   HTRDR_ARGS_CAMERA_DEFAULT__, /* Pinhole camera */                            \
                                                                                \

@@ -27,6 +27,14 @@
  * Row major ordered 2D buffer
  */
 
+struct htrdr_pixel_format {
+  size_t size; /* In bytes */
+  size_t alignment; /* Power of two, in Bytes */
+};
+#define HTRDR_PIXEL_FORMAT_NULL__ {0, 0}
+static const struct htrdr_pixel_format HTRDR_PIXEL_FORMAT_NULL =
+  HTRDR_PIXEL_FORMAT_NULL__;
+
 struct htrdr_buffer_layout {
   size_t width; /* #elements in X */
   size_t height; /* #elements in Y */

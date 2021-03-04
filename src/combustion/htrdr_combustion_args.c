@@ -51,12 +51,13 @@ print_help(const char* cmd)
 "                 model. Its default value is %g.\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.gyration_radius_prefactor);
   printf(
-"  -g GEOMETRY    filename of the combustion chamber.\n");
+"  -g <geometry>  define the combustion chamber geometry. Refer to the\n"
+"                 %s man page for the list of geometry options.\n", cmd);
   printf(
 "  -h             display this help and exit.\n");
   printf(
 "  -i <image>     define the image to compute. Refer to the %s man\n"
-"                 page for the list of image options\n", cmd);
+"                 page for the list of image options.\n", cmd);
   printf(
 "  -l <laser>     define the geometry of the laser sheet. Refer to the\n"
 "                 %s man page for the list of laser options.\n", cmd);
@@ -65,7 +66,7 @@ print_help(const char* cmd)
   printf(
 "  -N             precompute the tetrahedra normals.\n");
   printf(
-"  -O CACHE       filename of the cache file used to store/restore the\n"
+"  -O CACHE       path of the cache file used to store/restore the\n"
 "                 volumetric data. By default do not use any cache.\n");
   printf(
 "  -o OUTPUT      file where data are written. If not defined, data are\n"
@@ -182,7 +183,7 @@ htrdr_combustion_args_init
           res = RES_BAD_ARG;
         break;
       case 'g':
-        args->filename_geom = optarg;
+        res = htrdr_args_geometry_parse(&args->geom, optarg);
         break;
       case 'h':
         print_help(argv[0]);
@@ -196,12 +197,12 @@ htrdr_combustion_args_init
         res = htrdr_args_rectangle_parse(&args->laser, optarg);
         laser_is_defined = 1;
         break;
-      case 'm': args->filename_tetra = optarg; break;
+      case 'm': args->path_tetra = optarg; break;
       case 'N': args->precompute_normals = 1; break;
-      case 'O': args->filename_cache = optarg; break;
-      case 'o': args->filename_output = optarg; break;
-      case 'p': args->filename_therm_props = optarg; break;
-      case 'r': args->filename_refract_ids = optarg; break;
+      case 'O': args->path_cache = optarg; break;
+      case 'o': args->path_output = optarg; break;
+      case 'p': args->path_therm_props = optarg; break;
+      case 'r': args->path_refract_ids = optarg; break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
         if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
@@ -214,7 +215,7 @@ htrdr_combustion_args_init
         res = parse_grid_definition(&args->grid, optarg);
         break;
       case 'v': args->verbose = 1; break;
-      case 'w': 
+      case 'w':
         res = cstr_to_double(optarg, &args->wavelength);
         break;
       default: res = RES_BAD_ARG; break;
@@ -228,22 +229,22 @@ htrdr_combustion_args_init
     }
   }
 
-  if(!laser_is_defined) {
+  if(!args->dump_volumetric_acceleration_structure && !laser_is_defined) {
     fprintf(stderr, "Missing the laser definition -- option '-l'\n");
     res = RES_BAD_ARG;
     goto error;
   }
-  if(!args->filename_tetra) {
+  if(!args->path_tetra) {
     fprintf(stderr, "Missing the volumetric mesh -- option '-m'\n");
     res = RES_BAD_ARG;
     goto error;
   }
-  if(!args->filename_therm_props) {
+  if(!args->path_therm_props) {
     fprintf(stderr, "Missing the thermodynamic properties -- option '-p'\n");
     res = RES_BAD_ARG;
     goto error;
   }
-  if(!args->filename_refract_ids) {
+  if(!args->path_refract_ids) {
     fprintf(stderr, "Missing the refractive indices -- option '-r'\n");
     res = RES_BAD_ARG;
     goto error;
@@ -260,6 +261,7 @@ void
 htrdr_combustion_args_release(struct htrdr_combustion_args* args)
 {
   ASSERT(args);
+  htrdr_args_geometry_free(&args->geom);
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 }
 

@@ -540,7 +540,7 @@ dump_buffer
    struct htrdr_accum* flux_acc, /* May be NULL */
    FILE* stream)
 {
-  struct atmosphere_pixel_format pixfmt;
+  struct htrdr_pixel_format pixfmt;
   struct htrdr_buffer_layout layout;
   size_t x, y;
   ASSERT(cmd && buf && stream);

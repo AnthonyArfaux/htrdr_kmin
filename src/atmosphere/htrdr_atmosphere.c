@@ -391,7 +391,7 @@ htrdr_atmosphere_create
 
 
   if(!cmd->dump_volumetric_acceleration_structure) {
-    struct atmosphere_pixel_format pixfmt = ATMOSPHERE_PIXEL_FORMAT_NULL;
+    struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
     atmosphere_get_pixel_format(cmd, &pixfmt);
 
     /* Setup the buffer layout */
@@ -459,8 +459,9 @@ error:
 void
 atmosphere_get_pixel_format
   (const struct htrdr_atmosphere* cmd,
-   struct atmosphere_pixel_format* fmt)
+   struct htrdr_pixel_format* fmt)
 {
+  ASSERT(cmd && fmt);
   switch(cmd->sensor.type) {
     case HTRDR_SENSOR_RECTANGLE:
       fmt->size = sizeof(struct atmosphere_pixel_flux);

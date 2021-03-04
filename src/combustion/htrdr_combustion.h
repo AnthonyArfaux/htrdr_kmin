@@ -21,7 +21,25 @@
 #include "core/htrdr.h"
 #include <rsys/rsys.h>
 
+struct htrdr;
+struct htrdr_combustion;
+struct htrdr_combustion_args;
+
 BEGIN_DECLS
+
+HTRDR_API res_T
+htrdr_combustion_create
+  (struct htrdr* htrdr,
+   const struct htrdr_combustion_args* args,
+   struct htrdr_combustion** cmd);
+
+HTRDR_API void
+htrdr_combustion_ref_get
+  (struct htrdr_combustion* cmd);
+
+HTRDR_API void
+htrdr_combustion_ref_put
+  (struct htrdr_combustion* cmd);
 
 HTRDR_API int
 htrdr_combustion_main

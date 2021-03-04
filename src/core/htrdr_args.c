@@ -23,6 +23,7 @@
 
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
+#include <rsys/str.h>
 
 #include <string.h>
 
@@ -329,25 +330,88 @@ error:
 }
 
 static res_T
+parse_geometry_parameter(void* ptr, const char* str)
+{
+  struct str buf;
+  struct htrdr_args_geometry* geom = ptr;
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+  ASSERT(geom && str);
+
+  str_init(NULL, &buf);
+  res = str_set(&buf, str);
+  if(res != RES_OK) {
+    fprintf(stderr,
+      "Could not duplicate the geometry option string `%s' -- %s.\n",
+      str, res_to_cstr(res));
+    goto error;
+  }
+
+  key = strtok_r(str_get(&buf), "=", &ctx);
+  val = strtok_r(NULL, "",  &ctx);
+
+  if(!val) {
+    fprintf(stderr, "Missing value to the geometry parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  htrdr_args_geometry_free(geom);
+
+  #define SET_VALUE(Key, Val, Str) {                                           \
+    const size_t len = strlen(Val) + 1;                                        \
+    Str = mem_alloc(len);                                                      \
+    if(!Str) {                                                                 \
+      fprintf(stderr,                                                          \
+        "Could not duplicate the value `%s' of the geometry parameter `%s'.\n",\
+        (Val), (Key));                                                         \
+        res = RES_MEM_ERR;                                                     \
+      goto error;                                                              \
+    }                                                                          \
+    strncpy(Str, Val, len);                                                    \
+  } (void)0
+  if(!strcmp(key, "obj")) {
+    SET_VALUE(key, val, geom->path_obj);
+  } else if(!strcmp(key, "mats")) {
+    SET_VALUE(key, val, geom->path_mats);
+  } else {
+    fprintf(stderr, "Invalid geometry parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  #undef SET_VALUE
+
+exit:
+  str_release(&buf);
+  return res;
+error:
+  htrdr_args_geometry_free(geom);
+  goto exit;
+}
+
+static res_T
 parse_multiple_parameters
   (void* args,
    const char* str,
    res_T (*parse_parameter)(void* args, const char* str))
 {
-  char buf[512];
+  struct str buf;
   char* tk;
   char* ctx;
   res_T res = RES_OK;
   ASSERT(args && str);
 
-  if(strlen(str) >= sizeof(buf) - 1/*NULL char*/) {
+  str_init(NULL, &buf);
+  res = str_set(&buf, str);
+  if(res != RES_OK) {
     fprintf(stderr, "Could not duplicate the option string `%s'.\n", str);
     res = RES_MEM_ERR;
     goto error;
   }
-  strncpy(buf, str, sizeof(buf));
 
-  tk = strtok_r(buf, ":", &ctx);
+  tk = strtok_r(str_get(&buf), ":", &ctx);
   do {
     res = parse_parameter(args, tk);
     if(res != RES_OK) goto error;
@@ -355,6 +419,7 @@ parse_multiple_parameters
   } while(tk);
 
 exit:
+  str_release(&buf);
   return res;
 error:
   goto exit;
@@ -376,7 +441,7 @@ htrdr_args_rectangle_parse(struct htrdr_args_rectangle* rect, const char* str)
   if(!rect || !str) return RES_BAD_ARG;
   return parse_multiple_parameters(rect, str, parse_rectangle_parameter);
 }
- 
+
 res_T
 htrdr_args_image_parse(struct htrdr_args_image* img, const char* str)
 {
@@ -389,5 +454,46 @@ htrdr_args_spectral_parse(struct htrdr_args_spectral* spectral, const char* str)
 {
   if(!spectral || !str) return RES_BAD_ARG;
   return parse_multiple_parameters(spectral, str, parse_spectral_parameter);
+}
+
+void
+htrdr_args_geometry_free(struct htrdr_args_geometry* geom)
+{
+  ASSERT(geom);
+  if(geom->path_obj) mem_rm(geom->path_obj);
+  if(geom->path_mats) mem_rm(geom->path_mats);
+  *geom = HTRDR_ARGS_GEOMETRY_NULL;
+}
+
+res_T
+htrdr_args_geometry_parse(struct htrdr_args_geometry* geom, const char* str)
+{
+  res_T res = RES_OK;
+
+  if(!geom || !str) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = parse_multiple_parameters(geom, str, parse_geometry_parameter);
+  if(res != RES_OK) goto error;
+
+  if(!geom->path_obj) {
+    fprintf(stderr, "Missing the `obj' geometry parameter.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if(!geom->path_mats) {
+    fprintf(stderr, "Missing the `mats' geometry parameter.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  if(geom) htrdr_args_geometry_free(geom);
+  goto exit;
 }
 

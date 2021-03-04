@@ -18,6 +18,8 @@
 #include "combustion/htrdr_combustion.h"
 #include "combustion/htrdr_combustion_args.h"
 
+#include "core/htrdr.h"
+#include "core/htrdr_args.h"
 #include "core/htrdr_log.h"
 
 #include <rsys/mem_allocator.h>
@@ -26,21 +28,47 @@ int
 htrdr_combustion_main(int argc, char** argv)
 {
   char cmd_name[] = "htrdr-combustion";
+  struct htrdr_args htrdr_args = HTRDR_ARGS_DEFAULT;
   struct htrdr_combustion_args cmd_args = HTRDR_COMBUSTION_ARGS_DEFAULT;
+  struct htrdr* htrdr = NULL;
+  struct htrdr_combustion* cmd = NULL;
   const size_t memsz_begin = MEM_ALLOCATED_SIZE(&mem_default_allocator);
   size_t memsz_end;
+  int is_mpi_init = 0;
   res_T res = RES_OK;
   int err = 0;
 
   /* Overwrite command name */
   argv[0] = cmd_name;
 
+  res = htrdr_mpi_init(argc, argv);
+  if(res != RES_OK) goto error;
+  is_mpi_init = 1;
+
   res = htrdr_combustion_args_init(&cmd_args, argc, argv);
   if(res != RES_OK) goto error;
   if(cmd_args.quit) goto exit;
 
+  htrdr_args.nthreads = cmd_args.nthreads;
+  htrdr_args.verbose = cmd_args.verbose;
+  res = htrdr_create(&mem_default_allocator, &htrdr_args, &htrdr);
+  if(res != RES_OK) goto error;
+
+  if(cmd_args.dump_volumetric_acceleration_structure 
+  && htrdr_get_mpi_rank(htrdr) != 0) {
+    goto exit; /* Nothing to do except for the master process */
+  }
+
+  res = htrdr_combustion_create(htrdr, &cmd_args, &cmd);
+  if(res != RES_OK) goto error;
+
+  /* TODO run the command */
+
 exit:
   htrdr_combustion_args_release(&cmd_args);
+  if(is_mpi_init) htrdr_mpi_finalize();
+  if(htrdr) htrdr_ref_put(htrdr);
+  if(cmd) htrdr_combustion_ref_put(cmd);
 
   /* Check memory leaks */
   memsz_end = MEM_ALLOCATED_SIZE(&mem_default_allocator);
