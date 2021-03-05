@@ -28,7 +28,7 @@ print_help(const char* cmd)
 {
   ASSERT(cmd);
   printf(
-"Usage: %s [<options>] -l <laser> -m TETRAHEDRA -p THERMOPROPS -r REFRACT_IDS\n",
+"Usage: %s [<options>] -m TETRAHEDRA -p THERMOPROPS -r REFRACT_IDS\n",
     cmd);
   printf(
 "Render a monochromatic image within a sooting flame described according\n"
@@ -156,7 +156,6 @@ htrdr_combustion_args_init
    int argc,
    char** argv)
 {
-  int laser_is_defined = 0;
   int opt;
   res_T res = RES_OK;
   ASSERT(args && argc && argv);
@@ -195,7 +194,6 @@ htrdr_combustion_args_init
         break;
       case 'l':
         res = htrdr_args_rectangle_parse(&args->laser, optarg);
-        laser_is_defined = 1;
         break;
       case 'm': args->path_tetra = optarg; break;
       case 'N': args->precompute_normals = 1; break;
@@ -229,11 +227,6 @@ htrdr_combustion_args_init
     }
   }
 
-  if(!args->dump_volumetric_acceleration_structure && !laser_is_defined) {
-    fprintf(stderr, "Missing the laser definition -- option '-l'\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
   if(!args->path_tetra) {
     fprintf(stderr, "Missing the volumetric mesh -- option '-m'\n");
     res = RES_BAD_ARG;
