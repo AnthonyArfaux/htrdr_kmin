@@ -241,6 +241,9 @@ dump_volumetric_acceleration_structure(struct htrdr_combustion* cmd)
   /* Nothing to do on non master process */
   if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
+  htrdr_log(cmd->htrdr, "Write volumetric acceleration structure to '%s'.\n",
+    str_cget(&cmd->output_name));
+
   res = atrstm_dump_svx_octree(cmd->medium, &args, cmd->output);
   if(res != RES_OK) goto error;
 
