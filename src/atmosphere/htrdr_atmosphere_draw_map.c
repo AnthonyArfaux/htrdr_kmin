@@ -395,7 +395,7 @@ draw_pixel_xwave
     time_sub(&t0, time_current(&t1), &t0);
     usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
 
-    /* Update the pixel accumulator of the current channel */
+    /* Update the pixel accumulator */
     radiance.sum_weights += weight;
     radiance.sum_weights_sqr += weight*weight;
     radiance.nweights += 1;

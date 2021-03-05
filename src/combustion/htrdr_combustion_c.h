@@ -32,6 +32,7 @@ struct htrdr_camera;
 struct htrdr_geometry;
 struct htrdr_materials;
 struct htrdr_rectangle;
+struct ssp_rng;
 
 struct combustion_pixel {
   struct htrdr_estimate radiance; /* In W/m^2/sr */
@@ -53,13 +54,13 @@ struct htrdr_combustion {
   struct htrdr_rectangle* laser; /* Laser surface emission */
   double wavelength; /* Wavelength of the laser in nanometer */
 
-  struct htrdr_args_image image; /* Image definition */
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
+  size_t spp; /* #samples per pixel */
 
   FILE* output; /* Output stream */
   struct str output_name; /* Name of the output stream */
-  int dump_volumetric_acceleration_structure; 
+  int dump_volumetric_acceleration_structure;
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -69,5 +70,19 @@ extern LOCAL_SYM void
 combustion_get_pixel_format
   (const struct htrdr_combustion* cmd,
    struct htrdr_pixel_format* fmt);
+
+extern LOCAL_SYM res_T
+combustion_draw_map
+  (struct htrdr_combustion* cmd);
+
+/* Return the shortwave radiance in W/m^2/sr/m */
+extern LOCAL_SYM double
+combustion_compute_radiance_sw
+  (struct htrdr_combustion* cmd,
+   const size_t ithread,
+   struct ssp_rng* rng,
+   const double pos_in[3],
+   const double dir_in[3],
+   const double wlen); /* In nanometer */
 
 #endif /* HTRDR_COMBUSTION_C_H */

@@ -166,7 +166,7 @@ setup_buffer
 
   /* Create the image buffer only on the master process; the image parts
    * rendered by the others processes are gathered onto the master process */
-  if(!htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
   res = htrdr_buffer_create(cmd->htrdr, &cmd->buf_layout, &cmd->buf);
   if(res != RES_OK) goto error;
@@ -300,6 +300,7 @@ htrdr_combustion_create
   htrdr_ref_get(htrdr);
   cmd->htrdr = htrdr;
 
+  cmd->spp = args->image.spp;
   cmd->dump_volumetric_acceleration_structure =
     args->dump_volumetric_acceleration_structure;
 
@@ -351,7 +352,8 @@ htrdr_combustion_run(struct htrdr_combustion* cmd)
     res = dump_volumetric_acceleration_structure(cmd);
     if(res != RES_OK) goto error;
   } else {
-    /* TODO */
+    res = combustion_draw_map(cmd);
+    if(res != RES_OK) goto error;
   }
 
 exit:

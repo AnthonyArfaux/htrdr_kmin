@@ -49,6 +49,8 @@ include_directories(
 set(HTRDR_COMBUSTION_FILES_SRC
   htrdr_combustion.c
   htrdr_combustion_args.c
+  htrdr_combustion_draw_map.c
+  htrdr_combustion_compute_radiance_sw.c
   htrdr_combustion_main.c)
 
 set(HTRDR_COMBUSTION_FILES_INC
