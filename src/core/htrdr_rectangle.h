@@ -32,7 +32,7 @@ htrdr_rectangle_create
   (struct htrdr* htrdr,
    const double sz[2], /* Size of the rectangle along its local X and Y axis */
    const double pos[3], /* World space position of the rectangle center */
-   const double tgt[3], /* Vector orthognal to the rectangle plane */
+   const double tgt[3], /* Targeted point */
    const double up[3], /* vector orthogonal to the rectangle X axis */
    struct htrdr_rectangle** rect);
 
