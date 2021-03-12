@@ -55,6 +55,16 @@ htrdr_rectangle_get_normal
   (const struct htrdr_rectangle* rect,
    double normal[3]);
 
+HTRDR_CORE_API double*
+htrdr_rectangle_get_transform
+  (const struct htrdr_rectangle* rect,
+   double transform[12]);
+
+HTRDR_CORE_API double*
+htrdr_rectangle_get_transform_inverse
+  (const struct htrdr_rectangle* rect,
+   double transform_inverse[12]);
+
 END_DECLS
 
 #endif /* HTRDR_RECTANGLE_H */

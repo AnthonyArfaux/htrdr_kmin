@@ -51,12 +51,14 @@ set(HTRDR_COMBUSTION_FILES_SRC
   htrdr_combustion_args.c
   htrdr_combustion_draw_map.c
   htrdr_combustion_compute_radiance_sw.c
+  htrdr_combustion_laser.c
   htrdr_combustion_main.c)
 
 set(HTRDR_COMBUSTION_FILES_INC
   htrdr_combustion.h
   htrdr_combustion_c.h
-  htrdr_combustion_args.h)
+  htrdr_combustion_args.h
+  htrdr_combustion_laser.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_COMBUSTION_FILES_SRC ${HTRDR_SOURCE_DIR}/combustion)

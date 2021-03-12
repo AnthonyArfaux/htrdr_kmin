@@ -18,6 +18,7 @@
 #include "combustion/htrdr_combustion.h"
 #include "combustion/htrdr_combustion_args.h"
 #include "combustion/htrdr_combustion_c.h"
+#include "combustion/htrdr_combustion_laser.h"
 
 #include "core/htrdr.h"
 #include "core/htrdr_camera.h"
@@ -133,15 +134,12 @@ setup_laser
   (struct htrdr_combustion* cmd,
    const struct htrdr_combustion_args* args)
 {
+  struct htrdr_combustion_laser_create_args laser_args =
+    HTRDR_COMBUSTION_LASER_CREATE_ARGS_DEFAULT;
   ASSERT(cmd && args);
   cmd->wavelength = args->wavelength;
-  return htrdr_rectangle_create
-    (cmd->htrdr,
-     args->laser.size,
-     args->laser.position,
-     args->laser.target,
-     args->laser.up,
-     &cmd->laser);
+  laser_args.surface = args->laser;
+  return htrdr_combustion_laser_create(cmd->htrdr, &laser_args, &cmd->laser);
 }
 
 static res_T
@@ -264,7 +262,7 @@ combustion_release(ref_T* ref)
   if(cmd->mats) htrdr_materials_ref_put(cmd->mats);
   if(cmd->medium) ATRSTM(ref_put(cmd->medium));
   if(cmd->camera) htrdr_camera_ref_put(cmd->camera);
-  if(cmd->laser) htrdr_rectangle_ref_put(cmd->laser);
+  if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   str_release(&cmd->output_name);

@@ -16,6 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "combustion/htrdr_combustion_c.h"
+#include "combustion/htrdr_combustion_laser.h"
 
 #include <astoria/atrstm.h>
 
@@ -340,8 +341,8 @@ laser_once_scattered
   double L = 0; /* Radiance in W/m^2/sr/m */
   ASSERT(cmd && rng && wlen >= 0 && pos && dir);
 
-  /* Find the intersections along dir with the laser sheet TODO */
-  /* htrdr_combustion_laser_trace_ray(cmd->laser, pos, dir, range, laser_hit_dst); */
+  /* Find the intersections along dir with the laser sheet */
+  htrdr_combustion_laser_trace_ray(cmd->laser, pos, dir, range, laser_hit_dst);
 
   /* No intersection with the laser sheet => no laser contribution */
   if(HIT_NONE(laser_hit_dst[0])) return 0;

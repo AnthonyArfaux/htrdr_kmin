@@ -29,6 +29,7 @@
 struct atrstm;
 struct htrdr;
 struct htrdr_camera;
+struct htrdr_combustion_laser;
 struct htrdr_geometry;
 struct htrdr_materials;
 struct htrdr_rectangle;
@@ -51,7 +52,7 @@ struct htrdr_combustion {
   struct atrstm* medium; /* Semi transparent medium */
 
   struct htrdr_camera* camera; /* Pinhole camera */
-  struct htrdr_rectangle* laser; /* Laser surface emission */
+  struct htrdr_combustion_laser* laser; /* Laser sheet */
   double wavelength; /* Wavelength of the laser in nanometer */
 
   struct htrdr_buffer_layout buf_layout;
