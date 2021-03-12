@@ -165,6 +165,7 @@ draw_pixel_image
         case 2: wlen = htrdr_cie_xyz_sample_Z(cmd->cie, r0, r1, &pdf); break;
         default: FATAL("Unreachable code.\n"); break;
       }
+      pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
 
       iband = htsky_find_spectral_band(cmd->sky, wlen);
       iquad = htsky_spectral_band_sample_quadrature(cmd->sky, r2, iband);
@@ -174,7 +175,6 @@ draw_pixel_image
         ATMOSPHERE_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
-      pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
       weight /= pdf; /* In W/m^2/sr */
 
       /* End the registration of the per realisation time */
@@ -250,6 +250,7 @@ draw_pixel_flux
 
     /* Sample a wavelength */
     wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
+    band_pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(cmd->sky, wlen);
@@ -370,6 +371,7 @@ draw_pixel_xwave
 
     /* Sample a wavelength */
     wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
+    band_pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
 
     /* Select the associated band and sample a quadrature point */
     iband = htsky_find_spectral_band(cmd->sky, wlen);

@@ -53,7 +53,7 @@ htrdr_ran_wlen_sample
   (const struct htrdr_ran_wlen* wlen_ran,
    const double r0, /* Canonical number in [0, 1[ */
    const double r1, /* Canonical number in [0, 1[ */
-   double* pdf); /* May be NULL */
+   double* pdf); /* In nm^-1. May be NULL */
 
 END_DECLS
 

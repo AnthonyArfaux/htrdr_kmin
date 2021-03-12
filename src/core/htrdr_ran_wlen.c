@@ -201,9 +201,10 @@ wlen_ran_sample_continue
     const double B_lambda = htrdr_planck(lambda_m, lambda_m, Tref);
     const double B_mean = htrdr_planck(range_m[0], range_m[1], Tref);
     *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
+    *pdf = 1.e-9; /* Transform from m^-1 to nm^-1 */
   }
 
-  return lambda_m * 1.0e9; /* Convert in nanometers */
+  return lambda_m * 1.e9; /* Convert in nanometers */
 }
 
 static double
@@ -249,7 +250,7 @@ wlen_ran_sample_discrete
 
   /* Uniformly sample a wavelength in the sampled band */
   lambda = band_range[0] + (band_range[1] - band_range[0]) * r1;
-  pdf_continue = 1.0 / ((band_range[1] - band_range[0])*1.e-9);
+  pdf_continue = 1.0 / (band_range[1] - band_range[0]);
 
   if(pdf) {
     *pdf = pdf_band * pdf_continue;
