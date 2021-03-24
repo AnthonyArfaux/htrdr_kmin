@@ -18,59 +18,95 @@
 #include "combustion/htrdr_combustion_c.h"
 #include "combustion/htrdr_combustion_laser.h"
 
+#include "core/htrdr.h"
+
 #include <astoria/atrstm.h>
 
+#include <star/ssf.h>
 #include <star/ssp.h>
 
 #include <rsys/double2.h>
 #include <rsys/double3.h>
+#include <rsys/double4.h>
+#include <rsys/dynamic_array.h>
 
-struct transmissivity_context {
-  struct ssp_rng* rng;
-  struct atrstm* medium;
-  double wavelength;
-  enum atrstm_radcoef radcoef;
+/* Define a position along the ray into the semi-transparent medium */
+struct position {
+  double distance; /* Distance up to the position  */
+  struct suvm_primitive prim; /* Volumetric primitive of the position */
+  double bcoords[4]; /* Local coordinate of the position into `prim' */
 };
-#define TRANSMISSIVITY_CONTEXT_NULL__ {                                        \
+#define POSITION_NULL__ {                                                      \
+  DBL_MAX, /* Distance */                                                      \
+  SUVM_PRIMITIVE_NULL__, /* Primitive */                                       \
+  {0, 0, 0, 0} /* Barycentric coordinates */                                   \
+}
+static const struct position POSITION_NULL = POSITION_NULL__;
+
+/* Syntactic sugar to check if the position is valid */
+#define POSITION_NONE(Pos) ((Pos)->distance >= DBL_MAX)
+
+/* Common position but preferentially sampled within a limited range.
+ * Its associated ksi variable defines ??? TODO write the comment */
+struct position_limited {
+  struct position position;
+  double ksi;
+};
+#define POSITION_LIMITED_NULL__ {POSITION_NULL__, 1}
+static const struct position_limited POSITION_LIMITED_NULL =
+  POSITION_LIMITED_NULL__;
+
+struct sample_position_context {
+  /* Input data */
+  struct ssp_rng* rng; /* Random Number Generator */
+  struct atrstm* medium; /* Semi-transparent medium */
+  double wavelength; /* Wavelength to handel in nanometer */
+  enum atrstm_radcoef radcoef; /* Radiative coef used to sample a position */
+  double Ts; /* Sampled optical thickness */
+
+  /* Output data */
+  struct position position;
+};
+#define SAMPLE_POSITION_CONTEXT_NULL__ {                                       \
   NULL, /* RNG */                                                              \
   NULL, /* Medium */                                                           \
   0, /* Wavelength */                                                          \
-  ATRSTM_RADCOEFS_COUNT__ /* Radiative coefficient */                          \
+  ATRSTM_RADCOEFS_COUNT__, /* Radiative coefficient */                         \
+  0, /* Optical thickness */                                                   \
+  POSITION_NULL__                                                              \
 }
-static const struct transmissivity_context TRANSMISSIVITY_CONTEXT_NULL =
-  TRANSMISSIVITY_CONTEXT_NULL__;
+static const struct sample_position_context SAMPLE_POSITION_CONTEXT_NULL =
+  SAMPLE_POSITION_CONTEXT_NULL__;
 
 struct sample_scattering_limited_context {
-  struct ssp_rng* rng;
-  struct atrstm* medium;
-  double wavelength;
-  double traversal_dst; /* Distance traversed up to the collision */
-  double ksi;
+  /* Input data */
+  struct ssp_rng* rng; /* Random number generator to use */
+  struct atrstm* medium; /* Semi transparent medium */
+  double wavelength; /* Wavelength to handle in nanometer */
+
+  /* Local data updated during traversal */
+  double ks_2hat;
+
+  /* Output data */
+  struct position_limited position_limited;
 };
 #define SAMPLE_SCATTERING_LIMITED_CONTEXT_NULL__ {                             \
   NULL, /* RNG */                                                              \
   NULL, /* Medium */                                                           \
-  0, /* Wavelength */                                                          \
-  DBL_MAX, /* Traversal dst */                                                 \
-  1, /* ksi */                                                                 \
+  -1, /* Wavelength */                                                         \
+  -1, /* ks_2hat */                                                            \
+  POSITION_LIMITED_NULL__                                                      \
 }
-static const struct sample_scattering_limited_context 
-SAMPLE_SCATTERING_LIMITED_CONTEXT_NULL = 
+static const struct sample_scattering_limited_context
+SAMPLE_SCATTERING_LIMITED_CONTEXT_NULL =
   SAMPLE_SCATTERING_LIMITED_CONTEXT_NULL__;
 
-struct laser_sheet_scattering {
-  double distance; /* Distance along the ray up to a scattering event */
-  double ksi;
-};
-#define LASER_SHEET_SCATTERING_NULL__ {0, 1}
-static const struct laser_sheet_scattering LASER_SHEET_SCATTERING_NULL =
-  LASER_SHEET_SCATTERING_NULL__;
-
 /*******************************************************************************
- * Helper function
+ * Sample a position along a ray into the inhomogeneous medium for a given
+ * radiative coefficient
  ******************************************************************************/
 static int
-transmissivity_hit_filter
+sample_position_hit_filter
   (const struct svx_hit* hit,
    const double org[3],
    const double dir[3],
@@ -82,7 +118,7 @@ transmissivity_hit_filter
     ATRSTM_FETCH_RADCOEFS_ARGS_DEFAULT;
   struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args =
     ATRSTM_FETCH_RADCOEFS_SVX_VOXEL_ARGS_DEFAULT;
-  struct transmissivity_context* ctx = context;
+  struct sample_position_context* ctx = context;
   double k_min = 0;
   double k_max = 0;
   double traversal_dst = 0;
@@ -112,83 +148,145 @@ transmissivity_hit_filter
   traversal_dst = hit->distance[0];
 
   for(;;) {
-    atrstm_radcoefs_T radcoefs;
-    double collision_dst;
-    double tau;
-    double k;
-    double r;
+    /* Compute the optical thickness of the current leaf */
+    const double vox_dst = hit->distance[1] - traversal_dst;
+    const double T = vox_dst * k_max;
 
-    /* Compute the distance up to the next collision to challenge */
-    tau = ssp_ran_exp(ctx->rng, 1);
-    collision_dst = tau / k_max;
-
-    /* Compute the traversed distance up to the challenged collision */
-    traversal_dst += collision_dst;
-
-    /* The collision to challenge lies behind the current voxel */
-    if(traversal_dst > hit->distance[1]) {
+    /* A collision occurs behind the voxel */
+    if(ctx->Ts > T) {
+      ctx->Ts -= T;
       pursue_traversal = 1;
       break;
-    }
-    ASSERT(traversal_dst >= hit->distance[0]);
 
-    /* Compute the world space position where a collision may occur */
-    fetch_raw_args.pos[0] = org[0] + traversal_dst * dir[0];
-    fetch_raw_args.pos[1] = org[1] + traversal_dst * dir[1];
-    fetch_raw_args.pos[2] = org[2] + traversal_dst * dir[2];
+    /* A collision occurs _in_ the voxel */
+    } else {
+      const double vox_collision_dst = ctx->Ts / k_max;
+      atrstm_radcoefs_T radcoefs;
+      double x[3];
+      double k;
+      double r;
 
-    /* Fetch the radiative coefficient at the collision position */
-    ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
-    k = radcoefs[ctx->radcoef];
+      /* Compute the traversed distance up to the challenged collision */
+      traversal_dst += vox_collision_dst;
 
-    r = ssp_rng_canonical(ctx->rng);
-    if(r < k/k_max) { /* Real collision => stop the traversal */
-      pursue_traversal = 0;
-      break;
+      /* Compute the world space position where a collision may occur */
+      x[0] = org[0] + traversal_dst * dir[0];
+      x[1] = org[1] + traversal_dst * dir[1];
+      x[2] = org[2] + traversal_dst * dir[2];
+
+      /* Fetch the radiative coefficient at the collision position */
+      ATRSTM(at(ctx->medium, x, &fetch_raw_args.prim, fetch_raw_args.bcoords));
+      ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
+      k = radcoefs[ctx->radcoef];
+
+      r = ssp_rng_canonical(ctx->rng);
+
+      if(r > k/k_max) { /* Null collision */
+        ctx->Ts = ssp_ran_exp(ctx->rng, 1);
+      } else { /* Real collision */
+        /* Setup output data */
+        ctx->position.distance = traversal_dst;
+        ctx->position.prim = fetch_raw_args.prim;
+        d4_set(ctx->position.bcoords, fetch_raw_args.bcoords);
+
+        /* Stop ray traversal */
+        pursue_traversal = 0;
+        break;
+      }
     }
   }
   return pursue_traversal;
 }
 
-static double
-transmissivity
+static void
+sample_position
   (struct htrdr_combustion* cmd,
    struct ssp_rng* rng,
    const enum atrstm_radcoef radcoef,
-   const double wlen, /* In nanometer */
    const double pos[3],
    const double dir[3],
-   const double range[2])
+   const double range[2],
+   struct position* position)
 {
   struct atrstm_trace_ray_args args = ATRSTM_TRACE_RAY_ARGS_DEFAULT;
-  struct transmissivity_context transmissivity_ctx = TRANSMISSIVITY_CONTEXT_NULL;
+  struct sample_position_context sample_pos_ctx = SAMPLE_POSITION_CONTEXT_NULL;
   struct svx_hit svx_hit = SVX_HIT_NULL;
-  ASSERT(cmd && rng && wlen > 0 && pos && dir && range);
+  double wlen = 0;
+  ASSERT(cmd && rng && pos && dir && range);
 
-  /* Degenerated range => no attenuation along dir */
-  if(range[1] <= range[0]) return 1;
+  wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
-  /* Setup the trace ray context */
-  transmissivity_ctx.rng = rng;
-  transmissivity_ctx.medium = cmd->medium;
-  transmissivity_ctx.wavelength = wlen;
-  transmissivity_ctx.radcoef = radcoef;
+  /* Sample an optical thickness */
+  sample_pos_ctx.Ts = ssp_ran_exp(rng, 1);
 
-  /* Setup input arguments for the ray tracing into the medium */
+  /* Setup the arguments of the function invoked per voxel (i.e. the filter
+   * function) */
+  sample_pos_ctx.rng = rng;
+  sample_pos_ctx.medium = cmd->medium;
+  sample_pos_ctx.wavelength = wlen;
+  sample_pos_ctx.radcoef = radcoef;
+
+  /* Setup ray tracing arguments */
   d3_set(args.ray_org, pos);
   d3_set(args.ray_dir, dir);
   d2_set(args.ray_range, range);
-  args.filter = transmissivity_hit_filter;
-  args.context = &transmissivity_ctx;
+  args.filter = sample_position_hit_filter;
+  args.context = &sample_pos_ctx;
 
-  /* Trace the ray into the medium to compute the transmissivity */
+  /* Trace the ray into the heterogeneous medium */
   ATRSTM(trace_ray(cmd->medium, &args, &svx_hit));
 
   if(SVX_HIT_NONE(&svx_hit)) {
-    return 1; /* No collision with the medium */
+    /* No collision with the medium was found */
+    *position = POSITION_NULL;
   } else {
-    return 0; /* A collision occurs */
+    /* A collision occurs into the medium */
+    *position = sample_pos_ctx.position;
   }
+}
+
+/*******************************************************************************
+ * Preferentially sample a scattering position into an inhomogeneous medium
+ * according to a limited range
+ ******************************************************************************/
+/* Find the constant Ks max (named ks_2hat) along the traced ray */
+static int
+sample_scattering_limited_find_ks_2hat
+  (const struct svx_hit* hit,
+   const double org[3],
+   const double dir[3],
+   const double range[2],
+   void* context)
+{
+  struct sample_scattering_limited_context* ctx = context;
+  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args =
+    ATRSTM_FETCH_RADCOEFS_SVX_VOXEL_ARGS_DEFAULT;
+  atrstm_radcoefs_svx_T radcoefs_svx;
+  ASSERT(hit && org && dir && range && context);
+  (void)org, (void)dir;
+
+  /* In all situations, initialise ks_2hat with the ks_max of the root node */
+  if(hit->voxel.depth == 0) {
+    fetch_svx_args.voxel = hit->voxel;
+    fetch_svx_args.radcoefs_mask = ATRSTM_RADCOEF_FLAG_Ks;
+    fetch_svx_args.components_mask = ATRSTM_CPNTS_MASK_ALL;
+    fetch_svx_args.operations_mask = ATRSTM_SVX_OP_FLAG_MAX;
+    ATRSTM(fetch_radcoefs_svx_voxel(ctx->medium, &fetch_svx_args, radcoefs_svx));
+    ctx->ks_2hat = radcoefs_svx[ATRSTM_RADCOEF_Ks][ATRSTM_SVX_OP_MAX];
+
+  /* Update ks_2hat with the ks_max of the current descending node until the ray
+   * range was no more included into this node */
+  } else if(hit->distance[0] <= range[0] && range[1] <= hit->distance[1]) {
+    fetch_svx_args.voxel = hit->voxel;
+    fetch_svx_args.radcoefs_mask = ATRSTM_RADCOEF_FLAG_Ks;
+    fetch_svx_args.components_mask = ATRSTM_CPNTS_MASK_ALL;
+    fetch_svx_args.operations_mask = ATRSTM_SVX_OP_FLAG_MAX;
+    ATRSTM(fetch_radcoefs_svx_voxel(ctx->medium, &fetch_svx_args, radcoefs_svx));
+    ctx->ks_2hat = radcoefs_svx[ATRSTM_RADCOEF_Ks][ATRSTM_SVX_OP_MAX];
+  }
+
+  /* Do not stop here: keep diving up to the leaves */
+  return 0;
 }
 
 static int
@@ -209,6 +307,7 @@ sample_scattering_limited_hit_filter
   double ks_max = 0;
   double tau_max = 0;
   double traversal_dst = 0;
+  double Ume = 0;
   int pursue_traversal = 1;
   ASSERT(hit && org && dir && range && ctx);
   (void)range;
@@ -222,6 +321,7 @@ sample_scattering_limited_hit_filter
 
   ks_min = radcoefs_svx[ATRSTM_RADCOEF_Ks][ATRSTM_SVX_OP_MIN];
   ks_max = radcoefs_svx[ATRSTM_RADCOEF_Ks][ATRSTM_SVX_OP_MAX];
+  ASSERT(ks_max <= ctx->ks_2hat);
 
   /* Setup the constants of the 'fetch' function for the current voxel */
   fetch_raw_args.wavelength = ctx->wavelength;
@@ -234,26 +334,26 @@ sample_scattering_limited_hit_filter
    * current ray enters into the current voxel */
   traversal_dst = hit->distance[0];
 
-  tau_max = (hit->distance[1] - hit->distance[0]) * ks_max;
+  tau_max = (range[1] - range[0]) * ctx->ks_2hat;
+  Ume = 1 - exp(-tau_max);
 
   for(;;) {
     atrstm_radcoefs_T radcoefs;
-    double collision_dst;
+    double vox_collision_dst;
     double tau;
     double ks;
     double r;
 
-    r = ssp_rng_canonical(ctx->rng);
-
     /* Sampled optical thickness (preferential sampling) */
+    r = ssp_rng_canonical(ctx->rng);
     tau = -log(1.0-r*(1.0-exp(-tau_max)));
-    collision_dst = tau / ks_max;
+    vox_collision_dst = tau / ks_max;
 
     /* Compute the traversed distance up to the challenged collision */
-    traversal_dst += collision_dst;
+    traversal_dst += vox_collision_dst;
 
     /* Update the ksi output data */
-    ctx->ksi *= 1 - exp(-tau_max);
+    ctx->position_limited.ksi *= Ume;
 
     /* The collision to challenge lies behind the current voxel */
     if(traversal_dst > hit->distance[1]) {
@@ -262,20 +362,32 @@ sample_scattering_limited_hit_filter
     }
     ASSERT(traversal_dst >= hit->distance[0]);
 
-    /* Compute the world space position where a collision may occur */
-    fetch_raw_args.pos[0] = org[0] + traversal_dst * dir[0];
-    fetch_raw_args.pos[1] = org[1] + traversal_dst * dir[1];
-    fetch_raw_args.pos[2] = org[2] + traversal_dst * dir[2];
-
-    /* Fetch the radiative coefficient at the collision position */
-    ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
-    ks = radcoefs[ATRSTM_RADCOEF_Ks];
-
     r = ssp_rng_canonical(ctx->rng);
-    if(r < ks/ks_max) { /* Real collision => stop the traversal */
-      ctx->traversal_dst = traversal_dst;
-      pursue_traversal = 0;
-      break;
+    if(r < ks_max / ctx->ks_2hat) { /* Collision with ks_max */
+      double x[3];
+
+      /* Compute the world space position where a collision may occur */
+      x[0] = org[0] + traversal_dst * dir[0];
+      x[1] = org[1] + traversal_dst * dir[1];
+      x[2] = org[2] + traversal_dst * dir[2];
+
+      /* Fetch the radiative coefficient at the collision position */
+      ATRSTM(at(ctx->medium, x, &fetch_raw_args.prim, fetch_raw_args.bcoords));
+      ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
+      ks = radcoefs[ATRSTM_RADCOEF_Ks];
+
+      r = ssp_rng_canonical(ctx->rng);
+
+      if(r < ks/ks_max) { /* Real collision */
+        /* Setup output data */
+        ctx->position_limited.position.distance = traversal_dst;
+        ctx->position_limited.position.prim = fetch_raw_args.prim;
+        d4_set(ctx->position_limited.position.bcoords, fetch_raw_args.bcoords);
+
+        /* Stop ray traversal */
+        pursue_traversal = 0;
+        break;
+      }
     }
   }
   return pursue_traversal;
@@ -285,88 +397,190 @@ static void
 sample_scattering_limited
   (struct htrdr_combustion* cmd,
    struct ssp_rng* rng,
-   const double wlen,
    const double pos[3],
    const double dir[3],
    const double range[2],
-   struct laser_sheet_scattering* sample)
+   struct position_limited* position)
 {
   struct atrstm_trace_ray_args args = ATRSTM_TRACE_RAY_ARGS_DEFAULT;
-  struct sample_scattering_limited_context sample_scattering_limited_ctx = 
+  struct sample_scattering_limited_context sample_scattering_limited_ctx =
     SAMPLE_SCATTERING_LIMITED_CONTEXT_NULL;
   struct svx_hit svx_hit = SVX_HIT_NULL;
-  ASSERT(cmd && rng && wlen >= 0 && pos && dir && sample);
+  double wlen = 0;
+  ASSERT(cmd && rng && pos && dir && position);
+
+  wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
   /* Setup the trace ray context */
   sample_scattering_limited_ctx.rng = rng;
   sample_scattering_limited_ctx.medium = cmd->medium;
   sample_scattering_limited_ctx.wavelength = wlen;
-  sample_scattering_limited_ctx.traversal_dst = 0;
-  sample_scattering_limited_ctx.ksi = 1;
+  sample_scattering_limited_ctx.ks_2hat = 0;
+  sample_scattering_limited_ctx.position_limited = POSITION_LIMITED_NULL;
 
   /* Setup the input arguments for the ray tracing into the medium */
   d3_set(args.ray_org, pos);
   d3_set(args.ray_dir, dir);
   d2_set(args.ray_range, range);
+  args.challenge = sample_scattering_limited_find_ks_2hat;
   args.filter = sample_scattering_limited_hit_filter;
   args.context = &sample_scattering_limited_ctx;
 
   /* Trace the ray into the medium to compute the transmissivity */
   ATRSTM(trace_ray(cmd->medium, &args, &svx_hit));
 
-  if(SVX_HIT_NONE(&svx_hit)) { /* No collision with the medium */
-    sample->distance = INF;
-    sample->ksi = 0;
-  } else { /* A collision occurs */
-    sample->distance = sample_scattering_limited_ctx.traversal_dst;
-    sample->ksi = sample_scattering_limited_ctx.ksi;
+  if(SVX_HIT_NONE(&svx_hit)) {
+    /* No scattering event was found */
+    *position = POSITION_LIMITED_NULL;
+  } else {
+    /* A scattering event occurs into the medium */
+    *position = sample_scattering_limited_ctx.position_limited;
   }
 }
 
+/*******************************************************************************
+ * Helper functions
+ ******************************************************************************/
+static double
+transmissivity
+  (struct htrdr_combustion* cmd,
+   struct ssp_rng* rng,
+   const enum atrstm_radcoef radcoef,
+   const double pos[3],
+   const double dir[3],
+   const double range[2])
+{
+  struct position position = POSITION_NULL;
+
+  /* Degenerated range => no attenuation along dir */
+  if(range[1] <= range[0]) return 1;
+
+  sample_position(cmd, rng, radcoef, pos, dir, range, &position);
+
+  if(POSITION_NONE(&position)) {
+    return 1; /* No collision with the medium */
+  } else {
+    return 0; /* A collision occurs */
+  }
+}
+
+/* This function computes the contribution of the in-laser scattering for the
+ * current scattering position of the reverse optical path 'pos' and current
+ * direction 'dir'. One contribution has to be computed for each scattering
+ * position in order to compute the value of the Monte-Carlo weight for the
+ * optical path (weight of the statistical realization). */
 static double
 laser_once_scattered
   (struct htrdr_combustion* cmd,
+   const size_t ithread,
    struct ssp_rng* rng,
-   const double wlen, /* In nanometer */
    const double pos[3],
    const double dir[3])
 {
-  #define HIT_NONE(Dst) (Dst >= DBL_MAX)
+  /* RDG-FA phase function */
+  struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
+  struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
+    ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
+  struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
+    SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
+  struct ssf_phase* rdgfa = NULL;
 
-  struct laser_sheet_scattering sample = LASER_SHEET_SCATTERING_NULL;
+  /* Scattering position into the laser sheet */
+  struct position_limited sc_sample = POSITION_LIMITED_NULL;
+  double xsc[3] = {0, 0, 0}; /* World space position */
+
+  /* The transmissivities to compute */
+  double Tr_ext_pos_xin = 0;
+  double Tr_ext_xsc_lse = 0;
+  double Tr_abs_xin_xsc = 0;
+
+  /* Laser data */
   double laser_hit_dst[2] = {0, 0};
+  double laser_flux_density = 0; /* In W/m^2 */
+  double wlen = 0; /* In nm */
+
+  /* Miscellaneous varbale */
+  double wi[3] = {0, 0, 0};
+  double wo[3] = {0, 0, 0};
   double range[2] = {0, DBL_MAX};
-  double Tr_pos_xin = 0;
-  double Tr_xin_xs = 0;
-  double L = 0; /* Radiance in W/m^2/sr/m */
-  ASSERT(cmd && rng && wlen >= 0 && pos && dir);
+  double R = 0;
+
+  /* Radiance to compute in W/m^2/sr */
+  double L = 0;
+
+  ASSERT(cmd && rng && pos && dir);
+
+  /* Fetch the laser wavelength */
+  wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
   /* Find the intersections along dir with the laser sheet */
   htrdr_combustion_laser_trace_ray(cmd->laser, pos, dir, range, laser_hit_dst);
 
   /* No intersection with the laser sheet => no laser contribution */
-  if(HIT_NONE(laser_hit_dst[0])) return 0;
-
-  /* Sample the scattering position into the laser sheet */
-  range[0] = laser_hit_dst[0];
-  range[1] = laser_hit_dst[1];
-  sample_scattering_limited(cmd, rng, wlen, pos, dir, range, &sample);
-
-  /* No scattering in the laser sheet => no laser contribution */
-  if(HIT_NONE(sample.distance)) return 0;
-
-  /* Compute the transmissivity due to absorption from 'xin' to 'xs' */
-  range[0] = laser_hit_dst[0];
-  range[1] = sample.distance;
-  Tr_xin_xs = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, wlen, pos, dir, range);
+  if(HTRDR_COMBUSTION_LASER_HIT_NONE(laser_hit_dst)) return 0;
 
   /* Compute the transmissivity from 'pos' to 'xin' */
   range[0] = 0;
   range[1] = laser_hit_dst[0];
-  Tr_pos_xin = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, wlen, pos, dir, range);
+  Tr_ext_pos_xin = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, pos, dir, range);
+  if(Tr_ext_pos_xin == 0) return 0; /* no laser contribution */
 
-  (void)Tr_xin_xs, (void)Tr_pos_xin;
+  /* Sample the scattering position into the laser sheet */
+  range[0] = laser_hit_dst[0];
+  range[1] = laser_hit_dst[1];
+  sample_scattering_limited(cmd, rng, pos, dir, range, &sc_sample);
+  if(POSITION_NONE(&sc_sample.position)) return 0; /* No laser contribution */
+  ASSERT(laser_hit_dst[0] <= sc_sample.position.distance);
+  ASSERT(laser_hit_dst[1] >= sc_sample.position.distance);
 
+  /* Compute the transmissivity from 'xin' to 'xsc' */
+  range[0] = laser_hit_dst[0]; /* <=> xin */
+  range[1] = sc_sample.position.distance; /* <=> xsc */
+  Tr_abs_xin_xsc = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, pos, dir, range);
+  if(Tr_abs_xin_xsc == 0) return 0; /* No laser contribution */
+
+  /* Compute the scattering position */
+  xsc[0] = pos[0] + dir[0] * sc_sample.position.distance;
+  xsc[1] = pos[1] + dir[1] * sc_sample.position.distance;
+  xsc[2] = pos[2] + dir[2] * sc_sample.position.distance;
+
+  /* Retrieve the direction toward the laser surface emission */
+  htrdr_combustion_laser_get_direction(cmd->laser, wi);
+  d3_minus(wi, wi);
+
+  /* Compute the transmissivity from xsc to the laser surface emission */
+  range[0] = 0;
+  range[1] = htrdr_combustion_laser_compute_surface_plane_distance
+    (cmd->laser, xsc);
+  ASSERT(range[1] >= 0);
+  Tr_ext_xsc_lse = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, xsc, wi, range);
+  if(Tr_ext_xsc_lse == 0) return 0; /* No aser contribution */
+
+  /* Retrieve the RDG-FA phase function parameters from the semi transparent
+   * medium */
+  fetch_rdgfa_args.wavelength = wlen;
+  fetch_rdgfa_args.prim = sc_sample.position.prim;
+  d4_set(fetch_rdgfa_args.bcoords, sc_sample.position.bcoords);
+  ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
+
+  /* Setup the RDG-FA phase function */
+  rdgfa = cmd->rdgfa_phase_functions[ithread];
+  setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
+  setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
+  setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
+  SSF(phase_rdgfa_setup(rdgfa, &setup_rdgfa_args));
+
+  /* Evaluate the phase function at the scattering position */
+  d3_minus(wo, dir); /* Ensure SSF convention */
+  R = ssf_phase_eval(rdgfa, wo, wi); /* In sr^-1 */
+
+  laser_flux_density = htrdr_combustion_laser_get_flux_density(cmd->laser);
+
+  L = Tr_ext_pos_xin
+    * Tr_abs_xin_xsc
+    * sc_sample.ksi * R
+    * Tr_ext_xsc_lse
+    * laser_flux_density;
   return L;
 }
 
@@ -379,27 +593,48 @@ combustion_compute_radiance_sw
    const size_t ithread,
    struct ssp_rng* rng,
    const double pos_in[3],
-   const double dir_in[3],
-   const double wlen) /* In nanometer */
+   const double dir_in[3])
 {
   double pos[3];
   double dir[3];
   double range[2];
-  double ksi; /* Throughput */
   double weight;
+
+  /* Transmissivity due to absorption between two consecutive scattering
+   * positions */
+  double Tr_abs;
+
   ASSERT(cmd && rng && pos_in && dir_in);
-  (void)cmd, (void)ithread, (void)rng, (void)pos_in, (void)dir_in, (void)wlen;
-  (void)ksi, (void)laser_once_scattered;
+  (void)cmd, (void)ithread, (void)rng, (void)pos_in, (void)dir_in;
+  (void)Tr_abs, (void)laser_once_scattered;
 
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
   d2(range, 0, FLT_MAX);
 
-  ksi = 1;
+  Tr_abs = 1;
   weight = 0;
 
-  /* TODO Radiative random walk */
+  for(;;) {
+    struct position scattering = POSITION_NULL;
+    double laser_sheet_emissivity = 0; /* In W/m^2/sr */
+    double Tr_abs_pos_xsc = 0;
 
+    laser_sheet_emissivity = laser_once_scattered(cmd, ithread, rng, pos, dir);
+    weight += Tr_abs * laser_sheet_emissivity;
+
+    /* Sample a scattering position */
+    sample_position(cmd, rng, ATRSTM_RADCOEF_Ks, pos, dir, range, &scattering);
+    if(POSITION_NONE(&scattering)) break;
+
+    /* Compute the absorption transmissivity */
+    range[0] = 0;
+    range[1] = scattering.distance;
+    Tr_abs_pos_xsc = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, pos, dir, range);
+    if(Tr_abs_pos_xsc == 0) break;
+
+    /* TODO */
+  }
   return weight;
 }
 

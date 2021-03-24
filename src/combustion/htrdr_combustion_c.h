@@ -80,14 +80,13 @@ extern LOCAL_SYM res_T
 combustion_draw_map
   (struct htrdr_combustion* cmd);
 
-/* Return the shortwave radiance in W/m^2/sr/m */
+/* Return the shortwave radiance in W/m^2/sr */
 extern LOCAL_SYM double
 combustion_compute_radiance_sw
   (struct htrdr_combustion* cmd,
    const size_t ithread,
    struct ssp_rng* rng,
    const double pos_in[3],
-   const double dir_in[3],
-   const double wlen); /* In nanometer */
+   const double dir_in[3]);
 
 #endif /* HTRDR_COMBUSTION_C_H */

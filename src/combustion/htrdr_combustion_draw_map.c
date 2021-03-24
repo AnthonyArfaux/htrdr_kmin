@@ -69,7 +69,7 @@ draw_pixel
 
     /* Backward trace the path */
     weight = combustion_compute_radiance_sw(cmd, args->ithread, args->rng,
-        ray_org, ray_dir, cmd->wavelength);
+        ray_org, ray_dir);
 
     /* End the registration of the per realisation time */
     time_sub(&t0, time_current(&t1), &t0);
