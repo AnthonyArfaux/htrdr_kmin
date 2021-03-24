@@ -33,6 +33,7 @@ struct htrdr_combustion_laser;
 struct htrdr_geometry;
 struct htrdr_materials;
 struct htrdr_rectangle;
+struct ssf_phase;
 struct ssp_rng;
 
 struct combustion_pixel {
@@ -55,6 +56,8 @@ struct htrdr_combustion {
   struct htrdr_combustion_laser* laser; /* Laser sheet */
   double wavelength; /* Wavelength of the laser in nanometer */
 
+  struct ssf_phase** rdgfa_phase_functions; /* Per thread RDG-FA phase func */
+
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
   size_t spp; /* #samples per pixel */
@@ -62,6 +65,7 @@ struct htrdr_combustion {
   FILE* output; /* Output stream */
   struct str output_name; /* Name of the output stream */
   int dump_volumetric_acceleration_structure;
+
 
   ref_T ref;
   struct htrdr* htrdr;

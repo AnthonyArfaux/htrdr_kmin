@@ -29,12 +29,33 @@
 
 #include <astoria/atrstm.h>
 
+#include <star/ssf.h>
+
 #include <rsys/cstr.h>
 #include <rsys/mem_allocator.h>
 
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static void
+release_rdgfa(struct htrdr_combustion* cmd)
+{
+  size_t i;
+  ASSERT(cmd);
+
+  if(!cmd->rdgfa_phase_functions) return; /* Nothing to release */
+
+
+  FOR_EACH(i, 0, htrdr_get_threads_count(cmd->htrdr)) {
+    if(cmd->rdgfa_phase_functions[i]) {
+      SSF(phase_ref_put(cmd->rdgfa_phase_functions[i]));
+    }
+  }
+
+  MEM_RM(htrdr_get_allocator(cmd->htrdr), cmd->rdgfa_phase_functions);
+  cmd->rdgfa_phase_functions = NULL;
+}
+
 static res_T
 setup_output
   (struct htrdr_combustion* cmd,
@@ -142,6 +163,50 @@ setup_laser
   laser_args.wavelength = args->wavelength;
   laser_args.flux_density = args->laser_flux_density;
   return htrdr_combustion_laser_create(cmd->htrdr, &laser_args, &cmd->laser);
+}
+
+static res_T
+setup_rdgfa
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  struct mem_allocator* allocator = NULL;
+  size_t nthreads;
+  size_t i;
+  res_T res = RES_OK;
+  ASSERT(cmd);
+  (void)args; /* Not use */
+
+  nthreads = htrdr_get_threads_count(cmd->htrdr);
+  allocator = htrdr_get_allocator(cmd->htrdr);
+
+  /* Allocate the list of per thread RDG-FA */
+  cmd->rdgfa_phase_functions = MEM_CALLOC
+    (allocator, nthreads, sizeof(*cmd->rdgfa_phase_functions));
+  if(!cmd->rdgfa_phase_functions) {
+    htrdr_log_err(cmd->htrdr,
+      "Could not allocate the per thread RDG-FA phase function.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  /* Create the per thread RDG-FA */
+  FOR_EACH(i, 0, nthreads) {
+    res = ssf_phase_create
+      (allocator, &ssf_phase_rdgfa, cmd->rdgfa_phase_functions + i);
+    if(res != RES_OK) {
+      htrdr_log_err(cmd->htrdr,
+        "Could not create the RDG-FA phase function for the thread %lu -- %s.\n",
+        (unsigned long)i, res_to_cstr(res));
+      goto error;
+    }
+  }
+
+exit:
+  return res;
+error:
+  release_rdgfa(cmd);
+  goto exit;
 }
 
 static res_T
@@ -267,6 +332,7 @@ combustion_release(ref_T* ref)
   if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
+  release_rdgfa(cmd);
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -311,6 +377,8 @@ htrdr_combustion_create
   res = setup_camera(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_laser(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_rdgfa(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
