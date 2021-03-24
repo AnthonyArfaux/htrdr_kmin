@@ -75,7 +75,7 @@ parse_fov(const char* str, double* out_fov)
 }
 
 static res_T
-parse_image_parameter(void* args, const char* str)
+parse_image_parameter(const char* str, void* args)
 {
   char buf[128];
   struct htrdr_args_image* img = args;
@@ -137,7 +137,7 @@ error:
 }
 
 static res_T
-parse_camera_parameter(void* args, const char* str)
+parse_camera_parameter(const char* str, void* args)
 {
   char buf[128];
   struct htrdr_args_camera* cam = args;
@@ -191,7 +191,7 @@ error:
 }
 
 static res_T
-parse_rectangle_parameter(void* args, const char* str)
+parse_rectangle_parameter(const char* str, void* args)
 {
   char buf[128];
   struct htrdr_args_rectangle* rect = args;
@@ -270,7 +270,7 @@ error:
 }
 
 static res_T
-parse_spectral_parameter(void* ptr, const char* str)
+parse_spectral_parameter(const char* str, void* ptr)
 {
   char buf[128];
   struct htrdr_args_spectral* args = ptr;
@@ -330,7 +330,7 @@ error:
 }
 
 static res_T
-parse_geometry_parameter(void* ptr, const char* str)
+parse_geometry_parameter(const char* str, void* ptr)
 {
   struct str buf;
   struct htrdr_args_geometry* geom = ptr;
@@ -391,40 +391,6 @@ error:
   goto exit;
 }
 
-static res_T
-parse_multiple_parameters
-  (void* args,
-   const char* str,
-   res_T (*parse_parameter)(void* args, const char* str))
-{
-  struct str buf;
-  char* tk;
-  char* ctx;
-  res_T res = RES_OK;
-  ASSERT(args && str);
-
-  str_init(NULL, &buf);
-  res = str_set(&buf, str);
-  if(res != RES_OK) {
-    fprintf(stderr, "Could not duplicate the option string `%s'.\n", str);
-    res = RES_MEM_ERR;
-    goto error;
-  }
-
-  tk = strtok_r(str_get(&buf), ":", &ctx);
-  do {
-    res = parse_parameter(args, tk);
-    if(res != RES_OK) goto error;
-    tk = strtok_r(NULL, ":", &ctx);
-  } while(tk);
-
-exit:
-  str_release(&buf);
-  return res;
-error:
-  goto exit;
-}
-
 /*******************************************************************************
  * Exported functions
  ******************************************************************************/
@@ -432,28 +398,28 @@ res_T
 htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
 {
   if(!cam || !str) return RES_BAD_ARG;
-  return parse_multiple_parameters(cam, str, parse_camera_parameter);
+  return cstr_parse_list(str, ':', parse_camera_parameter, cam);
 }
 
 res_T
 htrdr_args_rectangle_parse(struct htrdr_args_rectangle* rect, const char* str)
 {
   if(!rect || !str) return RES_BAD_ARG;
-  return parse_multiple_parameters(rect, str, parse_rectangle_parameter);
+  return cstr_parse_list(str, ':', parse_rectangle_parameter, rect);
 }
 
 res_T
 htrdr_args_image_parse(struct htrdr_args_image* img, const char* str)
 {
   if(!img || !str) return RES_BAD_ARG;
-  return parse_multiple_parameters(img, str, parse_image_parameter);
+  return cstr_parse_list(str, ':', parse_image_parameter, img);
 }
 
 res_T
 htrdr_args_spectral_parse(struct htrdr_args_spectral* spectral, const char* str)
 {
   if(!spectral || !str) return RES_BAD_ARG;
-  return parse_multiple_parameters(spectral, str, parse_spectral_parameter);
+  return cstr_parse_list(str, ':', parse_spectral_parameter, spectral);
 }
 
 void
@@ -475,7 +441,7 @@ htrdr_args_geometry_parse(struct htrdr_args_geometry* geom, const char* str)
     goto error;
   }
 
-  res = parse_multiple_parameters(geom, str, parse_geometry_parameter);
+  res = cstr_parse_list(str, ':', parse_geometry_parameter, geom);
   if(res != RES_OK) goto error;
 
   if(!geom->path_obj) {
