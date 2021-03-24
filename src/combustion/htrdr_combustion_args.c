@@ -40,7 +40,7 @@ print_help(const char* cmd)
 
   printf(
 "  -C <camera>    define the rendering point of view. Refer to the\n"
-"                 %s man page for the list of camera options.\n", cmd);
+"                 man page for the list of camera options.\n");
   printf(
 "  -D FLUX_DENSITY\n"
 "                 flux density of the laser in W/m^2. By default the\n"
@@ -50,28 +50,27 @@ print_help(const char* cmd)
 "  -d             dump volumetric acceleration structures to OUTPUT\n"
 "                 and exit.\n");
   printf(
-"  -F <fractal-coefs>"
+"  -F <fractal-coefs>\n"
 "                 value of the fractal prefactor and fractal dimension\n"
-"                 to use in the RDG-FA model. Refer to the %s man page\n"
+"                 to use in the RDG-FA model. Refer to the man page\n"
 "                 for the syntax of the <fractal-coefs> option. Default\n"
 "                 fractal prefactor is %g and the default fractal\n"
 "                 dimension is %g.\n",
-    cmd,
     HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_prefactor,
     HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_dimension);
   printf(
 "  -f             overwrite the OUTPUT file if it already exists.\n");
   printf(
 "  -g <geometry>  define the combustion chamber geometry. Refer to the\n"
-"                 %s man page for the list of geometry options.\n", cmd);
+"                 man page for the list of geometry options.\n");
   printf(
 "  -h             display this help and exit.\n");
   printf(
-"  -i <image>     define the image to compute. Refer to the %s man\n"
-"                 page for the list of image options.\n", cmd);
+"  -i <image>     define the image to compute. Refer to the man\n"
+"                 page for the list of image options.\n");
   printf(
 "  -l <laser>     define the geometry of the laser sheet. Refer to the\n"
-"                 %s man page for the list of laser options.\n", cmd);
+"                 man page for the list of laser options.\n");
   printf(
 "  -m TETRAHEDRA  path toward the volumetric mesh.\n");
   printf(
