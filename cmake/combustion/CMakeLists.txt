@@ -76,6 +76,24 @@ set_target_properties(htrdr-combustion PROPERTIES
   SOVERSION ${VERSION_MAJOR})
 
 ################################################################################
+# Add tests
+################################################################################
+if(NOT NO_TEST)
+  function(build_test _name)
+    add_executable(${_name}
+      ${HTRDR_SOURCE_DIR}/combustion/${_name}.c)
+    target_link_libraries(${_name} htrdr-combustion ${ARGN})
+  endfunction()
+
+  function(new_test _name)
+    build_test(${_name} ${ARGN})
+    add_test(${_name} ${_name})
+  endfunction()
+
+  new_test(test_htrdr_combustion_laser)
+endif()
+
+################################################################################
 # Define output & install directories
 ################################################################################
 install(TARGETS htrdr-core
