@@ -55,6 +55,11 @@ htrdr_rectangle_get_normal
   (const struct htrdr_rectangle* rect,
    double normal[3]);
 
+HTRDR_CORE_API void
+htrdr_rectangle_get_center
+  (const struct htrdr_rectangle* rect,
+   double center[3]);
+
 HTRDR_CORE_API double*
 htrdr_rectangle_get_transform
   (const struct htrdr_rectangle* rect,

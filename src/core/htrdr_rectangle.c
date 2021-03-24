@@ -166,6 +166,13 @@ htrdr_rectangle_get_normal(const struct htrdr_rectangle* rect, double normal[3])
   d3_set(normal, rect->normal);
 }
 
+void
+htrdr_rectangle_get_center(const struct htrdr_rectangle* rect, double pos[3])
+{
+  ASSERT(rect && pos);
+  d3_set(pos, rect->position);
+}
+
 double*
 htrdr_rectangle_get_transform
   (const struct htrdr_rectangle* rect,
