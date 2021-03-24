@@ -139,6 +139,8 @@ setup_laser
   ASSERT(cmd && args);
   cmd->wavelength = args->wavelength;
   laser_args.surface = args->laser;
+  laser_args.wavelength = args->wavelength;
+  laser_args.flux_density = args->laser_flux_density;
   return htrdr_combustion_laser_create(cmd->htrdr, &laser_args, &cmd->laser);
 }
 
@@ -193,7 +195,7 @@ setup_medium
   atrstm_args.spectral_type = ATRSTM_SPECTRAL_SW;
   atrstm_args.wlen_range[0] = args->wavelength;
   atrstm_args.wlen_range[1] = args->wavelength;
-  atrstm_args.gyration_radius_prefactor = args->gyration_radius_prefactor;
+  atrstm_args.fractal_prefactor = args->fractal_prefactor;
   atrstm_args.fractal_dimension = args->fractal_dimension;
   atrstm_args.optical_thickness = args->optical_thickness;
   atrstm_args.precompute_normals = args->precompute_normals;

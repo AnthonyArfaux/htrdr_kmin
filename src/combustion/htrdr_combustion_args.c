@@ -15,10 +15,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 200112L /* strtok_r support */
+
 #include "combustion/htrdr_combustion_args.h"
 
 #include <rsys/cstr.h>
+
 #include <getopt.h>
+#include <string.h>
 
 /*******************************************************************************
  * Helper functions
@@ -38,18 +42,25 @@ print_help(const char* cmd)
 "  -C <camera>    define the rendering point of view. Refer to the\n"
 "                 %s man page for the list of camera options.\n", cmd);
   printf(
+"  -D FLUX_DENSITY\n"
+"                 flux density of the laser in W/m^2. By default the\n"
+"                 flux density is %g W/m^2.\n",
+    HTRDR_COMBUSTION_ARGS_DEFAULT.laser_flux_density);
+  printf(
 "  -d             dump volumetric acceleration structures to OUTPUT\n"
 "                 and exit.\n");
   printf(
-"  -F FRACTAL_DIM value of the fractal dimension to use in the RDG-FA\n"
-"                 model. Its default value is %g.\n",
+"  -F <fractal-coefs>"
+"                 value of the fractal prefactor and fractal dimension\n"
+"                 to use in the RDG-FA model. Refer to the %s man page\n"
+"                 for the syntax of the <fractal-coefs> option. Default\n"
+"                 fractal prefactor is %g and the default fractal\n"
+"                 dimension is %g.\n",
+    cmd,
+    HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_prefactor,
     HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_dimension);
   printf(
 "  -f             overwrite the OUTPUT file if it already exists.\n");
-  printf(
-"  -G PREFACTOR   value gyration radius prefactor to use in the RDG-FA\n"
-"                 model. Its default value is %g.\n",
-    HTRDR_COMBUSTION_ARGS_DEFAULT.gyration_radius_prefactor);
   printf(
 "  -g <geometry>  define the combustion chamber geometry. Refer to the\n"
 "                 %s man page for the list of geometry options.\n", cmd);
@@ -147,6 +158,46 @@ error:
   goto exit;
 }
 
+static res_T
+parse_fractal_parameters(const char* str, void* ptr)
+{
+  char buf[128];
+  struct htrdr_combustion_args* args = ptr;
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+  ASSERT(ptr && str);
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the fractal option string `%s'.\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &ctx);
+  val = strtok_r(NULL, "",  &ctx);
+
+  if(!strcmp(key, "prefactor")) {
+    res = cstr_to_double(val, &args->fractal_prefactor);
+    if(res != RES_OK) goto error;
+  } else if(!strcmp(key, "dimension")) {
+    res = cstr_to_double(val, &args->fractal_dimension);
+    if(res != RES_OK) goto error;
+  } else {
+    fprintf(stderr, "Invalid fractal parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -162,25 +213,22 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:dF:fG:g:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:dF:fg:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
         res = htrdr_args_camera_parse(&args->camera, optarg);
+        break;
+      case 'D':
+        res = cstr_to_double(optarg, &args->laser_flux_density);
+        if(res == RES_OK && args->laser_flux_density <= 0) res = RES_BAD_ARG;
         break;
       case 'd':
         args->dump_volumetric_acceleration_structure = 1;
         break;
       case 'F':
-        res = cstr_to_double(optarg, &args->fractal_dimension);
-        if(res == RES_OK && args->fractal_dimension <= 0)
-          res = RES_BAD_ARG;
+        res = cstr_parse_list(optarg, ':', parse_fractal_parameters, args);
         break;
       case 'f': args->force_overwriting = 1; break;
-      case 'G':
-        res = cstr_to_double(optarg, &args->gyration_radius_prefactor);
-        if(res == RES_OK && args->gyration_radius_prefactor <= 0)
-          res = RES_BAD_ARG;
-        break;
       case 'g':
         res = htrdr_args_geometry_parse(&args->geom, optarg);
         break;

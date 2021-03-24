@@ -30,6 +30,8 @@ struct htrdr_combustion_laser {
   struct htrdr_rectangle* surface; /* Surface emission */
   double world2local[12];
   double low_ls[3], upp_ls[3]; /* Local space AABB */
+  double flux_density; /* In W/m^2 */
+  double wavelength; /* In nm */
   ref_T ref;
   struct htrdr* htrdr;
 };
@@ -63,15 +65,29 @@ htrdr_combustion_laser_create
   res_T res = RES_OK;
   ASSERT(htrdr && args && out_laser);
 
+  if(args->flux_density <= 0) {
+    htrdr_log_err(htrdr, "Invalid flux density %g W.m^2\n", args->flux_density);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if(args->wavelength <= 0) {
+    htrdr_log_err(htrdr, "Invalid wavelength %g nm\n", args->wavelength);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   laser = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*laser));
   if(!laser) {
     htrdr_log_err(htrdr, "Could not allocate the laser data structure.\n");
-    res = RES_BAD_ARG;
+    res = RES_MEM_ERR;
     goto error;
   }
   ref_init(&laser->ref);
   htrdr_ref_get(htrdr);
   laser->htrdr = htrdr;
+  laser->flux_density = args->flux_density;
+  laser->wavelength = args->wavelength;
 
   res = htrdr_rectangle_create
     (laser->htrdr,
@@ -93,7 +109,7 @@ htrdr_combustion_laser_create
   laser->upp_ls[1] = args->surface.size[1] * 0.5;
   laser->upp_ls[2] = 0;
   laser->low_ls[0] = -laser->upp_ls[0];
-  laser->low_ls[2] = -laser->upp_ls[1];
+  laser->low_ls[1] = -laser->upp_ls[1];
   laser->upp_ls[2] = INF;
 
 exit:
@@ -163,3 +179,88 @@ htrdr_combustion_laser_trace_ray
   distance[1] = t_max;
 }
 
+void
+htrdr_combustion_laser_get_mesh
+  (const struct htrdr_combustion_laser* laser,
+   const double extend,
+   struct htrdr_combustion_laser_mesh* mesh)
+{
+  double transform[12];
+  double low[3];
+  double upp[3];
+  ASSERT(laser && extend > 0 && mesh);
+
+  htrdr_rectangle_get_transform(laser->surface, transform);
+
+  /* Define the laser sheet vertices in local space */
+  low[0] = laser->low_ls[0];
+  low[1] = laser->low_ls[1];
+  low[2] = laser->low_ls[2];
+  upp[0] = laser->upp_ls[0];
+  upp[1] = laser->upp_ls[1];
+  upp[2] = laser->low_ls[2] + extend;
+
+  /* Transform the laser sheet vertices in world space */
+  d3(mesh->vertices + 0*3, low[0], low[1], low[2]);
+  d3(mesh->vertices + 1*3, upp[0], low[1], low[2]);
+  d3(mesh->vertices + 2*3, low[0], upp[1], low[2]);
+  d3(mesh->vertices + 3*3, upp[0], upp[1], low[2]);
+  d3(mesh->vertices + 4*3, low[0], low[1], upp[2]);
+  d3(mesh->vertices + 5*3, upp[0], low[1], upp[2]);
+  d3(mesh->vertices + 6*3, low[0], upp[1], upp[2]);
+  d3(mesh->vertices + 7*3, upp[0], upp[1], upp[2]);
+  mesh->nvertices = 8;
+
+  /* Define the laser sheet triangles */
+  mesh->triangles[0]  = 0; mesh->triangles[1]  = 2; mesh->triangles[2]  = 1;
+  mesh->triangles[3]  = 1; mesh->triangles[4]  = 2; mesh->triangles[5]  = 3;
+  mesh->triangles[6]  = 0; mesh->triangles[7]  = 4; mesh->triangles[8]  = 2;
+  mesh->triangles[9]  = 2; mesh->triangles[10] = 4; mesh->triangles[11] = 6;
+  mesh->triangles[12] = 1; mesh->triangles[13] = 3; mesh->triangles[14] = 5;
+  mesh->triangles[15] = 5; mesh->triangles[16] = 3; mesh->triangles[17] = 7;
+  mesh->triangles[18] = 1; mesh->triangles[19] = 5; mesh->triangles[20] = 0;
+  mesh->triangles[21] = 0; mesh->triangles[22] = 5; mesh->triangles[23] = 4;
+  mesh->triangles[24] = 3; mesh->triangles[25] = 2; mesh->triangles[26] = 7;
+  mesh->triangles[27] = 7; mesh->triangles[28] = 2; mesh->triangles[29] = 6;
+  mesh->ntriangles = 10;
+}
+
+void
+htrdr_combustion_laser_get_direction
+  (const struct htrdr_combustion_laser* laser,
+   double dir[3])
+{
+  ASSERT(laser && dir);
+  htrdr_rectangle_get_normal(laser->surface, dir);
+}
+
+double
+htrdr_combustion_laser_get_flux_density
+  (const struct htrdr_combustion_laser* laser)
+{
+  ASSERT(laser);
+  return laser->flux_density;
+}
+
+double
+htrdr_combustion_laser_get_wavelength
+  (const struct htrdr_combustion_laser* laser)
+{
+  ASSERT(laser);
+  return laser->wavelength;
+}
+
+double
+htrdr_combustion_laser_compute_surface_plane_distance
+  (const struct htrdr_combustion_laser* laser,
+   const double pos[3])
+{
+  double center[3];
+  double normal[3];
+  double vec[3];
+  ASSERT(laser && pos);
+  htrdr_rectangle_get_normal(laser->surface, normal);
+  htrdr_rectangle_get_center(laser->surface, center);
+  d3_sub(vec, pos, center);
+  return d3_dot(normal, vec);
+}

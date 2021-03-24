@@ -58,11 +58,12 @@ struct htrdr_combustion_args {
 
   struct htrdr_args_rectangle laser; /* Laser surface emission */
   double wavelength; /* Wavelength of the laser in nanometer */
+  double laser_flux_density; /* In W/m^2 */
 
   struct htrdr_args_image image; /* Output Image */
 
   /* RDG-FA parameters */
-  double gyration_radius_prefactor;
+  double fractal_prefactor;
   double fractal_dimension;
 
   struct htrdr_combustion_args_grid_definition grid;
@@ -92,6 +93,7 @@ struct htrdr_combustion_args {
                                                                                \
   HTRDR_ARGS_RECTANGLE_DEFAULT__, /* Laser surface emission */                 \
   532, /* Wavelength in nanometer */                                           \
+  1, /* FIXME Flux density */                                                  \
                                                                                \
   HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
                                                                                \
