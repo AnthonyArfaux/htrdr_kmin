@@ -209,7 +209,6 @@ parse_rectangle_parameter(const char* str, void* args)
   }
   strncpy(buf, str, sizeof(buf));
 
-  /* pos=0,0,10.1; key <- pos, val <- 0,0,10 */
   key = strtok_r(buf, "=", &ctx);
   val = strtok_r(NULL, "", &ctx);
 

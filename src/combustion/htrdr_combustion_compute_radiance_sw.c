@@ -595,22 +595,34 @@ combustion_compute_radiance_sw
    const double pos_in[3],
    const double dir_in[3])
 {
-  double pos[3];
-  double dir[3];
-  double range[2];
-  double weight;
+  /* RDG-FA phase function */
+  struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
+  struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
+    ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
+  struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
+    SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
+  struct ssf_phase* rdgfa = NULL;
 
   /* Transmissivity due to absorption between two consecutive scattering
    * positions */
-  double Tr_abs;
+  double Tr_abs = 1;
 
+  /* Monte carlo weight of the simulated optical path */
+  double weight = 0;
+
+  /* Miscellaneous variables */
+  double pos[3] = {0, 0, 0};
+  double dir[3] = {0, 0, 0};
+  double range[2] = {0, DBL_MAX};
+  double wlen = 0;
   ASSERT(cmd && rng && pos_in && dir_in);
-  (void)cmd, (void)ithread, (void)rng, (void)pos_in, (void)dir_in;
-  (void)Tr_abs, (void)laser_once_scattered;
 
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
   d2(range, 0, FLT_MAX);
+
+  rdgfa = cmd->rdgfa_phase_functions[ithread];
+  wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
   Tr_abs = 1;
   weight = 0;
@@ -619,7 +631,10 @@ combustion_compute_radiance_sw
     struct position scattering = POSITION_NULL;
     double laser_sheet_emissivity = 0; /* In W/m^2/sr */
     double Tr_abs_pos_xsc = 0;
+    double wo[3];
+    double wi[3];
 
+    /* Handle the laser contribution */
     laser_sheet_emissivity = laser_once_scattered(cmd, ithread, rng, pos, dir);
     weight += Tr_abs * laser_sheet_emissivity;
 
@@ -633,7 +648,37 @@ combustion_compute_radiance_sw
     Tr_abs_pos_xsc = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, pos, dir, range);
     if(Tr_abs_pos_xsc == 0) break;
 
-    /* TODO */
+    /* Retrieve the RDG-FA phase function parameters */
+    fetch_rdgfa_args.wavelength = wlen;
+    fetch_rdgfa_args.prim = scattering.prim;
+    fetch_rdgfa_args.bcoords[0] = scattering.bcoords[0];
+    fetch_rdgfa_args.bcoords[1] = scattering.bcoords[1];
+    fetch_rdgfa_args.bcoords[2] = scattering.bcoords[2];
+    fetch_rdgfa_args.bcoords[3] = scattering.bcoords[3];
+    ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
+
+    /* Setup the RDG-FA phase function corresponding to the scattering event */
+    setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
+    setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
+    setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
+    SSF(phase_rdgfa_setup(rdgfa, &setup_rdgfa_args));
+
+    /* Sample a new optical path direction from the phase function */
+    d3_minus(wo, dir); /* Ensure SSF convention */
+    ssf_phase_sample(rdgfa, rng, wo, wi, NULL);
+
+    /* Update the overall absorption transmissivity of the optical path and its
+     * Monte-Carlo weight */
+    Tr_abs *= Tr_abs_pos_xsc;
+    weight *= Tr_abs;
+
+    /* Update the position and direction of the optical path */
+    pos[0] = pos[0] + dir[0] * scattering.distance;
+    pos[1] = pos[1] + dir[1] * scattering.distance;
+    pos[2] = pos[2] + dir[2] * scattering.distance;
+    dir[0] = wi[0];
+    dir[1] = wi[1];
+    dir[2] = wi[2];
   }
   return weight;
 }
