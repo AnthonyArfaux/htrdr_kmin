@@ -46,8 +46,10 @@ static const struct position POSITION_NULL = POSITION_NULL__;
 /* Syntactic sugar to check if the position is valid */
 #define POSITION_NONE(Pos) ((Pos)->distance >= DBL_MAX)
 
-/* Common position but preferentially sampled within a limited range.
- * Its associated ksi variable defines ??? TODO write the comment */
+/* Common position but preferentially sampled within a limited range. Its
+ * associated ksi variable defines the correction of the weight due to the
+ * normalization of the sampling pdf, and the recursivity associated with the
+ * null-collision technique. */
 struct position_limited {
   struct position position;
   double ksi;
@@ -554,13 +556,16 @@ laser_once_scattered
     (cmd->laser, xsc);
   ASSERT(range[1] >= 0);
   Tr_ext_xsc_lse = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, xsc, wi, range);
-  if(Tr_ext_xsc_lse == 0) return 0; /* No aser contribution */
+  if(Tr_ext_xsc_lse == 0) return 0; /* No laser contribution */
 
   /* Retrieve the RDG-FA phase function parameters from the semi transparent
    * medium */
   fetch_rdgfa_args.wavelength = wlen;
   fetch_rdgfa_args.prim = sc_sample.position.prim;
-  d4_set(fetch_rdgfa_args.bcoords, sc_sample.position.bcoords);
+  fetch_rdgfa_args.bcoords[0] = sc_sample.position.bcoords[0];
+  fetch_rdgfa_args.bcoords[1] = sc_sample.position.bcoords[1];
+  fetch_rdgfa_args.bcoords[2] = sc_sample.position.bcoords[2];
+  fetch_rdgfa_args.bcoords[3] = sc_sample.position.bcoords[3];
   ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
 
   /* Setup the RDG-FA phase function */
@@ -603,8 +608,8 @@ combustion_compute_radiance_sw
     SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
   struct ssf_phase* rdgfa = NULL;
 
-  /* Transmissivity due to absorption between two consecutive scattering
-   * positions */
+  /* Transmissivity between the probe position (i.e. 'pos_in') and the current
+   * scattering position over the reverse scattering path */
   double Tr_abs = 1;
 
   /* Monte carlo weight of the simulated optical path */
@@ -648,6 +653,14 @@ combustion_compute_radiance_sw
     Tr_abs_pos_xsc = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, pos, dir, range);
     if(Tr_abs_pos_xsc == 0) break;
 
+    /* Update the overall absorption transmissivity of the optical path */
+    Tr_abs *= Tr_abs_pos_xsc;
+
+    /* Update the position of the optical path */
+    pos[0] = pos[0] + dir[0] * scattering.distance;
+    pos[1] = pos[1] + dir[1] * scattering.distance;
+    pos[2] = pos[2] + dir[2] * scattering.distance;
+
     /* Retrieve the RDG-FA phase function parameters */
     fetch_rdgfa_args.wavelength = wlen;
     fetch_rdgfa_args.prim = scattering.prim;
@@ -667,19 +680,10 @@ combustion_compute_radiance_sw
     d3_minus(wo, dir); /* Ensure SSF convention */
     ssf_phase_sample(rdgfa, rng, wo, wi, NULL);
 
-    /* Update the overall absorption transmissivity of the optical path and its
-     * Monte-Carlo weight */
-    Tr_abs *= Tr_abs_pos_xsc;
-    weight *= Tr_abs;
-
-    /* Update the position and direction of the optical path */
-    pos[0] = pos[0] + dir[0] * scattering.distance;
-    pos[1] = pos[1] + dir[1] * scattering.distance;
-    pos[2] = pos[2] + dir[2] * scattering.distance;
+    /* Update the optical path direction */
     dir[0] = wi[0];
     dir[1] = wi[1];
     dir[2] = wi[2];
   }
   return weight;
 }
-

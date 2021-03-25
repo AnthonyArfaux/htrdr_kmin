@@ -93,7 +93,7 @@ struct htrdr_combustion_args {
                                                                                \
   HTRDR_ARGS_RECTANGLE_DEFAULT__, /* Laser surface emission */                 \
   532, /* Wavelength in nanometer */                                           \
-  1, /* FIXME Flux density */                                                  \
+  1, /* Flux density */                                                        \
                                                                                \
   HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
                                                                                \
