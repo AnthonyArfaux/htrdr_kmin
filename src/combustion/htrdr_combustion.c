@@ -38,22 +38,21 @@
  * Helper functions
  ******************************************************************************/
 static void
-release_rdgfa(struct htrdr_combustion* cmd)
+release_phase_functions
+  (struct htrdr_combustion* cmd,
+   struct ssf_phase* phases[])
 {
   size_t i;
   ASSERT(cmd);
 
-  if(!cmd->rdgfa_phase_functions) return; /* Nothing to release */
-
+  if(!phases) return; /* Nothing to release */
 
   FOR_EACH(i, 0, htrdr_get_threads_count(cmd->htrdr)) {
-    if(cmd->rdgfa_phase_functions[i]) {
-      SSF(phase_ref_put(cmd->rdgfa_phase_functions[i]));
+    if(phases[i]) {
+      SSF(phase_ref_put(phases[i]));
     }
   }
-
-  MEM_RM(htrdr_get_allocator(cmd->htrdr), cmd->rdgfa_phase_functions);
-  cmd->rdgfa_phase_functions = NULL;
+  MEM_RM(htrdr_get_allocator(cmd->htrdr), phases);
 }
 
 static res_T
@@ -166,46 +165,47 @@ setup_laser
 }
 
 static res_T
-setup_rdgfa
+setup_phase_functions
   (struct htrdr_combustion* cmd,
-   const struct htrdr_combustion_args* args)
+   const struct ssf_phase_type* phase_type,
+   struct ssf_phase** out_phases[])
 {
   struct mem_allocator* allocator = NULL;
+  struct ssf_phase** phases = NULL;
   size_t nthreads;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(cmd);
-  (void)args; /* Not use */
+  ASSERT(cmd && phase_type && out_phases);
 
   nthreads = htrdr_get_threads_count(cmd->htrdr);
   allocator = htrdr_get_allocator(cmd->htrdr);
 
-  /* Allocate the list of per thread RDG-FA */
-  cmd->rdgfa_phase_functions = MEM_CALLOC
-    (allocator, nthreads, sizeof(*cmd->rdgfa_phase_functions));
-  if(!cmd->rdgfa_phase_functions) {
+  /* Allocate the list of per thread phase function */
+  phases = MEM_CALLOC(allocator, nthreads, sizeof(*phases));
+  if(!phases) {
     htrdr_log_err(cmd->htrdr,
       "Could not allocate the per thread RDG-FA phase function.\n");
     res = RES_MEM_ERR;
     goto error;
   }
 
-  /* Create the per thread RDG-FA */
+  /* Create the per thread phase function */
   FOR_EACH(i, 0, nthreads) {
-    res = ssf_phase_create
-      (allocator, &ssf_phase_rdgfa, cmd->rdgfa_phase_functions + i);
+    res = ssf_phase_create(allocator, phase_type, phases+i);
     if(res != RES_OK) {
       htrdr_log_err(cmd->htrdr,
-        "Could not create the RDG-FA phase function for the thread %lu -- %s.\n",
+        "Could not create the phase function for the thread %lu -- %s.\n",
         (unsigned long)i, res_to_cstr(res));
       goto error;
     }
   }
 
 exit:
+  *out_phases = phases;
   return res;
 error:
-  release_rdgfa(cmd);
+  release_phase_functions(cmd, phases);
+  phases = NULL;
   goto exit;
 }
 
@@ -332,7 +332,8 @@ combustion_release(ref_T* ref)
   if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
-  release_rdgfa(cmd);
+  release_phase_functions(cmd, cmd->rdgfa_phase_functions);
+  release_phase_functions(cmd, cmd->hg_phase_functions);
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -378,7 +379,9 @@ htrdr_combustion_create
   if(res != RES_OK) goto error;
   res = setup_laser(cmd, args);
   if(res != RES_OK) goto error;
-  res = setup_rdgfa(cmd, args);
+  res = setup_phase_functions(cmd, &ssf_phase_rdgfa, &cmd->rdgfa_phase_functions);
+  if(res != RES_OK) goto error;
+  res = setup_phase_functions(cmd, &ssf_phase_hg, &cmd->hg_phase_functions);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;

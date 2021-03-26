@@ -30,6 +30,8 @@
 #include <rsys/double4.h>
 #include <rsys/dynamic_array.h>
 
+#define USE_HG_PHASE_FUNCTION 1
+
 /* Define a position along the ray into the semi-transparent medium */
 struct position {
   double distance; /* Distance up to the position  */
@@ -178,8 +180,12 @@ sample_position_hit_filter
 
       /* Fetch the radiative coefficient at the collision position */
       ATRSTM(at(ctx->medium, x, &fetch_raw_args.prim, fetch_raw_args.bcoords));
-      ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
-      k = radcoefs[ctx->radcoef];
+      if(SUVM_PRIMITIVE_NONE(&fetch_raw_args.prim)) {
+        k = 0;
+      } else {
+        ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
+        k = radcoefs[ctx->radcoef];
+      }
 
       r = ssp_rng_canonical(ctx->rng);
 
@@ -375,8 +381,12 @@ sample_scattering_limited_hit_filter
 
       /* Fetch the radiative coefficient at the collision position */
       ATRSTM(at(ctx->medium, x, &fetch_raw_args.prim, fetch_raw_args.bcoords));
-      ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
-      ks = radcoefs[ATRSTM_RADCOEF_Ks];
+      if(SUVM_PRIMITIVE_NONE(&fetch_raw_args.prim)) {
+        ks = 0;
+      } else {
+        ATRSTM(fetch_radcoefs(ctx->medium, &fetch_raw_args, radcoefs));
+        ks = radcoefs[ATRSTM_RADCOEF_Ks];
+      }
 
       r = ssp_rng_canonical(ctx->rng);
 
@@ -479,13 +489,15 @@ laser_once_scattered
    const double pos[3],
    const double dir[3])
 {
+#ifndef USE_HG_PHASE_FUNCTION
   /* RDG-FA phase function */
   struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
   struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
     ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
   struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
     SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
-  struct ssf_phase* rdgfa = NULL;
+#endif
+  struct ssf_phase* phase = NULL;
 
   /* Scattering position into the laser sheet */
   struct position_limited sc_sample = POSITION_LIMITED_NULL;
@@ -558,6 +570,11 @@ laser_once_scattered
   Tr_ext_xsc_lse = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, xsc, wi, range);
   if(Tr_ext_xsc_lse == 0) return 0; /* No laser contribution */
 
+#ifdef USE_HG_PHASE_FUNCTION
+  phase = cmd->hg_phase_functions[ithread];
+  SSF(phase_hg_setup(phase, 0));
+  (void)wlen;
+#else
   /* Retrieve the RDG-FA phase function parameters from the semi transparent
    * medium */
   fetch_rdgfa_args.wavelength = wlen;
@@ -569,15 +586,16 @@ laser_once_scattered
   ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
 
   /* Setup the RDG-FA phase function */
-  rdgfa = cmd->rdgfa_phase_functions[ithread];
+  phase = cmd->rdgfa_phase_functions[ithread];
   setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
   setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
   setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
-  SSF(phase_rdgfa_setup(rdgfa, &setup_rdgfa_args));
+  SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+#endif
 
   /* Evaluate the phase function at the scattering position */
   d3_minus(wo, dir); /* Ensure SSF convention */
-  R = ssf_phase_eval(rdgfa, wo, wi); /* In sr^-1 */
+  R = ssf_phase_eval(phase, wo, wi); /* In sr^-1 */
 
   laser_flux_density = htrdr_combustion_laser_get_flux_density(cmd->laser);
 
@@ -600,13 +618,15 @@ combustion_compute_radiance_sw
    const double pos_in[3],
    const double dir_in[3])
 {
+#ifndef USE_HG_PHASE_FUNCTION
   /* RDG-FA phase function */
   struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
   struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
     ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
   struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
     SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
-  struct ssf_phase* rdgfa = NULL;
+#endif
+  struct ssf_phase* phase = NULL;
 
   /* Transmissivity between the probe position (i.e. 'pos_in') and the current
    * scattering position over the reverse scattering path */
@@ -626,7 +646,6 @@ combustion_compute_radiance_sw
   d3_set(dir, dir_in);
   d2(range, 0, FLT_MAX);
 
-  rdgfa = cmd->rdgfa_phase_functions[ithread];
   wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
   Tr_abs = 1;
@@ -661,6 +680,11 @@ combustion_compute_radiance_sw
     pos[1] = pos[1] + dir[1] * scattering.distance;
     pos[2] = pos[2] + dir[2] * scattering.distance;
 
+#ifdef USE_HG_PHASE_FUNCTION
+    phase = cmd->hg_phase_functions[ithread];
+    SSF(phase_hg_setup(phase, 0));
+    (void)wlen;
+#else
     /* Retrieve the RDG-FA phase function parameters */
     fetch_rdgfa_args.wavelength = wlen;
     fetch_rdgfa_args.prim = scattering.prim;
@@ -671,14 +695,16 @@ combustion_compute_radiance_sw
     ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
 
     /* Setup the RDG-FA phase function corresponding to the scattering event */
+    phase = cmd->rdgfa_phase_functions[ithread];
     setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
     setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
     setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
-    SSF(phase_rdgfa_setup(rdgfa, &setup_rdgfa_args));
+    SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+#endif
 
     /* Sample a new optical path direction from the phase function */
     d3_minus(wo, dir); /* Ensure SSF convention */
-    ssf_phase_sample(rdgfa, rng, wo, wi, NULL);
+    ssf_phase_sample(phase, rng, wo, wi, NULL);
 
     /* Update the optical path direction */
     dir[0] = wi[0];

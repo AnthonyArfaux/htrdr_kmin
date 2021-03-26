@@ -57,6 +57,7 @@ struct htrdr_combustion {
   double wavelength; /* Wavelength of the laser in nanometer */
 
   struct ssf_phase** rdgfa_phase_functions; /* Per thread RDG-FA phase func */
+  struct ssf_phase** hg_phase_functions; /* Per thread Henyey-Greenstein func */
 
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
