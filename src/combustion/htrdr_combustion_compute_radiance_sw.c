@@ -88,8 +88,12 @@ struct sample_scattering_limited_context {
   struct atrstm* medium; /* Semi transparent medium */
   double wavelength; /* Wavelength to handle in nanometer */
 
-  /* Local data updated during traversal */
+  /* Smallest scattering upper-field over the range traveled by the ray */
   double ks_2hat;
+
+  double Tmax; /* Scattering optical thickness computed using ks_2hat */
+  double Ume; /* Normalization of the pdf for the sampled optical thickness */
+  double sampled_vox_collision_dst; /* Scattering path length */
 
   /* Output data */
   struct position_limited position_limited;
@@ -99,6 +103,9 @@ struct sample_scattering_limited_context {
   NULL, /* Medium */                                                           \
   -1, /* Wavelength */                                                         \
   -1, /* ks_2hat */                                                            \
+  -1, /* Tau max */                                                            \
+  -1, /* Ume */                                                                \
+  -1, /* Sampled collision dst */                                              \
   POSITION_LIMITED_NULL__                                                      \
 }
 static const struct sample_scattering_limited_context
@@ -313,9 +320,7 @@ sample_scattering_limited_hit_filter
   struct sample_scattering_limited_context* ctx = context;
   double ks_min = 0;
   double ks_max = 0;
-  double tau_max = 0;
   double traversal_dst = 0;
-  double Ume = 0;
   int pursue_traversal = 1;
   ASSERT(hit && org && dir && range && ctx);
   (void)range;
@@ -342,36 +347,47 @@ sample_scattering_limited_hit_filter
    * current ray enters into the current voxel */
   traversal_dst = hit->distance[0];
 
-  tau_max = (range[1] - range[0]) * ctx->ks_2hat;
-  Ume = 1 - exp(-tau_max);
+  /* First traversed leaf */
+  if(ctx->sampled_vox_collision_dst < 0) {
+    ctx->Tmax = (range[1] - range[0]) * ctx->ks_2hat;
+    ctx->Ume = 1 - exp(-ctx->Tmax);
+  }
 
   for(;;) {
     atrstm_radcoefs_T radcoefs;
-    double vox_collision_dst;
+    double vox_dst;
     double tau;
     double ks;
     double r;
 
-    /* Sampled optical thickness (preferential sampling) */
-    r = ssp_rng_canonical(ctx->rng);
-    tau = -log(1.0-r*(1.0-exp(-tau_max)));
-    vox_collision_dst = tau / ks_max;
+    /* Compute the remaining distance to traverse in the current voxel */
+    vox_dst = hit->distance[1] - traversal_dst;
+
+    /* A collision distance was not already sampled */
+    if(ctx->sampled_vox_collision_dst < 0) {
+      r = ssp_rng_canonical(ctx->rng);
+      tau = -log(1.0-r*(1.0-exp(-ctx->Tmax)));
+      ctx->sampled_vox_collision_dst = tau / ctx->ks_2hat;
+
+      /* Update the ksi output data */
+      ctx->position_limited.ksi *= ctx->Ume;
+    }
 
     /* Compute the traversed distance up to the challenged collision */
-    traversal_dst += vox_collision_dst;
-
-    /* Update the ksi output data */
-    ctx->position_limited.ksi *= Ume;
+    traversal_dst = traversal_dst + ctx->sampled_vox_collision_dst;
 
     /* The collision to challenge lies behind the current voxel */
     if(traversal_dst > hit->distance[1]) {
+      ctx->sampled_vox_collision_dst -= vox_dst;
       pursue_traversal = 1;
       break;
     }
     ASSERT(traversal_dst >= hit->distance[0]);
 
     r = ssp_rng_canonical(ctx->rng);
-    if(r < ks_max / ctx->ks_2hat) { /* Collision with ks_max */
+    if(r >= ks_max / ctx->ks_2hat) { /* Null collision */
+      ctx->sampled_vox_collision_dst = -1;
+    } else { /* Collision with ks_max */
       double x[3];
 
       /* Compute the world space position where a collision may occur */
@@ -390,7 +406,9 @@ sample_scattering_limited_hit_filter
 
       r = ssp_rng_canonical(ctx->rng);
 
-      if(r < ks/ks_max) { /* Real collision */
+      if(r >= ks/ks_max) { /* Null collision */
+        ctx->sampled_vox_collision_dst = -1;
+      } else { /* Real collision */
         /* Setup output data */
         ctx->position_limited.position.distance = traversal_dst;
         ctx->position_limited.position.prim = fetch_raw_args.prim;
@@ -428,6 +446,9 @@ sample_scattering_limited
   sample_scattering_limited_ctx.medium = cmd->medium;
   sample_scattering_limited_ctx.wavelength = wlen;
   sample_scattering_limited_ctx.ks_2hat = 0;
+  sample_scattering_limited_ctx.Tmax = -1;
+  sample_scattering_limited_ctx.Ume = -1;
+  sample_scattering_limited_ctx.sampled_vox_collision_dst = -1;
   sample_scattering_limited_ctx.position_limited = POSITION_LIMITED_NULL;
 
   /* Setup the input arguments for the ray tracing into the medium */
