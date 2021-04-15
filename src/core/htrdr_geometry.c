@@ -61,9 +61,12 @@ static const struct mesh MESH_NULL;
 
 struct ray_context {
   float range[2];
-  struct s3d_hit hit_prev;
+  struct s3d_hit hit_from;
+
+  s3d_hit_filter_function_T user_filter; /* May be NULL */
+  void* user_filter_data; /* May be NULL */
 };
-#define RAY_CONTEXT_NULL__ {{0,INF}, S3D_HIT_NULL__}
+#define RAY_CONTEXT_NULL__ {{0,INF}, S3D_HIT_NULL__, NULL, NULL}
 static const struct ray_context RAY_CONTEXT_NULL = RAY_CONTEXT_NULL__;
 
 struct htrdr_geometry {
@@ -99,6 +102,44 @@ hit_on_edge(const struct s3d_hit* hit)
       || eq_epsf(w, 1.f, on_edge_eps);
 }
 
+/* Return 1 if the submitted hit is actually a self hit, i.e. if the ray starts
+ * the primitive from which it starts */
+static INLINE int
+self_hit
+  (const struct s3d_hit* hit,
+   const float ray_org[3],
+   const float ray_dir[3],
+   const float ray_range[2],
+   const struct s3d_hit* hit_from)
+{
+  ASSERT(hit && hit_from);
+  (void)ray_org, (void)ray_dir;
+
+  /* Internally, Star-3D relies on Embree that, due to numerically inaccuracy,
+   * can find hits whose distances are not strictly included in the submitted
+   * ray range. Discard these hits. */
+  if(hit->distance <= ray_range[0] || hit->distance >= ray_range[1])
+    return 1;
+
+  /* The hit primitive is the one from which the the ray starts. Discard these
+   * hits */
+  if(S3D_PRIMITIVE_EQ(&hit->prim, &hit_from->prim))
+    return 1;
+
+  /* If the targeted point is near of the origin, check that it lies on an
+   * edge/vertex shared by the 2 primitives. In such situation, we assume that
+   * it is a self intersection and discard this hit */
+  if(!S3D_HIT_NONE(hit_from)
+  && eq_epsf(hit->distance, 0, 1.e-1f)
+  && hit_on_edge(hit_from) 
+  && hit_on_edge(hit)) {
+    return 1;
+  }
+
+  /* No self hit */
+  return 0;
+}
+
 static int
 geometry_filter
   (const struct s3d_hit* hit,
@@ -108,20 +149,19 @@ geometry_filter
    void* filter_data)
 {
   const struct ray_context* ray_ctx = ray_data;
-  (void)ray_org, (void)ray_dir, (void)filter_data;
+  (void)filter_data;
 
-  if(!ray_ctx) return 0;
+  if(!ray_ctx) /* Nothing to do */
+    return 0;
 
-  if(S3D_PRIMITIVE_EQ(&hit->prim, &ray_ctx->hit_prev.prim)) return 1;
+  if(self_hit(hit, ray_org, ray_dir, ray_ctx->range, &ray_ctx->hit_from))
+    return 1; /* Discard this hit */
 
-  if(!S3D_HIT_NONE(&ray_ctx->hit_prev) && eq_epsf(hit->distance, 0, 1.e-1f)) {
-    /* If the targeted point is near of the origin, check that it lies on an
-     * edge/vertex shared by the 2 primitives. */
-    return hit_on_edge(&ray_ctx->hit_prev) && hit_on_edge(hit);
-  }
+  if(!ray_ctx->user_filter) /* That's all */
+    return 0;
 
-  return hit->distance <= ray_ctx->range[0]
-      || hit->distance >= ray_ctx->range[1];
+  return ray_ctx->user_filter /* Invoke user filtering */
+    (hit, ray_org, ray_dir, ray_ctx->user_filter_data, filter_data);
 }
 
 static res_T
@@ -611,22 +651,21 @@ htrdr_geometry_get_interface
 res_T
 htrdr_geometry_trace_ray
   (struct htrdr_geometry* geom,
-   const double org[3],
-   const double dir[3], /* Must be normalized */
-   const double range[2],
-   const struct s3d_hit* prev_hit,
+   const struct htrdr_geometry_trace_ray_args* args,
    struct s3d_hit* hit)
 {
   struct ray_context ray_ctx = RAY_CONTEXT_NULL;
   float ray_org[3];
   float ray_dir[3];
   res_T res = RES_OK;
-  ASSERT(geom && org && dir && range && hit);
+  ASSERT(geom && args && hit);
 
-  f3_set_d3(ray_org, org);
-  f3_set_d3(ray_dir, dir);
-  f2_set_d2(ray_ctx.range, range);
-  ray_ctx.hit_prev = prev_hit ? *prev_hit : S3D_HIT_NULL;
+  f3_set_d3(ray_org, args->ray_org);
+  f3_set_d3(ray_dir, args->ray_dir);
+  f2_set_d2(ray_ctx.range, args->ray_range);
+  ray_ctx.hit_from = args->hit_from;
+  ray_ctx.user_filter = args->filter;
+  ray_ctx.user_filter_data = args->filter_context;
 
   res = s3d_scene_view_trace_ray
     (geom->view, ray_org, ray_dir, ray_ctx.range, &ray_ctx, hit);
