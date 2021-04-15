@@ -122,10 +122,8 @@ sample_position_hit_filter
    void* context)
 {
   atrstm_radcoefs_svx_T radcoefs_svx;
-  struct atrstm_fetch_radcoefs_args fetch_raw_args =
-    ATRSTM_FETCH_RADCOEFS_ARGS_DEFAULT;
-  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args =
-    ATRSTM_FETCH_RADCOEFS_SVX_VOXEL_ARGS_DEFAULT;
+  struct atrstm_fetch_radcoefs_args fetch_raw_args;
+  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args;
   struct sample_position_context* ctx = context;
   double k_min = 0;
   double k_max = 0;
@@ -271,8 +269,7 @@ sample_scattering_limited_find_ks_2hat
    void* context)
 {
   struct sample_scattering_limited_context* ctx = context;
-  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args =
-    ATRSTM_FETCH_RADCOEFS_SVX_VOXEL_ARGS_DEFAULT;
+  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args;
   atrstm_radcoefs_svx_T radcoefs_svx;
   ASSERT(hit && org && dir && range && context);
   (void)org, (void)dir;
@@ -310,10 +307,8 @@ sample_scattering_limited_hit_filter
    void* context)
 {
   atrstm_radcoefs_svx_T radcoefs_svx;
-  struct atrstm_fetch_radcoefs_args fetch_raw_args =
-    ATRSTM_FETCH_RADCOEFS_ARGS_DEFAULT;
-  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args =
-    ATRSTM_FETCH_RADCOEFS_SVX_VOXEL_ARGS_DEFAULT;
+  struct atrstm_fetch_radcoefs_args fetch_raw_args;
+  struct atrstm_fetch_radcoefs_svx_voxel_args fetch_svx_args;
   struct sample_scattering_limited_context* ctx = context;
   double ks_min = 0;
   double ks_max = 0;
