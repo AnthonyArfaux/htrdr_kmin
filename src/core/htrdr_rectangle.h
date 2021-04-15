@@ -32,7 +32,7 @@ htrdr_rectangle_create
   (struct htrdr* htrdr,
    const double sz[2], /* Size of the rectangle along its local X and Y axis */
    const double pos[3], /* World space position of the rectangle center */
-   const double tgt[3], /* Vector orthognal to the rectangle plane */
+   const double tgt[3], /* Targeted point */
    const double up[3], /* vector orthogonal to the rectangle X axis */
    struct htrdr_rectangle** rect);
 
@@ -54,6 +54,21 @@ HTRDR_CORE_API void
 htrdr_rectangle_get_normal
   (const struct htrdr_rectangle* rect,
    double normal[3]);
+
+HTRDR_CORE_API void
+htrdr_rectangle_get_center
+  (const struct htrdr_rectangle* rect,
+   double center[3]);
+
+HTRDR_CORE_API double*
+htrdr_rectangle_get_transform
+  (const struct htrdr_rectangle* rect,
+   double transform[12]);
+
+HTRDR_CORE_API double*
+htrdr_rectangle_get_transform_inverse
+  (const struct htrdr_rectangle* rect,
+   double transform_inverse[12]);
 
 END_DECLS
 

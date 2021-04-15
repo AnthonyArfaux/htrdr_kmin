@@ -52,7 +52,6 @@ typedef void
 struct htrdr_draw_map_args {
   htrdr_draw_pixel_T draw_pixel;
   struct htrdr_buffer_layout buffer_layout;
-  struct ssp_rng* rng;
   size_t spp; /* Samples per pixel */
   void* context; /* User defined data */
 };
@@ -60,7 +59,6 @@ struct htrdr_draw_map_args {
 #define HTRDR_DRAW_MAP_ARGS_NULL__ {                                           \
   NULL, /* Draw pixel functor */                                               \
   HTRDR_BUFFER_LAYOUT_NULL__, /* Layout of the destination buffer */           \
-  NULL, /* Random Number Generator */                                          \
   0, /* #Samples per pixel */                                                  \
   NULL /* User defined data */                                                 \
 }

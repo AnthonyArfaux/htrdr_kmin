@@ -36,14 +36,6 @@ enum atmosphere_radiance_cpnt_flag {
   | ATMOSPHERE_RADIANCE_DIFFUSE
 };
 
-struct atmosphere_pixel_format {
-  size_t size; /* In bytes */
-  size_t alignment; /* Power of two, in Bytes */
-};
-#define ATMOSPHERE_PIXEL_FORMAT_NULL__ {0, 0}
-static const struct atmosphere_pixel_format ATMOSPHERE_PIXEL_FORMAT_NULL =
-  ATMOSPHERE_PIXEL_FORMAT_NULL__;
-
 struct atmosphere_pixel_xwave {
   struct htrdr_estimate radiance; /* In W/m^2/sr */
   struct htrdr_estimate radiance_temperature; /* In K */
@@ -52,7 +44,7 @@ struct atmosphere_pixel_xwave {
 #define ATMOSPHERE_PIXEL_XWAVE_NULL__ {                                        \
   HTRDR_ESTIMATE_NULL__, /* Radiance */                                        \
   HTRDR_ESTIMATE_NULL__, /* Radiance temperature */                            \
-  HTRDR_ACCUM_NULL /* Time */                                                  \
+  HTRDR_ACCUM_NULL__ /* Time */                                                \
 }
 static const struct atmosphere_pixel_xwave ATMOSPHERE_PIXEL_XWAVE_NULL =
   ATMOSPHERE_PIXEL_XWAVE_NULL__;
@@ -62,8 +54,8 @@ struct atmosphere_pixel_flux {
   struct htrdr_accum time;
 };
 #define ATMOSPHERE_PIXEL_FLUX_NULL__ {                                         \
-  HTRDR_ACCUM_NULL,                                                            \
-  HTRDR_ACCUM_NULL                                                             \
+  HTRDR_ACCUM_NULL__,                                                          \
+  HTRDR_ACCUM_NULL__                                                           \
 }
 static const struct atmosphere_pixel_flux ATMOSPHERE_PIXEL_FLUX_NULL =
   ATMOSPHERE_PIXEL_FLUX_NULL__;
@@ -78,7 +70,7 @@ struct atmosphere_pixel_image {
   HTRDR_ESTIMATE_NULL__, /* X */                                               \
   HTRDR_ESTIMATE_NULL__, /* Y */                                               \
   HTRDR_ESTIMATE_NULL__, /* Z */                                               \
-  HTRDR_ACCUM_NULL /* Time */                                                  \
+  HTRDR_ACCUM_NULL__ /* Time */                                                \
 }
 static const struct atmosphere_pixel_image ATMOSPHERE_PIXEL_IMAGE_NULL =
   ATMOSPHERE_PIXEL_IMAGE_NULL__;
@@ -129,7 +121,7 @@ struct htrdr_atmosphere {
 extern LOCAL_SYM void
 atmosphere_get_pixel_format
   (const struct htrdr_atmosphere* cmd,
-   struct atmosphere_pixel_format* fmt);
+   struct htrdr_pixel_format* fmt);
 
 extern LOCAL_SYM res_T
 atmosphere_draw_map

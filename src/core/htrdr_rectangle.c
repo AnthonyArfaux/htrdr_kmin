@@ -20,6 +20,7 @@
 #include "core/htrdr_rectangle.h"
 
 #include <rsys/double3.h>
+#include <rsys/double33.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/ref_count.h>
 
@@ -27,8 +28,11 @@ struct htrdr_rectangle {
   /* Frame of the rectangle in world space */
   double axis_x[3];
   double axis_y[3];
-
   double normal[3];
+
+  double local2world[12]; /* Rectangle to world transformation matrix */
+  double world2local[12]; /* World to rectangle transformation matrix */
+
   double position[3]; /* Center of the rectangle */
   struct htrdr* htrdr;
   ref_T ref;
@@ -50,7 +54,7 @@ rectangle_release(ref_T* ref)
 }
 
 /*******************************************************************************
- * Local fuuction
+ * Exported functions
  ******************************************************************************/
 res_T
 htrdr_rectangle_create
@@ -63,12 +67,13 @@ htrdr_rectangle_create
 {
   struct htrdr_rectangle* rect = NULL;
   double x[3], y[3], z[3];
+  double trans[3];
   res_T res = RES_OK;
   ASSERT(htrdr && pos && tgt && up && sz && out_rect);
 
   rect = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*rect));
   if(!rect) {
-    htrdr_log_err(htrdr, "could not allocate the rectangle data structure.\n");
+    htrdr_log_err(htrdr, "Could not allocate the rectangle data structure.\n");
     res = RES_MEM_ERR;
     goto error;
   }
@@ -78,7 +83,7 @@ htrdr_rectangle_create
 
   if(sz[0] <= 0 || sz[1] <= 0) {
     htrdr_log_err(htrdr,
-      "invalid rectangle size `%g %g'. It must be strictly positive.\n",
+      "Invalid rectangle size `%g %g'. It must be strictly positive.\n",
       SPLIT2(sz));
     res = RES_BAD_ARG;
     goto error;
@@ -87,7 +92,7 @@ htrdr_rectangle_create
   if(d3_normalize(z, d3_sub(z, tgt, pos)) <= 0
   || d3_normalize(x, d3_cross(x, z, up)) <= 0
   || d3_normalize(y, d3_cross(y, z, x)) <= 0) {
-    htrdr_log_err(htrdr, "invalid rectangle frame:\n"
+    htrdr_log_err(htrdr, "Invalid rectangle frame:\n"
       "\tposition = %g %g %g\n"
       "\ttarget = %g %g %g\n"
       "\tup = %g %g %g\n",
@@ -95,6 +100,21 @@ htrdr_rectangle_create
     res = RES_BAD_ARG;
     goto error;
   }
+
+  /* Setup the local to world transformation matrix */
+  d3_set(rect->local2world+0, x);
+  d3_set(rect->local2world+3, y);
+  d3_set(rect->local2world+6, z);
+  d3_set(rect->local2world+9, pos);
+
+  /* Inverse the local to world transformation matrix. Note that since the
+   * represented frame is orthonormal one can transpose the original rotation
+   * matrix to cheaply compute its inverse */
+  d33_transpose(rect->world2local, rect->local2world);
+
+  /* Compute the affine inverse transform */
+  d3_minus(trans, pos);
+  d33_muld3(rect->world2local+9, rect->world2local, trans);
 
   d3_muld(rect->axis_x, x, sz[0]*0.5);
   d3_muld(rect->axis_y, y, sz[1]*0.5);
@@ -146,3 +166,35 @@ htrdr_rectangle_get_normal(const struct htrdr_rectangle* rect, double normal[3])
   d3_set(normal, rect->normal);
 }
 
+void
+htrdr_rectangle_get_center(const struct htrdr_rectangle* rect, double pos[3])
+{
+  ASSERT(rect && pos);
+  d3_set(pos, rect->position);
+}
+
+double*
+htrdr_rectangle_get_transform
+  (const struct htrdr_rectangle* rect,
+   double transform[12])
+{
+  ASSERT(rect && transform);
+  d3_set(transform+0, rect->local2world+0);
+  d3_set(transform+3, rect->local2world+3);
+  d3_set(transform+6, rect->local2world+6);
+  d3_set(transform+9, rect->local2world+9);
+  return transform;
+}
+
+double*
+htrdr_rectangle_get_transform_inverse
+  (const struct htrdr_rectangle* rect,
+   double transform_inverse[12])
+{
+  ASSERT(rect && transform_inverse);
+  d3_set(transform_inverse+0, rect->world2local+0);
+  d3_set(transform_inverse+3, rect->world2local+3);
+  d3_set(transform_inverse+6, rect->world2local+6);
+  d3_set(transform_inverse+9, rect->world2local+9);
+  return transform_inverse;
+}

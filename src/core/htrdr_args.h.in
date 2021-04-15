@@ -67,6 +67,15 @@ struct htrdr_args_image {
 static const struct htrdr_args_image HTRDR_ARGS_IMAGE_DEFAULT =
   HTRDR_ARGS_IMAGE_DEFAULT__;
 
+/* Arguments of a geometry */
+struct htrdr_args_geometry {
+  char* path_obj; /* Path toward a htrdr-obj */
+  char* path_mats; /* Path toward a htrdr-materials */
+};
+#define HTRDR_ARGS_GEOMETRY_NULL__ {NULL, NULL}
+static const struct htrdr_args_geometry HTRDR_ARGS_GEOMETRY_NULL =
+  HTRDR_ARGS_GEOMETRY_NULL__;
+
 /* Arguments of the spectral domain */
 struct htrdr_args_spectral {
   double wlen_range[2]; /* Spectral range of integration in nm */
@@ -84,18 +93,18 @@ static const struct htrdr_args_spectral HTRDR_ARGS_SPECTRAL_DEFAULT =
 /*******************************************************************************
  * Exported functions
  ******************************************************************************/
-BEGIN_DECLS 
+BEGIN_DECLS
 
 HTRDR_CORE_API res_T
 htrdr_args_camera_parse
-  (struct htrdr_args_camera* cam, 
+  (struct htrdr_args_camera* cam,
    const char* str);
 
 HTRDR_CORE_API res_T
 htrdr_args_rectangle_parse
   (struct htrdr_args_rectangle* rect,
    const char* str);
- 
+
 HTRDR_CORE_API res_T
 htrdr_args_image_parse
   (struct htrdr_args_image* img,
@@ -104,6 +113,15 @@ htrdr_args_image_parse
 HTRDR_CORE_API res_T
 htrdr_args_spectral_parse
   (struct htrdr_args_spectral* spectral,
+   const char* str);
+
+HTRDR_CORE_API void
+htrdr_args_geometry_free
+  (struct htrdr_args_geometry* geom);
+
+HTRDR_CORE_API res_T
+htrdr_args_geometry_parse
+  (struct htrdr_args_geometry* geom,
    const char* str);
 
 END_DECLS

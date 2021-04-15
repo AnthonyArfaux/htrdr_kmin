@@ -30,7 +30,7 @@ include_directories(${RSys_INCLUDE_DIR})
 # Configure and define targets
 ################################################################################
 add_executable(htrdr_cmd ${HTRDR_SOURCE_DIR}/commands/htrdr_cmd.c)
-target_link_libraries(htrdr_cmd htrdr-atmosphere)
+target_link_libraries(htrdr_cmd htrdr-atmosphere htrdr-combustion)
 set_target_properties(htrdr_cmd PROPERTIES
   OUTPUT_NAME htrdr)
 
@@ -39,6 +39,12 @@ add_executable(htrdr_atmosphere_cmd
 target_link_libraries(htrdr_atmosphere_cmd htrdr-atmosphere)
 set_target_properties(htrdr_atmosphere_cmd PROPERTIES 
   OUTPUT_NAME htrdr-atmosphere)
+
+add_executable(htrdr_combustion_cmd 
+  ${HTRDR_SOURCE_DIR}/commands/htrdr_combustion_cmd.c)
+target_link_libraries(htrdr_combustion_cmd htrdr-combustion)
+set_target_properties(htrdr_combustion_cmd PROPERTIES 
+  OUTPUT_NAME htrdr-combustion)
 
 ################################################################################
 # Define output & install directories

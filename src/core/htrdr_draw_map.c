@@ -635,7 +635,7 @@ draw_map
      * is initialised in order to ensure that an unique and predictable set of
      * random numbers is used for the current tile. */
     SSP(rng_proxy_create2
-      (&htrdr->lifo_allocators[ithread],
+      (htrdr_get_thread_allocator(htrdr, (size_t)ithread),
        &ssp_rng_threefry,
        RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
        RNG_SEQUENCE_SIZE, /* Size */
