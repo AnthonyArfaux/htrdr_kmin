@@ -726,7 +726,6 @@ sample_bounce_direction
    struct ssp_rng* rng,
    const struct s3d_hit* hit,
    const double wlen,
-   const double pos[3],
    const double incoming_dir[3],
    double bounce_dir[3])
 {
@@ -738,7 +737,7 @@ sample_bounce_direction
   double bounce_reflectivity;
   int bsdf_type = 0;
 
-  ASSERT(cmd && rng && hit && pos && incoming_dir && bounce_dir);
+  ASSERT(cmd && rng && hit && incoming_dir && bounce_dir);
   ASSERT(!S3D_HIT_NONE(hit));
 
   /* Recover the bsdf of the intersected interface */
@@ -988,7 +987,7 @@ combustion_compute_radiance_sw
 
       /* Sample a new optical path direction from the surface BSDF */
       bounce_reflectivity = sample_bounce_direction
-        (cmd, ithread, rng, &hit_curr, wlen, pos, dir, wi);
+        (cmd, ithread, rng, &hit_curr, wlen, dir, wi);
 
       /* Russian roulette wrt surface scattering */
       r = ssp_rng_canonical(rng);

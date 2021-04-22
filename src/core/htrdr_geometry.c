@@ -668,6 +668,7 @@ htrdr_geometry_get_hit_position
 {
   struct s3d_attrib attr;
   ASSERT(geom && hit && position && !S3D_HIT_NONE(hit));
+  (void)geom;
 
   S3D(primitive_get_attrib(&hit->prim, S3D_POSITION, hit->uv, &attr));
   position[0] = attr.value[0];
