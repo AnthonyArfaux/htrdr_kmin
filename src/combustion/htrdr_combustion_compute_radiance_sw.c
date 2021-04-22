@@ -59,7 +59,7 @@ struct position {
 static const struct position POSITION_NULL = POSITION_NULL__;
 
 /* Syntactic sugar to check if the position is valid */
-#define POSITION_NONE(Pos) ((Pos)->distance >= DBL_MAX)
+#define POSITION_NONE(Pos) ((Pos)->distance >= FLT_MAX)
 
 /* Common position but preferentially sampled within a limited range. Its
  * associated ksi variable defines the correction of the weight due to the
@@ -946,10 +946,13 @@ combustion_compute_radiance_sw
     /* Handle the laser contribution */
     range[0] = 0;
     range[1] = hit_curr.distance;
+
     laser_sheet_emissivity = laser_once_scattered(cmd, ithread, rng, pos, dir, range);
     weight += Tr_abs * laser_sheet_emissivity;
 
     /* Sample a scattering position */
+    range[0] = 0;
+    range[1] = hit_curr.distance;
     sample_position(cmd, rng, ATRSTM_RADCOEF_Ks, pos, dir, range, &scattering);
 
     if(!POSITION_NONE(&scattering)) { /* Scattering event in volume */
@@ -958,7 +961,7 @@ combustion_compute_radiance_sw
     } else if(!S3D_HIT_NONE(&hit_curr)) { /* Scattering event at surface */
       sc_type = SCATTERING_AT_SURFACE;
       sc_distance = hit_curr.distance;
-    } else {  /* No scattering event. Stop the random walk */
+    } else { /* No scattering event. Stop the random walk */
       sc_type = SCATTERING_NONE;
       break;
     }
