@@ -15,10 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 200112L /* nextafterf */
+
 #include "combustion/htrdr_combustion_c.h"
 #include "combustion/htrdr_combustion_laser.h"
+#include "combustion/htrdr_combustion_geometry_ray_filter.h"
 
 #include "core/htrdr.h"
+#include "core/htrdr_log.h"
+#include "core/htrdr_geometry.h"
+#include "core/htrdr_interface.h"
+#include "core/htrdr_materials.h"
 
 #include <astoria/atrstm.h>
 
@@ -29,6 +36,14 @@
 #include <rsys/double3.h>
 #include <rsys/double4.h>
 #include <rsys/dynamic_array.h>
+
+#include <math.h> /* nextafterf */
+
+enum scattering_type {
+  SCATTERING_IN_VOLUME,
+  SCATTERING_AT_SURFACE,
+  SCATTERING_NONE
+};
 
 /* Define a position along the ray into the semi-transparent medium */
 struct position {
@@ -492,15 +507,27 @@ transmissivity
 /* This function computes the contribution of the in-laser scattering for the
  * current scattering position of the reverse optical path 'pos' and current
  * direction 'dir'. One contribution has to be computed for each scattering
- * position in order to compute the value of the Monte-Carlo weight for the
- * optical path (weight of the statistical realization). */
+ * position 'xsc' in order to compute the value of the Monte-Carlo weight for
+ * the optical path (weight of the statistical realization).
+ *                                       __
+ *                                        /\ dir
+ *                                  xout /
+ *                +---------------------x--------------- - - -
+ *       lse      |  --->       wi     /
+ * (laser surface |  --->        <----x xsc
+ *   emission)    |  --->            /
+ *                +-----------------x------------------- - - -
+ *                                 / xin
+ *                                /
+ *                               o pos */
 static double
 laser_once_scattered
   (struct htrdr_combustion* cmd,
    const size_t ithread,
    struct ssp_rng* rng,
    const double pos[3],
-   const double dir[3])
+   const double dir[3],
+   const double range_in[2])
 {
   /* RDG-FA phase function */
   struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
@@ -509,6 +536,12 @@ laser_once_scattered
   struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
     SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
   struct ssf_phase* phase = NULL;
+
+  /* Surface ray tracing */
+  struct htrdr_geometry_trace_ray_args rt_args =
+    HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL;
+  struct geometry_ray_filter_context rt_ctx = GEOMETRY_RAY_FILTER_CONTEXT_NULL;
+  struct s3d_hit hit = S3D_HIT_NULL;
 
   /* Scattering position into the laser sheet */
   struct position_limited sc_sample = POSITION_LIMITED_NULL;
@@ -524,7 +557,7 @@ laser_once_scattered
   double laser_flux_density = 0; /* In W/m^2 */
   double wlen = 0; /* In nm */
 
-  /* Miscellaneous varbale */
+  /* Miscellaneous variables */
   double wi[3] = {0, 0, 0};
   double wo[3] = {0, 0, 0};
   double range[2] = {0, DBL_MAX};
@@ -533,13 +566,18 @@ laser_once_scattered
   /* Radiance to compute in W/m^2/sr */
   double L = 0;
 
-  ASSERT(cmd && rng && pos && dir);
+  ASSERT(cmd && rng && pos && dir && range_in);
+  ASSERT(range_in[0] <= range_in[1]);
 
   /* Fetch the laser wavelength */
   wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
   /* Find the intersections along dir with the laser sheet */
+  range[0] = range_in[0];
+  range[1] = range_in[1];
   htrdr_combustion_laser_trace_ray(cmd->laser, pos, dir, range, laser_hit_dst);
+  ASSERT(laser_hit_dst[0] <= laser_hit_dst[1]);
+  ASSERT(laser_hit_dst[1] <= range_in[1]);
 
   /* No intersection with the laser sheet => no laser contribution */
   if(HTRDR_COMBUSTION_LASER_HIT_NONE(laser_hit_dst)) return 0;
@@ -572,6 +610,29 @@ laser_once_scattered
   /* Retrieve the direction toward the laser surface emission */
   htrdr_combustion_laser_get_direction(cmd->laser, wi);
   d3_minus(wi, wi);
+
+  /* Find the intersection with the combustion chamber */
+  if(cmd->geom) { /* Is there a combustion chamber? */
+    /* Setup the ray to trace */
+    d3_set(rt_args.ray_org, xsc);
+    d3_set(rt_args.ray_dir, wi);
+    d2_set(rt_args.ray_range, range);
+    rt_args.hit_from = S3D_HIT_NULL;
+
+   /* Configure the "X-ray" surface ray trace filtering. This filtering function
+    * helps to avoid intersections with the side of the surfaces facing inside
+    * the combustion chamber to allow the rays to exit out. */
+    rt_args.filter = geometry_ray_filter_discard_medium_interface;
+    rt_args.filter_context = &rt_ctx;
+    rt_ctx.geom = cmd->geom;
+    rt_ctx.medium_name = "chamber";
+
+    HTRDR(geometry_trace_ray(cmd->geom, &rt_args, &hit));
+
+    /* If a surface was intersected then the laser surface emissions is
+     * occluded along `wi' and thus there is no laser contribution  */
+    if(!S3D_HIT_NONE(&hit)) return 0;
+  }
 
   /* Compute the transmissivity from xsc to the laser surface emission */
   range[0] = 0;
@@ -612,16 +673,15 @@ laser_once_scattered
   return L;
 }
 
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-extern LOCAL_SYM double
-combustion_compute_radiance_sw
+static void
+sample_scattering_direction
   (struct htrdr_combustion* cmd,
    const size_t ithread,
    struct ssp_rng* rng,
-   const double pos_in[3],
-   const double dir_in[3])
+   const struct position* scattering,
+   const double wlen,
+   const double incoming_dir[3],
+   double scattering_dir[3])
 {
   /* RDG-FA phase function */
   struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
@@ -630,6 +690,205 @@ combustion_compute_radiance_sw
   struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
     SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
   struct ssf_phase* phase = NULL;
+
+  /* Miscellaneous variable */
+  double wo[3];
+
+  ASSERT(cmd && rng && scattering && incoming_dir && scattering_dir);
+  ASSERT(!POSITION_NONE(scattering));
+
+  /* Retrieve the RDG-FA phase function parameters */
+  fetch_rdgfa_args.wavelength = wlen;
+  fetch_rdgfa_args.prim = scattering->prim;
+  fetch_rdgfa_args.bcoords[0] = scattering->bcoords[0];
+  fetch_rdgfa_args.bcoords[1] = scattering->bcoords[1];
+  fetch_rdgfa_args.bcoords[2] = scattering->bcoords[2];
+  fetch_rdgfa_args.bcoords[3] = scattering->bcoords[3];
+  ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
+
+  /* Setup the RDG-FA phase function corresponding to the scattering event */
+  phase = cmd->rdgfa_phase_functions[ithread];
+  setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
+  setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
+  setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
+  SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+
+  /* Sample a new optical path direction from the phase function */
+  d3_minus(wo, incoming_dir); /* Ensure SSF convention */
+  ssf_phase_sample(phase, rng, wo, scattering_dir, NULL);
+}
+
+/* Return the bounce reflectivity */
+static double
+sample_bounce_direction
+  (struct htrdr_combustion* cmd,
+   const size_t ithread,
+   struct ssp_rng* rng,
+   const struct s3d_hit* hit,
+   const double wlen,
+   const double pos[3],
+   const double incoming_dir[3],
+   double bounce_dir[3])
+{
+  struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+  const struct htrdr_mtl* mtl = NULL;
+  struct ssf_bsdf* bsdf = NULL;
+  double wo[3];
+  double N[3];
+  double bounce_reflectivity;
+  int bsdf_type = 0;
+
+  ASSERT(cmd && rng && hit && pos && incoming_dir && bounce_dir);
+  ASSERT(!S3D_HIT_NONE(hit));
+
+  /* Recover the bsdf of the intersected interface */
+  htrdr_geometry_get_interface(cmd->geom, hit, &interf);
+  mtl = htrdr_interface_fetch_hit_mtl(&interf, incoming_dir, hit);
+  HTRDR(mtl_create_bsdf(cmd->htrdr, mtl, ithread, wlen, rng, &bsdf));
+
+  /* Surface normal */
+  d3_set_f3(N, hit->normal);
+  d3_normalize(N, N);
+  if(d3_dot(N, incoming_dir) > 0) d3_minus(N, N); /* Ensure SSF convention */
+
+  /* Sample a new optical path direction from the brdf function */
+  d3_minus(wo, incoming_dir); /* Ensure SSF convention */
+  bounce_reflectivity = ssf_bsdf_sample
+    (bsdf, rng, wo, N, bounce_dir, &bsdf_type, NULL);
+
+  if(!(bsdf_type & SSF_REFLECTION)) { /* Handle only reflections */
+    bounce_reflectivity = 0;
+  }
+
+  return bounce_reflectivity;
+}
+
+static res_T
+move_to_scattering_position
+  (struct htrdr_combustion* cmd,
+   const double pos[3],
+   const double dir[3],
+   const double sc_distance,
+   const enum scattering_type sc_type,
+   double out_pos[3])
+{
+  res_T res = RES_OK;
+  ASSERT(cmd && pos && dir && sc_distance >= 0 && out_pos);
+  ASSERT(sc_type == SCATTERING_IN_VOLUME || sc_type == SCATTERING_AT_SURFACE);
+
+  /* The scattering position is at a surface or in an open air volume */
+  if(sc_type == SCATTERING_AT_SURFACE || cmd->geom == NULL) {
+    out_pos[0] = pos[0] + dir[0] * sc_distance;
+    out_pos[1] = pos[1] + dir[1] * sc_distance;
+    out_pos[2] = pos[2] + dir[1] * sc_distance;
+
+  /* The scattering position is in a volume surrounded by the geometry of the
+   * combustion chamber. Be careful when moving along 'dir'; due to numerical
+   * uncertainty, the diffusion position could be outside the combustion
+   * chamber */
+  } else {
+    const int MAX_ATTEMPTS = 10; /* Max #attempts before reporting an error */
+    int iattempt = 0; /* Index of the current attempt */
+
+    double tmp[3]; /* Temporary vector */
+    double pos_to_challenge[3]; /* Scattering position to challenge */
+    double dst; /* Distance up to the scattering position */
+
+    /* Search distance of a near position onto the geometry of the combustion
+     * chamber */
+    double search_radius;
+
+    search_radius = htrdr_geometry_get_epsilon(cmd->geom) * 10.0;
+    dst = sc_distance;
+
+    while(iattempt < MAX_ATTEMPTS) {
+      struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
+      struct s3d_hit hit = S3D_HIT_NULL;
+      double hit_pos[3];
+      double N[3];
+      double sign;
+      const struct htrdr_mtl* mtl = NULL;
+
+      /* Move to the scattering position */
+      pos_to_challenge[0] = pos[0] + dir[0] * dst;
+      pos_to_challenge[1] = pos[1] + dir[1] * dst;
+      pos_to_challenge[2] = pos[2] + dir[1] * dst;
+
+      /* Find the geometry near the scattering position */
+      HTRDR(geometry_find_closest_point
+        (cmd->geom, pos_to_challenge, search_radius, &hit));
+
+      /* No geometry => the scattering position to challenge is necessarily
+       * inside the combustion chamber. */
+      if(S3D_HIT_NONE(&hit)) break;
+
+      /* Retrieve the property of the geometry near the scattering position */
+      htrdr_geometry_get_hit_position(cmd->geom, &hit, hit_pos);
+      htrdr_geometry_get_interface(cmd->geom, &hit, &interf);
+
+      /* Fetch the material looking toward the scattering position */
+      d3_normalize(N, d3_set_f3(N, hit.normal));
+      sign = d3_dot(N, d3_sub(tmp, pos_to_challenge, hit_pos));
+      mtl = sign < 0 ? &interf.mtl_back : &interf.mtl_front;
+
+      /* The scattering position is inside the combustion chamber. Everything
+       * is fine. */
+      if(!strcmp(mtl->name, "chamber")) break;
+
+      /* The scattering position is outside the combustion chamber! Due to
+       * numerical uncertainty, while moving along 'dir' we accidentally
+       * crossed the combustion chamber geometry. To deal with this problem, we
+       * try to move slightly less than expected. By "slightly less" we mean
+       * the next representable single precision floating point value, directly
+       * less than the previous challenge distance. */
+      dst = (double)nextafterf((float)dst, 0);
+
+      /* Next trial */
+      iattempt += 1;
+    }
+
+    /* Max attempts is reached. Report an error */
+    if(iattempt == MAX_ATTEMPTS) {
+      htrdr_log_warn(cmd->htrdr,
+        "The scattering position {%g, %g, %g} "
+        "is outside the combustion chamber.\n",
+        pos_to_challenge[0],
+        pos_to_challenge[1],
+        pos_to_challenge[2]);
+      res = RES_BAD_OP;
+      goto error;
+    }
+
+    /* A valid scattering position was found */
+    out_pos[0] = pos_to_challenge[0];
+    out_pos[1] = pos_to_challenge[1];
+    out_pos[2] = pos_to_challenge[2];
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+extern LOCAL_SYM res_T
+combustion_compute_radiance_sw
+  (struct htrdr_combustion* cmd,
+   const size_t ithread,
+   struct ssp_rng* rng,
+   const double pos_in[3],
+   const double dir_in[3],
+   double* out_weight)
+{
+  /* Surface ray tracing */
+  struct htrdr_geometry_trace_ray_args rt_args =
+    HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL;
+  struct geometry_ray_filter_context rt_ctx = GEOMETRY_RAY_FILTER_CONTEXT_NULL;
+  struct s3d_hit hit_curr = S3D_HIT_NULL; /* Current surface hit */
+  struct s3d_hit hit_prev = S3D_HIT_NULL; /* Previous surface hit */
 
   /* Transmissivity between the probe position (i.e. 'pos_in') and the current
    * scattering position over the reverse scattering path */
@@ -643,7 +902,9 @@ combustion_compute_radiance_sw
   double dir[3] = {0, 0, 0};
   double range[2] = {0, DBL_MAX};
   double wlen = 0;
-  ASSERT(cmd && rng && pos_in && dir_in);
+  enum scattering_type sc_type = SCATTERING_NONE;
+  res_T res = RES_OK;
+  ASSERT(cmd && rng && pos_in && dir_in && out_weight);
 
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
@@ -654,24 +915,58 @@ combustion_compute_radiance_sw
   Tr_abs = 1;
   weight = 0;
 
+  /* Configure the "X-ray" surface ray trace filtering. This filtering function
+   * helps to avoid intersections with the side of the surfaces facing outside
+   * the combustion chamber to allow primary rays to enter. */
+  rt_args.filter = geometry_ray_filter_discard_medium_interface;
+  rt_args.filter_context = &rt_ctx;
+  rt_ctx.geom = cmd->geom;
+  rt_ctx.medium_name = "air";
+
   for(;;) {
     struct position scattering = POSITION_NULL;
     double laser_sheet_emissivity = 0; /* In W/m^2/sr */
     double Tr_abs_pos_xsc = 0;
-    double wo[3];
     double wi[3];
+    double sc_distance;
+
+    if(cmd->geom) { /* Is there a combustion chamber? */
+      /* Find the intersection with the combustion chamber geometry */
+      d3_set(rt_args.ray_org, pos);
+      d3_set(rt_args.ray_dir, dir);
+      d2_set(rt_args.ray_range, range);
+      rt_args.hit_from = hit_prev; /* Avoid self intersection */
+      HTRDR(geometry_trace_ray(cmd->geom, &rt_args, &hit_curr));
+
+      /* Deactivate the "X-ray" filtering function. It is only used during the
+       * first step of the random walk to allow primary rays (i.e. camera rays)
+       * to enter the combustion chamber. */
+      rt_args.filter = NULL;
+    }
 
     /* Handle the laser contribution */
-    laser_sheet_emissivity = laser_once_scattered(cmd, ithread, rng, pos, dir);
+    range[0] = 0;
+    range[1] = hit_curr.distance;
+    laser_sheet_emissivity = laser_once_scattered(cmd, ithread, rng, pos, dir, range);
     weight += Tr_abs * laser_sheet_emissivity;
 
     /* Sample a scattering position */
     sample_position(cmd, rng, ATRSTM_RADCOEF_Ks, pos, dir, range, &scattering);
-    if(POSITION_NONE(&scattering)) break;
+
+    if(!POSITION_NONE(&scattering)) { /* Scattering event in volume */
+      sc_type = SCATTERING_IN_VOLUME;
+      sc_distance = scattering.distance;
+    } else if(!S3D_HIT_NONE(&hit_curr)) { /* Scattering event at surface */
+      sc_type = SCATTERING_AT_SURFACE;
+      sc_distance = hit_curr.distance;
+    } else {  /* No scattering event. Stop the random walk */
+      sc_type = SCATTERING_NONE;
+      break;
+    }
 
     /* Compute the absorption transmissivity */
     range[0] = 0;
-    range[1] = scattering.distance;
+    range[1] = sc_distance;
     Tr_abs_pos_xsc = transmissivity(cmd, rng, ATRSTM_RADCOEF_Ka, pos, dir, range);
     if(Tr_abs_pos_xsc == 0) break;
 
@@ -679,34 +974,41 @@ combustion_compute_radiance_sw
     Tr_abs *= Tr_abs_pos_xsc;
 
     /* Update the position of the optical path */
-    pos[0] = pos[0] + dir[0] * scattering.distance;
-    pos[1] = pos[1] + dir[1] * scattering.distance;
-    pos[2] = pos[2] + dir[2] * scattering.distance;
+    res = move_to_scattering_position(cmd, pos, dir, sc_distance, sc_type, pos);
+    if(res != RES_OK) goto error;
 
-    /* Retrieve the RDG-FA phase function parameters */
-    fetch_rdgfa_args.wavelength = wlen;
-    fetch_rdgfa_args.prim = scattering.prim;
-    fetch_rdgfa_args.bcoords[0] = scattering.bcoords[0];
-    fetch_rdgfa_args.bcoords[1] = scattering.bcoords[1];
-    fetch_rdgfa_args.bcoords[2] = scattering.bcoords[2];
-    fetch_rdgfa_args.bcoords[3] = scattering.bcoords[3];
-    ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
+    if(sc_type == SCATTERING_IN_VOLUME) {
+      /* Sample a new optical path direction from the medium phase function */
+      sample_scattering_direction(cmd, ithread, rng, &scattering, wlen, dir, wi);
 
-    /* Setup the RDG-FA phase function corresponding to the scattering event */
-    phase = cmd->rdgfa_phase_functions[ithread];
-    setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
-    setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
-    setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
-    SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+    } else  {
+      double bounce_reflectivity;
+      double r;
+      ASSERT(sc_type == SCATTERING_AT_SURFACE);
 
-    /* Sample a new optical path direction from the phase function */
-    d3_minus(wo, dir); /* Ensure SSF convention */
-    ssf_phase_sample(phase, rng, wo, wi, NULL);
+      /* Sample a new optical path direction from the surface BSDF */
+      bounce_reflectivity = sample_bounce_direction
+        (cmd, ithread, rng, &hit_curr, wlen, pos, dir, wi);
+
+      /* Russian roulette wrt surface scattering */
+      r = ssp_rng_canonical(rng);
+      if(r > bounce_reflectivity) break;
+
+      /* Register the current hit to avoid a self intersection for the next
+       * optical path direction */
+      hit_prev = hit_curr;
+    }
 
     /* Update the optical path direction */
     dir[0] = wi[0];
     dir[1] = wi[1];
     dir[2] = wi[2];
   }
-  return weight;
+
+exit:
+  *out_weight = weight;
+  return res;
+error:
+  weight = NaN;
+  goto exit;
 }
