@@ -779,7 +779,7 @@ move_to_scattering_position
   if(sc_type == SCATTERING_AT_SURFACE || cmd->geom == NULL) {
     out_pos[0] = pos[0] + dir[0] * sc_distance;
     out_pos[1] = pos[1] + dir[1] * sc_distance;
-    out_pos[2] = pos[2] + dir[1] * sc_distance;
+    out_pos[2] = pos[2] + dir[2] * sc_distance;
 
   /* The scattering position is in a volume surrounded by the geometry of the
    * combustion chamber. Be careful when moving along 'dir'; due to numerical
