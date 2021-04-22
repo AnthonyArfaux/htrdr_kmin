@@ -73,16 +73,6 @@ htrdr_geometry_get_interface
    const struct s3d_hit* hit,
    struct htrdr_interface* interface);
 
-HTRDR_CORE_API res_T
-htrdr_geometry_create_bsdf
-  (struct htrdr_geometry* geom,
-   const size_t ithread,
-   const double wavelength,
-   const double pos[3],
-   const double dir[3], /* Incoming ray */
-   const struct s3d_hit* hit,
-   struct htrdr_interface* interf, /* NULL <=> do not return the interface */
-   struct ssf_bsdf** bsdf);
 
 HTRDR_CORE_API res_T
 htrdr_geometry_trace_ray
