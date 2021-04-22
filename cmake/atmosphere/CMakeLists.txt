@@ -46,8 +46,8 @@ include_directories(
 ################################################################################
 # Generate files
 ################################################################################
-set(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1")
-set(HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME "\"air\"")
+set(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1" CACHE INTERNAL "")
+set(HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME "\"air\"" CACHE INTERNAL "")
 
 configure_file(${HTRDR_SOURCE_DIR}/atmosphere/htrdr_atmosphere_args.h.in
   ${HTRDR_BUILD_DIR}/atmosphere/htrdr_atmosphere_args.h @ONLY)
