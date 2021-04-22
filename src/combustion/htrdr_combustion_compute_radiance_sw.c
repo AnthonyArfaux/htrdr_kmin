@@ -811,7 +811,7 @@ move_to_scattering_position
       /* Move to the scattering position */
       pos_to_challenge[0] = pos[0] + dir[0] * dst;
       pos_to_challenge[1] = pos[1] + dir[1] * dst;
-      pos_to_challenge[2] = pos[2] + dir[1] * dst;
+      pos_to_challenge[2] = pos[2] + dir[2] * dst;
 
       /* Find the geometry near the scattering position */
       HTRDR(geometry_find_closest_point
