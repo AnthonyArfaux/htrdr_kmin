@@ -759,6 +759,8 @@ sample_bounce_direction
     bounce_reflectivity = 0;
   }
 
+  SSF(bsdf_ref_put(bsdf));
+
   return bounce_reflectivity;
 }
 
