@@ -357,8 +357,6 @@ parse_geometry_parameter(const char* str, void* ptr)
     goto error;
   }
 
-  htrdr_args_geometry_free(geom);
-
   #define SET_VALUE(Key, Val, Str) {                                           \
     const size_t len = strlen(Val) + 1;                                        \
     Str = mem_alloc(len);                                                      \
@@ -439,6 +437,8 @@ htrdr_args_geometry_parse(struct htrdr_args_geometry* geom, const char* str)
     res = RES_BAD_ARG;
     goto error;
   }
+
+  htrdr_args_geometry_free(geom);
 
   res = cstr_parse_list(str, ':', parse_geometry_parameter, geom);
   if(res != RES_OK) goto error;
