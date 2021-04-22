@@ -98,6 +98,12 @@ htrdr_geometry_get_aabb
    double lower[3],
    double upper[3]);
 
+/* Empirical value relative to the extent of the geometry that represents the
+ * threshold below which a numerical problem could occur. */
+HTRDR_CORE_API double
+htrdr_geometry_get_epsilon
+  (const struct htrdr_geometry* geom);
+
 END_DECLS
 
 #endif /* HTRDR_GEOMETRY_H */

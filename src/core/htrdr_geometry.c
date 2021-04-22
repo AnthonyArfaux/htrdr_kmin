@@ -75,6 +75,10 @@ struct htrdr_geometry {
   float upper[3]; /* Ground upper bound */
   int repeat; /* Make the geom infinite in X and Y */
 
+  /* A empirical value relative to the extent of the geometry that represents
+   * the threshold below which a numerical problem could occur. */
+  float epsilon;
+
   struct htable_interface interfaces; /* Map a Star3D shape to its interface */
 
   struct htrdr* htrdr;
@@ -581,6 +585,10 @@ htrdr_geometry_create
 {
   char buf[128];
   struct htrdr_geometry* geom = NULL;
+  double low[3];
+  double upp[3];
+  double tmp[3];
+  double extent;
   struct time t0, t1;
   res_T res = RES_OK;
   ASSERT(htrdr && obj_filename && mats && out_ground);
@@ -607,6 +615,10 @@ htrdr_geometry_create
   time_sub(&t0, time_current(&t1), &t0);
   time_dump(&t0, TIME_ALL, NULL, buf, sizeof(buf));
   htrdr_log(geom->htrdr, "Setup geom in %s\n", buf);
+
+  htrdr_geometry_get_aabb(geom, low, upp);
+  extent = d3_len(d3_sub(tmp, upp, low));
+  geom->epsilon = MMAX((float)(extent * 1e-6), FLT_EPSILON);
 
 exit:
   *out_ground = geom;
@@ -737,4 +749,11 @@ htrdr_geometry_get_aabb
   ASSERT(geom && lower && upper);
   d3_set_f3(lower, geom->lower);
   d3_set_f3(upper, geom->upper);
+}
+
+double
+htrdr_geometry_get_epsilon(const struct htrdr_geometry* geom)
+{
+  ASSERT(geom);
+  return geom->epsilon;
 }
