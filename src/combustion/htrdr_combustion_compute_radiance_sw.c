@@ -576,11 +576,11 @@ laser_once_scattered
   range[0] = range_in[0];
   range[1] = range_in[1];
   htrdr_combustion_laser_trace_ray(cmd->laser, pos, dir, range, laser_hit_dst);
-  ASSERT(laser_hit_dst[0] <= laser_hit_dst[1]);
-  ASSERT(laser_hit_dst[1] <= range_in[1]);
 
   /* No intersection with the laser sheet => no laser contribution */
   if(HTRDR_COMBUSTION_LASER_HIT_NONE(laser_hit_dst)) return 0;
+  ASSERT(laser_hit_dst[0] <= laser_hit_dst[1]);
+  ASSERT(laser_hit_dst[1] <= range_in[1]);
 
   /* Compute the transmissivity from 'pos' to 'xin' */
   range[0] = 0;
