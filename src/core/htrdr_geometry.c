@@ -648,6 +648,21 @@ htrdr_geometry_get_interface
   *out_interface = *interf;
 }
 
+void
+htrdr_geometry_get_hit_position
+  (const struct htrdr_geometry* geom,
+   const struct s3d_hit* hit,
+   double position[3])
+{
+  struct s3d_attrib attr;
+  ASSERT(geom && hit && position && !S3D_HIT_NONE(hit));
+
+  S3D(primitive_get_attrib(&hit->prim, S3D_POSITION, hit->uv, &attr));
+  position[0] = attr.value[0];
+  position[1] = attr.value[1];
+  position[2] = attr.value[2];
+}
+
 res_T
 htrdr_geometry_trace_ray
   (struct htrdr_geometry* geom,

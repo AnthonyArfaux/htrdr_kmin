@@ -73,6 +73,11 @@ htrdr_geometry_get_interface
    const struct s3d_hit* hit,
    struct htrdr_interface* interface);
 
+HTRDR_CORE_API void
+htrdr_geometry_get_hit_position
+  (const struct htrdr_geometry* geom,
+   const struct s3d_hit* hit,
+   double position[3]);
 
 HTRDR_CORE_API res_T
 htrdr_geometry_trace_ray
