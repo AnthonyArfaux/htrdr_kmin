@@ -57,11 +57,16 @@ trace_slab
    int* hit)
 {
   struct trace_slab_context* ctx = context;
+  struct htrdr_geometry_trace_ray_args rt_args =
+    HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL;
   res_T res = RES_OK;
   ASSERT(org && dir && range && context && hit);
 
-  res = htrdr_geometry_trace_ray
-    (ctx->geom, org, dir, range, ctx->hit_prev, ctx->hit);
+  d3_set(rt_args.ray_org, org);
+  d3_set(rt_args.ray_dir, dir);
+  d3_set(rt_args.ray_range, range);
+  rt_args.hit_from = ctx->hit_prev ? *ctx->hit_prev : S3D_HIT_NULL;
+  res = htrdr_geometry_trace_ray(ctx->geom, &rt_args, ctx->hit);
   if(res != RES_OK) return res;
 
   *hit = !S3D_HIT_NONE(ctx->hit);
@@ -172,9 +177,16 @@ htrdr_atmosphere_ground_trace_ray
   }
 
   if(!ground->repeat) {
-    res = htrdr_geometry_trace_ray
-      (ground->geom, org, dir, range, prev_hit, hit);
+    struct htrdr_geometry_trace_ray_args rt_args =
+      HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL;
+
+    d3_set(rt_args.ray_org, org);
+    d3_set(rt_args.ray_dir, dir);
+    d3_set(rt_args.ray_range, range);
+    if(prev_hit) rt_args.hit_from = *prev_hit;
+    res = htrdr_geometry_trace_ray(ground->geom, &rt_args, hit);
     if(res != RES_OK) goto error;
+
   } else {
     struct trace_slab_context slab_ctx = TRACE_SLAB_CONTEXT_NULL;
     double low[3], upp[3];

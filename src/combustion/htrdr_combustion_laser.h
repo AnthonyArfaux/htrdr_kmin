@@ -46,7 +46,7 @@ struct htrdr_combustion_laser_mesh {
 };
 
 /* Syntactic sugar to check if a laser sheet hit is valid */
-#define HTRDR_COMBUSTION_LASER_HIT_NONE(Hit) ((Hit)[0] >= DBL_MAX)
+#define HTRDR_COMBUSTION_LASER_HIT_NONE(Hit) ((Hit)[0] >= FLT_MAX)
 
 /* Forward declaration */
 struct htrdr;

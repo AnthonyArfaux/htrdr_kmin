@@ -39,7 +39,7 @@ static INLINE const struct htrdr_mtl*
 htrdr_interface_fetch_hit_mtl
   (const struct htrdr_interface* interf,
    const double dir[3], /* Incoming ray */
-   struct s3d_hit* hit)
+   const struct s3d_hit* hit)
 {
   const struct htrdr_mtl* mtl = NULL;
   enum { FRONT, BACK };

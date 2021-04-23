@@ -40,6 +40,7 @@ draw_pixel
   struct htrdr_combustion* cmd = NULL;
   struct combustion_pixel* pixel = NULL;
   size_t isamp;
+  res_T res = RES_OK;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
   (void)htrdr;
 
@@ -68,8 +69,9 @@ draw_pixel
     htrdr_camera_ray(cmd->camera, pix_samp, ray_org, ray_dir);
 
     /* Backward trace the path */
-    weight = combustion_compute_radiance_sw(cmd, args->ithread, args->rng,
-        ray_org, ray_dir);
+    res = combustion_compute_radiance_sw(cmd, args->ithread, args->rng,
+        ray_org, ray_dir, &weight);
+    if(res != RES_OK) continue; /* Reject the path */
 
     /* End the registration of the per realisation time */
     time_sub(&t0, time_current(&t1), &t0);

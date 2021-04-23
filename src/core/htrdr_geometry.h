@@ -20,6 +20,8 @@
 
 #include "core/htrdr.h"
 
+#include <star/s3d.h>
+
 /* Forware declarations */
 struct htrdr;
 struct htrdr_geometry;
@@ -27,6 +29,26 @@ struct htrdr_interface;
 struct htrdr_materials;
 struct s3d_hit;
 struct ssf_bsdf;
+
+struct htrdr_geometry_trace_ray_args {
+  double ray_org[3];
+  double ray_dir[3];
+  double ray_range[2];
+  struct s3d_hit hit_from; /* Hit from which the ray starts */
+  s3d_hit_filter_function_T filter; /* NULL <=> no user defined filter */
+  void* filter_context;
+};
+
+#define HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL__ {                                 \
+  {0,0,0}, /* Ray origin */                                                    \
+  {0,0,1}, /* Ray direction */                                                 \
+  {0,DBL_MAX}, /* Ray range */                                                 \
+  S3D_HIT_NULL, /* Hit from */                                                 \
+  NULL, /* User defined filter function */                                     \
+  NULL /* User filter function */                                              \
+}
+static const struct htrdr_geometry_trace_ray_args
+HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL = HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL__;
 
 BEGIN_DECLS
 
@@ -51,24 +73,16 @@ htrdr_geometry_get_interface
    const struct s3d_hit* hit,
    struct htrdr_interface* interface);
 
-HTRDR_CORE_API res_T
-htrdr_geometry_create_bsdf
-  (struct htrdr_geometry* geom,
-   const size_t ithread,
-   const double wavelength,
-   const double pos[3],
-   const double dir[3], /* Incoming ray */
+HTRDR_CORE_API void
+htrdr_geometry_get_hit_position
+  (const struct htrdr_geometry* geom,
    const struct s3d_hit* hit,
-   struct htrdr_interface* interf, /* NULL <=> do not return the interface */
-   struct ssf_bsdf** bsdf);
+   double position[3]);
 
 HTRDR_CORE_API res_T
 htrdr_geometry_trace_ray
   (struct htrdr_geometry* geom,
-   const double ray_origin[3],
-   const double ray_direction[3], /* Must be normalized */
-   const double ray_range[2],
-   const struct s3d_hit* prev_hit,/* Previous hit. Avoid self hit. May be NULL*/
+   const struct htrdr_geometry_trace_ray_args* args,
    struct s3d_hit* hit);
 
 HTRDR_CORE_API res_T
@@ -83,6 +97,12 @@ htrdr_geometry_get_aabb
   (const struct htrdr_geometry* geom,
    double lower[3],
    double upper[3]);
+
+/* Empirical value relative to the extent of the geometry that represents the
+ * threshold below which a numerical problem could occur. */
+HTRDR_CORE_API double
+htrdr_geometry_get_epsilon
+  (const struct htrdr_geometry* geom);
 
 END_DECLS
 
