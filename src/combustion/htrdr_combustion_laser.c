@@ -188,6 +188,7 @@ htrdr_combustion_laser_get_mesh
   double transform[12];
   double low[3];
   double upp[3];
+  int i;
   ASSERT(laser && extend > 0 && mesh);
 
   htrdr_rectangle_get_transform(laser->surface, transform);
@@ -200,7 +201,7 @@ htrdr_combustion_laser_get_mesh
   upp[1] = laser->upp_ls[1];
   upp[2] = laser->low_ls[2] + extend;
 
-  /* Transform the laser sheet vertices in world space */
+  /* Define the mesh of the laser sheet in local space */
   d3(mesh->vertices + 0*3, low[0], low[1], low[2]);
   d3(mesh->vertices + 1*3, upp[0], low[1], low[2]);
   d3(mesh->vertices + 2*3, low[0], upp[1], low[2]);
@@ -210,6 +211,13 @@ htrdr_combustion_laser_get_mesh
   d3(mesh->vertices + 6*3, low[0], upp[1], upp[2]);
   d3(mesh->vertices + 7*3, upp[0], upp[1], upp[2]);
   mesh->nvertices = 8;
+
+  /* Transform the laser sheet vertices in world space */
+  FOR_EACH(i, 0, 8) {
+    double* v = mesh->vertices + i*3;
+    d33_muld3(v, transform, v);
+    d3_add(v, v, transform+9);
+  }
 
   /* Define the laser sheet triangles */
   mesh->triangles[0]  = 0; mesh->triangles[1]  = 2; mesh->triangles[2]  = 1;
