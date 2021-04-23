@@ -80,8 +80,13 @@ HTRDR_API void
 htrdr_combustion_laser_get_mesh
   (const struct htrdr_combustion_laser* laser,
    /* Max distance of the laser mesh along its infinite dimension */
-   const double extend,
+   const double extent,
    struct htrdr_combustion_laser_mesh* mesh);
+
+HTRDR_API void
+htrdr_combustion_laser_get_position
+  (const struct htrdr_combustion_laser* laser,
+   double pos[3]);
 
 HTRDR_API void
 htrdr_combustion_laser_get_direction

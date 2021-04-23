@@ -182,14 +182,14 @@ htrdr_combustion_laser_trace_ray
 void
 htrdr_combustion_laser_get_mesh
   (const struct htrdr_combustion_laser* laser,
-   const double extend,
+   const double extent,
    struct htrdr_combustion_laser_mesh* mesh)
 {
   double transform[12];
   double low[3];
   double upp[3];
   int i;
-  ASSERT(laser && extend > 0 && mesh);
+  ASSERT(laser && extent > 0 && mesh);
 
   htrdr_rectangle_get_transform(laser->surface, transform);
 
@@ -199,7 +199,7 @@ htrdr_combustion_laser_get_mesh
   low[2] = laser->low_ls[2];
   upp[0] = laser->upp_ls[0];
   upp[1] = laser->upp_ls[1];
-  upp[2] = laser->low_ls[2] + extend;
+  upp[2] = laser->low_ls[2] + extent;
 
   /* Define the mesh of the laser sheet in local space */
   d3(mesh->vertices + 0*3, low[0], low[1], low[2]);
@@ -231,6 +231,15 @@ htrdr_combustion_laser_get_mesh
   mesh->triangles[24] = 3; mesh->triangles[25] = 2; mesh->triangles[26] = 7;
   mesh->triangles[27] = 7; mesh->triangles[28] = 2; mesh->triangles[29] = 6;
   mesh->ntriangles = 10;
+}
+
+void
+htrdr_combustion_laser_get_position
+  (const struct htrdr_combustion_laser* laser,
+   double pos[3])
+{
+  ASSERT(laser && pos);
+  htrdr_rectangle_get_center(laser->surface, pos);
 }
 
 void
