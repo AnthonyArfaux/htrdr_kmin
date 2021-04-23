@@ -47,8 +47,9 @@ print_help(const char* cmd)
 "                 flux density is %g W/m^2.\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.laser_flux_density);
   printf(
-"  -d             dump volumetric acceleration structures to OUTPUT\n"
-"                 and exit.\n");
+"  -d <octrees|laser>\n"
+"                 output the volumetric acceleration structures or the\n"
+"                 the geometry of the laser sheet and exit.\n");
   printf(
 "  -F <fractal-coefs>\n"
 "                 value of the fractal prefactor and fractal dimension\n"
@@ -197,6 +198,30 @@ error:
   goto exit;
 }
 
+static res_T
+parse_dump_parameter
+  (const char* str,
+   enum htrdr_combustion_args_output_type* output_type)
+{
+  res_T res = RES_OK;
+  ASSERT(str && output_type);
+
+  if(!strcmp(str, "octrees")) {
+    *output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_OCTREES;
+  } else if(!strcmp(str, "laser")) {
+    *output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_LASER_SHEET;
+  } else {
+    fprintf(stderr, "Invalid dump parameter `%s'.\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -212,7 +237,7 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:D:dF:fg:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
         res = htrdr_args_camera_parse(&args->camera, optarg);
@@ -222,7 +247,7 @@ htrdr_combustion_args_init
         if(res == RES_OK && args->laser_flux_density <= 0) res = RES_BAD_ARG;
         break;
       case 'd':
-        args->dump_volumetric_acceleration_structure = 1;
+        res = parse_dump_parameter(optarg, &args->output_type);
         break;
       case 'F':
         res = cstr_parse_list(optarg, ':', parse_fractal_parameters, args);

@@ -218,7 +218,7 @@ setup_buffer
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->dump_volumetric_acceleration_structure) goto exit;
+  if(cmd->output_type != HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE) goto exit;
 
   combustion_get_pixel_format(cmd, &pixfmt);
 
@@ -318,6 +318,106 @@ error:
   goto exit;
 }
 
+static double
+compute_laser_mesh_extent(const struct htrdr_combustion* cmd)
+{
+  double mdm_upp[3];
+  double mdm_low[3];
+  double laser_dir[3];
+  double laser_pos[3];
+  double t[2];
+  int max_axis;
+  ASSERT(cmd);
+
+  /* Retrieve the medium axis aligned bounding box */
+  atrstm_get_aabb(cmd->medium, mdm_low, mdm_upp);
+
+  /* Retrieve laser parameters */
+  htrdr_combustion_laser_get_position(cmd->laser, laser_pos);
+  htrdr_combustion_laser_get_direction(cmd->laser, laser_dir);
+
+  /* Compute the dominant axis of the laser direction */
+  max_axis =
+     fabs(laser_dir[0]) > fabs(laser_dir[1])
+  ? (fabs(laser_dir[0]) > fabs(laser_dir[2]) ? 0 : 2)
+  : (fabs(laser_dir[1]) > fabs(laser_dir[2]) ? 1 : 2);
+
+  /* Define the intersection of the laser along its dominant axis with the
+   * medium bounds along this axis */
+  t[0] = (mdm_low[max_axis] - laser_pos[max_axis]) / laser_dir[max_axis];
+  t[1] = (mdm_upp[max_axis] - laser_pos[max_axis]) / laser_dir[max_axis];
+  if(t[0] > t[1]) SWAP(double, t[0], t[1]);
+
+  /* Use the far intersection distance as the extent of the laser mesh */
+  return t[1];
+}
+
+static res_T
+dump_laser_sheet(const struct htrdr_combustion* cmd)
+{
+  struct htrdr_combustion_laser_mesh laser_mesh;
+  double extent;
+  unsigned i;
+  res_T res = RES_OK;
+  ASSERT(cmd);
+
+  /* Compute the extent of the geometry that will represent the laser sheet */
+  extent = compute_laser_mesh_extent(cmd);
+
+  /* Retreive the mesh of the laser sheet */
+  htrdr_combustion_laser_get_mesh(cmd->laser, extent, &laser_mesh);
+
+  #define FPRINTF(Fmt, Args) {                                                 \
+    const int err = fprintf(cmd->output, Fmt COMMA_##Args LIST_##Args);        \
+    if(err < 0) {                                                              \
+      htrdr_log_err(cmd->htrdr, "Error writing data to `%s'.\n",               \
+        str_cget(&cmd->output_name));                                          \
+      res = RES_IO_ERR;                                                        \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+
+  /* Write header */
+  FPRINTF("# vtk DataFile Version 2.0\n", ARG0());
+  FPRINTF("Laser sheet\n", ARG0());
+  FPRINTF("ASCII\n", ARG0());
+  FPRINTF("DATASET POLYDATA\n", ARG0());
+
+  /* Write the vertices */
+  FPRINTF("POINTS %u double\n", ARG1(laser_mesh.nvertices));
+  FOR_EACH(i, 0, laser_mesh.nvertices) {
+    FPRINTF("%g %g %g\n", ARG3
+      (laser_mesh.vertices[i*3+0],
+       laser_mesh.vertices[i*3+1],
+       laser_mesh.vertices[i*3+2]));
+  }
+
+  /* Write the triangles */
+  FPRINTF("POLYGONS %u %u\n",ARG2
+    (laser_mesh.ntriangles,
+     laser_mesh.ntriangles*4));
+  FOR_EACH(i, 0, laser_mesh.ntriangles) {
+    FPRINTF("3 %u %u %u\n", ARG3
+      (laser_mesh.triangles[i*3+0],
+       laser_mesh.triangles[i*3+1],
+       laser_mesh.triangles[i*3+2]));
+  }
+
+  /* Write flux density */
+  FPRINTF("CELL_DATA %u\n", ARG1(laser_mesh.ntriangles));
+  FPRINTF("SCALARS Flux_density double 1\n", ARG0());
+  FPRINTF("LOOKUP_TABLE default\n", ARG0());
+  FOR_EACH(i, 0, laser_mesh.ntriangles) {
+    FPRINTF("%g\n", ARG1(htrdr_combustion_laser_get_flux_density(cmd->laser)));
+  }
+  #undef FPRINTF
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 static void
 combustion_release(ref_T* ref)
 {
@@ -368,8 +468,7 @@ htrdr_combustion_create
   cmd->htrdr = htrdr;
 
   cmd->spp = args->image.spp;
-  cmd->dump_volumetric_acceleration_structure =
-    args->dump_volumetric_acceleration_structure;
+  cmd->output_type = args->output_type;
 
   res = setup_output(cmd, args);
   if(res != RES_OK) goto error;
@@ -419,12 +518,20 @@ htrdr_combustion_run(struct htrdr_combustion* cmd)
   res_T res = RES_OK;
   ASSERT(cmd);
 
-  if(cmd->dump_volumetric_acceleration_structure) {
-    res = dump_volumetric_acceleration_structure(cmd);
-    if(res != RES_OK) goto error;
-  } else {
-    res = combustion_draw_map(cmd);
-    if(res != RES_OK) goto error;
+  switch(cmd->output_type) {
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE:
+      res = combustion_draw_map(cmd);
+      break;
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_LASER_SHEET:
+      res = dump_laser_sheet(cmd);
+      break;
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_OCTREES:
+      res = dump_volumetric_acceleration_structure(cmd);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  if(res != RES_OK) {
+    goto error;
   }
 
 exit:

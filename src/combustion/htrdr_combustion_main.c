@@ -54,7 +54,7 @@ htrdr_combustion_main(int argc, char** argv)
   res = htrdr_create(&mem_default_allocator, &htrdr_args, &htrdr);
   if(res != RES_OK) goto error;
 
-  if(cmd_args.dump_volumetric_acceleration_structure 
+  if(cmd_args.output_type != HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE 
   && htrdr_get_mpi_rank(htrdr) != 0) {
     goto exit; /* Nothing to do except for the master process */
   }

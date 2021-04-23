@@ -23,9 +23,16 @@
 
 #include <limits.h> /* UINT_MAX support */
 
+enum htrdr_combustion_args_output_type {
+  HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE,
+  HTRDR_COMBUSTION_ARGS_OUTPUT_LASER_SHEET,
+  HTRDR_COMBUSTION_ARGS_OUTPUT_OCTREES,
+  HTRDR_COMBUSTION_ARGS_OUTPUT_TYPES_COUNT__
+};
+
 enum htrdr_combustion_args_grid_definition_type {
-  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_FIXED,
   HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_AUTO,
+  HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_FIXED,
   HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_TYPES_COUNT__
 };
 
@@ -72,9 +79,9 @@ struct htrdr_combustion_args {
 
   /* Miscellaneous parameters */
   unsigned nthreads; /* Hint on the number of threads to use */
+  enum htrdr_combustion_args_output_type output_type;
   int precompute_normals; /* Pre-compute the tetrahedra normals */
   int force_overwriting;
-  int dump_volumetric_acceleration_structure;
   int verbose; /* Verbosity level */
   int quit; /* Stop the command */
 };
@@ -105,9 +112,9 @@ struct htrdr_combustion_args {
   1, /* Optical thickness */                                                   \
                                                                                \
   UINT_MAX, /* #threads */                                                     \
+  HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE, /* Output type */                        \
   0, /* Precompute normals */                                                  \
   0, /* Force overwriting */                                                   \
-  0, /* dump volumetric acceleration structure */                              \
   0, /* Verbose flag */                                                        \
   0  /* Stop the command */                                                    \
 }

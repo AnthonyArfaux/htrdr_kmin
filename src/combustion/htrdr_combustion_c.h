@@ -18,6 +18,8 @@
 #ifndef HTRDR_COMBUSTION_C_H
 #define HTRDR_COMBUSTION_C_H
 
+#include "combustion/htrdr_combustion_args.h"
+
 #include "core/htrdr_accum.h"
 #include "core/htrdr_args.h"
 #include "core/htrdr_buffer.h"
@@ -65,7 +67,7 @@ struct htrdr_combustion {
 
   FILE* output; /* Output stream */
   struct str output_name; /* Name of the output stream */
-  int dump_volumetric_acceleration_structure;
+  enum htrdr_combustion_args_output_type output_type; /* Type of output data */
 
   ref_T ref;
   struct htrdr* htrdr;
