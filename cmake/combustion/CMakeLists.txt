@@ -98,7 +98,7 @@ endif()
 ################################################################################
 # Define output & install directories
 ################################################################################
-install(TARGETS htrdr-core
+install(TARGETS htrdr-combustion
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
