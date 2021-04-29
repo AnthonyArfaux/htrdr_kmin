@@ -49,7 +49,7 @@ set_target_properties(htrdr_combustion_cmd PROPERTIES
 ################################################################################
 # Define output & install directories
 ################################################################################
-install(TARGETS htrdr_cmd htrdr_atmosphere_cmd
+install(TARGETS htrdr_cmd htrdr_atmosphere_cmd htrdr_combustion_cmd
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
