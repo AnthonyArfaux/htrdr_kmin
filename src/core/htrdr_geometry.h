@@ -43,7 +43,7 @@ struct htrdr_geometry_trace_ray_args {
   {0,0,0}, /* Ray origin */                                                    \
   {0,0,1}, /* Ray direction */                                                 \
   {0,DBL_MAX}, /* Ray range */                                                 \
-  S3D_HIT_NULL, /* Hit from */                                                 \
+  S3D_HIT_NULL__, /* Hit from */                                               \
   NULL, /* User defined filter function */                                     \
   NULL /* User filter function */                                              \
 }
