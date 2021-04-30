@@ -616,12 +616,13 @@ laser_once_scattered
     /* Setup the ray to trace */
     d3_set(rt_args.ray_org, xsc);
     d3_set(rt_args.ray_dir, wi);
-    d2_set(rt_args.ray_range, range);
+    rt_args.ray_range[0] = 0;
+    rt_args.ray_range[1] = INF;
     rt_args.hit_from = S3D_HIT_NULL;
 
-   /* Configure the "X-ray" surface ray trace filtering. This filtering function
-    * helps to avoid intersections with the side of the surfaces facing inside
-    * the combustion chamber to allow the rays to exit out. */
+    /* Configure the "X-ray" surface ray trace filtering. This filtering
+     * function helps to avoid intersections with the side of the surfaces
+     * facing inside the combustion chamber to allow the rays to exit out. */
     rt_args.filter = geometry_ray_filter_discard_medium_interface;
     rt_args.filter_context = &rt_ctx;
     rt_ctx.geom = cmd->geom;
