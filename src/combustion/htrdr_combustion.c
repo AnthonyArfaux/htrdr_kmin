@@ -103,6 +103,38 @@ error:
 }
 
 static res_T
+setup_simd
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  ASSERT(cmd && args);
+
+  if(!args->use_simd) {
+    cmd->rdgfa_simd = SSF_SIMD_NONE;
+  } else {
+    struct ssf_info ssf_info = SSF_INFO_NULL;
+
+    /* Check SIMD support for the RDG-FA phase function */
+    ssf_get_info(&ssf_info);
+    if(ssf_info.simd_256) {
+      htrdr_log(cmd->htrdr,
+        "Use the SIMD-256 instruction set for the RDG-FA phase function.\n");
+      cmd->rdgfa_simd = SSF_SIMD_256;
+    } else if(ssf_info.simd_128) {
+      htrdr_log(cmd->htrdr,
+        "Use the SIMD-128 instruction set for the RDG-FA phase function.\n");
+      cmd->rdgfa_simd = SSF_SIMD_128;
+    } else {
+      htrdr_log_warn(cmd->htrdr,
+        "Cannot use SIMD for the RDG-FA phase function: the "
+        "Star-ScatteringFunction library was compiled without SIMD support.\n");
+      cmd->rdgfa_simd = SSF_SIMD_NONE;
+    }
+  }
+  return RES_OK;
+}
+
+static res_T
 setup_geometry
   (struct htrdr_combustion* cmd,
    const struct htrdr_combustion_args* args)
@@ -264,6 +296,7 @@ setup_medium
   atrstm_args.fractal_dimension = args->fractal_dimension;
   atrstm_args.optical_thickness = args->optical_thickness;
   atrstm_args.precompute_normals = args->precompute_normals;
+  atrstm_args.use_simd = args->use_simd;
   atrstm_args.nthreads = args->nthreads;
   atrstm_args.verbose = args->verbose;
 
@@ -471,6 +504,8 @@ htrdr_combustion_create
   cmd->output_type = args->output_type;
 
   res = setup_output(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_simd(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_geometry(cmd, args);
   if(res != RES_OK) goto error;

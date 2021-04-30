@@ -658,6 +658,7 @@ laser_once_scattered
   setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
   setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
   setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
+  setup_rdgfa_args.simd = cmd->rdgfa_simd;
   SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
 
   /* Evaluate the phase function at the scattering position */
@@ -712,6 +713,7 @@ sample_scattering_direction
   setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
   setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
   setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
+  setup_rdgfa_args.simd = cmd->rdgfa_simd;
   SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
 
   /* Sample a new optical path direction from the phase function */

@@ -43,8 +43,8 @@ print_help(const char* cmd)
 "                 man page for the list of camera options.\n");
   printf(
 "  -D FLUX_DENSITY\n"
-"                 flux density of the laser in W/m^2. By default the\n"
-"                 flux density is %g W/m^2.\n",
+"                 flux density of the laser in W/m^2\n"
+"                 (default: %g W/m^2).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.laser_flux_density);
   printf(
 "  -d <octrees|laser>\n"
@@ -54,9 +54,9 @@ print_help(const char* cmd)
 "  -F <fractal-coefs>\n"
 "                 value of the fractal prefactor and fractal dimension\n"
 "                 to use in the RDG-FA model. Refer to the man page\n"
-"                 for the syntax of the <fractal-coefs> option. Default\n"
-"                 fractal prefactor is %g and the default fractal\n"
-"                 dimension is %g.\n",
+"                 for the syntax of the <fractal-coefs> option\n"
+"                 (default fractal prefactor = %g;\n"
+"                  default fractal dimension = %g).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_prefactor,
     HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_dimension);
   printf(
@@ -80,16 +80,18 @@ print_help(const char* cmd)
 "  -O CACHE       path of the cache file used to store/restore the\n"
 "                 volumetric data. By default do not use any cache.\n");
   printf(
-"  -o OUTPUT      file where data are written. If not defined, data are\n"
-"                 written to standard output.\n");
+"  -o OUTPUT      file where data are written\n"
+"                 (default: write data to standard output).\n");
   printf(
 "  -p THERMOPROPS path toward the thermodynamic properties.\n");
   printf(
 "  -r REFRACT_ID  path toward the per wavelength refractive\n"
 "                 indices.\n");
   printf(
+"  -s             use of the SIMD instruction set if available.\n");
+  printf(
 "  -T THRESHOLD   optical thickness used as threshold during the octree\n"
-"                 building. By default its value is %g.\n",
+"                 building. (default: %g).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.optical_thickness);
   printf(
 "  -t NTHREADS    hint on the number of threads to use. By default use\n"
@@ -104,7 +106,7 @@ print_help(const char* cmd)
 "  -v             make the command verbose.\n");
   printf(
 "  -w WAVELENGTH  wavelength definition of the laser in nanometer.\n"
-"                 By default its value is %g.\n",
+"                 (default: %g).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.wavelength);
 
   printf("\n");
@@ -237,7 +239,7 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:r:T:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:r:sT:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
         res = htrdr_args_camera_parse(&args->camera, optarg);
@@ -273,6 +275,7 @@ htrdr_combustion_args_init
       case 'o': args->path_output = optarg; break;
       case 'p': args->path_therm_props = optarg; break;
       case 'r': args->path_refract_ids = optarg; break;
+      case 's': args->use_simd = 1; break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
         if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;

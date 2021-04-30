@@ -83,6 +83,7 @@ struct htrdr_combustion_args {
   int precompute_normals; /* Pre-compute the tetrahedra normals */
   int force_overwriting;
   int verbose; /* Verbosity level */
+  int use_simd; /* Use the SIMD instruction set if available */
   int quit; /* Stop the command */
 };
 
@@ -116,6 +117,7 @@ struct htrdr_combustion_args {
   0, /* Precompute normals */                                                  \
   0, /* Force overwriting */                                                   \
   0, /* Verbose flag */                                                        \
+  0, /* Use SIMD */                                                            \
   0  /* Stop the command */                                                    \
 }
 static const struct htrdr_combustion_args HTRDR_COMBUSTION_ARGS_DEFAULT =

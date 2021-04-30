@@ -24,6 +24,8 @@
 #include "core/htrdr_args.h"
 #include "core/htrdr_buffer.h"
 
+#include <star/ssf.h>
+
 #include <rsys/ref_count.h>
 #include <rsys/str.h>
 
@@ -60,6 +62,7 @@ struct htrdr_combustion {
 
   struct ssf_phase** rdgfa_phase_functions; /* Per thread RDG-FA phase func */
   struct ssf_phase** hg_phase_functions; /* Per thread Henyey-Greenstein func */
+  enum ssf_simd rdgfa_simd; /* SIMD support for the RDG-FA phase func */
 
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
