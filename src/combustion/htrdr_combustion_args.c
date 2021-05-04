@@ -47,12 +47,12 @@ print_help(const char* cmd)
 "                 (default: %g W/m^2).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.laser_flux_density);
   printf(
-"  -d <octrees|laser>\n"
-"                 output the volumetric acceleration structures or the\n"
-"                 the geometry of the laser sheet and exit.\n");
+"  -d <laser|octree>\n"
+"                 output geometry of the laser sheet or the volumetric\n"
+"                 acceleration structure and exit.\n");
   printf(
 "  -F <fractal-coefs>\n"
-"                 value of the fractal prefactor and fractal dimension\n"
+"                 value of the fractal dimension and fractal prefactor\n"
 "                 to use in the RDG-FA model. Refer to the man page\n"
 "                 for the syntax of the <fractal-coefs> option\n"
 "                 (default fractal prefactor = %g;\n"
@@ -105,7 +105,7 @@ print_help(const char* cmd)
   printf(
 "  -v             make the command verbose.\n");
   printf(
-"  -w WAVELENGTH  wavelength definition of the laser in nanometer.\n"
+"  -w WAVELENGTH  wavelength definition of the laser in nanometre.\n"
 "                 (default: %g).\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.wavelength);
 
@@ -208,7 +208,7 @@ parse_dump_parameter
   res_T res = RES_OK;
   ASSERT(str && output_type);
 
-  if(!strcmp(str, "octrees")) {
+  if(!strcmp(str, "octree")) {
     *output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_OCTREES;
   } else if(!strcmp(str, "laser")) {
     *output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_LASER_SHEET;

@@ -1,0 +1,324 @@
+// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+// Copyright (C) 2018, 2019, 2021 CNRS
+// Copyright (C) 2018, 2019 Université Paul Sabatier
+//                          (contact-edstar@laplace.univ-tlse.fr)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+:toc:
+
+htrdr-combustion(1)
+===================
+
+NAME
+----
+htrdr-combustion - simulate radiative transfer in combustion medium
+
+SYNOPSIS
+--------
+[verse]
+*htrdr-combustion* [_option_]... -m _tetrahedra_ -p _thermoprops_ -r _refract_ids_
+
+DESCRIPTION
+-----------
+The purpose of *htrdr-combustion* is to perform radiative transfer computations
+in a scene representing a combustion semi-transparent medium enlighten by a
+laser sheet. The combustion medium may be surrounded by solid boundaries (inner
+limits of the combustion chamber). The program will currently compute the
+monochromatic image (in the visible, at a given frequency) of the combustion
+medium: collected light comes from the laser, and is scattered by soot
+aggregates within the flame before eventually reaching the camera.
+
+Data about the gaseous medium have to be provided on the vertices of a
+unstructured tetrahedron mesh: pressure, temperature and concentrations of H2O,
+CO2 and CO have to be provided for every spatial position used to define this
+mesh. These data have to be provided in anticipation of future developments for
+the longwave range: since the gas is assumed to be transparent in the visible,
+it is not currently used.
+
+Soot optical properties are computed using the Rayleigh-Debye Gans theory, for
+Fractal Aggregates (RDG-FA) [1]. This requires the knowledge of: soot volumic
+fraction, soot number density (number of primary particles per aggregate) and
+primary particles diameter, over each vertex of the tetrahedron mesh. For any
+position in the volume, these quantities are first interpolated from the values
+retrieved at the nodes of the current tetrahedron, and are then interpolated
+for the position of interest.  Which then makes possible to compute the
+absorption and scattering cross-sections of soot aggregates, as well as their
+scattering function.
+
+The Monte-Carlo algorithm that accounts for the visible intensity is inspired
+from the algorithm used for solar radiation in the *htrdr-atmosphere* command.
+
+*htrdr-combustion* implements a mixed parallelism: on one computer (i.e. a
+node) it uses a shared memory parallelism, and it relies on the message passing
+interface [3] to parallelize the computations between several nodes.
+
+OPTIONS
+-------
+
+*-C* <__camera-parameter__:...>::
+  Define the rendering point of view. Available camera parameters are:
+
+  **fov**=**_angle_**;;
+    Vertical field of view of the camera in [30, 120] degrees. By default
+    _angle_ is set to @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Position of the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
+
+*-D* _flux_density_::
+  Flux density of the laser in W/m^2. By default it is set to
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@.
+
+*-d* <__laser__|__octree__>::
+  When define with the _laser_ argument, write in _output_ the geometry of the
+  laser sheet saved in the VTK file format [2]. With the _octree_ argument,
+  write in _output_ the space partitioning data structure used to speed up the
+  radiative transfer computations in the combustion medium. The octree is saved
+  following the VTK file format [2]. Each node stores the minimum and the
+  maximum of the extinction coefficients of the tetrahedra that the node
+  overlaps.
+
+*-F* <_fractal-coefficients__:...>::
+  Fractal parameters of the RDG-FA model. Available fractal coefficients are:
+
+  **dimension**=_real_;;
+    Fractal dimension. By default it is set to
+    @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION@.
+
+  **prefactor**=_real_;;
+    Fractal prefactor. By default it is set to
+    @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@.
+
+*-f*::
+  Force overwrite of the _output_ file.
+
+*-g*:: <__geometry-parameter__:...>::
+  Define the geometry of the combustion chamber. Available geometry parameters
+  are:
+
+  **mats**=__materials__;;
+    Path to the *htrdr-materials*(5) that defines the media and materials used
+    by the combustion chamber geometry.
+
+  **obj**=_mesh_;;
+    Path to the *htrdr-obj*(5) file that represents the mesh of the combustion
+    chamber. Following the *htrdr-obj*(5) fileformat, the interface of the
+    submitted mesh must be defined as a thin interface, i.e. it must be
+    composed of 3 names of materials, separating by the ':' character. By
+    convention, *htrdr-combustion* expects the outside environment to be called
+    "air" and the medium inside the combustion chamber to be called "chamber".
+    No assumption is made on the name of the surface material excepted that it
+    has to reference a valid material.
+
+*-h*::
+  List short help and exit.
+
+*-i* <__image-parameter__:...>::
+  Define the sensor array. Available image parameters are:
+
+  **def**=**_width_**x**_height_**;;
+    Definition of the image. By default the image definition is
+    @HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+
+  **spp**=**_samples-count_**;;
+    Number of samples per pixel estimation. By default, *spp* is set to
+    @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+
+*-l* <__laser-parameter__:...>::
+  Define the laser surface emission. Available laser parameters are:
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Position of the center of the surface emission. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the laser, i.e. *tgt* - *pos* is normal of the laser
+    surface. By default it is set to {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the laser surface. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@}.
+
+  **sz**=**_width_**,**_height_**;;
+    Size of the laser surface. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}.
+
+*-m* _tetrahedra_::
+  Path to the *sth*(5) that stores the volumetric mesh of the combustion
+  medium.
+
+*-N*::
+  Precompute the normals of the tetrahedra. This option should speed up the
+  computation since the normals are computed once per tetrahedron rather than
+  reevaluated each time a tetrahedron is queried at a given position. On the
+  other hand, the storage required by these normals increases the memory
+  footprint.
+
+*-O* _cache_::
+  File used to cache the acceleration structure that partitions the combustion
+  medium. If the _cache_ file does not exist, it is created and populated with
+  the octree built from the _tetrahedra_, _thermoprops_ and _refract_ids_ input
+  files. This cached acceleration structure can then be reused in future runs
+  as long as the input data provided on the command line is the same as that
+  used to configure the cache; leading to a significant acceleration of the
+  pretreatment step. If _cache_ contains data generated from input data that is
+  not that submitted on the command line, an error is notified and execution is
+  stopped, thus avoiding the use of bad cached data.
+
+*-o* _output_::
+  Path to the file where *htrdr-combustion* writes the output data. If not set,
+  data is written to standard output.
+
+*-p* _thermprops_::
+  Path to the *atrtp*(5) file that stores the thermodynamic properties of the
+  combustion medium.
+
+*-r* _refract_ids_::
+  Path the the *atrri*(5) file that lists the spectrally varying refractive
+  indices of the combustion medium.
+
+*-s*::
+  Use of Single Instruction, Multiple Data (SIMD) instruction sets if
+  available. This should speed up the computation time.
+
+*-T*::
+  Optical thickness used as threshold criteria to build the acceleration
+  structure the combustion medium. By default its value is
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+
+*-t* _threads-count_::
+  Hint on the number of threads to use. By default use as many threads as CPU
+  cores.
+
+*-V* <__definition__>::
+  definition of the grid of the upper bound field of radiative coefficients
+  from which the volumetric acceleration structure is built. The grid extent
+  corresponds to the axis aligned bounding box of the volumetric mesh
+  representing the combustion medium. Grid definition can be set in  two ways:
+
+  **_x_**,**_z_**,**_z_**;;
+    Explicitly set the grid definition along the X, Y, and Z extents.
+
+  **_hint_**;;
+    Provide an hint on the expected definition of the grid along its major
+    extent. The definition along the two remaining axes are then internally
+    computed. This is the default comportment with an _hint_ set to
+    @HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+
+*-v*::
+  Make *htrdr-combustion* verbose.
+
+*-w*::
+  Define the wavelength of the laser in nanometre. By default it is set to
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@.
+
+EXEMPLE
+-------
+
+Make htrdr-combustion verbose (option *-v*) and render an image of a combustion
+medium whose tetrahedral mesh is stored in *tetra.sth* and its associated
+thermodynamic properties are saved in *thermprops.atrtp*. The spectrally
+varying indices of the medium are listed in the *refract_ids.atrri* file. The
+center of the laser surface emission is positioned at the origin and its
+direction is aligned to the Y axis. The definition of the rendered image is
+*800* by *600* pixels and the monochromatic radiance of each pixel is estimated
+at *500* nanometre with *64* Monte-Carlo realisations. The resulting image is
+written to *output* excepted if it already exists; in this case an
+error is notified, the program stops and the *output* file remains unchanged.
+
+  $ htrdr-combustion -v \
+    -m tetra.sth \
+    -p thermprops.atrtp \
+    -r refract_ids.atrri \
+    -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \
+    -w 500 \
+    -C pos=0.06,0,0.01:tgt=0.05,0,0.01:up=0,0,1:fov=30 \
+    -i def=800x600:spp=64 \
+    -o output
+
+Add a combustion chamber to the previous example: its mesh is defined in
+*chamber.obj* while its materials are listed in *materials.mtls*. Save the
+volumetric acceleration structure in *octree.cache* or reused it if it was
+already populated in a previous run with compatible input data. Set the finest
+resolution of this acceleration structure to 1000 along the major extend of the
+medium and use a optical thickness criterion of 5 to build it. Use the *-f*
+option to force the overwrite of the *output* file if it exists.
+
+  $ htrdr-combustion -v \
+    -m tetra.sth \
+    -p thermprops.atrtp \
+    -r refract_ids.atrri \
+    -g obj=chamber.obj:mats=materials.mtls \
+    -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \
+    -w 500 \
+    -C pos=0.06,0,0.01:tgt=0.05,0,0.01:up=0,0,1:fov=30 \
+    -i def=800x600:spp=64 \
+    -O octree.cache \
+    -V 1000 \
+    -T 5 \
+    -o output -f
+
+Write into *octree.vtk* a representation of the volumetric acceleration
+structure.
+
+  $ htrdr-combustion -v \
+    -m tetra.sth \
+    -p thermprops.atrtp \
+    -r refract_ids.atrri \
+    -O octree.cache \
+    -d -o octree.vtk
+
+NOTES
+-----
+
+1. Effects of multiple scattering on radiative properties of soot fractal
+aggregates. J. Yon et al, JQSRT 133, 374-381, 2014.
+
+2. VTK file format -
+<http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
+
+3. MPI specifications - <https://www.mpi-forum.org/docs/>
+
+COPYRIGHT
+---------
+Copyright &copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
+Copyright &copy; 2018, 2019, 2021 CNRS
+Copyright &copy; 2018, 2019 Université Paul Sabatier
+<contact-edstar@laplace.univ-tlse.fr>.
+
+LICENSE
+-------
+
+*htrdr-combustion* is free software released under the GPLv3+ license: GNU GPL
+version 3 or later <https://gnu.org/licenses/gpl.html>. You are free to change
+and redistribute it. There is NO WARRANTY, to the extent permitted by law.
+
+SEE ALSO
+--------
+*atrtp*(5),
+*atrri*(5),
+*htrdr-atmosphere*(1),
+*htrdr-obj*(5),
+*htrdr-materials*(5),
+*mpirun*(1),
+*sth*(5)

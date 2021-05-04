@@ -49,7 +49,10 @@ add_custom_target(man-copy ALL DEPENDS ${MAN_FILES})
 
 configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr-atmosphere.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/htrdr-atmosphere.1.txt @ONLY)
-list(APPEND MAN_NAMES htrdr-atmosphere.1)
+configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr-combustion.1.txt.in
+  ${CMAKE_CURRENT_BINARY_DIR}/htrdr-combustion.1.txt @ONLY)
+
+list(APPEND MAN_NAMES htrdr-atmosphere.1 htrdr-combustion.1)
 
 ################################################################################
 # ROFF man pages

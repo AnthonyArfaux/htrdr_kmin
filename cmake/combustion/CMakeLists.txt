@@ -44,6 +44,19 @@ include_directories(
   ${HTRDR_SOURCE_DIR})
 
 ################################################################################
+# Generate files
+################################################################################
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY "1" CACHE INTERNAL "")
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION "1.80" CACHE INTERNAL "")
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR "1.30" CACHE INTERNAL "")
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1.0" CACHE INTERNAL "")
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT "256" CACHE INTERNAL "")
+set(HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH "532" CACHE INTERNAL "")
+
+configure_file(${HTRDR_SOURCE_DIR}/combustion/htrdr_combustion_args.h.in
+  ${HTRDR_BUILD_DIR}/combustion/htrdr_combustion_args.h @ONLY)
+
+################################################################################
 # Configure and define targets
 ################################################################################
 set(HTRDR_COMBUSTION_FILES_SRC

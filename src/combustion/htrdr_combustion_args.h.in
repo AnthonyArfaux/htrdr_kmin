@@ -44,7 +44,7 @@ struct htrdr_combustion_args_grid_definition {
   enum htrdr_combustion_args_grid_definition_type type;
 };
 #define HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__ {                      \
-  {256},                                                                       \
+  {@HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT@},                      \
   HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_AUTO                                   \
 }
 static const struct htrdr_combustion_args_grid_definition
@@ -55,7 +55,7 @@ struct htrdr_combustion_args {
   struct htrdr_args_geometry geom; /* Combustion chamber geometry */
 
   const char* path_tetra; /* Volumetric mesh of the medium */
-  const char* path_therm_props; /* Termodynamic properties of the medium */
+  const char* path_therm_props; /* Thermodynamic properties of the medium */
   const char* path_refract_ids; /* Refractive indices in the medium */
 
   const char* path_cache; /* Path of the file to store/restore cached data */
@@ -64,7 +64,7 @@ struct htrdr_combustion_args {
   struct htrdr_args_camera camera; /* Pinhole Camera */
 
   struct htrdr_args_rectangle laser; /* Laser surface emission */
-  double wavelength; /* Wavelength of the laser in nanometer */
+  double wavelength; /* Wavelength of the laser in nanometre */
   double laser_flux_density; /* In W/m^2 */
 
   struct htrdr_args_image image; /* Output Image */
@@ -100,17 +100,18 @@ struct htrdr_combustion_args {
   HTRDR_ARGS_CAMERA_DEFAULT__, /* Pinhole camera */                            \
                                                                                \
   HTRDR_ARGS_RECTANGLE_DEFAULT__, /* Laser surface emission */                 \
-  532, /* Wavelength in nanometer */                                           \
-  1, /* Flux density */                                                        \
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@, /* Wavelength in nanometre */    \
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@, /* Flux density */       \
                                                                                \
   HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
                                                                                \
-  1.30, /* Gyration radius prefactor */                                        \
-  1.80, /* Fractal dimension */                                                \
+  /* Fractal coefficients */                                                   \
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@,                           \
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION@,                           \
                                                                                \
   HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_DEFAULT__,                             \
                                                                                \
-  1, /* Optical thickness */                                                   \
+  @HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                 \
                                                                                \
   UINT_MAX, /* #threads */                                                     \
   HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE, /* Output type */                        \
