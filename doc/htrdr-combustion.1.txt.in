@@ -98,7 +98,7 @@ OPTIONS
   maximum of the extinction coefficients of the tetrahedra that the node
   overlaps.
 
-*-F* <_fractal-coefficients__:...>::
+*-F* <__fractal-coefficients__:...>::
   Fractal parameters of the RDG-FA model. Available fractal coefficients are:
 
   **dimension**=_real_;;
@@ -112,7 +112,7 @@ OPTIONS
 *-f*::
   Force overwrite of the _output_ file.
 
-*-g*:: <__geometry-parameter__:...>::
+*-g* <__geometry-parameter__:...>::
   Define the geometry of the combustion chamber. Available geometry parameters
   are:
 
@@ -124,7 +124,7 @@ OPTIONS
     Path to the *htrdr-obj*(5) file that represents the mesh of the combustion
     chamber. Following the *htrdr-obj*(5) fileformat, the interface of the
     submitted mesh must be defined as a thin interface, i.e. it must be
-    composed of 3 names of materials, separating by the ':' character. By
+    composed of 3 components separated by the ':' character. By
     convention, *htrdr-combustion* expects the outside environment to be called
     "air" and the medium inside the combustion chamber to be called "chamber".
     No assumption is made on the name of the surface material excepted that it
@@ -164,7 +164,7 @@ OPTIONS
     {@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}.
 
 *-m* _tetrahedra_::
-  Path to the *sth*(5) that stores the volumetric mesh of the combustion
+  Path to the *sth*(5) file that stores the volumetric mesh of the combustion
   medium.
 
 *-N*::
@@ -175,15 +175,15 @@ OPTIONS
   footprint.
 
 *-O* _cache_::
-  File used to cache the acceleration structure that partitions the combustion
-  medium. If the _cache_ file does not exist, it is created and populated with
-  the octree built from the _tetrahedra_, _thermoprops_ and _refract_ids_ input
-  files. This cached acceleration structure can then be reused in future runs
-  as long as the input data provided on the command line is the same as that
-  used to configure the cache; leading to a significant acceleration of the
-  pretreatment step. If _cache_ contains data generated from input data that is
-  not that submitted on the command line, an error is notified and execution is
-  stopped, thus avoiding the use of bad cached data.
+  Path to the file used to cache the acceleration structure that partitions the
+  combustion medium. If the _cache_ file does not exist, it is created and
+  populated with the octree built from the _tetrahedra_, _thermoprops_ and
+  _refract_ids_ input files. This cached acceleration structure can then be
+  reused in future runs as long as the input data provided on the command line
+  is the same as that used to configure the cache; leading to a significant
+  acceleration of the pretreatment step. If _cache_ contains data generated
+  from input data that is not that submitted on the command line, an error is
+  notified and execution is stopped, thus avoiding the use of bad cached data.
 
 *-o* _output_::
   Path to the file where *htrdr-combustion* writes the output data. If not set,
@@ -232,8 +232,8 @@ OPTIONS
   Define the wavelength of the laser in nanometre. By default it is set to
   @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@.
 
-EXEMPLE
--------
+EXAMPLES
+--------
 
 Make htrdr-combustion verbose (option *-v*) and render an image of a combustion
 medium whose tetrahedral mesh is stored in *tetra.sth* and its associated
