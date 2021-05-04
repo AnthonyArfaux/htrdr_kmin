@@ -572,6 +572,8 @@ draw_map
   #pragma omp parallel
   for(;;) {
     const int ithread = omp_get_thread_num();
+    struct ssp_rng_proxy_create2_args proxy_create2_args =
+      SSP_RNG_PROXY_CREATE2_ARGS_NULL;
     struct ssp_rng_proxy* rng_proxy = NULL;
     struct ssp_rng* rng;
     struct tile* tile;
@@ -634,13 +636,15 @@ draw_map
      * current thread only and thus it has to manage only one RNG. This proxy
      * is initialised in order to ensure that an unique and predictable set of
      * random numbers is used for the current tile. */
+    proxy_create2_args.type = &ssp_rng_threefry;
+    proxy_create2_args.sequence_offset = RNG_SEQUENCE_SIZE * (size_t)mcode;
+    proxy_create2_args.sequence_size = RNG_SEQUENCE_SIZE;
+    proxy_create2_args.sequence_pitch = RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted;
+    proxy_create2_args.nbuckets = 1;
     SSP(rng_proxy_create2
       (htrdr_get_thread_allocator(htrdr, (size_t)ithread),
-       &ssp_rng_threefry,
-       RNG_SEQUENCE_SIZE * (size_t)mcode, /* Offset */
-       RNG_SEQUENCE_SIZE, /* Size */
-       RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted, /* Pitch */
-       1, &rng_proxy));
+       &proxy_create2_args,
+       &rng_proxy));
     SSP(rng_proxy_create_rng(rng_proxy, 0, &rng));
 
     /* Launch the tile rendering */
