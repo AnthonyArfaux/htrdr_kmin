@@ -286,7 +286,7 @@ structure.
     -p thermprops.atrtp \
     -r refract_ids.atrri \
     -O octree.cache \
-    -d -o octree.vtk
+    -d octree -o octree.vtk
 
 NOTES
 -----
