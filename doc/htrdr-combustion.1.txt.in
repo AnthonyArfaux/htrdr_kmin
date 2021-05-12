@@ -32,7 +32,7 @@ SYNOPSIS
 DESCRIPTION
 -----------
 The purpose of *htrdr-combustion* is to perform radiative transfer computations
-in a scene representing a combustion semi-transparent medium enlighten by a
+in a scene representing a combustion semi-transparent medium enlightened by a
 laser sheet. The combustion medium may be surrounded by solid boundaries (inner
 limits of the combustion chamber). The program will currently compute the
 monochromatic image (in the visible, at a given frequency) of the combustion
@@ -58,10 +58,15 @@ scattering function.
 
 The Monte-Carlo algorithm that accounts for the visible intensity is inspired
 from the algorithm used for solar radiation in the *htrdr-atmosphere* command.
+It was adapted to partially illuminated scenes in order to solve convergence
+issues. The algorithm is presented in the following article:
+"Null-collision meshless Monte-Carlo - a new reverse Monte-Carlo algorithm
+designed for laser-source emission in absorbing/scattering inhomogeneous
+media". M. Sans et al, JQSRT, 2021 [2].
 
 *htrdr-combustion* implements a mixed parallelism: on one computer (i.e. a
 node) it uses a shared memory parallelism, and it relies on the message passing
-interface [3] to parallelize the computations between several nodes.
+interface [4] to parallelize the computations between several nodes.
 
 OPTIONS
 -------
@@ -91,10 +96,10 @@ OPTIONS
 
 *-d* <__laser__|__octree__>::
   When define with the _laser_ argument, write in _output_ the geometry of the
-  laser sheet saved in the VTK file format [2]. With the _octree_ argument,
+  laser sheet saved in the VTK file format [3]. With the _octree_ argument,
   write in _output_ the space partitioning data structure used to speed up the
   radiative transfer computations in the combustion medium. The octree is saved
-  following the VTK file format [2]. Each node stores the minimum and the
+  following the VTK file format [3]. Each node stores the minimum and the
   maximum of the extinction coefficients of the tetrahedra that the node
   overlaps.
 
@@ -294,10 +299,14 @@ NOTES
 1. Effects of multiple scattering on radiative properties of soot fractal
 aggregates. J. Yon et al, JQSRT 133, 374-381, 2014.
 
-2. VTK file format -
+2. Null-collision meshless Monte-Carlo - a new reverse Monte-Carlo algorithm
+designed for laser-source emission in absorbing/scattering inhomogeneous media. M. 
+Sans et al, JQSRT, 2021 - <https://doi.org/10.1016/j.jqsrt.2021.107725>
+
+3. VTK file format -
 <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
-3. MPI specifications - <https://www.mpi-forum.org/docs/>
+4. MPI specifications - <https://www.mpi-forum.org/docs/>
 
 COPYRIGHT
 ---------
