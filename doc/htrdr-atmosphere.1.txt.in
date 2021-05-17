@@ -316,7 +316,7 @@ nanometers with a reference temperature of *300* Kelvin:
       -c clouds.htcp \
       -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
       -i def=800x600:spp=64 \
-      -s lw=9200,10000:Tref=300
+      -s lw=9200,10000:Tref=300 \
       -f -o output
 
 Move the sun by setting its azimuthal and elevation angles to *120* and *40*
