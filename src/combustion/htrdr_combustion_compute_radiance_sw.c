@@ -354,11 +354,18 @@ sample_scattering_limited_hit_filter
    * current ray enters into the current voxel */
   traversal_dst = hit->distance[0];
 
-  /* First traversed leaf */
-  if(ctx->sampled_vox_collision_dst < 0) {
+  /* Tmax was not already computed */
+  if(ctx->Tmax < 0) {
     ctx->Tmax = (range[1] - range[0]) * ctx->ks_2hat;
     ctx->Ume = 1 - exp(-ctx->Tmax);
   }
+
+  /* No scattering into the whole traversed laser sheet */
+  if(ctx->Tmax == 0) {
+    pursue_traversal = 1;
+    return pursue_traversal;
+  }
+  ASSERT(ctx->Tmax > 0);
 
   for(;;) {
     atrstm_radcoefs_T radcoefs;
