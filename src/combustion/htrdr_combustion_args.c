@@ -73,6 +73,11 @@ print_help(const char* cmd)
 "  -l <laser>     define the geometry of the laser sheet. Refer to the\n"
 "                 man page for the list of laser options.\n");
   printf(
+"  -R <rectangle> switch in flux computation bu defining the\n"
+"                 rectangular sensor onto which the flux is computed.\n"
+"                 Refer to the man page for the list of rectangle\n"
+"                 options.\n");
+  printf(
 "  -m TETRAHEDRA  path toward the volumetric mesh.\n");
   printf(
 "  -N             precompute the tetrahedra normals.\n");
@@ -239,9 +244,10 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:r:sT:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:R:r:sT:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
+        args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE;
         res = htrdr_args_camera_parse(&args->camera, optarg);
         break;
       case 'D':
@@ -275,6 +281,10 @@ htrdr_combustion_args_init
       case 'o': args->path_output = optarg; break;
       case 'p': args->path_therm_props = optarg; break;
       case 'r': args->path_refract_ids = optarg; break;
+      case 'R':
+        args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP;
+        res = htrdr_args_rectangle_parse(&args->flux_map, optarg);
+        break;
       case 's': args->use_simd = 1; break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);

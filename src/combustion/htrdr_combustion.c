@@ -166,6 +166,7 @@ setup_camera
 {
   double proj_ratio = 0;
   ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
+  ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE);
 
   proj_ratio =
     (double)args->image.definition[0]
@@ -179,6 +180,40 @@ setup_camera
      proj_ratio,
      MDEG2RAD(args->camera.fov_y),
      &cmd->camera);
+}
+
+static res_T
+setup_flux_map
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  ASSERT(cmd && args);
+  ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP);
+  return htrdr_rectangle_create
+    (cmd->htrdr,
+     args->flux_map.size,
+     args->flux_map.position,
+     args->flux_map.target,
+     args->flux_map.up,
+     &cmd->flux_map);
+}
+
+static res_T
+setup_sensor
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  res_T res = RES_OK;
+  switch(cmd->output_type) {
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP:
+      res = setup_flux_map(cmd, args);
+      break;
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE:
+      res = setup_camera(cmd, args);
+      break;
+    default: /* Nothing to do */ break;
+  }
+  return res;
 }
 
 static res_T
@@ -250,7 +285,9 @@ setup_buffer
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type != HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE) goto exit;
+  if(cmd->output_type != HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP
+  && cmd->output_type != HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE)
+    goto exit;
 
   combustion_get_pixel_format(cmd, &pixfmt);
 
@@ -394,6 +431,9 @@ dump_laser_sheet(const struct htrdr_combustion* cmd)
   res_T res = RES_OK;
   ASSERT(cmd);
 
+  htrdr_log(cmd->htrdr, "Write laser sheet to '%s'.\n",
+    str_cget(&cmd->output_name));
+
   /* Compute the extent of the geometry that will represent the laser sheet */
   extent = compute_laser_mesh_extent(cmd);
 
@@ -462,6 +502,7 @@ combustion_release(ref_T* ref)
   if(cmd->mats) htrdr_materials_ref_put(cmd->mats);
   if(cmd->medium) ATRSTM(ref_put(cmd->medium));
   if(cmd->camera) htrdr_camera_ref_put(cmd->camera);
+  if(cmd->flux_map) htrdr_rectangle_ref_put(cmd->flux_map);
   if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
@@ -509,7 +550,7 @@ htrdr_combustion_create
   if(res != RES_OK) goto error;
   res = setup_geometry(cmd, args);
   if(res != RES_OK) goto error;
-  res = setup_camera(cmd, args);
+  res = setup_sensor(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_laser(cmd, args);
   if(res != RES_OK) goto error;
@@ -554,6 +595,9 @@ htrdr_combustion_run(struct htrdr_combustion* cmd)
   ASSERT(cmd);
 
   switch(cmd->output_type) {
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP:
+      res = combustion_draw_map(cmd);
+      break;
     case HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE:
       res = combustion_draw_map(cmd);
       break;
@@ -585,6 +629,15 @@ combustion_get_pixel_format
 {
   ASSERT(cmd && fmt);
   (void)cmd;
-  fmt->size = sizeof(struct combustion_pixel);
-  fmt->alignment = ALIGNOF(struct combustion_pixel);
+  switch(cmd->output_type) {
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP:
+      fmt->size = sizeof(struct combustion_pixel_flux);
+      fmt->alignment = ALIGNOF(struct combustion_pixel_flux);
+      break;
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE:
+      fmt->size = sizeof(struct combustion_pixel_image);
+      fmt->alignment = ALIGNOF(struct combustion_pixel_image);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
 }
