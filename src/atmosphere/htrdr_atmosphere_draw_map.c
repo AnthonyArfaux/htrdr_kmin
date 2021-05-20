@@ -310,7 +310,7 @@ draw_pixel_flux
     time.nweights += 1;
   }
 
-  /* Save the per realisation integration time */
+  /* Write the accumulators */
   pixel->flux = flux;
   pixel->time = time;
 }

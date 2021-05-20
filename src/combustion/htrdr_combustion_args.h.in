@@ -24,6 +24,7 @@
 #include <limits.h> /* UINT_MAX support */
 
 enum htrdr_combustion_args_output_type {
+  HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP,
   HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE,
   HTRDR_COMBUSTION_ARGS_OUTPUT_LASER_SHEET,
   HTRDR_COMBUSTION_ARGS_OUTPUT_OCTREES,
@@ -62,6 +63,7 @@ struct htrdr_combustion_args {
   const char* path_output; /* Name of the output file */
 
   struct htrdr_args_camera camera; /* Pinhole Camera */
+  struct htrdr_args_rectangle flux_map; /* Flux map */
 
   struct htrdr_args_rectangle laser; /* Laser surface emission */
   double wavelength; /* Wavelength of the laser in nanometre */
@@ -98,6 +100,7 @@ struct htrdr_combustion_args {
   NULL, /* Output path */                                                      \
                                                                                \
   HTRDR_ARGS_CAMERA_DEFAULT__, /* Pinhole camera */                            \
+  HTRDR_ARGS_RECTANGLE_DEFAULT__, /* Flux map */                               \
                                                                                \
   HTRDR_ARGS_RECTANGLE_DEFAULT__, /* Laser surface emission */                 \
   @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@, /* Wavelength in nanometre */    \

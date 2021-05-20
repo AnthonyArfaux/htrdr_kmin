@@ -40,16 +40,27 @@ struct htrdr_rectangle;
 struct ssf_phase;
 struct ssp_rng;
 
-struct combustion_pixel {
+struct combustion_pixel_flux {
+  struct htrdr_accum flux; /* In W/m^2 */
+  struct htrdr_accum time; /* In microseconds */
+};
+#define COMBUSTION_PIXEL_FLUX_NULL__ {                                         \
+  HTRDR_ACCUM_NULL__, /* Flux */                                               \
+  HTRDR_ACCUM_NULL__, /* Time */                                               \
+}
+static const struct combustion_pixel_flux COMBUSTION_PIXEL_FLUX_NULL =
+  COMBUSTION_PIXEL_FLUX_NULL__;
+
+struct combustion_pixel_image {
   struct htrdr_estimate radiance; /* In W/m^2/sr */
   struct htrdr_accum time; /* In microseconds */
 };
-#define COMBUSTION_PIXEL_NULL__ {                                              \
+#define COMBUSTION_PIXEL_IMAGE_NULL__ {                                        \
   HTRDR_ESTIMATE_NULL__, /* Radiance */                                        \
   HTRDR_ACCUM_NULL__, /* Time */                                               \
 }
-static const struct combustion_pixel COMBUSTION_PIXEL_NULL =
-  COMBUSTION_PIXEL_NULL__;
+static const struct combustion_pixel_image COMBUSTION_PIXEL_IMAGE_NULL =
+  COMBUSTION_PIXEL_IMAGE_NULL__;
 
 struct htrdr_combustion {
   struct htrdr_geometry* geom; /* Combustion chamber geometry */
@@ -57,6 +68,7 @@ struct htrdr_combustion {
   struct atrstm* medium; /* Semi transparent medium */
 
   struct htrdr_camera* camera; /* Pinhole camera */
+  struct htrdr_rectangle* flux_map; /* Flux map */
   struct htrdr_combustion_laser* laser; /* Laser sheet */
   double wavelength; /* Wavelength of the laser in nanometer */
 

@@ -198,6 +198,26 @@ OPTIONS
   Path to the *atrtp*(5) file that stores the thermodynamic properties of the
   combustion medium.
 
+*-R* <__rectangle-parameter__:...>::
+  Switch in flux map computation. The rectangular sensor onto which
+  the flux is integrated is defined by the following parameters:
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Position of the center of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the rectangle, i.e. *tgt* - *pos* is the rectangle
+    normal. By default it is set to {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@}.
+
+  **sz**=**_width_**,**_height_**;;
+    Size of the rectangle. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}.
+
 *-r* _refract_ids_::
   Path the the *atrri*(5) file that lists the spectrally varying refractive
   indices of the combustion medium.
@@ -296,11 +316,12 @@ structure.
 NOTES
 -----
 
-1. Effects of multiple scattering on radiative properties of soot fractal
-aggregates. J. Yon et al, JQSRT 133, 374-381, 2014.
+1. Effects of multiple scattering on radiative properties of soot
+fractal aggregates. J. Yon et al, JQSRT 133, 374-381, 2014 -
+<https://doi.org/10.1016/j.jqsrt.2013.08.022>
 
 2. Null-collision meshless Monte-Carlo - a new reverse Monte-Carlo algorithm
-designed for laser-source emission in absorbing/scattering inhomogeneous media. M. 
+designed for laser-source emission in absorbing/scattering inhomogeneous media. M.
 Sans et al, JQSRT, 2021 - <https://doi.org/10.1016/j.jqsrt.2021.107725>
 
 3. VTK file format -
@@ -311,7 +332,7 @@ Sans et al, JQSRT, 2021 - <https://doi.org/10.1016/j.jqsrt.2021.107725>
 COPYRIGHT
 ---------
 Copyright &copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
-Copyright &copy; 2018, 2019, 2021 CNRS
+Copyright &copy; 2018, 2019, 2021 CNRS.
 Copyright &copy; 2018, 2019 Université Paul Sabatier
 <contact-edstar@laplace.univ-tlse.fr>.
 

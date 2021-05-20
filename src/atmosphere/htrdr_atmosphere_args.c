@@ -65,7 +65,7 @@ print_help(const char* cmd)
   printf(
 "  -m MIE         filename of the Mie's data.\n");
   printf(
-"  -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
+" -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
 "                 Its default value is `%s'.\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sky_mtl_name);
   printf(
@@ -76,7 +76,7 @@ print_help(const char* cmd)
 "                 written to standard output.\n");
   printf(
 "  -p <rectangle> switch in flux computation by defining the rectangular\n"
-"                 sensor onto wich the flux is computed. Refer to the\n"
+"                 sensor onto which the flux is computed. Refer to the\n"
 "                 %s man page for the list of rectangle options.\n", cmd);
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");

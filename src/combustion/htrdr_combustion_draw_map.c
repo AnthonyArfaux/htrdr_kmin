@@ -21,6 +21,7 @@
 #include "core/htrdr_camera.h"
 #include "core/htrdr_draw_map.h"
 #include "core/htrdr_log.h"
+#include "core/htrdr_rectangle.h"
 
 #include <star/ssp.h>
 
@@ -30,7 +31,7 @@
  * Helper functions
  ******************************************************************************/
 static void
-draw_pixel
+draw_pixel_image
   (struct htrdr* htrdr,
    const struct htrdr_draw_pixel_args* args,
    void* data)
@@ -38,7 +39,7 @@ draw_pixel
   struct htrdr_accum radiance = HTRDR_ACCUM_NULL;
   struct htrdr_accum time = HTRDR_ACCUM_NULL;
   struct htrdr_combustion* cmd = NULL;
-  struct combustion_pixel* pixel = NULL;
+  struct combustion_pixel_image* pixel = NULL;
   size_t isamp;
   res_T res = RES_OK;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
@@ -96,24 +97,123 @@ draw_pixel
 }
 
 static void
-dump_pixel
-  (const struct combustion_pixel* pix,
+draw_pixel_flux
+  (struct htrdr* htrdr,
+   const struct htrdr_draw_pixel_args* args,
+   void* data)
+{
+  struct htrdr_accum flux = HTRDR_ACCUM_NULL;
+  struct htrdr_accum time = HTRDR_ACCUM_NULL;
+  struct htrdr_combustion* cmd = NULL;
+  struct combustion_pixel_flux* pixel = NULL;
+  size_t isamp;
+  res_T res = RES_OK;
+  ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
+  (void)htrdr;
+
+  cmd = args->context;
+  pixel = data;
+
+  FOR_EACH(isamp, 0, args->spp) {
+    struct time t0, t1;
+    double pix_samp[2];
+    double ray_org[3];
+    double ray_dir[3];
+    double normal[3];
+    double weight;
+    double usec;
+
+    /* Begin the registration of the time spent in the realisation */
+    time_current(&t0);
+
+    /* Sample a position into the pixel, in the normalized image plane */
+    pix_samp[0] = (double)args->pixel_coord[0] + ssp_rng_canonical(args->rng);
+    pix_samp[1] = (double)args->pixel_coord[1] + ssp_rng_canonical(args->rng);
+    pix_samp[0] *= args->pixel_normalized_size[0];
+    pix_samp[1] *= args->pixel_normalized_size[1];
+
+    /* Retrieve the world space position of pix_samp */
+    htrdr_rectangle_sample_pos(cmd->flux_map, pix_samp, ray_org);
+
+    /* Sample a ray direction */
+    htrdr_rectangle_get_normal(cmd->flux_map, normal);
+    ssp_ran_hemisphere_cos(args->rng, normal, ray_dir, NULL);
+
+    /* Backward trace the path */
+    res = combustion_compute_radiance_sw(cmd, args->ithread,
+      args->rng, ray_org, ray_dir, &weight);
+    if(res != RES_OK) continue; /* Reject the path */
+    weight *= PI; /* Transform form W/m^2/sr to W/m^2 */
+
+    /* End the registration of the per realisation time */
+    time_sub(&t0, time_current(&t1), &t0);
+    usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+    /* Update the pixel accumulator */
+    flux.sum_weights += weight;
+    flux.sum_weights_sqr += weight*weight;
+    flux.nweights += 1;
+
+    /* Update the pixel accumulator of per realisation time */
+    time.sum_weights += usec;
+    time.sum_weights_sqr += usec*usec;
+    time.nweights += 1;
+  }
+
+  /* Write the accumulators */
+  pixel->flux = flux;
+  pixel->time = time;
+}
+
+static INLINE void
+dump_accum
+  (const struct htrdr_accum* acc, /* Accum to dump */
+   struct htrdr_accum* out_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(acc && stream);
+
+  if(acc->nweights == 0) {
+    fprintf(stream, "0 0 ");
+  } else {
+    struct htrdr_estimate estimate = HTRDR_ESTIMATE_NULL;
+
+    htrdr_accum_get_estimation(acc, &estimate);
+    fprintf(stream, "%g %g ", estimate.E, estimate.SE);
+
+    if(out_acc) {
+      out_acc->sum_weights += acc->sum_weights;
+      out_acc->sum_weights_sqr += acc->sum_weights_sqr;
+      out_acc->nweights += acc->nweights;
+    }
+  }
+}
+
+static void
+dump_pixel_flux
+  (const struct combustion_pixel_flux* pix,
+   struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
+   FILE* stream)
+{
+  ASSERT(pix && stream);
+  dump_accum(&pix->flux, flux_acc, stream);
+  fprintf(stream, "0 0 0 0 ");
+  dump_accum(&pix->time, time_acc, stream);
+  fprintf(stream, "\n");
+}
+
+static void
+dump_pixel_image
+  (const struct combustion_pixel_image* pix,
    struct htrdr_accum* time_acc, /* May be NULL */
    FILE* stream)
 {
-  struct htrdr_estimate time = HTRDR_ESTIMATE_NULL;
-  ASSERT(pix && stream && pix->time.nweights);
-
-  htrdr_accum_get_estimation(&pix->time, &time);
-
-  fprintf(stream, "%g %g 0 0 0 0 %g %g\n",
-    pix->radiance.E, pix->radiance.SE, time.E,time.SE);
-
-  if(time_acc) {
-    time_acc->sum_weights += pix->time.sum_weights;
-    time_acc->sum_weights_sqr += pix->time.sum_weights_sqr;
-    time_acc->nweights += pix->time.nweights;
-  }
+  ASSERT(pix && stream);
+  fprintf(stream, "%g %g ", pix->radiance.E, pix->radiance.SE);
+  fprintf(stream, "0 0 0 0 ");
+  dump_accum(&pix->time, time_acc, stream);
+  fprintf(stream, "\n");
 }
 
 static res_T
@@ -121,6 +221,7 @@ dump_buffer
   (struct htrdr_combustion* cmd,
    struct htrdr_buffer* buf,
    struct htrdr_accum* time_acc, /* May be NULL */
+   struct htrdr_accum* flux_acc, /* May be NULL */
    FILE* stream)
 {
   struct htrdr_pixel_format pixfmt;
@@ -138,9 +239,17 @@ dump_buffer
 
   FOR_EACH(y, 0, layout.height) {
     FOR_EACH(x, 0, layout.width) {
-      const struct combustion_pixel* pix = htrdr_buffer_at(buf, x, y);
-      ASSERT(IS_ALIGNED(pix, pixfmt.alignment));
-      dump_pixel(pix, time_acc, stream);
+      void* pix_raw = htrdr_buffer_at(buf, x, y);
+      ASSERT(IS_ALIGNED(pix_raw, pixfmt.alignment));
+      if(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP) {
+        const struct combustion_pixel_flux* pix = pix_raw;
+        dump_pixel_flux(pix, time_acc, flux_acc, stream);
+      } else if(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE) {
+        const struct combustion_pixel_image* pix = pix_raw;
+        dump_pixel_image(pix, time_acc, stream);
+      } else {
+        FATAL("Unreachable code.\n");
+      }
     }
     fprintf(stream, "\n");
   }
@@ -155,12 +264,22 @@ combustion_draw_map(struct htrdr_combustion* cmd)
 {
   struct htrdr_draw_map_args args = HTRDR_DRAW_MAP_ARGS_NULL;
   struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
+  struct htrdr_accum flux_acc = HTRDR_ACCUM_NULL;
   struct htrdr_estimate path_time = HTRDR_ESTIMATE_NULL;
+  struct htrdr_estimate flux = HTRDR_ESTIMATE_NULL;
   res_T res = RES_OK;
   ASSERT(cmd);
 
   /* Setup the draw map input arguments */
-  args.draw_pixel = draw_pixel;
+  switch(cmd->output_type) {
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE:
+      args.draw_pixel = draw_pixel_image;
+      break;
+    case HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP:
+      args.draw_pixel = draw_pixel_flux;
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
   args.buffer_layout = cmd->buf_layout;
   args.spp = cmd->spp;
   args.context = cmd;
@@ -172,13 +291,20 @@ combustion_draw_map(struct htrdr_combustion* cmd)
   if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
   /* Write buffer to output */
-  res = dump_buffer(cmd, cmd->buf, &path_time_acc, cmd->output);
+  res = dump_buffer(cmd, cmd->buf, &path_time_acc, &flux_acc, cmd->output);
   if(res != RES_OK) goto error;
 
   htrdr_accum_get_estimation(&path_time_acc, &path_time);
   htrdr_log(cmd->htrdr,
     "Time per radiative path (in micro seconds): %g +/- %g\n",
     path_time.E, path_time.SE);
+
+  if(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP) {
+    htrdr_accum_get_estimation(&flux_acc, &flux);
+    htrdr_log(cmd->htrdr,
+      "Radiative flux density (in W/m^2): %g +/- %g\n",
+      flux.E, flux.SE);
+  }
 
 exit:
   return res;
