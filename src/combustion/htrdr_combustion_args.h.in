@@ -37,6 +37,12 @@ enum htrdr_combustion_args_grid_definition_type {
   HTRDR_COMBUSTION_ARGS_GRID_DEFINITION_TYPES_COUNT__
 };
 
+enum htrdr_combustion_args_phase_func_type {
+  HTRDR_COMBUSTION_ARGS_PHASE_FUNC_ISOTROPIC,
+  HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA,
+  HTRDR_COMBUSTION_ARGS_PHASE_FUNC_TYPES_COUNT__
+};
+
 struct htrdr_combustion_args_grid_definition {
   union {
     unsigned hint; /* Hint on the grid definition to eval */
@@ -82,6 +88,7 @@ struct htrdr_combustion_args {
   /* Miscellaneous parameters */
   unsigned nthreads; /* Hint on the number of threads to use */
   enum htrdr_combustion_args_output_type output_type;
+  enum htrdr_combustion_args_phase_func_type phase_func_type;
   int precompute_normals; /* Pre-compute the tetrahedra normals */
   int force_overwriting;
   int verbose; /* Verbosity level */
@@ -118,6 +125,7 @@ struct htrdr_combustion_args {
                                                                                \
   UINT_MAX, /* #threads */                                                     \
   HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE, /* Output type */                        \
+  HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA, /* Phase func type */                \
   0, /* Precompute normals */                                                  \
   0, /* Force overwriting */                                                   \
   0, /* Verbose flag */                                                        \

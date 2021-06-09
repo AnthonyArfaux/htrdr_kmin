@@ -39,6 +39,7 @@ struct htrdr_materials;
 struct htrdr_rectangle;
 struct ssf_phase;
 struct ssp_rng;
+struct suvm_primitive;
 
 struct combustion_pixel_flux {
   struct htrdr_accum flux; /* In W/m^2 */
@@ -72,8 +73,7 @@ struct htrdr_combustion {
   struct htrdr_combustion_laser* laser; /* Laser sheet */
   double wavelength; /* Wavelength of the laser in nanometer */
 
-  struct ssf_phase** rdgfa_phase_functions; /* Per thread RDG-FA phase func */
-  struct ssf_phase** hg_phase_functions; /* Per thread Henyey-Greenstein func */
+  struct ssf_phase** phase_functions; /* Per thread phase func */
   enum ssf_simd rdgfa_simd; /* SIMD support for the RDG-FA phase func */
 
   struct htrdr_buffer_layout buf_layout;
@@ -83,6 +83,7 @@ struct htrdr_combustion {
   FILE* output; /* Output stream */
   struct str output_name; /* Name of the output stream */
   enum htrdr_combustion_args_output_type output_type; /* Type of output data */
+  enum htrdr_combustion_args_phase_func_type phase_func_type; /* Phase func */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -105,5 +106,13 @@ combustion_compute_radiance_sw
    const double pos_in[3],
    const double dir_in[3],
    double* out_weigh); /* Shortwave radiance in W/m^2/sr */
+
+extern LOCAL_SYM struct ssf_phase*
+combustion_fetch_phase_function
+  (struct htrdr_combustion* cmd,
+   const double wavelength, /* In nanometer */
+   const struct suvm_primitive* prim,
+   const double bcoords[4],
+   const size_t ithread);
 
 #endif /* HTRDR_COMBUSTION_C_H */
