@@ -26,7 +26,7 @@ find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.7.1 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
-find_package(StarSP 0.8 REQUIRED)
+find_package(StarSP 0.9 REQUIRED)
 find_package(StarVX 0.1 REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
@@ -66,7 +66,8 @@ set(HTRDR_COMBUSTION_FILES_SRC
   htrdr_combustion_compute_radiance_sw.c
   htrdr_combustion_geometry_ray_filter.c
   htrdr_combustion_laser.c
-  htrdr_combustion_main.c)
+  htrdr_combustion_main.c
+  htrdr_combustion_phase_func.c)
 
 set(HTRDR_COMBUSTION_FILES_INC
   htrdr_combustion.h

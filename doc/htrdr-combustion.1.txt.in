@@ -138,6 +138,9 @@ OPTIONS
 *-h*::
   List short help and exit.
 
+*-I*::
+  Use an isotropic phase function rather than the RDG-FA model.
+
 *-i* <__image-parameter__:...>::
   Define the sensor array. Available image parameters are:
 

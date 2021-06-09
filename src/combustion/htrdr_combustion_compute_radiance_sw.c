@@ -536,12 +536,7 @@ laser_once_scattered
    const double dir[3],
    const double range_in[2])
 {
-  /* RDG-FA phase function */
-  struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
-  struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
-    ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
-  struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
-    SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
+  /* Phase function */
   struct ssf_phase* phase = NULL;
 
   /* Surface ray tracing */
@@ -650,23 +645,9 @@ laser_once_scattered
   Tr_ext_xsc_lse = transmissivity(cmd, rng, ATRSTM_RADCOEF_Kext, xsc, wi, range);
   if(Tr_ext_xsc_lse == 0) return 0; /* No laser contribution */
 
-  /* Retrieve the RDG-FA phase function parameters from the semi transparent
-   * medium */
-  fetch_rdgfa_args.wavelength = wlen;
-  fetch_rdgfa_args.prim = sc_sample.position.prim;
-  fetch_rdgfa_args.bcoords[0] = sc_sample.position.bcoords[0];
-  fetch_rdgfa_args.bcoords[1] = sc_sample.position.bcoords[1];
-  fetch_rdgfa_args.bcoords[2] = sc_sample.position.bcoords[2];
-  fetch_rdgfa_args.bcoords[3] = sc_sample.position.bcoords[3];
-  ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
-
-  /* Setup the RDG-FA phase function */
-  phase = cmd->rdgfa_phase_functions[ithread];
-  setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
-  setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
-  setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
-  setup_rdgfa_args.simd = cmd->rdgfa_simd;
-  SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+  /* Retrieve phase function */
+  phase = combustion_fetch_phase_function
+    (cmd, wlen, &sc_sample.position.prim, sc_sample.position.bcoords, ithread);
 
   /* Evaluate the phase function at the scattering position */
   d3_minus(wo, dir); /* Ensure SSF convention */
@@ -682,7 +663,7 @@ laser_once_scattered
   return L;
 }
 
-static void
+static INLINE void
 sample_scattering_direction
   (struct htrdr_combustion* cmd,
    const size_t ithread,
@@ -692,36 +673,15 @@ sample_scattering_direction
    const double incoming_dir[3],
    double scattering_dir[3])
 {
-  /* RDG-FA phase function */
-  struct atrstm_rdgfa rdgfa_param = ATRSTM_RDGFA_NULL;
-  struct atrstm_fetch_rdgfa_args fetch_rdgfa_args =
-    ATRSTM_FETCH_RDGFA_ARGS_DEFAULT;
-  struct ssf_phase_rdgfa_setup_args setup_rdgfa_args =
-    SSF_PHASE_RDGFA_SETUP_ARGS_DEFAULT;
   struct ssf_phase* phase = NULL;
-
-  /* Miscellaneous variable */
   double wo[3];
 
   ASSERT(cmd && rng && scattering && incoming_dir && scattering_dir);
   ASSERT(!POSITION_NONE(scattering));
 
-  /* Retrieve the RDG-FA phase function parameters */
-  fetch_rdgfa_args.wavelength = wlen;
-  fetch_rdgfa_args.prim = scattering->prim;
-  fetch_rdgfa_args.bcoords[0] = scattering->bcoords[0];
-  fetch_rdgfa_args.bcoords[1] = scattering->bcoords[1];
-  fetch_rdgfa_args.bcoords[2] = scattering->bcoords[2];
-  fetch_rdgfa_args.bcoords[3] = scattering->bcoords[3];
-  ATRSTM(fetch_rdgfa(cmd->medium, &fetch_rdgfa_args, &rdgfa_param));
-
-  /* Setup the RDG-FA phase function corresponding to the scattering event */
-  phase = cmd->rdgfa_phase_functions[ithread];
-  setup_rdgfa_args.wavelength = rdgfa_param.wavelength;
-  setup_rdgfa_args.fractal_dimension = rdgfa_param.fractal_dimension;
-  setup_rdgfa_args.gyration_radius = rdgfa_param.gyration_radius;
-  setup_rdgfa_args.simd = cmd->rdgfa_simd;
-  SSF(phase_rdgfa_setup(phase, &setup_rdgfa_args));
+  /* Fetch the phase function */
+  phase = combustion_fetch_phase_function
+    (cmd, wlen, &scattering->prim, scattering->bcoords, ithread);
 
   /* Sample a new optical path direction from the phase function */
   d3_minus(wo, incoming_dir); /* Ensure SSF convention */

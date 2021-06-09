@@ -67,6 +67,8 @@ print_help(const char* cmd)
   printf(
 "  -h             display this help and exit.\n");
   printf(
+"  -I             use an isotropic phase function rather than the RDG-FA.\n");
+  printf(
 "  -i <image>     define the image to compute. Refer to the man\n"
 "                 page for the list of image options.\n");
   printf(
@@ -244,7 +246,7 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:D:d:F:fg:hi:l:m:NO:o:p:R:r:sT:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:d:F:fg:hIi:l:m:NO:o:p:R:r:sT:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
         args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE;
@@ -259,6 +261,7 @@ htrdr_combustion_args_init
         break;
       case 'F':
         res = cstr_parse_list(optarg, ':', parse_fractal_parameters, args);
+        args->phase_func_type = HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA;
         break;
       case 'f': args->force_overwriting = 1; break;
       case 'g':
@@ -269,6 +272,9 @@ htrdr_combustion_args_init
         htrdr_combustion_args_release(args);
         args->quit = 1;
         goto exit;
+      case 'I':
+        args->phase_func_type = HTRDR_COMBUSTION_ARGS_PHASE_FUNC_ISOTROPIC;
+        break;
       case 'i':
         res = htrdr_args_image_parse(&args->image, optarg);
         break;

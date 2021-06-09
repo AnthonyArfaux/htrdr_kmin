@@ -38,21 +38,20 @@
  * Helper functions
  ******************************************************************************/
 static void
-release_phase_functions
-  (struct htrdr_combustion* cmd,
-   struct ssf_phase* phases[])
+release_phase_functions(struct htrdr_combustion* cmd)
 {
   size_t i;
   ASSERT(cmd);
 
-  if(!phases) return; /* Nothing to release */
+  if(!cmd->phase_functions) return; /* Nothing to release */
 
   FOR_EACH(i, 0, htrdr_get_threads_count(cmd->htrdr)) {
-    if(phases[i]) {
-      SSF(phase_ref_put(phases[i]));
+    if(cmd->phase_functions[i]) {
+      SSF(phase_ref_put(cmd->phase_functions[i]));
     }
   }
-  MEM_RM(htrdr_get_allocator(cmd->htrdr), phases);
+  MEM_RM(htrdr_get_allocator(cmd->htrdr), cmd->phase_functions);
+  cmd->phase_functions = NULL;
 }
 
 static res_T
@@ -107,29 +106,29 @@ setup_simd
   (struct htrdr_combustion* cmd,
    const struct htrdr_combustion_args* args)
 {
+  struct ssf_info ssf_info = SSF_INFO_NULL;
   ASSERT(cmd && args);
 
-  if(!args->use_simd) {
-    cmd->rdgfa_simd = SSF_SIMD_NONE;
-  } else {
-    struct ssf_info ssf_info = SSF_INFO_NULL;
+  cmd->rdgfa_simd = SSF_SIMD_NONE;
 
-    /* Check SIMD support for the RDG-FA phase function */
-    ssf_get_info(&ssf_info);
-    if(ssf_info.simd_256) {
-      htrdr_log(cmd->htrdr,
-        "Use the SIMD-256 instruction set for the RDG-FA phase function.\n");
-      cmd->rdgfa_simd = SSF_SIMD_256;
-    } else if(ssf_info.simd_128) {
-      htrdr_log(cmd->htrdr,
-        "Use the SIMD-128 instruction set for the RDG-FA phase function.\n");
-      cmd->rdgfa_simd = SSF_SIMD_128;
-    } else {
-      htrdr_log_warn(cmd->htrdr,
-        "Cannot use SIMD for the RDG-FA phase function: the "
-        "Star-ScatteringFunction library was compiled without SIMD support.\n");
-      cmd->rdgfa_simd = SSF_SIMD_NONE;
-    }
+  if(args->phase_func_type != HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA)
+    return RES_OK; /* Nothing to do */
+
+  /* Check SIMD support for the RDG-FA phase function */
+  ssf_get_info(&ssf_info);
+  if(ssf_info.simd_256) {
+    htrdr_log(cmd->htrdr,
+      "Use the SIMD-256 instruction set for the RDG-FA phase function.\n");
+    cmd->rdgfa_simd = SSF_SIMD_256;
+  } else if(ssf_info.simd_128) {
+    htrdr_log(cmd->htrdr,
+      "Use the SIMD-128 instruction set for the RDG-FA phase function.\n");
+    cmd->rdgfa_simd = SSF_SIMD_128;
+  } else {
+    htrdr_log_warn(cmd->htrdr,
+      "Cannot use SIMD for the RDG-FA phase function: the "
+      "Star-ScatteringFunction library was compiled without SIMD support.\n");
+    cmd->rdgfa_simd = SSF_SIMD_NONE;
   }
   return RES_OK;
 }
@@ -232,24 +231,34 @@ setup_laser
 }
 
 static res_T
-setup_phase_functions
-  (struct htrdr_combustion* cmd,
-   const struct ssf_phase_type* phase_type,
-   struct ssf_phase** out_phases[])
+setup_phase_functions(struct htrdr_combustion* cmd)
 {
   struct mem_allocator* allocator = NULL;
-  struct ssf_phase** phases = NULL;
+  const struct ssf_phase_type* phase_type = NULL;
   size_t nthreads;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(cmd && phase_type && out_phases);
+  ASSERT(cmd);
 
   nthreads = htrdr_get_threads_count(cmd->htrdr);
   allocator = htrdr_get_allocator(cmd->htrdr);
 
+  switch(cmd->phase_func_type) {
+    case HTRDR_COMBUSTION_ARGS_PHASE_FUNC_ISOTROPIC:
+      htrdr_log(cmd->htrdr, "Use an isotropic phase function.\n");
+      phase_type = &ssf_phase_hg;
+      break;
+    case HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA:
+      htrdr_log(cmd->htrdr, "Use the RDG-FA phase function.\n");
+      phase_type = &ssf_phase_rdgfa;
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+
   /* Allocate the list of per thread phase function */
-  phases = MEM_CALLOC(allocator, nthreads, sizeof(*phases));
-  if(!phases) {
+  cmd->phase_functions = MEM_CALLOC
+    (allocator, nthreads, sizeof(*cmd->phase_functions));
+  if(!cmd->phase_functions) {
     htrdr_log_err(cmd->htrdr,
       "Could not allocate the per thread RDG-FA phase function.\n");
     res = RES_MEM_ERR;
@@ -258,7 +267,7 @@ setup_phase_functions
 
   /* Create the per thread phase function */
   FOR_EACH(i, 0, nthreads) {
-    res = ssf_phase_create(allocator, phase_type, phases+i);
+    res = ssf_phase_create(allocator, phase_type, cmd->phase_functions+i);
     if(res != RES_OK) {
       htrdr_log_err(cmd->htrdr,
         "Could not create the phase function for the thread %lu -- %s.\n",
@@ -268,11 +277,9 @@ setup_phase_functions
   }
 
 exit:
-  *out_phases = phases;
   return res;
 error:
-  release_phase_functions(cmd, phases);
-  phases = NULL;
+  release_phase_functions(cmd);
   goto exit;
 }
 
@@ -506,8 +513,7 @@ combustion_release(ref_T* ref)
   if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
-  release_phase_functions(cmd, cmd->rdgfa_phase_functions);
-  release_phase_functions(cmd, cmd->hg_phase_functions);
+  release_phase_functions(cmd);
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -543,8 +549,11 @@ htrdr_combustion_create
 
   cmd->spp = args->image.spp;
   cmd->output_type = args->output_type;
+  cmd->phase_func_type = args->phase_func_type;
 
   res = setup_output(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_phase_functions(cmd);
   if(res != RES_OK) goto error;
   res = setup_simd(cmd, args);
   if(res != RES_OK) goto error;
@@ -553,10 +562,6 @@ htrdr_combustion_create
   res = setup_sensor(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_laser(cmd, args);
-  if(res != RES_OK) goto error;
-  res = setup_phase_functions(cmd, &ssf_phase_rdgfa, &cmd->rdgfa_phase_functions);
-  if(res != RES_OK) goto error;
-  res = setup_phase_functions(cmd, &ssf_phase_hg, &cmd->hg_phase_functions);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
