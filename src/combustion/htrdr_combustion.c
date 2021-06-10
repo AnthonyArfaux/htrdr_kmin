@@ -111,7 +111,8 @@ setup_simd
 
   cmd->rdgfa_simd = SSF_SIMD_NONE;
 
-  if(args->phase_func_type != HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA)
+  if(args->phase_func_type != HTRDR_COMBUSTION_ARGS_PHASE_FUNC_RDGFA
+  || args->use_simd == 0)
     return RES_OK; /* Nothing to do */
 
   /* Check SIMD support for the RDG-FA phase function */
