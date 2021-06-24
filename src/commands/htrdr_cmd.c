@@ -62,6 +62,7 @@ print_help(const char* cmd)
 int
 main(int argc, char** argv)
 {
+  char cmd_name[] = "htrdr";
   int err = 0;
 
   if(argc < 2) {
@@ -91,13 +92,13 @@ main(int argc, char** argv)
 
   /* Help */
   } else if(!strcmp(argv[1], "--help")) {
-    print_help(argv[0]);
+    print_help(cmd_name);
     goto exit;
 
   /* Fallback */
   } else {
     fprintf(stderr, "Unknown option: %s\n", argv[1]);
-    print_usage(argv[0]);
+    print_usage(cmd_name);
     err = -1;
     goto error;
   }
