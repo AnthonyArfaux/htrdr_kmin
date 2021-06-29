@@ -20,6 +20,15 @@ project(htrdr-commands C)
 
 include_directories(${HTRDR_BUILD_DIR} ${HTRDR_SOURCE_DIR})
 
+set(_link_libraries "")
+
+if(HTRDR_BUILD_ATMOSPHERE)
+  list(APPEND _link_libraries htrdr-atmosphere)
+endif()
+if(HTRDR_BUILD_COMBUSTION)
+  list(APPEND _link_libraries htrdr-combustion)
+endif()
+
 ################################################################################
 # Check dependencies
 ################################################################################
@@ -30,21 +39,28 @@ include_directories(${RSys_INCLUDE_DIR})
 # Configure and define targets
 ################################################################################
 add_executable(htrdr_cmd ${HTRDR_SOURCE_DIR}/commands/htrdr_cmd.c)
-target_link_libraries(htrdr_cmd htrdr-atmosphere htrdr-combustion)
+target_link_libraries(htrdr_cmd ${_link_libraries})
 set_target_properties(htrdr_cmd PROPERTIES
+  COMPILE_DEFINITIONS "${HTRDR_BUILD_COMMANDS}"
   OUTPUT_NAME htrdr)
 
-add_executable(htrdr_atmosphere_cmd 
+add_executable(htrdr_atmosphere_cmd
   ${HTRDR_SOURCE_DIR}/commands/htrdr_atmosphere_cmd.c)
-target_link_libraries(htrdr_atmosphere_cmd htrdr-atmosphere)
-set_target_properties(htrdr_atmosphere_cmd PROPERTIES 
+set_target_properties(htrdr_atmosphere_cmd PROPERTIES
+  COMPILE_DEFINITIONS "${HTRDR_BUILD_COMMANDS}"
   OUTPUT_NAME htrdr-atmosphere)
+if(HTRDR_BUILD_ATMOSPHERE)
+  target_link_libraries(htrdr_atmosphere_cmd htrdr-atmosphere)
+endif()
 
-add_executable(htrdr_combustion_cmd 
+add_executable(htrdr_combustion_cmd
   ${HTRDR_SOURCE_DIR}/commands/htrdr_combustion_cmd.c)
-target_link_libraries(htrdr_combustion_cmd htrdr-combustion)
-set_target_properties(htrdr_combustion_cmd PROPERTIES 
+set_target_properties(htrdr_combustion_cmd PROPERTIES
+  COMPILE_DEFINITIONS "${HTRDR_BUILD_COMMANDS}"
   OUTPUT_NAME htrdr-combustion)
+if(HTRDR_BUILD_COMBUSTION)
+  target_link_libraries(htrdr_combustion_cmd htrdr-combustion)
+endif()
 
 ################################################################################
 # Define output & install directories
@@ -53,4 +69,3 @@ install(TARGETS htrdr_cmd htrdr_atmosphere_cmd htrdr_combustion_cmd
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-

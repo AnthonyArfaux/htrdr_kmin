@@ -15,10 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "atmosphere/htrdr_atmosphere.h"
-#include "combustion/htrdr_combustion.h"
+#ifdef HTRDR_BUILD_ATMOSPHERE
+  #include "atmosphere/htrdr_atmosphere.h"
+#endif
+#ifdef HTRDR_BUILD_COMBUSTION
+  #include "combustion/htrdr_combustion.h"
+#endif
+
+#include "core/htrdr_log.h"
 #include "core/htrdr_version.h"
 
+#include <rsys/rsys.h>
 #include <string.h>
 
 /*******************************************************************************
@@ -45,7 +52,7 @@ print_help(const char* cmd)
 "  --help         display this help and exit.\n");
   printf("\n");
 
-  printf("These are %s available modes:\n", cmd);
+  printf("These are %s modes:\n", cmd);
   printf("\n");
   printf(
 "  atmosphere     Radiative transfer computations in a cloudy atmosphere.\n");
@@ -72,14 +79,28 @@ main(int argc, char** argv)
   }
 
   /* Atmosphere mode */
-  if(!strcmp(argv[1], "atmosphere")) { 
+  if(!strcmp(argv[1], "atmosphere")) {
+#ifdef HTRDR_BUILD_ATMOSPHERE
     err = htrdr_atmosphere_main(argc-1, argv+1);
     if(err) goto error;
+#else
+    fprintf(stderr,
+      "The atmosphere mode is not available in this htrdr build.\n");
+    err = 1;
+    goto error;
+#endif
 
   /* Combustion mode */
-  } else if(!strcmp(argv[1], "combustion")) {
+  } else  if(!strcmp(argv[1], "combustion")) {
+#ifdef HTRDR_BUILD_COMBUSTION
     err = htrdr_combustion_main(argc-1, argv+1);
     if(err) goto error;
+#else
+    fprintf(stderr,
+      "The combustion mode is not available in this htrdr build.\n");
+    err = 1;
+    goto error;
+#endif
 
   /* Version */
   } else if(!strcmp(argv[1], "--version")) {

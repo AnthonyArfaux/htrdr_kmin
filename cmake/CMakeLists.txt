@@ -27,13 +27,30 @@ set(VERSION_MINOR 7)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
+option(HTRDR_BUILD_ATMOSPHERE "Build the htrdr-atmosphere program" ON)
+option(HTRDR_BUILD_COMBUSTION "Build the htrdr-combustion program" ON)
+
+set(HTRDR_BUILD_COMMANDS "")
+if(HTRDR_BUILD_ATMOSPHERE)
+  set(HTRDR_BUILD_COMMANDS "${HTRDR_BUILD_COMMANDS};HTRDR_BUILD_ATMOSPHERE")
+endif()
+if(HTRDR_BUILD_COMBUSTION)
+  set(HTRDR_BUILD_COMMANDS "${HTRDR_BUILD_COMMANDS};HTRDR_BUILD_COMBUSTION")
+endif()
+
 ################################################################################
 # Add sub projects
 ################################################################################
 add_subdirectory(core)
-add_subdirectory(atmosphere)
+
+if(HTRDR_BUILD_ATMOSPHERE)
+  add_subdirectory(atmosphere)
+endif()
+if(HTRDR_BUILD_COMBUSTION)
+  add_subdirectory(combustion)
+endif()
+
 add_subdirectory(commands)
-add_subdirectory(combustion)
 add_subdirectory(doc)
 
 ################################################################################

@@ -15,10 +15,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "atmosphere/htrdr_atmosphere.h"
+#ifdef HTRDR_BUILD_ATMOSPHERE
+  #include "atmosphere/htrdr_atmosphere.h"
+#else
+  #include <stdio.h>
+#endif
 
 int
 main(int argc, char** argv)
 {
+#ifdef HTRDR_BUILD_ATMOSPHERE
   return htrdr_atmosphere_main(argc, argv);
+#else
+  (void)argc, (void)argv;
+  fprintf(stderr,
+    "The htrdr-atmosphere command is not available in this htrdr build.\n");
+  return 1;
+#endif
 }
