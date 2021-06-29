@@ -19,6 +19,7 @@
 #include "core/htrdr_log.h"
 #include "core/htrdr_rectangle.h"
 
+#include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <rsys/double33.h>
 #include <rsys/mem_allocator.h>
@@ -29,6 +30,8 @@ struct htrdr_rectangle {
   double axis_x[3];
   double axis_y[3];
   double normal[3];
+
+  double size[2];
 
   double local2world[12]; /* Rectangle to world transformation matrix */
   double world2local[12]; /* World to rectangle transformation matrix */
@@ -121,6 +124,8 @@ htrdr_rectangle_create
   d3_set(rect->normal, z);
   d3_set(rect->position, pos);
 
+  d2_set(rect->size, sz);
+
 exit:
   *out_rect = rect;
   return res;
@@ -197,4 +202,11 @@ htrdr_rectangle_get_transform_inverse
   d3_set(transform_inverse+6, rect->world2local+6);
   d3_set(transform_inverse+9, rect->world2local+9);
   return transform_inverse;
+}
+
+void
+htrdr_rectangle_get_size(const struct htrdr_rectangle* rect, double size[2])
+{
+  ASSERT(rect && size);
+  d2_set(size, rect->size);
 }

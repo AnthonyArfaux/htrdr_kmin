@@ -70,6 +70,11 @@ htrdr_rectangle_get_transform_inverse
   (const struct htrdr_rectangle* rect,
    double transform_inverse[12]);
 
+HTRDR_CORE_API void
+htrdr_rectangle_get_size
+  (const struct htrdr_rectangle* rect,
+   double size[2]);
+
 END_DECLS
 
 #endif /* HTRDR_RECTANGLE_H */

@@ -300,10 +300,19 @@ combustion_draw_map(struct htrdr_combustion* cmd)
     path_time.E, path_time.SE);
 
   if(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP) {
+    double map_size[2];
+    double area;
+
     htrdr_accum_get_estimation(&flux_acc, &flux);
     htrdr_log(cmd->htrdr,
       "Radiative flux density (in W/m^2): %g +/- %g\n",
       flux.E, flux.SE);
+
+    htrdr_rectangle_get_size(cmd->flux_map, map_size);
+    area = map_size[0] * map_size[1];
+    htrdr_log(cmd->htrdr,
+      "Radiative flux (in W): %g +/- %g\n",
+      flux.E*area, flux.SE*area);
   }
 
 exit:
