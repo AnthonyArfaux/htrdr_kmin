@@ -379,8 +379,7 @@ sample_scattering_limited_hit_filter
 
     /* A collision distance was not already sampled */
     if(ctx->sampled_vox_collision_dst < 0) {
-      r = ssp_rng_canonical(ctx->rng);
-      tau = -log(1.0-r*(1.0-exp(-ctx->Tmax)));
+      tau = ssp_ran_exp_truncated(ctx->rng, 1, ctx->Tmax);
       ctx->sampled_vox_collision_dst = tau / ctx->ks_2hat;
 
       /* Update the ksi output data */
