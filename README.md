@@ -59,6 +59,34 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.7
+
+#### Adds the simulation of radiative transfert in combustion media
+
+The new `htrdr-combustion` command performs radiative transfert computations in
+a scene representing a combustion semi-transparent medium enlightened by a
+laser sheet. It uses Monte-Carlo to calculate a monochromatic image of the
+medium or the radiative flux density. Both compuations are performed in the
+visible at a given frequency.
+
+The medium data are defined on the vertices of an unstructured tetrahedral mesh
+that may be surrounded by a triangular surface mesh representing the inner
+limits of the combustion chamber.
+
+#### Updates the `htrdr` command
+
+The previous `htrdr` command is renamed to `htrdr-atmosphere`. `htrdr` becomes
+a proxy for the `htrdr-atmosphere` command or the `htrdr-combustion` command:
+calling `htrdr` with the `<atmosphere|combustion>` options is equivalent to
+directly calling the `htrdr-<atmosphere|combustion>` commands.
+
+#### Fixes and updates
+
+- Always displays the number of processes and the number of threads: previously
+  they were only printed on multi-node executions.
+- Fixed auto intersection issue on surfaces not facing the sun.
+- Fixed writing of pixel data: assumed pixel layout could be wrong.
+
 ### Version 0.6.1
 
 - Fix the self-intersection issue in shortwave computations introduced by
