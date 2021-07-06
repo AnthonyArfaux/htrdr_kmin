@@ -75,12 +75,12 @@ domain is longwave or shortwave.
 In *htrdr-atmosphere* the spatial unit 1.0 corresponds to one meter and the
 temperatures are expressed in Kelvin. The estimated radiances are given in
 W/sr/m^2 excepted for monochromatic computations where the computed spectral
-radiance is defined in W/sr/m^2/nm. The fluxes are saved in W/m^2. The results
-are written to the output file if the *-o* option is defined and the standard
-output otherwise.  The output image is a list of raw ASCII data formatted with
-respect to the *htrdr-image*(5) file format.  Since *htrdr-atmosphere* relies
-on the Monte-Carlo method, each estimation is given with its numerical
-accuracy.
+radiance is defined in W/sr/m^2/nm. The flux densities are saved in W/m^2. The
+results are written to the output file if the *-o* option is defined and the
+standard output otherwise. The output image is a list of raw ASCII data
+formatted with respect to the *htrdr-image*(5) file format. Since
+*htrdr-atmosphere* relies on the Monte-Carlo method, each estimation is given
+with its numerical accuracy.
 
 During the simulation, *htrdr-atmosphere* dynamically loads/unloads cloud
 properties to handle clouds whose data that do not feat in main memory.
