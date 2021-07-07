@@ -32,6 +32,7 @@ geometry_ray_filter_discard_medium_interface
   (const struct s3d_hit* hit,
    const float ray_org[3],
    const float ray_dir[3],
+   const float ray_range[2],
    void* ray_data,
    void* filter_data)
 {
@@ -41,8 +42,8 @@ geometry_ray_filter_discard_medium_interface
   float N[3];
   int hit_front;
   int discard = 0;
-  ASSERT(hit && ray_org && ray_dir && ray_data && !S3D_HIT_NONE(hit));
-  (void)ray_org, (void)ray_dir, (void)filter_data;
+  ASSERT(hit && ray_org && ray_dir && ray_range && ray_data && !S3D_HIT_NONE(hit));
+  (void)ray_org, (void)ray_dir, (void)ray_range, (void)filter_data;
 
   /* Recover the interface of the intersected surface */
   htrdr_geometry_get_interface(ctx->geom, hit, &interf);

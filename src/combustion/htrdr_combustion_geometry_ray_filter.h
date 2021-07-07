@@ -41,6 +41,7 @@ geometry_ray_filter_discard_medium_interface
   (const struct s3d_hit* hit,
    const float ray_org[3],
    const float ray_dir[3],
+   const float ray_range[2],
    void* ray_data, /* Must point to a struct geometry_ray_filter_context */
    void* filter_data);
 

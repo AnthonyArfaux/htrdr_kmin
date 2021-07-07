@@ -65,7 +65,7 @@ print_help(const char* cmd)
   printf(
 "  -m MIE         filename of the Mie's data.\n");
   printf(
-" -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
+"  -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
 "                 Its default value is `%s'.\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sky_mtl_name);
   printf(

@@ -60,13 +60,12 @@ struct mesh {
 static const struct mesh MESH_NULL;
 
 struct ray_context {
-  float range[2];
   struct s3d_hit hit_from;
 
   s3d_hit_filter_function_T user_filter; /* May be NULL */
   void* user_filter_data; /* May be NULL */
 };
-#define RAY_CONTEXT_NULL__ {{0,INF}, S3D_HIT_NULL__, NULL, NULL}
+#define RAY_CONTEXT_NULL__ {S3D_HIT_NULL__, NULL, NULL}
 static const struct ray_context RAY_CONTEXT_NULL = RAY_CONTEXT_NULL__;
 
 struct htrdr_geometry {
@@ -149,6 +148,7 @@ geometry_filter
   (const struct s3d_hit* hit,
    const float ray_org[3],
    const float ray_dir[3],
+   const float ray_range[2],
    void* ray_data,
    void* filter_data)
 {
@@ -158,14 +158,14 @@ geometry_filter
   if(!ray_ctx) /* Nothing to do */
     return 0;
 
-  if(self_hit(hit, ray_org, ray_dir, ray_ctx->range, &ray_ctx->hit_from))
+  if(self_hit(hit, ray_org, ray_dir, ray_range, &ray_ctx->hit_from))
     return 1; /* Discard this hit */
 
   if(!ray_ctx->user_filter) /* That's all */
     return 0;
 
   return ray_ctx->user_filter /* Invoke user filtering */
-    (hit, ray_org, ray_dir, ray_ctx->user_filter_data, filter_data);
+    (hit, ray_org, ray_dir, ray_range, ray_ctx->user_filter_data, filter_data);
 }
 
 static res_T
@@ -685,18 +685,19 @@ htrdr_geometry_trace_ray
   struct ray_context ray_ctx = RAY_CONTEXT_NULL;
   float ray_org[3];
   float ray_dir[3];
+  float ray_range[2];
   res_T res = RES_OK;
   ASSERT(geom && args && hit);
 
   f3_set_d3(ray_org, args->ray_org);
   f3_set_d3(ray_dir, args->ray_dir);
-  f2_set_d2(ray_ctx.range, args->ray_range);
+  f2_set_d2(ray_range, args->ray_range);
   ray_ctx.hit_from = args->hit_from;
   ray_ctx.user_filter = args->filter;
   ray_ctx.user_filter_data = args->filter_context;
 
   res = s3d_scene_view_trace_ray
-    (geom->view, ray_org, ray_dir, ray_ctx.range, &ray_ctx, hit);
+    (geom->view, ray_org, ray_dir, ray_range, &ray_ctx, hit);
   if(res != RES_OK) {
     htrdr_log_err(geom->htrdr,
       "%s: could not trace the ray against the geometry -- %s.\n",

@@ -286,12 +286,11 @@ depending on the type of calculation performed by *htrdr-combustion*.
 Shortwave monochromatic image
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For a monochromatic image rendering, the first and second pixel components are
-not used. The expected value and the standard deviation of the pixel radiance
-(in W/sr/m^2) are saved on the third and fourth components. The fifth and
-sixth components of the pixel are also not used while the last 2 components of
-the pixel (the seventh and the eighth) record the estimate in microseconds of
-the computation time per radiative path and its standard error. 
+For a monochromatic image rendering, the expected value and the standard
+deviation of the pixel radiance (in W/sr/m^2) are saved on the first and the
+second components. All other components are unused excepted the seventh and
+eighth components that store the estimate of the radiative path computation
+time in microseconds and its standard error.
 
 Shortwave flux density map
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
