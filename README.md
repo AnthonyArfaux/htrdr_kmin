@@ -1,35 +1,47 @@
-# High-Tune: RenDeRer
+# `htrdr`
 
-This program is a part of the [High-Tune](http://www.umr-cnrm.fr/high-tune/)
-project: it illustrates the implementation of efficient radiative transfer
-Monte-Carlo algorithms in cloudy atmospheres.
+`htrdr` evaluates the intensity at any position (probe) of the scene, in any
+direction, in the presence of surfaces and an absorbing and diffusing
+semi-transparent medium, both for radiation sources that are internal to the
+medium (longwave) or external to the medium (shortwave). The intensity is
+calculated using the *Monte-Carlo* method: a number of optical paths are
+simulated backward, from the probe position and into the medium. Various
+algorithms are used, depending on the specificities of the nature and shape of
+the radiation source.
 
-htrdr is an image renderer in the visible part of the spectrum, for scenes
-composed of an atmospheric gas mixture, clouds, and a ground. It uses spectral
-data that should be provided for the pressure and temperature atmospheric
-vertical profile defined along the Z axis, the liquid water content in
-suspension within the clouds that is a result of Large Eddy Simulation
-computations, and the optical properties of water droplets that have been
-obtained from a Mie code. The user also has to provide: the characteristics of
-the simulated camera, the sensor definition, and the position of the sun. It is
-also possible to provide a geometry representing the ground. Both, the clouds
-and the ground, can be infinitely repeated along the X and Y axis.
+Applications are theoretically possible to any configuration. However, it all
+eventually comes down to the possibility of using the physical data of
+interest, in their most common formats, in each scientific community. `htrdr`
+is currently suitable for two main application fields:
 
-htrdr evaluates the intensity incoming on each pixel of the sensor array. The
-underlying algorithm is based on a Monte-Carlo method: it consists in
-simulating a given number of optical paths originating from the camera,
-directed into the atmosphere, taking into account light absorption and
-scattering phenomena. The computation is performed over the whole visible part
-of the spectrum, for the three components of the CIE 1931 XYZ colorimetric
-space that are subsequently recombined in order to obtain the final color for
-each pixel, and finally the whole image of the scene as seen from the required
-observation position.
+1. *Atmospheric radiative transfer*: the clear-sky atmosphere is vertically
+   stratified, cloud thermodynamic data is provided on a regular 3D rectangular
+   grid, and surface optical properties can be provided for an arbitrary number
+   of materials. Internal radiation and solar radiation are taken into account.
 
-In addition of shared memory parallelism, htrdr supports the [*M*essage
-*P*assing *I*nterface](https://www.mpi-forum.org/) specification to
-parallelise its computations in a distribute memory environment; the htrdr
-binary can be run either directly or through a MPI process launcher like
-`mpirun`.
+2. *Combustion* processes: thermodynamic data is provided at the nodes of an
+   unstructured tetrahedral mesh, while surface properties can still be
+   provided for various materials. The radiation source is only external: a
+   monochromatic laser sheet illuminates the inside of the combustion chamber
+   for diagnostic purposes.
+
+Since any observable radiative transfer is expressed as an integral of the
+intensity, and since there is a strict equivalence between the integral to be
+solved and the underlying Monte-Carlo algorithm (each integral results in the
+sampling of a random variable), the algorithms that calculate the radiance are
+used for computing various quantities:
+
+- *Images* on a camera sensor, in a given field of view. For combustion
+  applications, only monochromatic images are supported. In atmospheres, both
+  visible and infrared images are possible: CIE colorimetry is used for visible
+  images, while an infrared image is in fact a temperature map of luminosity,
+  over the required spectral interval.
+
+- *Flux density maps*, on a grid of sensors, integrated over an entire
+  hemisphere. In the case of combustion chambers, only monochromatic flux maps
+  can be calculated, while spectrally integrated flux density maps (both on the
+  visible part of the spectrum and on the infrared) are possible for
+  atmospheric applications.
 
 ## How to build
 
