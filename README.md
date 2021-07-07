@@ -50,7 +50,6 @@ This program is compatible GNU/Linux 64-bits. It relies on the
 [RCMake](https://gitlab.com/vaplv/rcmake/) packages to build. It also depends
 on the
 [AW](https://gitlab.com/vaplv/loader_aw/#tab-readme),
-[HTSky](https://gitlab.com/meso-star/htsky/),
 [MruMtl](https://gitlab.com/meso-star/mrumtl/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),
@@ -61,9 +60,15 @@ on the
 [MPI](https://www.mpi-forum.org/) specification to parallelize its
 computations.
 
-First ensure that CMake is installed on your system. Then install the RCMake
-package as well as the aforementioned prerequisites. Finally generate the
-project from the `cmake/CMakeLists.txt` file by appending to the
+`htrdr` finally depends on the [HTSky](https://gitlab.com/meso-star/htsky/)
+library if the `HTRDR_BUILD_ATMOSPHERE` option is set and on
+[AtrSTM](https://gitlab.com/meso-star/atrstm/) when `HTRDR_BUILD_COMBUSTION` is
+set. These options enable/disable the build of the atmospheric part and the
+combustion part of htrdr. By default, both options are activated.
+
+To build `htrdr`, first ensure that CMake is installed on your system. Then
+install the RCMake package as well as the aforementioned prerequisites. Finally
+generate the project from the `cmake/CMakeLists.txt` file by appending to the
 `CMAKE_PREFIX_PATH` variable the install directories of its dependencies. The
 resulting project can be edited, built, tested and installed as any CMake
 project. Refer to the [CMake](https://cmake.org/documentation) for further
