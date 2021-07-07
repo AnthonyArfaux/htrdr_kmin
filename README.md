@@ -238,8 +238,8 @@ regular image rendering), longwave or shortwave.
 
 ## Copyright notice
 
-Copyright (C) 2018, 2019, 2020, 2021 [|Meso|Star>](http://www.meso-star.com).
-Copyright (C) 2018, 2019, 2021 CNRS.
+Copyright (C) 2018, 2019, 2020, 2021 [|Meso|Star>](http://www.meso-star.com).  
+Copyright (C) 2018, 2019, 2021 CNRS.  
 Copyright (C) 2018, 2019 Université Paul Sabatier.
 
 ## License
