@@ -78,13 +78,13 @@ informations on CMake.
 
 ### Version 0.7
 
-#### Adds the simulation of radiative transfert in combustion media
+#### Adds the simulation of radiative transfer in combustion media
 
-The new `htrdr-combustion` command performs radiative transfert computations in
-a scene representing a combustion semi-transparent medium enlightened by a
-laser sheet. It uses Monte-Carlo to calculate a monochromatic image of the
-medium or the radiative flux density. Both compuations are performed in the
-visible at a given frequency.
+The new `htrdr-combustion` command performs radiative transfer computations in
+a scene representing a semi-transparent medium enlightened by a laser sheet. It
+uses Monte-Carlo to calculate a monochromatic image of the medium or the
+radiative flux density. Both computations are performed in the visible at a
+given frequency.
 
 The medium data are defined on the vertices of an unstructured tetrahedral mesh
 that may be surrounded by a triangular surface mesh representing the inner
@@ -97,8 +97,10 @@ a proxy for the `htrdr-atmosphere` command or the `htrdr-combustion` command:
 calling `htrdr` with the `<atmosphere|combustion>` options is equivalent to
 directly calling the `htrdr-<atmosphere|combustion>` commands.
 
-#### Fixes and updates
+#### Miscellaneous
 
+- Major update of the entire codebase to add multiple applications to `htrdr`:
+  It was originally designed to handle atmospheric applications only.
 - Always displays the number of processes and the number of threads: previously
   they were only printed on multi-node executions.
 - Fixed auto intersection issue on surfaces not facing the sun.
@@ -244,7 +246,7 @@ Copyright (C) 2018, 2019 Université Paul Sabatier.
 
 ## License
 
-htrdr is free software released under the GPL v3+ license: GNU GPL version 3 or
+`htrdr` is free software released under the GPL v3+ license: GNU GPL version 3 or
 later. You are welcome to redistribute it under certain conditions; refer to
 the COPYING file for details.
 
