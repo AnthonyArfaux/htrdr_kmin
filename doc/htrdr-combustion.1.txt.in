@@ -73,7 +73,7 @@ format.
 *htrdr-combustion* implements a mixed parallelism: on one computer (i.e. a
 node) it uses a shared memory parallelism, and it relies on the message passing
 interface [4] to parallelize the computations between several nodes. We can
-thus launch * htrdr-combustion * either directly, or via a process launcher
+thus launch *htrdr-combustion* either directly, or via a process launcher
 like *mpirun*(1) to distribute the rendering over several nodes.
 
 OPTIONS
@@ -276,6 +276,32 @@ OPTIONS
 *-w*::
   Define the wavelength of the laser in nanometre. By default it is set to
   @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@.
+
+OUTPUT IMAGE
+------------
+
+Images calculated by *htrdr-combustion* are saved in the *htrdr-image*(5) file
+format. This section describes the nature and arrangement of image data
+depending on the type of calculation performed by *htrdr-combustion*.
+
+Shortwave monochromatic image
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For a monochromatic image rendering, the first and second pixel components are
+not used. The expected value and the standard deviation of the pixel radiance
+(in W/sr/m^2) are saved on the third and fourth components.  The fifth and
+sixth components of the pixel are also not used while the last 2 components of
+the pixel (the seventh and the eighth) record the estimate in microseconds of
+the computation time per radiative path and its standard error. 
+
+Shortwave flux density map
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A flux density map (option *-R*) is saved in an *htrdr-image*(5) storing the
+expected value and the standard error of the pixel radiative flux density (in
+W/m^2) on its first and second component. All other components are unused
+excepted the seventh and eighth components that store the estimate of the
+radiative path computation time in microseconds and its standard error.
 
 EXAMPLES
 --------
