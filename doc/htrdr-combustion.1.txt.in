@@ -32,13 +32,12 @@ SYNOPSIS
 DESCRIPTION
 -----------
 The purpose of *htrdr-combustion* is to perform radiative transfer computations
-in a scene representing a combustion semi-transparent medium enlightened by a
-laser sheet. The combustion medium may be surrounded by solid boundaries (inner
-limits of the combustion chamber). The program will currently compute, in the
-visible at a given frequency, the monochromatic image or the radiative flux
-density of the combustion medium: collected light comes from the laser, and is
-scattered by soot aggregates within the flame before eventually reaching the
-sensor.
+in a scene representing a semi-transparent medium enlightened by a laser sheet.
+The combustion medium may be surrounded by solid boundaries (inner limits of
+the combustion chamber). The program will currently compute, in the visible at
+a given frequency, the monochromatic image or the radiative flux density of the
+combustion medium: collected light comes from the laser, and is scattered by
+soot aggregates within the flame before eventually reaching the sensor.
 
 Data about the gaseous medium have to be provided on the vertices of a
 unstructured tetrahedral mesh: pressure, temperature and concentrations of H2O,
@@ -127,9 +126,9 @@ OPTIONS
   Force overwrite of the _output_ file.
 
 *-g* <__geometry-parameter__:...>::
-  Define the geometry of the combustion chamber. Note that this geometry do not
-  prevent the camera from viewing the medium or the laser from illuminating it,
-  even if they are outside the combustion chamber. The rendering algorithm
+  Define the geometry of the combustion chamber. Note that this geometry does
+  not prevent the camera from viewing the medium or the laser from illuminating
+  it, even if they are outside the combustion chamber. The rendering algorithm
   ensures that they are not occluded by this geometry like with a two-way
   mirror. When the laser is out of geometry, its emissive surface is seen as if
   it were following the interior surface of the chamber. Likewise, the radiance
@@ -289,7 +288,7 @@ Shortwave monochromatic image
 
 For a monochromatic image rendering, the first and second pixel components are
 not used. The expected value and the standard deviation of the pixel radiance
-(in W/sr/m^2) are saved on the third and fourth components.  The fifth and
+(in W/sr/m^2) are saved on the third and fourth components. The fifth and
 sixth components of the pixel are also not used while the last 2 components of
 the pixel (the seventh and the eighth) record the estimate in microseconds of
 the computation time per radiative path and its standard error. 

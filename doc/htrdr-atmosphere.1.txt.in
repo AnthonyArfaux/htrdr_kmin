@@ -22,7 +22,7 @@ htrdr-atmosphere(1)
 
 NAME
 ----
-htrdr-atmosphere - simulate radiative transfert in cloudy atmospheres
+htrdr-atmosphere - simulate radiative transfer in cloudy atmospheres
 
 SYNOPSIS
 --------
@@ -31,7 +31,7 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*htrdr-atmosphere* simulates radiative transfert in scenes composed of an
+*htrdr-atmosphere* simulates radiative transfer in scenes composed of an
 atmospheric gas mixture, clouds, and a ground. It evaluates the intensity
 incoming on each pixel of the sensor array. The underlying algorithm is based
 on a Monte-Carlo method: it consists in simulating a given number of optical
@@ -39,10 +39,10 @@ paths originating from the sensor, directed into the atmosphere, taking into
 account light absorption and scattering phenomena. This algorithm and the way
 it is efficiently implemented in *htrdr-atmosphere* is presented in the
 following article: "A path-tracing Monte Carlo library for 3-D radiative
-transfer in highly resolved cloudy atmospheres". N. Villefranque et al, JAMES
+transfer in highly resolved cloudy atmospheres", N. Villefranque et al, JAMES
 2019 [1].
 
-Radiative transfert can be evaluated in the visible or the infrared part of the
+Radiative transfer can be evaluated in the visible or the infrared part of the
 spectrum. It uses spectral data that should be provided for the pressure and
 temperature atmospheric vertical profile [2] (*-a* _atmosphere_), the liquid
 water content in suspension within the clouds stored in a *htcp*(5) file (*-c*
