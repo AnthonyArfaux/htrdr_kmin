@@ -1,35 +1,47 @@
-# High-Tune: RenDeRer
+# `htrdr`
 
-This program is a part of the [High-Tune](http://www.umr-cnrm.fr/high-tune/)
-project: it illustrates the implementation of efficient radiative transfer
-Monte-Carlo algorithms in cloudy atmospheres.
+`htrdr` evaluates the intensity at any position (probe) of the scene, in any
+direction, in the presence of surfaces and an absorbing and diffusing
+semi-transparent medium, both for radiation sources that are internal to the
+medium (longwave) or external to the medium (shortwave). The intensity is
+calculated using the *Monte-Carlo* method: a number of optical paths are
+simulated backward, from the probe position and into the medium. Various
+algorithms are used, depending on the specificities of the nature and shape of
+the radiation source.
 
-htrdr is an image renderer in the visible part of the spectrum, for scenes
-composed of an atmospheric gas mixture, clouds, and a ground. It uses spectral
-data that should be provided for the pressure and temperature atmospheric
-vertical profile defined along the Z axis, the liquid water content in
-suspension within the clouds that is a result of Large Eddy Simulation
-computations, and the optical properties of water droplets that have been
-obtained from a Mie code. The user also has to provide: the characteristics of
-the simulated camera, the sensor definition, and the position of the sun. It is
-also possible to provide a geometry representing the ground. Both, the clouds
-and the ground, can be infinitely repeated along the X and Y axis.
+Applications are theoretically possible to any configuration. However, it all
+eventually comes down to the possibility of using the physical data of
+interest, in their most common formats, in each scientific community. `htrdr`
+is currently suitable for two main application fields:
 
-htrdr evaluates the intensity incoming on each pixel of the sensor array. The
-underlying algorithm is based on a Monte-Carlo method: it consists in
-simulating a given number of optical paths originating from the camera,
-directed into the atmosphere, taking into account light absorption and
-scattering phenomena. The computation is performed over the whole visible part
-of the spectrum, for the three components of the CIE 1931 XYZ colorimetric
-space that are subsequently recombined in order to obtain the final color for
-each pixel, and finally the whole image of the scene as seen from the required
-observation position.
+1. *Atmospheric radiative transfer*: the clear-sky atmosphere is vertically
+   stratified, cloud thermodynamic data is provided on a regular 3D rectangular
+   grid, and surface optical properties can be provided for an arbitrary number
+   of materials. Internal radiation and solar radiation are taken into account.
 
-In addition of shared memory parallelism, htrdr supports the [*M*essage
-*P*assing *I*nterface](https://www.mpi-forum.org/) specification to
-parallelise its computations in a distribute memory environment; the htrdr
-binary can be run either directly or through a MPI process launcher like
-`mpirun`.
+2. *Combustion* processes: thermodynamic data is provided at the nodes of an
+   unstructured tetrahedral mesh, while surface properties can still be
+   provided for various materials. The radiation source is only external: a
+   monochromatic laser sheet illuminates the inside of the combustion chamber
+   for diagnostic purposes.
+
+Since any observable radiative transfer is expressed as an integral of the
+intensity, and since there is a strict equivalence between the integral to be
+solved and the underlying Monte-Carlo algorithm (each integral results in the
+sampling of a random variable), the algorithms that calculate the radiance are
+used for computing various quantities:
+
+- *Images* on a camera sensor, in a given field of view. For combustion
+  applications, only monochromatic images are supported. In atmospheres, both
+  visible and infrared images are possible: CIE colorimetry is used for visible
+  images, while an infrared image is in fact a temperature map of luminosity,
+  over the required spectral interval.
+
+- *Flux density maps*, on a grid of sensors, integrated over an entire
+  hemisphere. In the case of combustion chambers, only monochromatic flux maps
+  can be calculated, while spectrally integrated flux density maps (both on the
+  visible part of the spectrum and on the infrared) are possible for
+  atmospheric applications.
 
 ## How to build
 
@@ -38,7 +50,6 @@ This program is compatible GNU/Linux 64-bits. It relies on the
 [RCMake](https://gitlab.com/vaplv/rcmake/) packages to build. It also depends
 on the
 [AW](https://gitlab.com/vaplv/loader_aw/#tab-readme),
-[HTSky](https://gitlab.com/meso-star/htsky/),
 [MruMtl](https://gitlab.com/meso-star/mrumtl/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),
@@ -49,15 +60,51 @@ on the
 [MPI](https://www.mpi-forum.org/) specification to parallelize its
 computations.
 
-First ensure that CMake is installed on your system. Then install the RCMake
-package as well as the aforementioned prerequisites. Finally generate the
-project from the `cmake/CMakeLists.txt` file by appending to the
+`htrdr` finally depends on the [HTSky](https://gitlab.com/meso-star/htsky/)
+library if the `HTRDR_BUILD_ATMOSPHERE` option is set and on
+[AtrSTM](https://gitlab.com/meso-star/atrstm/) when `HTRDR_BUILD_COMBUSTION` is
+set. These options enable/disable the build of the atmospheric part and the
+combustion part of htrdr. By default, both options are activated.
+
+To build `htrdr`, first ensure that CMake is installed on your system. Then
+install the RCMake package as well as the aforementioned prerequisites. Finally
+generate the project from the `cmake/CMakeLists.txt` file by appending to the
 `CMAKE_PREFIX_PATH` variable the install directories of its dependencies. The
 resulting project can be edited, built, tested and installed as any CMake
 project. Refer to the [CMake](https://cmake.org/documentation) for further
 informations on CMake.
 
 ## Release notes
+
+### Version 0.7
+
+#### Adds the simulation of radiative transfer in combustion media
+
+The new `htrdr-combustion` command performs radiative transfer computations in
+a scene representing a semi-transparent medium enlightened by a laser sheet. It
+uses Monte-Carlo to calculate a monochromatic image of the medium or the
+radiative flux density. Both computations are performed in the visible at a
+given frequency.
+
+The medium data are defined on the vertices of an unstructured tetrahedral mesh
+that may be surrounded by a triangular surface mesh representing the inner
+limits of the combustion chamber.
+
+#### Updates the `htrdr` command
+
+The previous `htrdr` command is renamed to `htrdr-atmosphere`. `htrdr` becomes
+a proxy for the `htrdr-atmosphere` command or the `htrdr-combustion` command:
+calling `htrdr` with the `<atmosphere|combustion>` options is equivalent to
+directly calling the `htrdr-<atmosphere|combustion>` commands.
+
+#### Miscellaneous
+
+- Major update of the entire codebase to add multiple applications to `htrdr`:
+  It was originally designed to handle atmospheric applications only.
+- Always displays the number of processes and the number of threads: previously
+  they were only printed on multi-node executions.
+- Fixed auto intersection issue on surfaces not facing the sun.
+- Fixed writing of pixel data: assumed pixel layout could be wrong.
 
 ### Version 0.6.1
 
@@ -193,13 +240,13 @@ regular image rendering), longwave or shortwave.
 
 ## Copyright notice
 
-Copyright (C) 2018, 2019, 2020, 2021 [|Meso|Star>](http://www.meso-star.com).
-Copyright (C) 2018, 2019, 2021 CNRS.
+Copyright (C) 2018, 2019, 2020, 2021 [|Meso|Star>](http://www.meso-star.com).  
+Copyright (C) 2018, 2019, 2021 CNRS.  
 Copyright (C) 2018, 2019 Université Paul Sabatier.
 
 ## License
 
-htrdr is free software released under the GPL v3+ license: GNU GPL version 3 or
+`htrdr` is free software released under the GPL v3+ license: GNU GPL version 3 or
 later. You are welcome to redistribute it under certain conditions; refer to
 the COPYING file for details.
 

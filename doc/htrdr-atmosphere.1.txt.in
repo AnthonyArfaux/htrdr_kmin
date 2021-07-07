@@ -22,7 +22,7 @@ htrdr-atmosphere(1)
 
 NAME
 ----
-htrdr-atmosphere - simulate radiative transfert in cloudy atmospheres
+htrdr-atmosphere - simulate radiative transfer in cloudy atmospheres
 
 SYNOPSIS
 --------
@@ -31,16 +31,20 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-*htrdr-atmosphere* simulate radiative transfert in scenes composed of an
+*htrdr-atmosphere* simulates radiative transfer in scenes composed of an
 atmospheric gas mixture, clouds, and a ground. It evaluates the intensity
 incoming on each pixel of the sensor array. The underlying algorithm is based
 on a Monte-Carlo method: it consists in simulating a given number of optical
 paths originating from the sensor, directed into the atmosphere, taking into
-account light absorption and scattering phenomena.
+account light absorption and scattering phenomena. This algorithm and the way
+it is efficiently implemented in *htrdr-atmosphere* is presented in the
+following article: "A path-tracing Monte Carlo library for 3-D radiative
+transfer in highly resolved cloudy atmospheres", N. Villefranque et al, JAMES
+2019 [1].
 
-Radiative transfert can be evaluated in the visible or the infrared part of the
+Radiative transfer can be evaluated in the visible or the infrared part of the
 spectrum. It uses spectral data that should be provided for the pressure and
-temperature atmospheric vertical profile [1] (*-a* _atmosphere_), the liquid
+temperature atmospheric vertical profile [2] (*-a* _atmosphere_), the liquid
 water content in suspension within the clouds stored in a *htcp*(5) file (*-c*
 _clouds_), and the optical properties of water droplets that have been obtained
 from a Mie code and formatted according to the *htmie*(5) file format (*-m*
@@ -75,25 +79,21 @@ domain is longwave or shortwave.
 In *htrdr-atmosphere* the spatial unit 1.0 corresponds to one meter and the
 temperatures are expressed in Kelvin. The estimated radiances are given in
 W/sr/m^2 excepted for monochromatic computations where the computed spectral
-radiance is defined in W/sr/m^2/nm. The fluxes are saved in W/m^2. The results
-are written to the output file if the *-o* option is defined and the standard
-output otherwise.  The output image is a list of raw ASCII data formatted with
-respect to the *htrdr-image*(5) file format.  Since *htrdr-atmosphere* relies
-on the Monte-Carlo method, each estimation is given with its numerical
-accuracy.
+radiance is defined in W/sr/m^2/nm. The flux densities are saved in W/m^2. The
+results are written to the output file if the *-o* option is defined and the
+standard output otherwise. The output image is a list of raw ASCII data
+formatted with respect to the *htrdr-image*(5) file format. 
 
-During the simulation, *htrdr-atmosphere* dynamically loads/unloads cloud
-properties to handle clouds whose data that do not feat in main memory.
-*htrdr-atmosphere* also supports shared memory parallelism and relies on the
-Message Passing Interface specification [3] to parallelise its computations in
-a distributed memory environment; it can thus be run either directly or through
-a MPI process launcher like *mpirun*(1).
+*htrdr-atmosphere* supports shared memory parallelism and relies on the Message
+Passing Interface specification [4] to parallelise its computations in a
+distributed memory environment; it can thus be run either directly or through a
+MPI process launcher like *mpirun*(1).
 
 OPTIONS
 -------
 *-a* _atmosphere_::
   Path toward the file containing the gas optical properties of the atmosphere.
-  Data must be formatted according to the fileformat described in [1].
+  Data must be formatted according to the fileformat described in [2].
 
 *-c* _clouds_::
   Submit a *htcp*(5) file describing the properties of the clouds. If not
@@ -132,7 +132,7 @@ OPTIONS
 *-d*::
   Write in _output_ the space partitioning data structures used to speed up
   the radiative transfer computations in the clouds. The written data are
-  octrees saved in the VTK file format [2]. Each octree node stores the minimum
+  octrees saved in the VTK file format [3]. Each octree node stores the minimum
   and the maximum of the extinction coefficients of the cloud cells overlapped
   by the octree node. In the _output_ file, each octree is separated from the
   previous one by a line with three minus characters, i.e. '---'.
@@ -273,12 +273,62 @@ OPTIONS
 *-v*::
   Make *htrdr-atmosphere* verbose.
 
+OUTPUT IMAGE
+------------
+
+Images calculated by *htrdr-atmosphere* are saved in the *htrdr-image*(5) file
+format. This section describes the nature and arrangement of image data
+depending on the type of calculation performed by *htrdr-atmosphere*.
+
+XYZ image
+~~~~~~~~~
+
+For an image rendering in the visible part of the spectrum (default behavior or
+*-s cie_xyz* option), the pixel components store 4 estimates. The first,
+second, and third pairs of floating point values encode the estimated
+integrated radiance in W/sr/m^2 for the X, Y, and Z components of the CIE
+1931 XYZ color space. The first value of each pair is the expected value of the
+average radiance of the pixel. The second value is its associated standard
+deviation. The fourth and final pair records the microsecond estimate of the
+computation time per radiative path and its standard error. 
+
+Longwave image
+~~~~~~~~~~~~~~
+
+If the image is an infrared rendering (option *-s* *lw*=_wlen-min_,_wlen-max_)
+the first and second pixel components store the expected value and the standard
+error of the estimated brightness temperature (in K), respectively. The third
+and fourth components record the expected value and the standard deviation of
+the pixel radiance which is either an integrated radiance in W/sr/m^2 or a
+spectral radiance in W/sr/m^2/nm depending on whether this radiance was
+calculated for a spectral range or at a single wavelength.  The fifth and sixth
+pixel components are not used. Finally, the last 2 components of the pixel
+record the estimate in microseconds of the computation time per radiative path
+and its standard error. 
+
+Shortwave image
+~~~~~~~~~~~~~~~
+
+For shortwave renderings (option *-s* *sw*=_wlen-min_,_wlen-max_), the data
+written to the output image are formatted as for a longwave image except
+that the first and second components of the pixels are not used because no
+brightness temperature has been evaluated.
+
+Flux density map (shortwave and longwave)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A flux density map (option *-p*) is saved in an *htrdr-image*(5) storing the
+expected value and the standard error of the pixel radiative flux density (in
+W/m^2) on its first and second component. All other components are unused
+excepted the seventh and eighth components that store the estimate of the
+radiative path computation time in microseconds and its standard error.
+
 EXAMPLES
 --------
 
 Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
 zenith. The vertical atmospheric gaz mixture along the Z axis is described in
-the *gas.txt* file. the ground geometry is a quad repeated to the infinity
+the *gas.txt* file. The ground geometry is a quad repeated to the infinity
 whose materials are listed in the *material.mtl* file. The camera is positioned
 at *400* meters height and looks toward the positive Y axis. The definition of
 the rendered image is *800* by *600* pixels and the radiance of each pixel
@@ -298,7 +348,7 @@ geometry was carefully designed to be cyclic and can be thus infinitely
 repeated without visual glitches. Use the *-f* option to write the rendered
 image to *output* even though the file already exists. Finally, use the
 *htpp*(1) command to convert the *htrdr-image*(5) saved in output in a regular
-PPM image [4]:
+PPM image [5]:
 
     $ htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R \
       -M materials.mtl \
@@ -370,17 +420,27 @@ Use *mpirun*(1) to launch *htrdr-atmosphere* on several hosts defined in the
 
 NOTES
 -----
-1. High-Tune: Gas Optical Properties file format -
-  <https://www.meso-star.com/projects/high-tune/downloads/gas_opt_prop_en.pdf>
-2. VTK file format -
-  <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
-3. MPI specifications - <https://www.mpi-forum.org/docs/>
-4. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+
+1. A path-tracing Monte Carlo library for 3-D radiative transfer in highly
+resolved cloudy atmospheres. N. Villefranque et al, JAMES 11, 2449-2473, 2019 -
+<https://doi.org/10.1029/2018MS001602>
+
+2. High-Tune: Gas Optical Properties file format -
+<https://www.meso-star.com/projects/high-tune/downloads/gas_opt_prop_en.pdf>
+
+3. VTK file format -
+<http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
+
+4. MPI specifications - <https://www.mpi-forum.org/docs/>
+
+5. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
 
 COPYRIGHT
 ---------
-Copyright $copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
+Copyright &copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
+
 Copyright &copy; 2018, 2019, 2021 CNRS
+
 Copyright &copy; 2018, 2019 Université Paul Sabatier
 <contact-edstar@laplace.univ-tlse.fr>.
 

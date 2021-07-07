@@ -32,15 +32,15 @@ SYNOPSIS
 DESCRIPTION
 -----------
 The purpose of *htrdr-combustion* is to perform radiative transfer computations
-in a scene representing a combustion semi-transparent medium enlightened by a
-laser sheet. The combustion medium may be surrounded by solid boundaries (inner
-limits of the combustion chamber). The program will currently compute the
-monochromatic image (in the visible, at a given frequency) of the combustion
-medium: collected light comes from the laser, and is scattered by soot
-aggregates within the flame before eventually reaching the camera.
+in a scene representing a semi-transparent medium enlightened by a laser sheet.
+The combustion medium may be surrounded by solid boundaries (inner limits of
+the combustion chamber). The program will currently compute, in the visible at
+a given frequency, the monochromatic image or the radiative flux density of the
+combustion medium: collected light comes from the laser, and is scattered by
+soot aggregates within the flame before eventually reaching the sensor.
 
 Data about the gaseous medium have to be provided on the vertices of a
-unstructured tetrahedron mesh: pressure, temperature and concentrations of H2O,
+unstructured tetrahedral mesh: pressure, temperature and concentrations of H2O,
 CO2 and CO have to be provided for every spatial position used to define this
 mesh. These data have to be provided in anticipation of future developments for
 the longwave range: since the gas is assumed to be transparent in the visible,
@@ -57,16 +57,23 @@ absorption and scattering cross-sections of soot aggregates, as well as their
 scattering function.
 
 The Monte-Carlo algorithm that accounts for the visible intensity is inspired
-from the algorithm used for solar radiation in the *htrdr-atmosphere* command.
-It was adapted to partially illuminated scenes in order to solve convergence
-issues. The algorithm is presented in the following article:
+from the algorithm used for solar radiation in the *htrdr-atmosphere*(1)
+command. It was adapted to partially illuminated scenes in order to solve
+convergence issues. The algorithm is presented in the following article:
 "Null-collision meshless Monte-Carlo - a new reverse Monte-Carlo algorithm
 designed for laser-source emission in absorbing/scattering inhomogeneous
 media". M. Sans et al, JQSRT, 2021 [2].
 
+In *htrdr-combustion* the spatial unit 1.0 corresponds to one meter while the
+estimated monochromatic radiances and flux densities are saved in W/sr/m^2 and
+W/m^2 respectively. Computed images are stored in the *htrdr-image*(5) file
+format.
+
 *htrdr-combustion* implements a mixed parallelism: on one computer (i.e. a
 node) it uses a shared memory parallelism, and it relies on the message passing
-interface [4] to parallelize the computations between several nodes.
+interface [4] to parallelize the computations between several nodes. We can
+thus launch *htrdr-combustion* either directly, or via a process launcher
+like *mpirun*(1) to distribute the rendering over several nodes.
 
 OPTIONS
 -------
@@ -97,14 +104,15 @@ OPTIONS
 *-d* <__laser__|__octree__>::
   When define with the _laser_ argument, write in _output_ the geometry of the
   laser sheet saved in the VTK file format [3]. With the _octree_ argument,
-  write in _output_ the space partitioning data structure used to speed up the
-  radiative transfer computations in the combustion medium. The octree is saved
-  following the VTK file format [3]. Each node stores the minimum and the
-  maximum of the extinction coefficients of the tetrahedra that the node
+  write in _output_ a VTK file that stores the octree leaves of the space
+  partitioning data structure used to speed up the radiative transfer
+  computations in the combustion medium. Each leaf stores the minimum and the
+  maximum of the extinction coefficients of the tetrahedra that the leaf
   overlaps.
 
 *-F* <__fractal-coefficients__:...>::
-  Fractal parameters of the RDG-FA model. Available fractal coefficients are:
+  Fractal parameters of the RDG-FA model. This option disable the *-I* option
+  if it was previously set. Available fractal coefficients are:
 
   **dimension**=_real_;;
     Fractal dimension. By default it is set to
@@ -118,8 +126,15 @@ OPTIONS
   Force overwrite of the _output_ file.
 
 *-g* <__geometry-parameter__:...>::
-  Define the geometry of the combustion chamber. Available geometry parameters
-  are:
+  Define the geometry of the combustion chamber. Note that this geometry does
+  not prevent the camera from viewing the medium or the laser from illuminating
+  it, even if they are outside the combustion chamber. The rendering algorithm
+  ensures that they are not occluded by this geometry like with a two-way
+  mirror. When the laser is out of geometry, its emissive surface is seen as if
+  it were following the interior surface of the chamber. Likewise, the radiance
+  seen by the camera outside the chamber is the radiance that reaches it as if
+  its image plane were following the surface of the geometry. Available
+  geometry parameters are:
 
   **mats**=__materials__;;
     Path to the *htrdr-materials*(5) that defines the media and materials used
@@ -129,11 +144,11 @@ OPTIONS
     Path to the *htrdr-obj*(5) file that represents the mesh of the combustion
     chamber. Following the *htrdr-obj*(5) fileformat, the interface of the
     submitted mesh must be defined as a thin interface, i.e. it must be
-    composed of 3 components separated by the ':' character. By
-    convention, *htrdr-combustion* expects the outside environment to be called
-    "air" and the medium inside the combustion chamber to be called "chamber".
-    No assumption is made on the name of the surface material excepted that it
-    has to reference a valid material.
+    composed of 3 components separated by the ':' character. By convention,
+    *htrdr-combustion* expects the outside environment to be called "air" and
+    the medium inside the combustion chamber to be called "chamber".  No
+    assumption is made on the name of the surface material excepted that it has
+    to reference a valid material.
 
 *-h*::
   List short help and exit.
@@ -202,8 +217,9 @@ OPTIONS
   combustion medium.
 
 *-R* <__rectangle-parameter__:...>::
-  Switch in flux map computation. The rectangular sensor onto which
-  the flux is integrated is defined by the following parameters:
+  Compute a radiatve flux density map rather than an image. The rectangular
+  sensor onto which the flux is integrated is defined by the following
+  parameters:
 
   **pos**=**_x_**,**_y_**,**_z_**;;
     Position of the center of the rectangle. By default it is set to
@@ -260,12 +276,38 @@ OPTIONS
   Define the wavelength of the laser in nanometre. By default it is set to
   @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@.
 
+OUTPUT IMAGE
+------------
+
+Images calculated by *htrdr-combustion* are saved in the *htrdr-image*(5) file
+format. This section describes the nature and arrangement of image data
+depending on the type of calculation performed by *htrdr-combustion*.
+
+Shortwave monochromatic image
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For a monochromatic image rendering, the first and second pixel components are
+not used. The expected value and the standard deviation of the pixel radiance
+(in W/sr/m^2) are saved on the third and fourth components. The fifth and
+sixth components of the pixel are also not used while the last 2 components of
+the pixel (the seventh and the eighth) record the estimate in microseconds of
+the computation time per radiative path and its standard error. 
+
+Shortwave flux density map
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A flux density map (option *-R*) is saved in an *htrdr-image*(5) storing the
+expected value and the standard error of the pixel radiative flux density (in
+W/m^2) on its first and second component. All other components are unused
+excepted the seventh and eighth components that store the estimate of the
+radiative path computation time in microseconds and its standard error.
+
 EXAMPLES
 --------
 
 Make htrdr-combustion verbose (option *-v*) and render an image of a combustion
 medium whose tetrahedral mesh is stored in *tetra.sth* and its associated
-thermodynamic properties are saved in *thermprops.atrtp*. The spectrally
+thermodynamic properties are saved in *thermprops.atrtp*. The spectrallyole 
 varying indices of the medium are listed in the *refract_ids.atrri* file. The
 center of the laser surface emission is positioned at the origin and its
 direction is aligned to the Y axis. The definition of the rendered image is
@@ -290,7 +332,8 @@ volumetric acceleration structure in *octree.cache* or reused it if it was
 already populated in a previous run with compatible input data. Set the finest
 resolution of this acceleration structure to 1000 along the major extend of the
 medium and use a optical thickness criterion of 5 to build it. Use the *-f*
-option to force the overwrite of the *output* file if it exists.
+option to force the overwrite of the *output* file if it exists and use *-s* to
+speed up the rendering with the available SIMD instruction sets.
 
   $ htrdr-combustion -v \
     -m tetra.sth \
@@ -304,7 +347,27 @@ option to force the overwrite of the *output* file if it exists.
     -O octree.cache \
     -V 1000 \
     -T 5 \
-    -o output -f
+    -o output -f -s
+
+Compute a flux density map whose definition is *500* by *500* pixels. The flux
+density per pixel is estimated with *64* realisations; the flux density for the
+entire sensor is thus calculated with 16 million realisations (`500 * 500
+* 64`). The sensor on which the flux density is calculated is a square with
+sides measuring *0.05* meter. Its center is positioned at the origin and points
+to the Z axis.
+
+  $ htrdr-combustion -v \
+    -m tetra.sth \
+    -p thermprops.atrtp \
+    -r refract_ids.atrri \
+    -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \
+    -w 500 \
+    -R pos=0,0,0:tgt=0,0,1:up=0,1,0:sz=0.05,0.05 \
+    -i def=500x500:spp=64 \
+    -O octree.cache \
+    -V 1000 \
+    -T 5 \
+    -o map.txt -f -s
 
 Write into *octree.vtk* a representation of the volumetric acceleration
 structure.
@@ -335,7 +398,9 @@ Sans et al, JQSRT, 2021 - <https://doi.org/10.1016/j.jqsrt.2021.107725>
 COPYRIGHT
 ---------
 Copyright &copy; 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.
+
 Copyright &copy; 2018, 2019, 2021 CNRS.
+
 Copyright &copy; 2018, 2019 Université Paul Sabatier
 <contact-edstar@laplace.univ-tlse.fr>.
 
@@ -351,6 +416,7 @@ SEE ALSO
 *atrtp*(5),
 *atrri*(5),
 *htrdr-atmosphere*(1),
+*htrdr-image*(5),
 *htrdr-obj*(5),
 *htrdr-materials*(5),
 *mpirun*(1),
