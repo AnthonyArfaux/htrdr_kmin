@@ -23,8 +23,6 @@
 #include "core/htrdr_ran_wlen.h"
 #include "core/htrdr_spectral.h"
 
-#include <high_tune/htsky.h>
-
 #include <rsys/algorithm.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_double.h>

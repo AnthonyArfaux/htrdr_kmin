@@ -20,8 +20,6 @@
 #include "core/htrdr_cie_xyz.h"
 #include "core/htrdr_log.h"
 
-#include <high_tune/htsky.h>
-
 #include <rsys/algorithm.h>
 #include <rsys/cstr.h>
 #include <rsys/dynamic_array_double.h>
