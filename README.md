@@ -57,14 +57,14 @@ on the
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
 [Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on
 [OpenMP](http://www.openmp.org) 1.2 and the
-[MPI](https://www.mpi-forum.org/) specification to parallelize its
+[MPI](https://www.mpi-forum.org/) 2 specification to parallelize its
 computations.
 
 `htrdr` finally depends on the [HTSky](https://gitlab.com/meso-star/htsky/)
 library if the `HTRDR_BUILD_ATMOSPHERE` option is set and on
 [AtrSTM](https://gitlab.com/meso-star/atrstm/) when `HTRDR_BUILD_COMBUSTION` is
 set. These options enable/disable the build of the atmospheric part and the
-combustion part of htrdr. By default, both options are activated.
+combustion part of `htrdr`. By default, both options are activated.
 
 To build `htrdr`, first ensure that CMake is installed on your system. Then
 install the RCMake package as well as the aforementioned prerequisites. Finally
