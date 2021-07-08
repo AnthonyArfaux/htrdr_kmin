@@ -27,8 +27,6 @@
 #include <rsys/mem_allocator.h>
 #include <rsys/str.h>
 
-#include "high_tune/htsky.h"
-
 #include <star/s3d.h>
 #include <star/ssf.h>
 
