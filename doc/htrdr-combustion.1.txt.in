@@ -306,7 +306,7 @@ EXAMPLES
 
 Make htrdr-combustion verbose (option *-v*) and render an image of a combustion
 medium whose tetrahedral mesh is stored in *tetra.sth* and its associated
-thermodynamic properties are saved in *thermprops.atrtp*. The spectrallyole 
+thermodynamic properties are saved in *thermprops.atrtp*. The spectrally 
 varying indices of the medium are listed in the *refract_ids.atrri* file. The
 center of the laser surface emission is positioned at the origin and its
 direction is aligned to the Y axis. The definition of the rendered image is
@@ -329,8 +329,8 @@ Add a combustion chamber to the previous example: its mesh is defined in
 *chamber.obj* while its materials are listed in *materials.mtls*. Save the
 volumetric acceleration structure in *octree.cache* or reused it if it was
 already populated in a previous run with compatible input data. Set the finest
-resolution of this acceleration structure to 1000 along the major extend of the
-medium and use a optical thickness criterion of 5 to build it. Use the *-f*
+resolution of this acceleration structure to *1000* along the major extend of the
+medium and use a optical thickness criterion of *5* to build it. Use the *-f*
 option to force the overwrite of the *output* file if it exists and use *-s* to
 speed up the rendering with the available SIMD instruction sets.
 
