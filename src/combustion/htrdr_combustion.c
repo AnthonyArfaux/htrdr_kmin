@@ -21,7 +21,6 @@
 #include "combustion/htrdr_combustion_laser.h"
 
 #include "core/htrdr.h"
-#include "core/htrdr_camera.h"
 #include "core/htrdr_log.h"
 #include "core/htrdr_geometry.h"
 #include "core/htrdr_materials.h"
@@ -29,9 +28,11 @@
 
 #include <astoria/atrstm.h>
 
+#include <star/scam.h>
 #include <star/ssf.h>
 
 #include <rsys/cstr.h>
+#include <rsys/double3.h>
 #include <rsys/mem_allocator.h>
 
 /*******************************************************************************
@@ -164,21 +165,23 @@ setup_camera
   (struct htrdr_combustion* cmd,
    const struct htrdr_combustion_args* args)
 {
-  double proj_ratio = 0;
+  struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
   ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
   ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE);
 
-  proj_ratio =
+  d3_set(cam_args.position, args->camera.position);
+  d3_set(cam_args.target, args->camera.target);
+  d3_set(cam_args.up, args->camera.up);
+  cam_args.aspect_ratio = 
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
+  cam_args.field_of_view = MDEG2RAD(args->camera.fov_y);
 
-  return htrdr_camera_create
-    (cmd->htrdr,
-     args->camera.position,
-     args->camera.target,
-     args->camera.up,
-     proj_ratio,
-     MDEG2RAD(args->camera.fov_y),
+  return scam_create_perspective
+    (htrdr_get_logger(cmd->htrdr),
+     htrdr_get_allocator(cmd->htrdr),
+     htrdr_get_verbosity_level(cmd->htrdr),
+     &cam_args,
      &cmd->camera);
 }
 
@@ -509,7 +512,7 @@ combustion_release(ref_T* ref)
   if(cmd->geom) htrdr_geometry_ref_put(cmd->geom);
   if(cmd->mats) htrdr_materials_ref_put(cmd->mats);
   if(cmd->medium) ATRSTM(ref_put(cmd->medium));
-  if(cmd->camera) htrdr_camera_ref_put(cmd->camera);
+  if(cmd->camera) SCAM(ref_put(cmd->camera));
   if(cmd->flux_map) htrdr_rectangle_ref_put(cmd->flux_map);
   if(cmd->laser) htrdr_combustion_laser_ref_put(cmd->laser);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);

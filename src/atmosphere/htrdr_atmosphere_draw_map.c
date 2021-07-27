@@ -21,7 +21,6 @@
 
 #include "core/htrdr.h"
 #include "core/htrdr_buffer.h"
-#include "core/htrdr_camera.h"
 #include "core/htrdr_cie_xyz.h"
 #include "core/htrdr_draw_map.h"
 #include "core/htrdr_interface.h"
@@ -32,6 +31,7 @@
 #include <high_tune/htsky.h>
 
 #include <star/s3d.h>
+#include <star/scam.h>
 #include <star/ssp.h>
 
 #include <rsys/clock_time.h>
@@ -130,9 +130,8 @@ draw_pixel_image
 
     FOR_EACH(isamp, 0, args->spp) {
       struct time t0, t1;
-      double pix_samp[2];
-      double ray_org[3];
-      double ray_dir[3];
+      struct scam_sample sample = SCAM_SAMPLE_NULL;
+      struct scam_ray ray = SCAM_RAY_NULL;
       double weight;
       double r0, r1, r2;
       double wlen; /* Sampled wavelength into the spectral band */
@@ -145,14 +144,15 @@ draw_pixel_image
       time_current(&t0);
 
       /* Sample a position into the pixel, in the normalized image plane */
-      pix_samp[0] = (double)args->pixel_coord[0] + ssp_rng_canonical(args->rng);
-      pix_samp[1] = (double)args->pixel_coord[1] + ssp_rng_canonical(args->rng);
-      pix_samp[0] *= args->pixel_normalized_size[0];
-      pix_samp[1] *= args->pixel_normalized_size[1];
+      sample.film[0] = (double)args->pixel_coord[0]+ssp_rng_canonical(args->rng);
+      sample.film[1] = (double)args->pixel_coord[1]+ssp_rng_canonical(args->rng);
+      sample.film[0] *= args->pixel_normalized_size[0];
+      sample.film[1] *= args->pixel_normalized_size[1];
+      sample.lens[0] = ssp_rng_canonical(args->rng);
+      sample.lens[1] = ssp_rng_canonical(args->rng);
 
-      /* Generate a ray starting from the pinhole camera and passing through the
-       * pixel sample */
-      htrdr_camera_ray(cmd->sensor.camera, pix_samp, ray_org, ray_dir);
+      /* Generate a camera ray */
+      scam_generate_ray(cmd->sensor.camera, &sample, &ray);
 
       r0 = ssp_rng_canonical(args->rng);
       r1 = ssp_rng_canonical(args->rng);
@@ -172,7 +172,7 @@ draw_pixel_image
 
       /* Compute the radiance in W/m^2/sr/m */
       weight = atmosphere_compute_radiance_sw(cmd, args->ithread, args->rng,
-        ATMOSPHERE_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
+        ATMOSPHERE_RADIANCE_ALL, ray.org, ray.dir, wlen, iband, iquad);
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m^2/sr */
@@ -341,9 +341,8 @@ draw_pixel_xwave
 
   FOR_EACH(isamp, 0, args->spp) {
     struct time t0, t1;
-    double pix_samp[2];
-    double ray_org[3];
-    double ray_dir[3];
+    struct scam_sample sample = SCAM_SAMPLE_NULL;
+    struct scam_ray ray = SCAM_RAY_NULL;
     double weight;
     double r0, r1, r2;
     double wlen;
@@ -356,14 +355,15 @@ draw_pixel_xwave
     time_current(&t0);
 
     /* Sample a position into the pixel, in the normalized image plane */
-    pix_samp[0] = (double)args->pixel_coord[0] + ssp_rng_canonical(args->rng);
-    pix_samp[1] = (double)args->pixel_coord[1] + ssp_rng_canonical(args->rng);
-    pix_samp[0] *= args->pixel_normalized_size[0];
-    pix_samp[1] *= args->pixel_normalized_size[1];
+    sample.film[0] = (double)args->pixel_coord[0]+ssp_rng_canonical(args->rng);
+    sample.film[1] = (double)args->pixel_coord[1]+ssp_rng_canonical(args->rng);
+    sample.film[0] *= args->pixel_normalized_size[0];
+    sample.film[1] *= args->pixel_normalized_size[1];
+    sample.lens[0] = ssp_rng_canonical(args->rng);
+    sample.lens[1] = ssp_rng_canonical(args->rng);
 
-    /* Generate a ray starting from the pinhole camera and passing through the
-     * pixel sample */
-    htrdr_camera_ray(cmd->sensor.camera, pix_samp, ray_org, ray_dir);
+    /* Generate a camera ray */
+    scam_generate_ray(cmd->sensor.camera, &sample, &ray);
 
     r0 = ssp_rng_canonical(args->rng);
     r1 = ssp_rng_canonical(args->rng);
@@ -381,11 +381,11 @@ draw_pixel_xwave
     switch(cmd->spectral_type) {
       case HTRDR_SPECTRAL_LW:
         weight = atmosphere_compute_radiance_lw(cmd, args->ithread, args->rng,
-          ray_org, ray_dir, wlen, iband, iquad);
+          ray.org, ray.dir, wlen, iband, iquad);
         break;
       case HTRDR_SPECTRAL_SW:
         weight = atmosphere_compute_radiance_sw(cmd, args->ithread, args->rng,
-          ATMOSPHERE_RADIANCE_ALL, ray_org, ray_dir, wlen, iband, iquad);
+          ATMOSPHERE_RADIANCE_ALL, ray.org, ray.dir, wlen, iband, iquad);
         break;
       default: FATAL("Unreachable code.\n"); break;
     }

@@ -25,6 +25,7 @@ find_package(AtrSTM REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
+find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.10 REQUIRED)
 find_package(StarVX 0.1 REQUIRED)
@@ -37,6 +38,7 @@ include_directories(
   ${AtrSTM_INCLUDE_DIR}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
+  ${StarCamera_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
@@ -84,7 +86,8 @@ rcmake_prepend_path(HTRDR_COMBUSTION_FILES_INC ${HTRDR_SOURCE_DIR}/combustion)
 add_library(htrdr-combustion SHARED
   ${HTRDR_COMBUSTION_FILES_SRC}
   ${HTRDR_COMBUSTION_FILES_INC})
-target_link_libraries(htrdr-combustion htrdr-core AtrSTM RSys Star3D StarSF StarSP)
+target_link_libraries(htrdr-combustion
+  htrdr-core AtrSTM RSys Star3D StarCamera StarSF StarSP)
 
 set_target_properties(htrdr-combustion PROPERTIES
   DEFINE_SYMBOL HTRDR_SHARED_BUILD

@@ -20,7 +20,7 @@
 
 /* Forward declarations */
 struct htrdr;
-struct htrdr_camera;
+struct scam;
 struct htrdr_rectangle;
 struct ssp_rng;
 
@@ -30,7 +30,7 @@ enum htrdr_sensor_type {
 };
 
 struct htrdr_sensor {
-  struct htrdr_camera* camera;
+  struct scam* camera;
   struct htrdr_rectangle* rectangle;
   enum htrdr_sensor_type type;
 };

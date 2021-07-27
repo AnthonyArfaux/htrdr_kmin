@@ -27,7 +27,7 @@ find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
-find_package(StarSP 0.9 REQUIRED)
+find_package(StarSP 0.10 REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
 find_package(MPI 2 REQUIRED)
 
@@ -77,7 +77,6 @@ set(HTRDR_CORE_FILES_SRC
   htrdr.c
   htrdr_args.c
   htrdr_buffer.c
-  htrdr_camera.c
   htrdr_cie_xyz.c
   htrdr_draw_map.c
   htrdr_geometry.c
@@ -91,7 +90,6 @@ set(HTRDR_CORE_FILES_INC
   htrdr.h
   htrdr_accum.h
   htrdr_buffer.h
-  htrdr_camera.h
   htrdr_c.h
   htrdr_cie_xyz.h
   htrdr_draw_map.h
