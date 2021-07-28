@@ -26,6 +26,7 @@ find_package(MruMtl 0.0 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
+find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.10 REQUIRED)
 find_package(OpenMP 1.2 REQUIRED)
@@ -42,6 +43,7 @@ include_directories(
   ${MruMtl_INCLUDE_DIR}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
+  ${StarCamera_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
   ${StarVX_INCLUDE_DIR}
@@ -57,6 +59,8 @@ set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_TGT "0,1,0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_UP  "0,0,1" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_FOV "70" CACHE INTERNAL "")
+set(HTRDR_ARGS_DEFAULT_CAMERA_LENS_RADIUS "0" CACHE INTERNAL "")
+set(HTRDR_ARGS_DEFAULT_CAMERA_FOCAL_DST "1" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_RECTANGLE_POS "0,0,0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_RECTANGLE_TGT "0,0,1" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_RECTANGLE_UP "0,1,0" CACHE INTERNAL "")
@@ -116,7 +120,7 @@ add_library(htrdr-core SHARED
   ${HTRDR_CORE_FILES_SRC}
   ${HTRDR_CORE_FILES_INC}
   ${HTRDR_CORE_FILES_INC2})
-target_link_libraries(htrdr-core AW MruMtl RSys Star3D StarSF StarSP)
+target_link_libraries(htrdr-core AW MruMtl RSys Star3D StarCamera StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr-core m)

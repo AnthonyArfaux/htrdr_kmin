@@ -179,6 +179,8 @@ setup_sensor
       d3_set(cam_args.up, args->sensor.camera.up);
       cam_args.aspect_ratio = proj_ratio;
       cam_args.field_of_view = MDEG2RAD(args->sensor.camera.fov_y);
+      cam_args.lens_radius = args->sensor.camera.lens_radius;
+      cam_args.focal_distance = args->sensor.camera.focal_dst;
       res = scam_create_perspective
         (htrdr_get_logger(cmd->htrdr),
          htrdr_get_allocator(cmd->htrdr),

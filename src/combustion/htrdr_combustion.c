@@ -176,6 +176,8 @@ setup_camera
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
   cam_args.field_of_view = MDEG2RAD(args->camera.fov_y);
+  cam_args.lens_radius = args->camera.lens_radius;
+  cam_args.focal_distance = args->camera.focal_dst;
 
   return scam_create_perspective
     (htrdr_get_logger(cmd->htrdr),
