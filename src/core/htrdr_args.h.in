@@ -23,6 +23,10 @@
 
 #include <rsys/rsys.h>
 
+/* Exclusive bounds of the camera field of view (degrees) */
+#define HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN@
+#define HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX@
+
 /* Arguments of a pinhole camera sensor */
 struct htrdr_args_camera {
   double position[3]; /* Lens position */

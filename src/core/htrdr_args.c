@@ -29,9 +29,6 @@
 
 #include <string.h>
 
-#define FOV_EXCLUSIVE_MIN 0.0 /* In degrees */
-#define FOV_EXCLUSIVE_MAX 180.0 /* In degrees */
-
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -71,9 +68,10 @@ parse_fov(const char* str, double* out_fov)
     fprintf(stderr, "Invalid field of view `%s'.\n", str);
     return RES_BAD_ARG;
   }
-  if(fov <= FOV_EXCLUSIVE_MIN || fov >= FOV_EXCLUSIVE_MAX) {
-    fprintf(stderr, "The field of view %g is not in ]%g, %g[.\n",
-      fov, FOV_EXCLUSIVE_MIN, FOV_EXCLUSIVE_MAX);
+  if(fov <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN 
+  || fov >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
+    fprintf(stderr, "The field of view %g is not in ]%g, %g[.\n", fov,
+      HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN, HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
     return RES_BAD_ARG;
   }
   *out_fov = fov;
@@ -506,15 +504,16 @@ htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
       goto error;
     }
     cam->fov_y = MRAD2DEG(cam->fov_y);
-    if(cam->fov_y <= FOV_EXCLUSIVE_MIN || cam->fov_y >= FOV_EXCLUSIVE_MAX) {
+    if(cam->fov_y <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN
+    || cam->fov_y >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
       fprintf(stderr,
         "Invalid focal length %g regarding the lens radius %g. "
         "The corresponding field of view %g is not in ]%g, %g[ degrees.\n",
         cam->focal_length,
         cam->lens_radius,
         cam->fov_y,
-        FOV_EXCLUSIVE_MIN,
-        FOV_EXCLUSIVE_MAX);
+        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN,
+        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
       res = RES_BAD_ARG;
       goto error;
     }

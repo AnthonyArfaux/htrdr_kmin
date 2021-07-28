@@ -55,6 +55,8 @@ include_directories(
 ################################################################################
 # Generate files
 ################################################################################
+set(HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN "0.0" CACHE INTERNAL "")
+set(HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX "180.0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_POS "0,0,0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_TGT "0,1,0" CACHE INTERNAL "")
 set(HTRDR_ARGS_DEFAULT_CAMERA_UP  "0,0,1" CACHE INTERNAL "")
