@@ -163,8 +163,8 @@ atmosphere_compute_radiance_lw
 
   /* Setup the phase function for this spectral band & quadrature point */
   CHK(RES_OK == ssf_phase_create
-    (htrdr_get_thread_allocator(cmd->htrdr, ithread), 
-     &ssf_phase_hg, 
+    (htrdr_get_thread_allocator(cmd->htrdr, ithread),
+     &ssf_phase_hg,
      &phase_hg));
   g = htsky_fetch_per_wavelength_particle_phase_function_asymmetry_parameter
     (cmd->sky, wlen);
@@ -178,6 +178,11 @@ atmosphere_compute_radiance_lw
   for(;;) {
     struct filter_context ctx = FILTER_CONTEXT_NULL;
 
+    /* Find the first intersection with the surface geometry */
+    d2(range, 0, DBL_MAX);
+    HTRDR(atmosphere_ground_trace_ray
+      (cmd->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
+
     /* Sample an optical thickness */
     ctx.Ts = ssp_ran_exp(rng, 1);
 
@@ -187,13 +192,8 @@ atmosphere_compute_radiance_lw
     ctx.iband = iband;
     ctx.iquad = iquad;
 
-    /* Found the first intersection with the surface geometry */
-    HTRDR(atmosphere_ground_trace_ray
-      (cmd->ground, pos, dir, range, &s3d_hit_prev, &s3d_hit));
-
     /* Fit the ray range to the surface distance along the ray */
-    range[0] = 0;
-    range[1] = s3d_hit.distance;
+    d2(range, 0, s3d_hit.distance);
 
     /* Trace a ray into the participating media */
     HTSKY(trace_ray(cmd->sky, pos, dir, range, NULL,
