@@ -25,8 +25,9 @@ find_package(HTSky 0.2 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
+find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
-find_package(StarSP 0.9 REQUIRED)
+find_package(StarSP 0.10 REQUIRED)
 find_package(StarVX 0.1 REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
@@ -36,6 +37,7 @@ include(rcmake_runtime)
 include_directories(
   ${HTSky_INCLUDE_DIR}
   ${RSys_INCLUDE_DIR}
+  ${StarCamera_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
@@ -84,7 +86,8 @@ add_library(htrdr-atmosphere SHARED
   ${HTRDR_ATMOSPHERE_FILES_SRC}
   ${HTRDR_ATMOSPHERE_FILES_INC}
   ${HTRDR_ATMOSPHERE_FILES_INC2})
-target_link_libraries(htrdr-atmosphere htrdr-core HTSky RSys Star3D StarSF StarSP)
+target_link_libraries(htrdr-atmosphere
+  htrdr-core HTSky RSys Star3D StarCamera StarSF StarSP)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   target_link_libraries(htrdr-atmosphere m)

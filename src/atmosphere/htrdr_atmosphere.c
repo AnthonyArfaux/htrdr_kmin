@@ -24,7 +24,6 @@
 #include "atmosphere/htrdr_atmosphere_sun.h"
 
 #include "core/htrdr_buffer.h"
-#include "core/htrdr_camera.h"
 #include "core/htrdr_cie_xyz.h"
 #include "core/htrdr_log.h"
 #include "core/htrdr_materials.h"
@@ -33,7 +32,10 @@
 
 #include <high_tune/htsky.h>
 
+#include <star/scam.h>
+
 #include <rsys/cstr.h>
+#include <rsys/double3.h>
 
 #include <math.h>
 
@@ -153,6 +155,7 @@ setup_sensor
    const struct htrdr_atmosphere_args* args)
 {
   double proj_ratio;
+  struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
@@ -171,13 +174,18 @@ setup_sensor
       proj_ratio =
         (double)args->image.definition[0]
       / (double)args->image.definition[1];
-      res = htrdr_camera_create
-        (cmd->htrdr,
-         args->sensor.camera.position,
-         args->sensor.camera.target,
-         args->sensor.camera.up,
-         proj_ratio,
-         MDEG2RAD(args->sensor.camera.fov_y),
+      d3_set(cam_args.position, args->sensor.camera.position);
+      d3_set(cam_args.target, args->sensor.camera.target);
+      d3_set(cam_args.up, args->sensor.camera.up);
+      cam_args.aspect_ratio = proj_ratio;
+      cam_args.field_of_view = MDEG2RAD(args->sensor.camera.fov_y);
+      cam_args.lens_radius = args->sensor.camera.lens_radius;
+      cam_args.focal_distance = args->sensor.camera.focal_dst;
+      res = scam_create_perspective
+        (htrdr_get_logger(cmd->htrdr),
+         htrdr_get_allocator(cmd->htrdr),
+         htrdr_get_verbosity_level(cmd->htrdr),
+         &cam_args,
          &cmd->sensor.camera);
       break;
     case HTRDR_SENSOR_RECTANGLE:
@@ -243,7 +251,7 @@ atmosphere_release(ref_T* ref)
   if(cmd->sun) htrdr_atmosphere_sun_ref_put(cmd->sun);
   if(cmd->cie) htrdr_cie_xyz_ref_put(cmd->cie);
   if(cmd->ran_wlen) htrdr_ran_wlen_ref_put(cmd->ran_wlen);
-  if(cmd->sensor.camera) htrdr_camera_ref_put(cmd->sensor.camera);
+  if(cmd->sensor.camera) SCAM(ref_put(cmd->sensor.camera));
   if(cmd->sensor.rectangle) htrdr_rectangle_ref_put(cmd->sensor.rectangle);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->sky) HTSKY(ref_put(cmd->sky));

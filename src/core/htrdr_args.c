@@ -21,6 +21,8 @@
 #include "core/htrdr_args.h"
 #include "core/htrdr_version.h"
 
+#include <star/scam.h>
+
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
 #include <rsys/str.h>
@@ -66,11 +68,73 @@ parse_fov(const char* str, double* out_fov)
     fprintf(stderr, "Invalid field of view `%s'.\n", str);
     return RES_BAD_ARG;
   }
-  if(fov <= 0 || fov >= 180) {
-    fprintf(stderr, "The field of view %g is not in [30, 120].\n", fov);
+  if(fov <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN 
+  || fov >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
+    fprintf(stderr, "The field of view %g is not in ]%g, %g[.\n", fov,
+      HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN, HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
     return RES_BAD_ARG;
   }
   *out_fov = fov;
+  return RES_OK;
+}
+
+static res_T
+parse_focal_length(const char* str, double* out_length)
+{
+  double length;
+  res_T res = RES_OK;
+  ASSERT(str && out_length);
+
+  res = cstr_to_double(str, &length);
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid focal length `%s'.\n", str);
+    return RES_BAD_ARG;
+  }
+  if(length <= 0) {
+    fprintf(stderr, "Invalid negative or null focal length %g.\n", length);
+    return RES_BAD_ARG;
+  }
+  *out_length = length;
+  return RES_OK;
+}
+
+static res_T
+parse_lens_radius(const char* str, double* out_radius)
+{
+  double radius;
+  res_T res = RES_OK;
+  ASSERT(str && out_radius);
+
+  res = cstr_to_double(str, &radius);
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid lens radius `%s'.\n", str);
+    return RES_BAD_ARG;
+  }
+  if(radius < 0) {
+    fprintf(stderr, "Invalid negative lens radius %g.\n", radius);
+    return RES_BAD_ARG;
+  }
+  *out_radius = radius;
+  return RES_OK;
+}
+
+static res_T
+parse_focal_dst(const char* str, double* out_dst)
+{
+  double dst;
+  res_T res = RES_OK;
+  ASSERT(str && out_dst);
+
+  res = cstr_to_double(str, &dst);
+  if(res != RES_OK) {
+    fprintf(stderr, "Invalid focal distance `%s'.\n", str);
+    return RES_BAD_ARG;
+  }
+  if(dst <= 0) {
+    fprintf(stderr, "Invalid negative or null focal disrtance %g.\n", dst);
+    return RES_BAD_ARG;
+  }
+  *out_dst = dst;
   return RES_OK;
 }
 
@@ -178,6 +242,14 @@ parse_camera_parameter(const char* str, void* args)
     PARSE("up vector", parse_doubleX(val, cam->up, 3));
   } else if(!strcmp(key, "fov")) {
     PARSE("field-of-view", parse_fov(val, &cam->fov_y));
+    cam->focal_length = -1; /* Overwrite the focal_length */
+  } else if(!strcmp(key, "focal-length")) {
+    PARSE("focal-length", parse_focal_length(val, &cam->focal_length));
+    cam->fov_y = -1; /* Overwrite the fov */
+  } else if(!strcmp(key, "lens-radius")) {
+    PARSE("lens radius", parse_lens_radius(val, &cam->lens_radius));
+  } else if(!strcmp(key, "focal-dst")) {
+    PARSE("focal distance", parse_focal_dst(val, &cam->focal_dst));
   } else {
     fprintf(stderr, "Invalid camera parameter `%s'.\n", key);
     res = RES_BAD_ARG;
@@ -394,9 +466,64 @@ error:
 res_T
 htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
 {
-  if(!cam || !str) return RES_BAD_ARG;
-  return cstr_parse_list(str, ':', parse_camera_parameter, cam);
-}
+  res_T res = RES_OK;
+
+  if(!cam || !str) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = cstr_parse_list(str, ':', parse_camera_parameter, cam);
+  if(res != RES_OK) goto error;
+  
+  if(cam->focal_length < 0) {
+    ASSERT(cam->fov_y > 0);
+    res = scam_field_of_view_to_focal_length
+      (cam->lens_radius, MDEG2RAD(cam->fov_y), &cam->focal_length);
+    if(res != RES_OK) {
+      fprintf(stderr,
+        "Cannot compute the focal length from the lens radius %g "
+        "and the field of view %g -- %s.\n", 
+        cam->lens_radius,
+        cam->fov_y,
+        res_to_cstr(res));
+      goto error;
+    }
+
+  } else if(cam->fov_y < 0) {
+    ASSERT(cam->focal_length > 0);
+    res = scam_focal_length_to_field_of_view
+      (cam->lens_radius, cam->focal_length, &cam->fov_y);
+    if(res != RES_OK) {
+      fprintf(stderr,
+        "Cannot compute the field of view from the lens radius %g "
+        "and the focal length %g -- %s.\n", 
+        cam->lens_radius,
+        cam->focal_length,
+        res_to_cstr(res));
+      goto error;
+    }
+    cam->fov_y = MRAD2DEG(cam->fov_y);
+    if(cam->fov_y <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN
+    || cam->fov_y >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
+      fprintf(stderr,
+        "Invalid focal length %g regarding the lens radius %g. "
+        "The corresponding field of view %g is not in ]%g, %g[ degrees.\n",
+        cam->focal_length,
+        cam->lens_radius,
+        cam->fov_y,
+        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN,
+        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+} 
 
 res_T
 htrdr_args_rectangle_parse(struct htrdr_args_rectangle* rect, const char* str)

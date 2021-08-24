@@ -79,14 +79,31 @@ OPTIONS
 -------
 
 *-C* <__camera-parameter__:...>::
-  Define the rendering point of view. Available camera parameters are:
+  Define the camera. Available parameters are:
+
+  **focal-dst**=**_dst_**;;
+    Distance to focus on with a thin lens camera, that is, a camera whose
+    *lens-radius* is not zero. The default focal distance is
+    @HTRDR_ARGS_DEFAULT_CAMERA_FOCAL_DST@ meter.
+
+  **focal-length**=**_length_**;;
+    Focal length of a camera lens. It is another way to control the field of
+    view of a thin lens camera. Be default, the field of view is directly set
+    through the **fov** parameter.
 
   **fov**=**_angle_**;;
-    Vertical field of view of the camera in [30, 120] degrees. By default
-    _angle_ is set to @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+    Vertical field of view of the camera in
+    ]@HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN@,
+    @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX@[ degrees. By default _angle_ is set to
+    @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+
+  **lens-radius**=**_radius_**;;
+    Radius of the camera lens. A non-zero radius means that the camera is a
+    thin lens camera while a zero radius defines a pinhole camera. By default
+    the lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_LENS_RADIUS@.
 
   **pos**=**_x_**,**_y_**,**_z_**;;
-    Position of the camera. By default it is set to
+    Camera lens position. By default it is set to
     {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
 
   **tgt**=**_x_**,**_y_**,**_z_**;;
@@ -306,7 +323,7 @@ EXAMPLES
 
 Make htrdr-combustion verbose (option *-v*) and render an image of a combustion
 medium whose tetrahedral mesh is stored in *tetra.sth* and its associated
-thermodynamic properties are saved in *thermprops.atrtp*. The spectrally 
+thermodynamic properties are saved in *thermprops.atrtp*. The spectrally
 varying indices of the medium are listed in the *refract_ids.atrri* file. The
 center of the laser surface emission is positioned at the origin and its
 direction is aligned to the Y axis. The definition of the rendered image is

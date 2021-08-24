@@ -82,7 +82,7 @@ W/sr/m^2 excepted for monochromatic computations where the computed spectral
 radiance is defined in W/sr/m^2/nm. The flux densities are saved in W/m^2. The
 results are written to the output file if the *-o* option is defined and the
 standard output otherwise. The output image is a list of raw ASCII data
-formatted with respect to the *htrdr-image*(5) file format. 
+formatted with respect to the *htrdr-image*(5) file format.
 
 *htrdr-atmosphere* supports shared memory parallelism and relies on the Message
 Passing Interface specification [4] to parallelise its computations in a
@@ -101,14 +101,31 @@ OPTIONS
   are taken into account.
 
 *-C* <__camera-parameter__:...>::
-  Define the rendering point of view. Available camera parameters are:
+  Define the camera. Available parameters are:
+
+  **focal-dst**=**_dst_**;;
+    Distance to focus on with a thin lens camera, that is, a camera whose
+    *lens-radius* is not zero. The default focal distance is
+    @HTRDR_ARGS_DEFAULT_CAMERA_FOCAL_DST@ meter.
+
+  **focal-length**=**_length_**;;
+    Focal length of a camera lens. It is another way to control the field of
+    view of a thin lens camera. Be default, the field of view is directly set
+    through the **fov** parameter.
 
   **fov**=**_angle_**;;
-    Vertical field of view of the camera in [30, 120] degrees. By default
-    _angle_ is set to @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+    Vertical field of view of the camera in
+    ]@HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN@,
+    @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX@[ degrees. By default _angle_ is set to
+    @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+
+  **lens-radius**=**_radius_**;;
+    Radius of the camera lens. A non-zero radius means that the camera is a
+    thin lens camera while a zero radius defines a pinhole camera. By default
+    the lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_LENS_RADIUS@.
 
   **pos**=**_x_**,**_y_**,**_z_**;;
-    Position of the camera. By default it is set to
+    Camera lens position. By default it is set to
     {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
 
   **tgt**=**_x_**,**_y_**,**_z_**;;
@@ -290,7 +307,7 @@ integrated radiance in W/sr/m^2 for the X, Y, and Z components of the CIE
 1931 XYZ color space. The first value of each pair is the expected value of the
 average radiance of the pixel. The second value is its associated standard
 deviation. The fourth and final pair records the microsecond estimate of the
-computation time per radiative path and its standard error. 
+computation time per radiative path and its standard error.
 
 Longwave image
 ~~~~~~~~~~~~~~
@@ -304,7 +321,7 @@ spectral radiance in W/sr/m^2/nm depending on whether this radiance was
 calculated for a spectral range or at a single wavelength.  The fifth and sixth
 pixel components are not used. Finally, the last 2 components of the pixel
 record the estimate in microseconds of the computation time per radiative path
-and its standard error. 
+and its standard error.
 
 Shortwave image
 ~~~~~~~~~~~~~~~
