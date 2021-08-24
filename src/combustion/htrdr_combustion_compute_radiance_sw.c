@@ -878,7 +878,6 @@ combustion_compute_radiance_sw
 
   d3_set(pos, pos_in);
   d3_set(dir, dir_in);
-  d2(range, 0, FLT_MAX);
 
   wlen = htrdr_combustion_laser_get_wavelength(cmd->laser);
 
@@ -904,7 +903,7 @@ combustion_compute_radiance_sw
       /* Find the intersection with the combustion chamber geometry */
       d3_set(rt_args.ray_org, pos);
       d3_set(rt_args.ray_dir, dir);
-      d2_set(rt_args.ray_range, range);
+      d2(rt_args.ray_range, 0, DBL_MAX);
       rt_args.hit_from = hit_prev; /* Avoid self intersection */
       HTRDR(geometry_trace_ray(cmd->geom, &rt_args, &hit_curr));
 
