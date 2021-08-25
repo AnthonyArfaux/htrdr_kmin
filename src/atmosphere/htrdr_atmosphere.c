@@ -150,61 +150,118 @@ spherical_to_cartesian_dir
 }
 
 static res_T
+setup_camera_orthographic
+  (struct htrdr_atmosphere* cmd,
+   const struct htrdr_atmosphere_args* args)
+{
+  struct scam_orthographic_args cam_args = SCAM_ORTHOGRAPHIC_ARGS_DEFAULT;
+  ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
+  ASSERT(args->cam_type == HTRDR_ARGS_CAMERA_ORTHOGRAPHIC);
+
+  d3_set(cam_args.position, args->cam_ortho.position);
+  d3_set(cam_args.target, args->cam_ortho.target);
+  d3_set(cam_args.up, args->cam_ortho.up);
+  cam_args.height = args->cam_ortho.height;
+  cam_args.aspect_ratio =
+    (double)args->image.definition[0]
+  / (double)args->image.definition[1];
+
+  return scam_create_orthographic
+    (htrdr_get_logger(cmd->htrdr),
+     htrdr_get_allocator(cmd->htrdr),
+     htrdr_get_verbosity_level(cmd->htrdr),
+     &cam_args,
+     &cmd->camera);
+}
+
+static res_T
+setup_camera_perspective
+  (struct htrdr_atmosphere* cmd,
+   const struct htrdr_atmosphere_args* args)
+{
+  struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
+  ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
+  ASSERT(args->cam_type == HTRDR_ARGS_CAMERA_PERSPECTIVE);
+
+  d3_set(cam_args.position, args->cam_persp.position);
+  d3_set(cam_args.target, args->cam_persp.target);
+  d3_set(cam_args.up, args->cam_persp.up);
+  cam_args.aspect_ratio =
+    (double)args->image.definition[0]
+  / (double)args->image.definition[1];
+  cam_args.field_of_view = MDEG2RAD(args->cam_persp.fov_y);
+  cam_args.lens_radius = args->cam_persp.lens_radius;
+  cam_args.focal_distance = args->cam_persp.focal_dst;
+
+  return scam_create_perspective
+    (htrdr_get_logger(cmd->htrdr),
+     htrdr_get_allocator(cmd->htrdr),
+     htrdr_get_verbosity_level(cmd->htrdr),
+     &cam_args,
+     &cmd->camera);
+}
+
+static res_T
+setup_camera
+  (struct htrdr_atmosphere* cmd,
+   const struct htrdr_atmosphere_args* args)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
+  switch(args->cam_type) {
+    case HTRDR_ARGS_CAMERA_ORTHOGRAPHIC:
+      res = setup_camera_orthographic(cmd, args);
+      break;
+    case HTRDR_ARGS_CAMERA_PERSPECTIVE:
+      res = setup_camera_perspective(cmd, args);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return res;
+}
+
+static res_T
+setup_flux_map
+  (struct htrdr_atmosphere* cmd,
+   const struct htrdr_atmosphere_args* args)
+{
+  ASSERT(cmd && args);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP);
+
+  if(args->spectral.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+    htrdr_log_err(cmd->htrdr,
+      "the CIE 1931 XYZ spectral integration can be used only with a camera"
+      "sensor.\n");
+    return RES_BAD_ARG;
+  }
+
+  return htrdr_rectangle_create
+    (cmd->htrdr,
+     args->flux_map.size,
+     args->flux_map.position,
+     args->flux_map.target,
+     args->flux_map.up,
+     &cmd->flux_map);
+}
+
+static res_T
 setup_sensor
   (struct htrdr_atmosphere* cmd,
    const struct htrdr_atmosphere_args* args)
 {
-  double proj_ratio;
-  struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
   res_T res = RES_OK;
-  ASSERT(cmd && args);
-
-  cmd->sensor.type = args->sensor_type;
-
-  if(args->spectral.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ
-  && args->sensor_type != HTRDR_SENSOR_CAMERA) {
-    htrdr_log_err(cmd->htrdr, "the CIE 1931 XYZ spectral integration can be used "
-      "only with a camera sensor.\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
-
-  switch(args->sensor_type) {
-    case HTRDR_SENSOR_CAMERA:
-      proj_ratio =
-        (double)args->image.definition[0]
-      / (double)args->image.definition[1];
-      d3_set(cam_args.position, args->sensor.camera.position);
-      d3_set(cam_args.target, args->sensor.camera.target);
-      d3_set(cam_args.up, args->sensor.camera.up);
-      cam_args.aspect_ratio = proj_ratio;
-      cam_args.field_of_view = MDEG2RAD(args->sensor.camera.fov_y);
-      cam_args.lens_radius = args->sensor.camera.lens_radius;
-      cam_args.focal_distance = args->sensor.camera.focal_dst;
-      res = scam_create_perspective
-        (htrdr_get_logger(cmd->htrdr),
-         htrdr_get_allocator(cmd->htrdr),
-         htrdr_get_verbosity_level(cmd->htrdr),
-         &cam_args,
-         &cmd->sensor.camera);
+  switch(cmd->output_type) {
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP:
+      res = setup_flux_map(cmd, args);
       break;
-    case HTRDR_SENSOR_RECTANGLE:
-      res = htrdr_rectangle_create
-        (cmd->htrdr,
-         args->sensor.rectangle.size,
-         args->sensor.rectangle.position,
-         args->sensor.rectangle.target,
-         args->sensor.rectangle.up,
-         &cmd->sensor.rectangle);
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE:
+      res = setup_camera(cmd, args);
       break;
-    default: FATAL("Unreachable code.\n"); break;
+    default: /* Nothing to do */ break;
   }
-  if(res != RES_OK) goto error;
-
-exit:
   return res;
-error:
-  goto exit;
 }
 
 static res_T
@@ -251,8 +308,8 @@ atmosphere_release(ref_T* ref)
   if(cmd->sun) htrdr_atmosphere_sun_ref_put(cmd->sun);
   if(cmd->cie) htrdr_cie_xyz_ref_put(cmd->cie);
   if(cmd->ran_wlen) htrdr_ran_wlen_ref_put(cmd->ran_wlen);
-  if(cmd->sensor.camera) SCAM(ref_put(cmd->sensor.camera));
-  if(cmd->sensor.rectangle) htrdr_rectangle_ref_put(cmd->sensor.rectangle);
+  if(cmd->camera) SCAM(ref_put(cmd->camera));
+  if(cmd->flux_map) htrdr_rectangle_ref_put(cmd->flux_map);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->sky) HTSKY(ref_put(cmd->sky));
   if(cmd->output && cmd->output != stdout) fclose(cmd->output);
@@ -290,8 +347,7 @@ htrdr_atmosphere_create
   }
   ref_init(&cmd->ref);
   str_init(htrdr_get_allocator(htrdr), &cmd->output_name);
-  cmd->dump_volumetric_acceleration_structure = 
-    args->dump_volumetric_acceleration_structure;
+  cmd->output_type = args->output_type;
   cmd->verbose = args->verbose;
   cmd->spp = args->image.spp;
   cmd->width = args->image.definition[0];
@@ -398,7 +454,7 @@ htrdr_atmosphere_create
   }
 
 
-  if(!cmd->dump_volumetric_acceleration_structure) {
+  if(cmd->output_type != HTRDR_ATMOSPHERE_ARGS_OUTPUT_OCTREES) {
     struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
     atmosphere_get_pixel_format(cmd, &pixfmt);
 
@@ -446,19 +502,17 @@ res_T
 htrdr_atmosphere_run(struct htrdr_atmosphere* cmd)
 {
   res_T res = RES_OK;
-
-  if(cmd->dump_volumetric_acceleration_structure) {
-    res = dump_volumetric_acceleration_structure(cmd);
-    if(res != RES_OK) goto error;
-  } else {
-    res = atmosphere_draw_map(cmd);
-    if(res != RES_OK) goto error;
+  switch(cmd->output_type) {
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE:
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP:
+      res = atmosphere_draw_map(cmd);
+      break;
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_OCTREES:
+      res = dump_volumetric_acceleration_structure(cmd);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
   }
-
-exit:
   return res;
-error:
-  goto exit;
 }
 
 /*******************************************************************************
@@ -470,12 +524,12 @@ atmosphere_get_pixel_format
    struct htrdr_pixel_format* fmt)
 {
   ASSERT(cmd && fmt);
-  switch(cmd->sensor.type) {
-    case HTRDR_SENSOR_RECTANGLE:
+  switch(cmd->output_type) {
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP:
       fmt->size = sizeof(struct atmosphere_pixel_flux);
       fmt->alignment = ALIGNOF(struct atmosphere_pixel_flux);
       break;
-    case HTRDR_SENSOR_CAMERA:
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE:
       switch(cmd->spectral_type) {
         case HTRDR_SPECTRAL_LW:
         case HTRDR_SPECTRAL_SW:

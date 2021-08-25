@@ -39,8 +39,9 @@ print_help(const char* cmd)
 "to the RDG-FA theory and lightened by a laser source.\n\n");
 
   printf(
-"  -C <camera>    define the rendering point of view. Refer to the\n"
-"                 man page for the list of camera options.\n");
+"  -C <perspective-camera>\n"
+"                 define the perspective camera. Refer to the man page\n"
+"                 for the list of camera options.\n");
   printf(
 "  -D FLUX_DENSITY\n"
 "                 flux density of the laser in W/m^2\n"
@@ -91,6 +92,10 @@ print_help(const char* cmd)
 "                 (default: write data to standard output).\n");
   printf(
 "  -p THERMOPROPS path toward the thermodynamic properties.\n");
+  printf(
+"  -P <orthoraphic-camera>\n"
+"                 define the orthoraphic camera. Refer to the man page\n"
+"                 for the list of orthographic camera options.\n");
   printf(
 "  -r REFRACT_ID  path toward the per wavelength refractive\n"
 "                 indices.\n");
@@ -246,11 +251,12 @@ htrdr_combustion_args_init
 
   *args = HTRDR_COMBUSTION_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "C:D:d:F:fg:hIi:l:m:NO:o:p:R:r:sT:t:V:vw:")) != -1) {
+  while((opt = getopt(argc, argv, "C:D:d:F:fg:hIi:l:m:NO:o:P:p:R:r:sT:t:V:vw:")) != -1) {
     switch(opt) {
       case 'C':
         args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE;
-        res = htrdr_args_camera_parse(&args->camera, optarg);
+        args->cam_type = HTRDR_ARGS_CAMERA_PERSPECTIVE;
+        res = htrdr_args_camera_perspective_parse(&args->cam_persp, optarg);
         break;
       case 'D':
         res = cstr_to_double(optarg, &args->laser_flux_density);
@@ -286,6 +292,11 @@ htrdr_combustion_args_init
       case 'O': args->path_cache = optarg; break;
       case 'o': args->path_output = optarg; break;
       case 'p': args->path_therm_props = optarg; break;
+      case 'P':
+        args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE;
+        args->cam_type = HTRDR_ARGS_CAMERA_ORTHOGRAPHIC;
+        res = htrdr_args_camera_orthographic_parse(&args->cam_ortho, optarg);
+        break;
       case 'r': args->path_refract_ids = optarg; break;
       case 'R':
         args->output_type = HTRDR_COMBUSTION_ARGS_OUTPUT_FLUX_MAP;

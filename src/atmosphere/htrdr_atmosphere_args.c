@@ -36,10 +36,10 @@ print_help(const char* cmd)
 
   printf(
 "  -a GAS         filename of the gas optical properties.\n");
-
   printf(
-"  -C <camera>    define the rendering point of view. Refer to the\n"
-"                 %s man page for the list of camera options.\n", cmd);
+"  -C <perspective-camera>\n"
+"                 define the perspective camera. Refer to the man page\n"
+"                 for the list of camera options.\n");
   printf(
 "  -c CLOUDS      filename of the clouds properties.\n");
   printf(
@@ -58,8 +58,8 @@ print_help(const char* cmd)
   printf(
 "  -h             display this help and exit.\n");
   printf(
-"  -i <image>     define the image to compute. Refer to the %s man\n"
-"                 page for the list of image options\n", cmd);
+"  -i <image>     define the image to compute. Refer to the man\n"
+"                 page for the list of image options\n");
   printf(
 "  -M MATERIALS   filename of the ground materials.\n");
   printf(
@@ -77,15 +77,19 @@ print_help(const char* cmd)
   printf(
 "  -p <rectangle> switch in flux computation by defining the rectangular\n"
 "                 sensor onto which the flux is computed. Refer to the\n"
-"                 %s man page for the list of rectangle options.\n", cmd);
+"                 man page for the list of rectangle options.\n");
+  printf(
+"  -P <orthoraphic-camera>\n"
+"                 define the orthoraphic camera. Refer to the man page\n"
+"                 for the list of orthographic camera options.\n");
   printf(
 "  -R             infinitely repeat the ground along the X and Y axis.\n");
   printf(
 "  -r             infinitely repeat the clouds along the X and Y axis.\n");
   printf(
 "  -s <spectral>  define the type and range of the spectral\n"
-"                 integration. Refer to the %s man page for the list\n"
-"                 of spectral options\n", cmd);
+"                 integration. Refer to the man page for the list\n"
+"                 of spectral options\n");
   printf(
 "  -T THRESHOLD   optical thickness used as threshold during the\n"
 "                 building of the volumetric acceleration structure.\n"
@@ -193,16 +197,19 @@ htrdr_atmosphere_args_init
 
   *args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:n:O:o:p:Rrs:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:c:D:dfg:hi:M:m:n:O:o:P:p:Rrs:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a': args->filename_gas = optarg; break;
-       case 'C':
-        args->sensor_type = HTRDR_SENSOR_CAMERA;
-        res = htrdr_args_camera_parse(&args->sensor.camera, optarg);
+      case 'C':
+        args->output_type = HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE;
+        args->cam_type = HTRDR_ARGS_CAMERA_PERSPECTIVE;
+        res = htrdr_args_camera_perspective_parse(&args->cam_persp, optarg);
         break;
       case 'c': args->filename_les = optarg; break;
       case 'D': res = parse_sun_dir(args, optarg); break;
-      case 'd': args->dump_volumetric_acceleration_structure = 1; break;
+      case 'd':
+        args->output_type = HTRDR_ATMOSPHERE_ARGS_OUTPUT_OCTREES;
+        break;
       case 'f': args->force_overwriting = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
@@ -219,8 +226,13 @@ htrdr_atmosphere_args_init
       case 'O': args->filename_cache = optarg; break;
       case 'o': args->filename_output = optarg; break;
       case 'p':
-        args->sensor_type = HTRDR_SENSOR_RECTANGLE;
-        res = htrdr_args_rectangle_parse(&args->sensor.rectangle, optarg);
+        args->output_type = HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP;;
+        res = htrdr_args_rectangle_parse(&args->flux_map, optarg);
+        break;
+      case 'P':
+        args->output_type = HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE;
+        args->cam_type = HTRDR_ARGS_CAMERA_ORTHOGRAPHIC;
+        res = htrdr_args_camera_orthographic_parse(&args->cam_ortho, optarg);
         break;
       case 'r': args->repeat_clouds = 1; break;
       case 'R': args->repeat_ground = 1; break;

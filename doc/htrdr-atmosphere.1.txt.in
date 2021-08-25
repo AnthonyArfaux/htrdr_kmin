@@ -101,7 +101,7 @@ OPTIONS
   are taken into account.
 
 *-C* <__camera-parameter__:...>::
-  Define the camera. Available parameters are:
+  Define a perspective camera. Available parameters are:
 
   **focal-dst**=**_dst_**;;
     Distance to focus on with a thin lens camera, that is, a camera whose

@@ -53,7 +53,7 @@ htrdr_atmosphere_main(int argc, char** argv)
   res = htrdr_create(&mem_default_allocator, &htrdr_args, &htrdr);
   if(res != RES_OK) goto error;
 
-  if(cmd_args.dump_volumetric_acceleration_structure 
+  if(cmd_args.output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_OCTREES
   && htrdr_get_mpi_rank(htrdr) != 0) {
     goto exit; /* Nothing to do except for the master process */
   }
@@ -74,7 +74,7 @@ exit:
   memsz_end = MEM_ALLOCATED_SIZE(&mem_default_allocator);
   if(memsz_begin != memsz_end) {
     ASSERT(memsz_end >= memsz_begin);
-    fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n", 
+    fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n",
       (unsigned long)(memsz_end - memsz_begin));
     err = -1;
   }

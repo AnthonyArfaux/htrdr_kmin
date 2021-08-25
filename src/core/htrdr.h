@@ -77,9 +77,10 @@ htrdr_fprint_license(const char* cmd, FILE* stream)
 {
   ASSERT(cmd);
   fprintf(stream,
-"%s is free software released under the GNU GPL license, version\n"
-"3 or later. You are free to change or redistribute it under certain\n"
-"conditions <http://gnu.org/licenses/gpl.html>.\n", cmd);
+"%s is free software released under the GNU GPL license,\n"
+"version 3 or later. You are free to change or redistribute it\n"
+"under certain conditions <http://gnu.org/licenses/gpl.html>.\n",
+    cmd);
 }
 
 BEGIN_DECLS
