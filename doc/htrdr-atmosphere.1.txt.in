@@ -106,7 +106,7 @@ OPTIONS
   **focal-dst**=**_dst_**;;
     Distance to focus on with a thin lens camera, that is, a camera whose
     *lens-radius* is not zero. The default focal distance is
-    @HTRDR_ARGS_DEFAULT_CAMERA_FOCAL_DST@ meter.
+    @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@ meter.
 
   **focal-length**=**_length_**;;
     Focal length of a camera lens. It is another way to control the field of
@@ -115,14 +115,15 @@ OPTIONS
 
   **fov**=**_angle_**;;
     Vertical field of view of the camera in
-    ]@HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN@,
-    @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX@[ degrees. By default _angle_ is set to
-    @HTRDR_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+    ]@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@,
+    @HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@[ degrees. By
+    default _angle_ is set to
+    @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
 
   **lens-radius**=**_radius_**;;
     Radius of the camera lens. A non-zero radius means that the camera is a
     thin lens camera while a zero radius defines a pinhole camera. By default
-    the lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_LENS_RADIUS@.
+    the lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@.
 
   **pos**=**_x_**,**_y_**,**_z_**;;
     Camera lens position. By default it is set to
@@ -211,6 +212,25 @@ OPTIONS
 *-o* _output_::
   File where *htrdr-atmosphere* writes its _output_ data. If not defined, write
   results to standard output.
+
+*-P* <__camera-parameter__:...>::
+  Define an orthographic camera. Available parameters are:
+
+  **height**=**_radius_**;;
+    Height of the image plane. By default it is set to
+    @HTRDR_ARGS_DEFAULT_CAMERA_ORTHOGRAPHIC_HEIGHT@.
+
+  **pos**=**_x_**,**_y_**,**_z_**;;
+    Camera lens position. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+  **tgt**=**_x_**,**_y_**,**_z_**;;
+    Position targeted by the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+  **up**=**_x_**,**_y_**,**_z_**;;
+    Up vector of the camera. By default it is set to
+    {@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
 
 *-p* <__rectangle-parameter__:...>::
   Switch in flux map computation. The flux is computed for the part of the
