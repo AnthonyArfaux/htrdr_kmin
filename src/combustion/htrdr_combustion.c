@@ -161,23 +161,50 @@ error:
 }
 
 static res_T
-setup_camera
+setup_camera_orthographic
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  struct scam_orthographic_args cam_args = SCAM_ORTHOGRAPHIC_ARGS_DEFAULT;
+  ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
+  ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE);
+  ASSERT(args->cam_type == HTRDR_ARGS_CAMERA_ORTHOGRAPHIC);
+
+  d3_set(cam_args.position, args->cam_ortho.position);
+  d3_set(cam_args.target, args->cam_ortho.target);
+  d3_set(cam_args.up, args->cam_ortho.up);
+  cam_args.height = args->cam_ortho.height;
+  cam_args.aspect_ratio =
+    (double)args->image.definition[0]
+  / (double)args->image.definition[1];
+
+  return scam_create_orthographic
+    (htrdr_get_logger(cmd->htrdr),
+     htrdr_get_allocator(cmd->htrdr),
+     htrdr_get_verbosity_level(cmd->htrdr),
+     &cam_args,
+     &cmd->camera);
+}
+
+static res_T
+setup_camera_perspective
   (struct htrdr_combustion* cmd,
    const struct htrdr_combustion_args* args)
 {
   struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
   ASSERT(cmd && args && args->image.definition[0] && args->image.definition[1]);
   ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE);
+  ASSERT(args->cam_type == HTRDR_ARGS_CAMERA_PERSPECTIVE);
 
-  d3_set(cam_args.position, args->camera.position);
-  d3_set(cam_args.target, args->camera.target);
-  d3_set(cam_args.up, args->camera.up);
-  cam_args.aspect_ratio = 
+  d3_set(cam_args.position, args->cam_persp.position);
+  d3_set(cam_args.target, args->cam_persp.target);
+  d3_set(cam_args.up, args->cam_persp.up);
+  cam_args.aspect_ratio =
     (double)args->image.definition[0]
   / (double)args->image.definition[1];
-  cam_args.field_of_view = MDEG2RAD(args->camera.fov_y);
-  cam_args.lens_radius = args->camera.lens_radius;
-  cam_args.focal_distance = args->camera.focal_dst;
+  cam_args.field_of_view = MDEG2RAD(args->cam_persp.fov_y);
+  cam_args.lens_radius = args->cam_persp.lens_radius;
+  cam_args.focal_distance = args->cam_persp.focal_dst;
 
   return scam_create_perspective
     (htrdr_get_logger(cmd->htrdr),
@@ -185,6 +212,25 @@ setup_camera
      htrdr_get_verbosity_level(cmd->htrdr),
      &cam_args,
      &cmd->camera);
+}
+
+static res_T
+setup_camera
+  (struct htrdr_combustion* cmd,
+   const struct htrdr_combustion_args* args)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd->output_type == HTRDR_COMBUSTION_ARGS_OUTPUT_IMAGE);
+  switch(args->cam_type) {
+    case HTRDR_ARGS_CAMERA_ORTHOGRAPHIC:
+      res = setup_camera_orthographic(cmd, args);
+      break;
+    case HTRDR_ARGS_CAMERA_PERSPECTIVE:
+      res = setup_camera_perspective(cmd, args);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  return res;
 }
 
 static res_T

@@ -68,10 +68,11 @@ parse_fov(const char* str, double* out_fov)
     fprintf(stderr, "Invalid field of view `%s'.\n", str);
     return RES_BAD_ARG;
   }
-  if(fov <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN 
-  || fov >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
+  if(fov <= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN 
+  || fov >= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX) {
     fprintf(stderr, "The field of view %g is not in ]%g, %g[.\n", fov,
-      HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN, HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
+      HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN, 
+      HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX);
     return RES_BAD_ARG;
   }
   *out_fov = fov;
@@ -139,6 +140,30 @@ parse_focal_dst(const char* str, double* out_dst)
 }
 
 static res_T
+parse_image_plane_height(const char* str, double* out_height)
+{
+  double height;
+  res_T res = RES_OK;
+  ASSERT(str && out_height);
+
+  res = cstr_to_double(str, &height);
+  if(res != RES_OK) {
+    fprintf(stderr, 
+      "Invalid height `%s' of the image plane of the orthographic camera.\n",
+      str);
+    return RES_BAD_ARG;
+  }
+  if(height <= 0) {
+    fprintf(stderr, 
+      "Invalid negative or null height of the image plane "
+      "of the orthographic camera.\n");
+    return RES_BAD_ARG;
+  }
+  *out_height = height;
+  return RES_OK;
+}
+
+static res_T
 parse_image_parameter(const char* str, void* args)
 {
   char buf[128];
@@ -201,10 +226,10 @@ error:
 }
 
 static res_T
-parse_camera_parameter(const char* str, void* args)
+parse_camera_perspective_parameter(const char* str, void* args)
 {
   char buf[128];
-  struct htrdr_args_camera* cam = args;
+  struct htrdr_args_camera_perspective* cam = args;
   char* key;
   char* val;
   char* ctx;
@@ -213,7 +238,7 @@ parse_camera_parameter(const char* str, void* args)
 
   if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
     fprintf(stderr,
-      "Could not duplicate the camera option string `%s'.\n", str);
+      "Could not duplicate the perspective camera option string `%s'.\n", str);
     res = RES_MEM_ERR;
     goto error;
   }
@@ -223,14 +248,15 @@ parse_camera_parameter(const char* str, void* args)
   val = strtok_r(NULL, "", &ctx);
 
   if(!val) {
-    fprintf(stderr, "Missing value to the camera option `%s'.\n", key);
+    fprintf(stderr,
+      "Missing value to the perspective camera parameter `%s'.\n", key);
     res = RES_BAD_ARG;
     goto error;
   }
 
   #define PARSE(Name, Func) {                                                  \
     if(RES_OK != (res = Func)) {                                               \
-      fprintf(stderr, "Invalid camera "Name" `%s'.\n", val);                   \
+      fprintf(stderr, "Invalid perspective camera "Name" `%s'.\n", val);       \
       goto error;                                                              \
     }                                                                          \
   } (void)0
@@ -251,7 +277,61 @@ parse_camera_parameter(const char* str, void* args)
   } else if(!strcmp(key, "focal-dst")) {
     PARSE("focal distance", parse_focal_dst(val, &cam->focal_dst));
   } else {
-    fprintf(stderr, "Invalid camera parameter `%s'.\n", key);
+    fprintf(stderr, "Invalid perspective camera parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  #undef PARSE
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_camera_orthographic_parameter(const char* str, void* args)
+{
+  char buf[128];
+  struct htrdr_args_camera_orthographic* cam = args;
+  char* key;
+  char* val;
+  char* ctx;
+  res_T res = RES_OK;
+  ASSERT(cam && str);
+
+  if(strlen(str) >= sizeof(buf) - 1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the orthographic camera option string `%s'.\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &ctx);
+  val = strtok_r(NULL, "", &ctx);
+
+  if(!val) {
+    fprintf(stderr,
+      "Missing value to the orthographic camera parameter `%s'.\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  #define PARSE(Name, Func) {                                                  \
+    if(RES_OK != (res = Func)) {                                               \
+      fprintf(stderr, "Invalid orthographic camera "Name" `%s'.\n", val);      \
+      goto error;                                                              \
+    }                                                                          \
+  } (void)0
+  if(!strcmp(key, "pos")) {
+    PARSE("position", parse_doubleX(val, cam->position, 3));
+  } else if(!strcmp(key, "tgt")) {
+    PARSE("target", parse_doubleX(val, cam->target, 3));
+  } else if(!strcmp(key, "up")) {
+    PARSE("up vector", parse_doubleX(val, cam->up, 3));
+  } else if(!strcmp(key, "height")) {
+    PARSE("image plane height", parse_image_plane_height(val, &cam->height));
+  } else {
+    fprintf(stderr, "Invalid orthographic camera parameter `%s'.\n", key);
     res = RES_BAD_ARG;
     goto error;
   }
@@ -464,7 +544,9 @@ error:
  * Exported functions
  ******************************************************************************/
 res_T
-htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
+htrdr_args_camera_perspective_parse
+  (struct htrdr_args_camera_perspective* cam,
+   const char* str)
 {
   res_T res = RES_OK;
 
@@ -473,7 +555,7 @@ htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
     goto error;
   }
 
-  res = cstr_parse_list(str, ':', parse_camera_parameter, cam);
+  res = cstr_parse_list(str, ':', parse_camera_perspective_parameter, cam);
   if(res != RES_OK) goto error;
   
   if(cam->focal_length < 0) {
@@ -504,16 +586,16 @@ htrdr_args_camera_parse(struct htrdr_args_camera* cam, const char* str)
       goto error;
     }
     cam->fov_y = MRAD2DEG(cam->fov_y);
-    if(cam->fov_y <= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN
-    || cam->fov_y >= HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX) {
+    if(cam->fov_y <= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN
+    || cam->fov_y >= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX) {
       fprintf(stderr,
         "Invalid focal length %g regarding the lens radius %g. "
         "The corresponding field of view %g is not in ]%g, %g[ degrees.\n",
         cam->focal_length,
         cam->lens_radius,
         cam->fov_y,
-        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN,
-        HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX);
+        HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN,
+        HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX);
       res = RES_BAD_ARG;
       goto error;
     }
@@ -523,7 +605,16 @@ exit:
   return res;
 error:
   goto exit;
-} 
+}
+
+res_T
+htrdr_args_camera_orthographic_parse
+  (struct htrdr_args_camera_orthographic* cam,
+   const char* str)
+{
+  if(!cam || !str) return RES_BAD_ARG;
+  return cstr_parse_list(str, ':', parse_camera_orthographic_parameter, cam);
+}
 
 res_T
 htrdr_args_rectangle_parse(struct htrdr_args_rectangle* rect, const char* str)

@@ -18,9 +18,10 @@
 #ifndef HTRDR_ATMOSPHERE_C_H
 #define HTRDR_ATMOSPHERE_C_H
 
+#include "atmosphere/htrdr_atmosphere_args.h"
+
 #include "core/htrdr_accum.h"
 #include "core/htrdr_buffer.h"
-#include "core/htrdr_sensor.h"
 #include "core/htrdr_spectral.h"
 
 #include <rsys/ref_count.h>
@@ -83,6 +84,7 @@ struct htrdr_buffer;
 struct htrdr_cie_xyz;
 struct htrdr_materials;
 struct htrdr_ran_wlen;
+struct ssp_rng;
 
 struct htrdr_atmosphere {
   struct htrdr_atmosphere_ground* ground;
@@ -91,7 +93,8 @@ struct htrdr_atmosphere {
   struct htrdr_cie_xyz* cie;
   struct htrdr_ran_wlen* ran_wlen;
 
-  struct htrdr_sensor sensor;
+  struct scam* camera; /* Camera */
+  struct htrdr_rectangle* flux_map; /* Flux map */
 
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
@@ -111,7 +114,7 @@ struct htrdr_atmosphere {
 
   unsigned grid_max_definition[3]; /* Max definition of the acceleration grids */
   unsigned nthreads; /* #threads of the process */
-  int dump_volumetric_acceleration_structure; /* Dump octrees */
+  enum htrdr_atmosphere_args_output_type output_type;
   int verbose; /* Verbosity level */
 
   ref_T ref;

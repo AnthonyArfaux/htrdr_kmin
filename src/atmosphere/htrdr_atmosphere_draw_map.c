@@ -117,7 +117,7 @@ draw_pixel_image
   cmd = args->context;
   ASSERT(cmd);
   ASSERT(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ);
-  ASSERT(cmd->sensor.type == HTRDR_SENSOR_CAMERA);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
 
   /* Reset accumulators */
   XYZ[0] = HTRDR_ACCUM_NULL;
@@ -152,7 +152,7 @@ draw_pixel_image
       sample.lens[1] = ssp_rng_canonical(args->rng);
 
       /* Generate a camera ray */
-      scam_generate_ray(cmd->sensor.camera, &sample, &ray);
+      scam_generate_ray(cmd->camera, &sample, &ray);
 
       r0 = ssp_rng_canonical(args->rng);
       r1 = ssp_rng_canonical(args->rng);
@@ -216,7 +216,7 @@ draw_pixel_flux
 
   cmd = args->context;
   ASSERT(cmd);
-  ASSERT(cmd->sensor.type == HTRDR_SENSOR_RECTANGLE);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP);
   ASSERT(cmd->spectral_type == HTRDR_SPECTRAL_LW
       || cmd->spectral_type == HTRDR_SPECTRAL_SW);
 
@@ -240,7 +240,7 @@ draw_pixel_flux
     /* Begin the registration of the time spent in the realisation */
     time_current(&t0);
 
-    res = sample_rectangle_ray(cmd, cmd->sensor.rectangle, args->pixel_coord,
+    res = sample_rectangle_ray(cmd, cmd->flux_map, args->pixel_coord,
       args->pixel_normalized_size, args->rng, ray_org, ray_dir);
     if(res != RES_OK) continue; /* Reject the current sample */
 
@@ -271,7 +271,7 @@ draw_pixel_flux
 
       /* Compute direct contribution if necessary */
       htrdr_atmosphere_sun_sample_direction(cmd->sun, args->rng, sun_dir);
-      htrdr_rectangle_get_normal(cmd->sensor.rectangle, N);
+      htrdr_rectangle_get_normal(cmd->flux_map, N);
       cos_N_sun_dir = d3_dot(N, sun_dir);
 
       if(cos_N_sun_dir <= 0) {
@@ -331,7 +331,7 @@ draw_pixel_xwave
   (void)htrdr;
 
   cmd = args->context;
-  ASSERT(cmd->sensor.type == HTRDR_SENSOR_CAMERA);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
   ASSERT(cmd->spectral_type == HTRDR_SPECTRAL_LW
       || cmd->spectral_type == HTRDR_SPECTRAL_SW);
 
@@ -363,7 +363,7 @@ draw_pixel_xwave
     sample.lens[1] = ssp_rng_canonical(args->rng);
 
     /* Generate a camera ray */
-    scam_generate_ray(cmd->sensor.camera, &sample, &ray);
+    scam_generate_ray(cmd->camera, &sample, &ray);
 
     r0 = ssp_rng_canonical(args->rng);
     r1 = ssp_rng_canonical(args->rng);
@@ -434,7 +434,8 @@ setup_draw_map_args_rectangle
   (struct htrdr_atmosphere* cmd,
    struct htrdr_draw_map_args* args)
 {
-  ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_RECTANGLE && args);
+  ASSERT(cmd && args);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP);
   *args = HTRDR_DRAW_MAP_ARGS_NULL;
   args->draw_pixel = draw_pixel_flux;
   args->buffer_layout = cmd->buf_layout;
@@ -447,7 +448,8 @@ setup_draw_map_args_camera
   (struct htrdr_atmosphere* cmd,
    struct htrdr_draw_map_args* args)
 {
-  ASSERT(cmd && cmd->sensor.type == HTRDR_SENSOR_CAMERA && args);
+  ASSERT(cmd && args);
+  ASSERT(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE);
 
   *args = HTRDR_DRAW_MAP_ARGS_NULL;
   args->buffer_layout = cmd->buf_layout;
@@ -561,7 +563,7 @@ dump_buffer
       void* pix_raw = htrdr_buffer_at(buf, x, y);
       ASSERT(IS_ALIGNED(pix_raw, pixfmt.alignment));
 
-      if(cmd->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+      if(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP) {
         const struct atmosphere_pixel_flux* pix = pix_raw;
         dump_pixel_flux(pix, time_acc, flux_acc, stream);
       } else if(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
@@ -594,11 +596,11 @@ atmosphere_draw_map(struct htrdr_atmosphere* cmd)
 
   args.spp = cmd->spp;
 
-  switch(cmd->sensor.type) {
-    case HTRDR_SENSOR_RECTANGLE:
+  switch(cmd->output_type) {
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP:
       setup_draw_map_args_rectangle(cmd, &args);
       break;
-    case HTRDR_SENSOR_CAMERA:
+    case HTRDR_ATMOSPHERE_ARGS_OUTPUT_IMAGE:
       setup_draw_map_args_camera(cmd, &args);
       break;
     default: FATAL("Unreachable code.\n"); break;
@@ -619,7 +621,7 @@ atmosphere_draw_map(struct htrdr_atmosphere* cmd)
     "Time per radiative path (in micro seconds): %g +/- %g\n",
     path_time.E, path_time.SE);
 
-  if(cmd->sensor.type == HTRDR_SENSOR_RECTANGLE) {
+  if(cmd->output_type == HTRDR_ATMOSPHERE_ARGS_OUTPUT_FLUX_MAP) {
     htrdr_accum_get_estimation(&flux_acc, &flux);
     htrdr_log(cmd->htrdr,
       "Radiative flux density (in W/(external m^2)): %g +/- %g\n",

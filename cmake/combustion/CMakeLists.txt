@@ -74,7 +74,6 @@ set(HTRDR_COMBUSTION_FILES_SRC
 set(HTRDR_COMBUSTION_FILES_INC
   htrdr_combustion.h
   htrdr_combustion_c.h
-  htrdr_combustion_args.h
   htrdr_combustion_geometry_ray_filter.h
   htrdr_combustion_laser.h)
 
