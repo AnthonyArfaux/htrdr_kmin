@@ -56,9 +56,11 @@ listed in the *htrdr-material*(5) file provided through the *-M* option. Both,
 the clouds and the ground, can be infinitely repeated along the X and Y axis by
 setting the *-r* and the *-R* options, respectively.
 
-Two types of sensor are supported by *htrdr-atmosphere*. The camera (*-C*
-_camera_) is used to render an image of the scene from the given point of view
-while the rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
+Four types of sensor are supported by *htrdr-atmosphere*. The pinhole and thin
+lens camera (*-C* _camera_) are used to render an image of the scene from the
+given point of view. The orthographic camera (*-P* _camera_) render the scene
+with a parallel projection rather than a perspective projection. Finally, the
+rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
 
 Spectral dimension can be integrated in many ways (*-s* option). When rendering
 an image (*-C* _camera_), the computation is by default performed for the
