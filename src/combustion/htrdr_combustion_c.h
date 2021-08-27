@@ -32,11 +32,11 @@
 /* Forward declarations */
 struct atrstm;
 struct htrdr;
-struct htrdr_camera;
 struct htrdr_combustion_laser;
 struct htrdr_geometry;
 struct htrdr_materials;
 struct htrdr_rectangle;
+struct scam;
 struct ssf_phase;
 struct ssp_rng;
 struct suvm_primitive;
@@ -68,7 +68,7 @@ struct htrdr_combustion {
   struct htrdr_materials* mats; /* Materials of the combustion chamber */
   struct atrstm* medium; /* Semi transparent medium */
 
-  struct htrdr_camera* camera; /* Pinhole camera */
+  struct scam* camera; /* Camera */
   struct htrdr_rectangle* flux_map; /* Flux map */
   struct htrdr_combustion_laser* laser; /* Laser sheet */
   double wavelength; /* Wavelength of the laser in nanometer */

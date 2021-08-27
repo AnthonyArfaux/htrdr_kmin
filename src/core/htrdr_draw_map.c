@@ -42,7 +42,7 @@
 #define RNG_SEQUENCE_SIZE 10000
 
 #define TILE_MCODE_NULL UINT32_MAX
-#define TILE_SIZE 32 /* Definition in X & Y of a tile */
+#define TILE_SIZE 8 /* Definition in X & Y of a tile */
 STATIC_ASSERT(IS_POW2(TILE_SIZE), TILE_SIZE_must_be_a_power_of_2);
 
 /* Tile of row ordered image pixels */

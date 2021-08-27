@@ -23,18 +23,28 @@
 
 #include <rsys/rsys.h>
 
+/* Exclusive bounds of the camera field of view (degrees) */
+#define HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MIN@
+#define HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX @HTRDR_ARGS_CAMERA_FOV_EXCLUSIVE_MAX@
+
 /* Arguments of a pinhole camera sensor */
 struct htrdr_args_camera {
-  double position[3]; /* Focal point */
+  double position[3]; /* Lens position */
   double target[3]; /* Targeted position */
   double up[3]; /* Up vector of the camera */
   double fov_y; /* Vertical field of view of the camera, in degrees */
+  double lens_radius; /* Radius of the lens. 0 means for pinhole */
+  double focal_dst; /* Distance to focus on */
+  double focal_length; /* Computed from fov_y and lens_radius. <0 => not used */
 };
 #define HTRDR_ARGS_CAMERA_DEFAULT__ {                                          \
   {@HTRDR_ARGS_DEFAULT_CAMERA_POS@}, /* position */                            \
   {@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}, /* target */                              \
   {@HTRDR_ARGS_DEFAULT_CAMERA_UP@}, /* Camera up */                            \
   @HTRDR_ARGS_DEFAULT_CAMERA_FOV@, /* Vertical field of view */                \
+  @HTRDR_ARGS_DEFAULT_CAMERA_LENS_RADIUS@, /* Radius of the lens */            \
+  @HTRDR_ARGS_DEFAULT_CAMERA_FOCAL_DST@, /* Distance to focus on */            \
+  -1 /* Focal length. <0 <=> not used */                                       \
 }
 static const struct htrdr_args_camera HTRDR_ARGS_CAMERA_DEFAULT =
   HTRDR_ARGS_CAMERA_DEFAULT__;
