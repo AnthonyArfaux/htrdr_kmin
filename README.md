@@ -76,6 +76,18 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.8
+
+- Adds support for a thin lens camera model and an orthographic camera model
+  for combustion and atmosphere modes.
+- Updates the size of a tile from 32x32 pixels to 8x8 pixels. A tile is a
+  block of pixels rendered by a thread. However, a size of 32x32 pixels could
+  be too large when rendering on several dozen threads: the image definition
+  could be insufficient to give tiles to all threads. 
+- Fixes the calculation of shortwave radiance by `htrdr-combustion` and the
+  calculation of longwave radiance by `htrdr-atmosphere`. At each scattering
+  position, the range of the traced ray could be incorrect.
+
 ### Version 0.7
 
 #### Adds the simulation of radiative transfer in combustion media
