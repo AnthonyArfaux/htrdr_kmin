@@ -112,7 +112,7 @@ OPTIONS
 
   **focal-length**=**_length_**;;
     Focal length of a camera lens. It is another way to control the field of
-    view of a thin lens camera. Be default, the field of view is directly set
+    view of a thin lens camera. By default, the field of view is directly set
     through the **fov** parameter.
 
   **fov**=**_angle_**;;
