@@ -554,7 +554,7 @@ draw_map
   ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
   (void)ntiles_x, (void)ntiles_y;
 
-  res = ssp_rng_create(htrdr->allocator, &ssp_rng_mt19937_64, &rng_proc);
+  res = ssp_rng_create(htrdr->allocator, SSP_RNG_MT19937_64, &rng_proc);
   if(res != RES_OK) {
     htrdr_log_err(htrdr, "Could not create the RNG used to sample a process "
       "to steal -- %s.\n", res_to_cstr((res_T)res));
@@ -636,7 +636,7 @@ draw_map
      * current thread only and thus it has to manage only one RNG. This proxy
      * is initialised in order to ensure that an unique and predictable set of
      * random numbers is used for the current tile. */
-    proxy_create2_args.type = &ssp_rng_threefry;
+    proxy_create2_args.type = SSP_RNG_THREEFRY;
     proxy_create2_args.sequence_offset = RNG_SEQUENCE_SIZE * (size_t)mcode;
     proxy_create2_args.sequence_size = RNG_SEQUENCE_SIZE;
     proxy_create2_args.sequence_pitch = RNG_SEQUENCE_SIZE * (size_t)ntiles_adjusted;

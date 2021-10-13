@@ -27,7 +27,7 @@ find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
 find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
-find_package(StarSP 0.10 REQUIRED)
+find_package(StarSP 0.12 REQUIRED)
 find_package(StarVX 0.1 REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
