@@ -31,8 +31,8 @@ htrdr_slab_trace_ray
    const double org[3],
    const double dir[3],
    const double range[2],
-   const double cell_low[2],
-   const double cell_upp[2],
+   const double cell_low[3],
+   const double cell_upp[3],
    htrdr_trace_cell_T trace_cell,
    const size_t max_steps,
    void* trace_cell_context)
