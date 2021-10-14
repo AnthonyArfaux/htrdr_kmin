@@ -76,6 +76,11 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.8.1
+
+Sets the required version of Star-SampPling to 0.12. This version fixes
+compilation errors with gcc 11 but introduce API breaks.
+
 ### Version 0.8
 
 - Adds support for a thin lens camera model and an orthographic camera model
