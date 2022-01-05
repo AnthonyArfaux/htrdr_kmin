@@ -453,7 +453,6 @@ htrdr_atmosphere_create
     if(res != RES_OK) goto error;
   }
 
-
   if(cmd->output_type != HTRDR_ATMOSPHERE_ARGS_OUTPUT_OCTREES) {
     struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
     atmosphere_get_pixel_format(cmd, &pixfmt);

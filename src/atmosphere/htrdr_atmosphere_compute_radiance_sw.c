@@ -397,7 +397,7 @@ atmosphere_compute_radiance_sw
       struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
       const struct htrdr_mtl* mtl = NULL;
 
-      /* Fetch the hit interface materal and build its BSDF */
+      /* Fetch the hit interface material and build its BSDF */
       htrdr_atmosphere_ground_get_interface(cmd->ground, &s3d_hit, &interf);
       mtl = htrdr_interface_fetch_hit_mtl(&interf, dir, &s3d_hit);
       HTRDR(mtl_create_bsdf(cmd->htrdr, mtl, ithread, wlen, rng, &bsdf));
