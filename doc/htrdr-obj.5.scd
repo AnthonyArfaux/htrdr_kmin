@@ -1,42 +1,40 @@
-// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
-// Copyright (C) 2018, 2019, 2021 CNRS
-// Copyright (C) 2018, 2019 Université Paul Sabatier
-//                          (contact-edstar@laplace.univ-tlse.fr)
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <http://www.gnu.org/licenses/>.
-:toc:
-
 htrdr-obj(5)
-============
 
-NAME
-----
+; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+; Copyright (C) 2018, 2019, 2021 CNRS
+; Copyright (C) 2018, 2019 Université Paul Sabatier
+;                          (contact-edstar@laplace.univ-tlse.fr)
+; 
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# NAME
+
 htrdr-obj - file format of the ground geometry in htrdr(1)
 
-DESCRIPTION
------------
-A *htrdr-obj* file is a regular OBJ [1] composed only of triangular meshes.
+# DESCRIPTION
+
+A *htrdr-obj* file is a regular OBJ [1] composed only of triangular meshes.
 Each triangle must be included in a material group as defined by the 'usemtl'
 directive. The name of the material group must be of the form
-"<__front-mtl-name__>:[<__interface-mtl-name__>:]<__back-mtl-name__>", where
-<__front-mtl-name__>, <__interface-mtl-name__> and <__back-mtl-name__> are
+"<_front-mtl-name_>:[<_interface-mtl-name_>:]<_back-mtl-name_>", where
+<_front-mtl-name_>, <_interface-mtl-name_> and <_back-mtl-name_> are
 strings separated by a colon (:) defining the name of the front, interface,
 and back facing materials, respectively. The interface material name is
 optionnal: it is used for thin geometries, i.e. geometries with no thickness.
 Material names can be composed of any characters expected for spaces and
 tabulations. Note that regarding the *htrdr*(1) convention, a triangle side is
-said "front facing" when its vertices are clock-wise ordered. 
+said "front facing" when its vertices are clock-wise ordered.
 
 Note that to be a valid *htrdr-obj*(5) file for *htrdr*(1), the front and the
 back facing names must reference a material listed in *htrdr-materials*(5)
@@ -47,13 +45,12 @@ format [1] with only a specific convention regarding the material name.
 As a consequence, any software supporting the OBJ file format can be
 used to create or visualise an *htrdr-obj* file.
 
-EXAMPLES
---------
+# EXAMPLES
+
 Define a quad at the interface between the air medium and the concrete
 material.
 
-[verse]
--------
+```
 v -5.0  -5.0  0
 v -5.0   5.0  0
 v  5.0  -5.0  0
@@ -62,13 +59,12 @@ v  5.0   5.0  0
 usemtl air:concrete
 f 1 2 3
 f 3 2 4
--------
+```
 
 Define a wooden cube whose Z-aligned faces are against a brick material.
 The remaining faces are in contact with the air.
 
-[verse]
--------
+```
 v 0 0 0
 v 1 0 0
 v 0 1 0
@@ -93,15 +89,10 @@ f 3 7 4
 f 4 7 8
 f 1 2 5
 f 5 2 6
--------
+```
 
-NOTES
------
+# SEE ALSO
 
-1. OBJ file format -
-  <http://www.martinreddy.net/gfx/3d/OBJ.spec>
-
-SEE ALSO
---------
+. OBJ file format - <http://www.martinreddy.net/gfx/3d/OBJ.spec>
 
 *htrdr*(1)

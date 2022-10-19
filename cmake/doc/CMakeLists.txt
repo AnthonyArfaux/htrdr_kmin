@@ -20,61 +20,46 @@ set(HTRDR_DOC_DIR ${PROJECT_SOURCE_DIR}/../doc)
 ################################################################################
 # Look for the a2x program
 ################################################################################
-find_program(A2X NAMES a2x a2x.py)
-if(NOT A2X)
+find_program(SCDOC NAMES scdoc)
+if(NOT SCDOC)
   message(WARNING
-    "The `a2x' program is missing. "
+    "The `scdoc' program is missing. "
     "The htrdr man pages cannot be generated.")
   return()
 endif()
 
 ################################################################################
-# Copy doc files
+# ROFF man pages
 ################################################################################
-set(MAN_NAMES htrdr.1 htrdr-image.5 htrdr-materials.5 htrdr-obj.5)
-
-set(MAN_FILES)
-foreach(_name IN LISTS MAN_NAMES)
-  set(_src ${HTRDR_DOC_DIR}/${_name}.txt)
-  set(_dst ${CMAKE_CURRENT_BINARY_DIR}/${_name}.txt)
-  add_custom_command(
-    OUTPUT ${_dst}
-    COMMAND ${CMAKE_COMMAND} -E copy ${_src} ${_dst}
-    DEPENDS ${_src}
-    COMMENT "Copy the asciidoc ${_src}"
-    VERBATIM)
-  list(APPEND MAN_FILES ${_dst})
-endforeach()
-add_custom_target(man-copy ALL DEPENDS ${MAN_FILES})
+set(MAN_SOURCES 
+  ${HTRDR_DOC_DIR}/htrdr.1.scd
+  ${HTRDR_DOC_DIR}/htrdr-image.5.scd
+  ${HTRDR_DOC_DIR}/htrdr-materials.5.scd
+  ${HTRDR_DOC_DIR}/htrdr-obj.5.scd)
 
 if(HTRDR_BUILD_ATMOSPHERE)
-  configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr-atmosphere.1.txt.in
-    ${CMAKE_CURRENT_BINARY_DIR}/htrdr-atmosphere.1.txt @ONLY)
-  list(APPEND MAN_NAMES htrdr-atmosphere.1)
+  configure_file(${HTRDR_DOC_DIR}/htrdr-atmosphere.1.scd.in
+    ${CMAKE_CURRENT_BINARY_DIR}/htrdr-atmosphere.1.scd @ONLY)
+  list(APPEND MAN_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/htrdr-atmosphere.1.scd)
 endif()
 
 if(HTRDR_BUILD_COMBUSTION)
-  configure_file(${HTRDR_SOURCE_DIR}/../doc/htrdr-combustion.1.txt.in
-    ${CMAKE_CURRENT_BINARY_DIR}/htrdr-combustion.1.txt @ONLY)
-  list(APPEND MAN_NAMES htrdr-combustion.1)
+  configure_file(${HTRDR_DOC_DIR}/htrdr-combustion.1.scd.in
+    ${CMAKE_CURRENT_BINARY_DIR}/htrdr-combustion.1.scd @ONLY)
+  list(APPEND MAN_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/htrdr-combustion.1.scd)
 endif()
 
-################################################################################
-# ROFF man pages
-################################################################################
-set(A2X_OPTS -dmanpage -fmanpage)
 set(MAN_FILES)
 set(MAN5_FILES)
 set(MAN1_FILES)
-foreach(_name IN LISTS MAN_NAMES)
-  set(_man ${CMAKE_CURRENT_BINARY_DIR}/${_name})
-  set(_txt ${CMAKE_CURRENT_BINARY_DIR}/${_name}.txt)
 
+foreach(_src IN LISTS MAN_SOURCES)
+  get_filename_component(_man ${_src} NAME_WLE)
+  message(STATUS "${_man}")
   add_custom_command(
     OUTPUT ${_man}
-    COMMAND ${A2X} ${A2X_OPTS} ${_txt}
-    DEPENDS man-copy ${_txt}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${SCDOC} < ${_src} > ${_man}
+    DEPENDS ${_src}
     COMMENT "Build ROFF man page ${_man}"
     VERBATIM)
   list(APPEND MAN_FILES ${_man})
@@ -82,9 +67,9 @@ foreach(_name IN LISTS MAN_NAMES)
   string(REGEX MATCH "^.*.5$" _man5 ${_man})
   string(REGEX MATCH "^.*.1$" _man1 ${_man})
   if(_man1)
-    list(APPEND MAN1_FILES ${_man1})
+    list(APPEND MAN1_FILES ${CMAKE_CURRENT_BINARY_DIR}/${_man1})
   elseif(_man5)
-    list(APPEND MAN5_FILES ${_man5})
+    list(APPEND MAN5_FILES ${CMAKE_CURRENT_BINARY_DIR}/${_man5})
   else()
     message(FATAL_ERROR "Unexpected man type")
   endif()
@@ -93,4 +78,3 @@ add_custom_target(man-roff ALL DEPENDS ${MAN_FILES})
 
 install(FILES ${MAN1_FILES} DESTINATION share/man/man1)
 install(FILES ${MAN5_FILES} DESTINATION share/man/man5)
-

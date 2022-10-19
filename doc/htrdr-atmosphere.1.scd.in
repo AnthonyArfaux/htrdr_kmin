@@ -1,0 +1,498 @@
+htrdr-atmosphere(1)
+
+; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+; Copyright (C) 2018, 2019, 2021 CNRS
+; Copyright (C) 2018, 2019 Université Paul Sabatier
+;                          (contact-edstar@laplace.univ-tlse.fr)
+; 
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# NAME
+
+htrdr-atmosphere - simulate radiative transfer in cloudy atmospheres
+
+# SYNOPSIS
+
+htrdr-atmosphere [_option_]... -a _atmosphere_
+
+# DESCRIPTION
+
+*htrdr-atmosphere* simulates radiative transfer in scenes composed of an
+atmospheric gas mixture, clouds, and a ground. It evaluates the intensity
+incoming on each pixel of the sensor array. The underlying algorithm is based
+on a Monte-Carlo method: it consists in simulating a given number of optical
+paths originating from the sensor, directed into the atmosphere, taking into
+account light absorption and scattering phenomena. This algorithm and the way
+it is efficiently implemented in *htrdr-atmosphere* is presented in the
+following article: "A path-tracing Monte Carlo library for 3-D radiative
+transfer in highly resolved cloudy atmospheres", N. Villefranque et al, JAMES
+2019 [1].
+
+Radiative transfer can be evaluated in the visible or the infrared part of the
+spectrum. It uses spectral data that should be provided for the pressure and
+temperature atmospheric vertical profile [2] (*-a* _atmosphere_), the liquid
+water content in suspension within the clouds stored in a *htcp*(5) file (*-c*
+_clouds_), and the optical properties of water droplets that have been obtained
+from a Mie code and formatted according to the *htmie*(5) file format (*-m*
+_mie_). The user also has to set the position of the sun (*-D*
+_azimuth_,_elevation_), the sensor type (*-C* _camera_ or *-p* _rectangle_) and
+its definition (*-i* _image_). It is also possible to provide an *htrdr-obj*(5)
+file representing the ground geometry (*-g* _ground_) whose materials are
+listed in the *htrdr-material*(5) file provided through the *-M* option. Both,
+the clouds and the ground, can be infinitely repeated along the X and Y axis by
+setting the *-r* and the *-R* options, respectively.
+
+Four types of sensor are supported by *htrdr-atmosphere*. The pinhole and thin
+lens camera (*-C* _camera_) are used to render an image of the scene from the
+given point of view. The orthographic camera (*-P* _camera_) render the scene
+with a parallel projection rather than a perspective projection. Finally, the
+rectangle sensor (*-p* _rectangle_) is used to compute a flux map.
+
+Spectral dimension can be integrated in many ways (*-s* option). When rendering
+an image (*-C* _camera_), the computation is by default performed for the
+visible part of the spectrum in [380, 780] nanometers, for the three components
+of the CIE 1931 XYZ colorimetric space that are subsequently recombined in
+order to obtain the final color for each pixel, and finally the whole image of
+the scene as seen from the set observation position. The two other ways consist
+in explicitly defining the longwave or shortwave spectral range to handle and
+continuously sampling a wavelength in this range. Actually longwave and
+shortwave are keywords that mean that the source of radiation is whether
+external or internal to the medium, respectively. In shortwave rendering, only
+the pixel radiance is evaluated and stored in the output image. For longwave
+rendering this estimated radiance is then converted to its brightness
+temperature and both are saved in the image. When computing a flux map (*-p*
+_rectangle_), the per pixel flux is saved into the output map whether spectral
+domain is longwave or shortwave.
+
+In *htrdr-atmosphere* the spatial unit 1.0 corresponds to one meter and the
+temperatures are expressed in Kelvin. The estimated radiances are given in
+W/sr/m² excepted for monochromatic computations where the computed spectral
+radiance is defined in W/sr/m²/nm. The flux densities are saved in W/m². The
+results are written to the output file if the *-o* option is defined and the
+standard output otherwise. The output image is a list of raw ASCII data
+formatted with respect to the *htrdr-image*(5) file format.
+
+*htrdr-atmosphere* supports shared memory parallelism and relies on the Message
+Passing Interface specification [4] to parallelise its computations in a
+distributed memory environment; it can thus be run either directly or through a
+MPI process launcher like *mpirun*(1).
+
+# OPTIONS
+
+*-a* _atmosphere_
+	Path toward the file containing the gas optical properties of the atmosphere.
+	Data must be formatted according to the fileformat described in [2].
+
+*-c* _clouds_
+	Submit a *htcp*(5) file describing the properties of the clouds. If not
+	defined, only the atmosphere properties submitted through the *-a* option
+	are taken into account.
+
+*-C* <_camera-parameter_:...>
+	Define a perspective camera. Available parameters are:
+
+	*focal-dst*=_dst_
+		Distance to focus on with a thin lens camera, that is, a camera whose
+		*lens-radius* is not zero. The default focal distance is
+		@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@ meter.
+
+	*focal-length*=_length_
+		Focal length of a camera lens. It is another way to control the field of
+		view of a thin lens camera. By default, the field of view is directly set
+		through the *fov* parameter.
+
+	*fov*=_angle_
+		Vertical field of view of the camera in
+		\]@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@,
+		@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@\[ degrees. By
+		default _angle_ is set to
+		@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
+
+	*lens-radius*=_radius_
+		Radius of the camera lens. A non-zero radius means that the camera is a thin
+		lens camera while a zero radius defines a pinhole camera. By default the
+		lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@.
+
+	*pos*=_x_,_y_,_z_
+		Camera lens position. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+	*tgt*=_x_,_y_,_z_
+		Position targeted by the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+	*up*=_x_,_y_,_z_
+		Up vector of the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
+
+*-D* <_azimuth_,_elevation_>
+	Direction toward the sun center. The direction is defined by two angles in
+	degrees: the _azimuth_ angle in [0, 360[ and the _elevation_ angle in [0,
+	90].  Following the right-handed convention, the azimuthal rotation is
+	counter-clockwise, with 0 degree on the X axis. The elevation starts from 0
+	degree for a direction in the XY plane, up to 90 degrees at zenith. Thus
+	*-D* _0_,_0_ *-D* _90_,_0_ -*D* _180_,_0_ and *-D* _270_,_0_ will produce solar
+	vectors {+1,0,0} {0,+1,0} {-1,0,0} and {0,-1,0} respectively, while
+	*-D* _azimuth_,_90_ will produce {0,0,+1} regardless of _azimuth_ value.
+
+*-d*
+	Write in _output_ the space partitioning data structures used to speed up
+	the radiative transfer computations in the clouds. The written data are
+	octrees saved in the VTK file format [3]. Each octree node stores the minimum
+	and the maximum of the extinction coefficients of the cloud cells overlapped
+	by the octree node. In the _output_ file, each octree is separated from the
+	previous one by a line with three minus characters, i.e. '---'.
+
+*-f*
+	Force overwrite of the _output_ file.
+
+*-g* _ground_
+	Path toward a *htrdr-obj*(5) representing the ground geometry.
+
+*-h*
+	List short help and exit.
+
+*-i* <_image-parameter_:...>
+	Define the sensor array. Available image parameters are:
+
+	*def*=<_width_>x<_height_>
+		Definition of the image. By default the image definition is
+		@HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+
+	*spp*=_samples-count_
+		Number of samples per pixel estimation. In regular image rendering, a pixel
+		will use "3 \* _samples-count_" Monte-Carlo realisations, one set of
+		_samples-count_ realisations for each X, Y and Z component of the CIE 1931
+		XYZ color space. In shortwave/longwave rendering or flux computation, only
+		one set of _samples-count_ is used. By default, *spp* is set to
+		@HTRDR_ARGS_DEFAULT_IMG_SPP@.
+
+*-R*
+	Infinitely repeat the _ground_ along the X and Y axis.
+
+*-r*
+	Infinitely repeat the _clouds_ along the X and Y axis.
+
+*-M* _materials_
+	Path toward a *htrdr-materials*(5) file listing the ground materials.
+
+*-m* _mie_
+	Path toward a *htmie*(5) file defining the optical properties of water
+	droplets.
+
+*-n* _sky-mtl_
+	Name of the material representing the sky in the *htrdr-materials*(5) file.
+	By default, _sky-mtl_ is @HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@.
+
+*-O* _cache_
+	File used to cache the sky data. If the _cache_ file does not exists, it is
+	created and filled with the sky data built from the _clouds_, the _atmosphere_
+	and the _mie_ input files. This cached data can then be reused in the next
+	runs as long as the input files provided on the command are the same as the
+	ones used to setup the cache; leading to a significant speed-up of the
+	pre-processing step. If _cache_ contains data generated from input files that
+	are not the ones submitted on the command line, an error is notified and the
+	execution is stopped, avoiding the use of wrong cached data.  Note that when
+	the cache is used, *htrdr-atmosphere* ignores the arguments used to
+	parametrise the structures partitioning the sky data, i.e. the *-T* and *-V*
+	options.
+
+*-o* _output_
+	File where *htrdr-atmosphere* writes its _output_ data. If not defined, write
+	results to standard output.
+
+*-P* <_camera-parameter_:...>
+	Define an orthographic camera. Available parameters are:
+
+	*height*=_radius_
+		Height of the image plane. By default it is set to
+		@HTRDR_ARGS_DEFAULT_CAMERA_ORTHOGRAPHIC_HEIGHT@.
+
+	*pos*=_x_,_y_,_z_
+		Camera lens position. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+	*tgt*=_x_,_y_,_z_
+		Position targeted by the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+	*up*=_x_,_y_,_z_
+		Up vector of the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
+
+*-p* <_rectangle-parameter_:...>
+	Switch in flux map computation. The flux is computed for the part of the
+	sensor that is outside any geometry. The rectangular sensor onto which the
+	flux is integrated is defined by the following parameters:
+
+	*pos*=_x_,_y_,_z_
+		Position of the center of the rectangle. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@}.
+
+	*tgt*=_x_,_y_,_z_
+		Position targeted by the rectangle, i.e. *tgt* - *pos* is the rectangle
+		normal. By default it is set to {@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@}.
+
+	*up*=_x_,_y_,_z_
+		Up vector of the rectangle. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@}.
+
+	*sz*=_width_,_height_
+		Size of the rectangle. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@}.
+
+*-s* <_spectral-parameter_:...>
+	Define the type and the range of the spectral integration. Available
+	spectral parameters are:
+
+	*cie_xyz*
+		the radiance is computed for the visible part of the spectrum in [380, 780]
+		nanometers with respect to the XYZ CIE 1931 tristimulus values. This is the
+		default comportment of *htrdr-atmosphere*.
+
+	*lw*=_wlen-min_,_wlen-max_
+		perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
+		wavelength range (wavelength must be provided in nanometers) according to
+		the Planck function for a reference temperature. If _wlen-min_ and
+		_wlen-max_ are equals the computation is monochromatic. *lw* means for
+		longwave but is here a code word that really means "computation of radiance
+		using the internal source of radiation": in other words, radiation is
+		emitted by the medium and its boundaries (ground and space). Because the
+		application is for the terrestrial atmosphere, internal radiation is
+		emitted in the thermal longwave part of the electromagnetic spectrum.
+		Therefore the default value of the reference temperature used in the
+		spectral sampling is fixed at 290 K.
+
+	*sw*=_wlen-min_,_wlen-max_
+		perform the spectral sampling continuously in the [_wlen-min_, _wlen-max_]
+		wavelength range (wavelength must be provided in nanometers) according to
+		the Planck function for a reference temperature. If _wlen-min_ and
+		_wlen-max_ are equals the computation is monochromatic.  In the present
+		case, *sw* means that the source of radiation is external to the medium:
+		because the application is for the terrestrial atmosphere, the value of the
+		reference temperature is by default fixed at 5778 K, i.e. the blackbody
+		temperature of the Sun.
+
+	*Tref*=_temperature_
+		reference temperature of the Planck function used to continuously sample the
+		longwave/shortwave spectral range. In longwave, it is set to 290 K by
+		default while in shortwave its default value is the blackbody temperature of
+		the sun (i.e. 5778 K).
+
+*-T* _threshold_
+	Optical thickness used as threshold criteria to partition the properties of
+	the clouds. By default its value is
+	@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.  This option is
+	ignored if a cache file is used (option *-O*).
+
+*-t* _threads-count_
+	Hint on the number of threads to use. By default use as many threads as CPU
+	cores.
+
+*-V* _x_,_y_,_z_
+	Define the maximum definition of the acceleration data structure that
+	partitions the cloud properties. By default the finest definition is the
+	definition of the submitted *htcp*(5) file. This option is ignored if a cache
+	file is used (option *-O*).
+
+*-v*
+	Make *htrdr-atmosphere* verbose.
+
+# OUTPUT IMAGE
+
+Images calculated by *htrdr-atmosphere* are saved in the *htrdr-image*(5) file
+format. This section describes the nature and arrangement of image data
+depending on the type of calculation performed by *htrdr-atmosphere*.
+
+## XYZ image
+
+For an image rendering in the visible part of the spectrum (default behavior or
+*-s cie_xyz* option), the pixel components store 4 estimates. The first,
+second, and third pairs of floating point values encode the estimated
+integrated radiance in W/sr/m² for the X, Y, and Z components of the CIE
+1931 XYZ color space. The first value of each pair is the expected value of the
+average radiance of the pixel. The second value is its associated standard
+deviation. The fourth and final pair records the microsecond estimate of the
+computation time per radiative path and its standard error.
+
+## Longwave image
+
+If the image is an infrared rendering (option *-s* *lw*=_wlen-min_,_wlen-max_)
+the first and second pixel components store the expected value and the standard
+error of the estimated brightness temperature (in K), respectively. The third
+and fourth components record the expected value and the standard deviation of
+the pixel radiance which is either an integrated radiance in W/sr/m² or a
+spectral radiance in W/sr/m²/nm depending on whether this radiance was
+calculated for a spectral range or at a single wavelength.  The fifth and sixth
+pixel components are not used. Finally, the last 2 components of the pixel
+record the estimate in microseconds of the computation time per radiative path
+and its standard error.
+
+## Shortwave image
+
+For shortwave renderings (option *-s* *sw*=_wlen-min_,_wlen-max_), the data
+written to the output image are formatted as for a longwave image except
+that the first and second components of the pixels are not used because no
+brightness temperature has been evaluated.
+
+## Flux density map (shortwave and longwave)
+
+A flux density map (option *-p*) is saved in an *htrdr-image*(5) storing the
+expected value and the standard error of the pixel radiative flux density (in
+W/m²) on its first and second component. All other components are unused
+excepted the seventh and eighth components that store the estimate of the
+radiative path computation time in microseconds and its standard error.
+
+# EXAMPLES
+
+Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
+zenith. The vertical atmospheric gaz mixture along the Z axis is described in
+the _gas.txt_ file. The ground geometry is a quad repeated to the infinity
+whose materials are listed in the _material.mtl_ file. The camera is positioned
+at _400_ meters height and looks toward the positive Y axis. The definition of
+the rendered image is _800_ by _600_ pixels and the radiance of each pixel
+component is estimated with _64_ Monte-Carlo realisations. The resulting image
+is written to _output_ excepted if the file already exists; in this case an
+error is notified, the program stops and the _output_ file remains unchanged:
+
+```
+htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g quad.obj -R \
+  -M materials.mtl \
+  -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+  -i def=800x600:spp=64 \
+  -o output
+```
+
+Add clouds to the previous scene and use a more complex geometry to represent
+the ground. The Mie data are provided through the _Mie.nc_ file. The ground
+geometry was carefully designed to be cyclic and can be thus infinitely
+repeated without visual glitches. Use the _-f_ option to write the rendered
+image to _output_ even though the file already exists. Finally, use the
+*htpp*(1) command to convert the *htrdr-image*(5) saved in output in a regular
+PPM image [5]:
+
+```
+htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g mountains.obj -R \
+  -M materials.mtl \
+  -c clouds.htcp \
+  -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+  -i def=800x600:spp=64 \
+  -f -o output
+htpp -o image.ppm output
+```
+
+Render the previous scene in infrared for the wavelengths in [_9200_, _10000_]
+nanometers with a reference temperature of _300_ Kelvin:
+
+```
+htrdr-atmosphere -a gas.txt -m Mie.nc -g mountains.obj -R \
+  -M materials.mtl \
+  -c clouds.htcp \
+  -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+  -i def=800x600:spp=64 \
+  -s lw=9200,10000:Tref=300 \
+  -f -o output
+```
+
+Move the sun by setting its azimuthal and elevation angles to _120_ and _40_
+degrees respectively. Use the *-O* option to enable the cache mechanism on
+sky data. Increase the image definition to _1280_ by _720_ and set the
+number of samples per pixel component to _1024_. Write results on standard
+output and convert the resulting image in PPM before visualising it through the
+*feh*(1) image viewer:
+
+```
+htrdr-atmosphere -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
+  -M materials.mtl \
+  -c clouds.htcp \
+  -O my_cache \
+  -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+  -i def=1280x720:spp=1024 | htpp | feh -
+```
+
+Compute the downward flux for the shortwave interval [_350_, _4000_] nanometers
+on a square of _100_ meters side positionned at the origin at *1* meter height.
+The resolution of the flux map is _500_ by _500_ pixels and _1000_ realisations
+is used to estimate the flux per pixel. It is saved in the _flux_map.txt_ file
+even though this file already exists:
+
+```
+htrdr-atmosphere -D0,90 -a gas.txt -m Mie.nc -g plane.obj -R \
+  -M materials.mtl \
+  -c clouds.htcp \
+  -O my_cache \
+  -p pos=0,0,1:tgt=0,0,2:up=0,1,0:sz=100,100 \
+  -i def=500x500:spp=1000 \
+  -s sw=350,4000 \
+  -f -o flux_map.txt
+```
+
+Write into _output_ the data structures used to partition the clouds properties.
+Use the *csplit*(1) Unix command to extract from _output_ the list of the
+generated grids and save each of them in a specific VTK file whose name is
+_cloud_grid<NUM>.vtk_ with _NUM_ in [0, N-1] where N is the number of grids
+written into _output_:
+
+```
+htrdr-atmosphere -a gas.txt -m Mie.nc -c clouds.htcp -d -f -o output
+csplit -f cloud_grid_ -b %02d.vtk -z --suppress-matched output /^---$/ {*}
+```
+
+Use *mpirun*(1) to launch *htrdr-atmosphere* on several hosts defined in the
+_my_hosts_ file. Make the clouds infinite along the X and Y axis:
+
+```
+mpirun --hostfile my_hosts htrdr-atmosphere \
+  -D120,40 -a gas.txt -m Mie.nc -g mountains.obj -R \
+  -M materials.mtl \
+  -c clouds.htcp -r \
+  -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \
+  -i def=1280x720:spp=1024 \
+  -f -o output
+```
+
+# COPYRIGHT
+
+Copyright (C) 2018, 2019, 2020, 2021 |Méso|Star> <contact@meso-star.com>++
+Copyright (C) 2018, 2019, 2021 Centre National de la Recherche Scientifique++
+Copyright (C) 2018, 2019 Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>
+
+# LICENSE
+
+*htrdr-atmosphere* is free software released under the GPLv3+ license: GNU GPL
+version 3 or later <https://gnu.org/licenses/gpl.html>. You are free to change
+and redistribute it. There is NO WARRANTY, to the extent permitted by law.
+
+# SEE ALSO
+
+. A path-tracing Monte Carlo library for 3-D radiative transfer in highly
+  resolved cloudy atmospheres. N. Villefranque et al, JAMES 11, 2449-2473, 2019 -
+  <https://doi.org/10.1029/2018MS001602>
+. High-Tune: Gas Optical Properties file format -
+  <https://www.meso-star.com/projects/high-tune/downloads/gas_opt_prop_en.pdf>
+. VTK file format -
+  <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
+. MPI specifications - <https://www.mpi-forum.org/docs/>
+. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+
+*csplit*(1),
+*feh*(1),
+*mpirun*(1),
+*htcp*(5),
+*htmie*(5),
+*htpp*(1),
+*htrdr*(1),
+*htrdr-image*(5),
+*htrdr-materials*(5)
+*htrdr-obj*(5)

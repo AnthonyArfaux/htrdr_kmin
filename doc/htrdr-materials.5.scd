@@ -1,31 +1,29 @@
-// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
-// Copyright (C) 2018, 2019, 2021 CNRS
-// Copyright (C) 2018, 2019 Université Paul Sabatier
-//                          (contact-edstar@laplace.univ-tlse.fr)
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <http://www.gnu.org/licenses/>.
-:toc:
-
 htrdr-materials(5)
-=================
 
-NAME
-----
+; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+; Copyright (C) 2018, 2019, 2021 CNRS
+; Copyright (C) 2018, 2019 Université Paul Sabatier
+;                          (contact-edstar@laplace.univ-tlse.fr)
+; 
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# NAME
+
 htrdr-materials - list of materials used by the geometries in htrdr(1)
 
-DESCRIPTION
------------
+# DESCRIPTION
+
 A *htrdr-materials* file lists the materials that can be used by geometries
 provided through a *htrdr-obj*(5) file to the *htrdr*(1) program.  Each line
 of the file gives the name of the material. For opaque materials the material
@@ -41,11 +39,9 @@ Characters behind the hash mark (#) are considered as comments and are thus
 ignored. Empty lines, i.e. lines without any characters or composed of spaces
 and tabulations, are simply skipped.
 
-GRAMMAR
--------
+# GRAMMAR
 
-[verse]
--------
+```
 <htrdr-materials>     ::= <material>
                         [ <material> ... ]
 <material>            ::= <name> <properties>
@@ -53,25 +49,23 @@ GRAMMAR
 <properties>          ::= none | <mrumtl-path> <temperature>
 <mrumtl-path>         ::= PATH
 <temperature>         ::= REAL # In Kelvin
--------
+```
 
-EXAMPLE
--------
+# EXAMPLE
 
-The following file lists 3 materials. The first one named *grass* has its
-spectral BRDF defines in the *A001.mrumtl* file. The second one is named
-*sand* and has its spectral properties saved in the *B002.mrumtl* file. Both
+The following file lists 3 materials. The first one named _grass_ has its
+spectral BRDF defines in the _A001.mrumtl_ file. The second one is named
+_sand_ and has its spectral properties saved in the _B002.mrumtl_ file. Both
 materials have a temperature of 300 Kelvin. The last material is a
-semi-transparent material named *air* with no additionnal properties defined
+semi-transparent material named _air_ with no additionnal properties defined
 in this file.
 
-[verse]
--------
+```
 grass   /opt/materials/A001.mrumtl 300
 sand    /opt/materials/B002.mrumtl 300
 air     none
--------
+```
 
-SEE ALSO
---------
+# SEE ALSO
+
 *htrdr*(1), *htrdr-obj*(5), *mrumtl*(5)

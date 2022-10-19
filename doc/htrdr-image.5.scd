@@ -1,55 +1,51 @@
-// Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
-// Copyright (C) 2018, 2019, 2021 CNRS
-// Copyright (C) 2018, 2019 Université Paul Sabatier
-//                          (contact-edstar@laplace.univ-tlse.fr)
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <http://www.gnu.org/licenses/>.
-:toc:
-
 htrdr-image(5)
-==============
 
-NAME
-----
+; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+; Copyright (C) 2018, 2019, 2021 CNRS
+; Copyright (C) 2018, 2019 Université Paul Sabatier
+;                          (contact-edstar@laplace.univ-tlse.fr)
+; 
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# NAME
+
 htrdr-image - two dimensional image format
 
-DESCRIPTION
------------
+# DESCRIPTION
+
 The *htrdr-image* is a raw image file format where data are stored in plain
 text. Characters after the '#' character are considered as comments and are
 thus ignored as well as empty lines. The first valid line stores 2 unsigned
 integers that represent the image definition, i.e. the number of pixels per
 line and per column. Then each line stores 8 floating point components per
-pixel. 
+pixel.
 
 Pixels are sorted line by line, with the origin defined at the top left corner
 of the image. With an image definition of N by M pixels, with N the number of
 pixels per line and M the overall number of lines in the image, the first N
 pixels correspond to the pixels of the top line of the image, the following N
-pixels are the pixels of the second line and so on. 
+pixels are the pixels of the second line and so on.
 
 The *htpp*(1) program can be used to convert an *htrdr-image* into a regular
-PPM image [1]. Note that the nature and unit of the data stored in an
+PPM image [1]. Note that the nature and unit of the data stored in an
 *htrdr-image* is not determined by the file format itself. Refer to the
 program that generates the image for a full description of the data it
 contains.
 
-GRAMMAR
--------
+# GRAMMAR
 
-[verse]
--------
+```
 <htrdr-image>    ::= <definition>
                      <pixel>
                    [ <pixel> ... ]
@@ -74,27 +70,26 @@ GRAMMAR
 <estimate>       ::= <expected-value> <standard-error>
 <expected-value> ::= REAL
 <standard-error> ::= REAL
--------
+```
 
-EXAMPLE
--------
+# EXAMPLE
+
 The following output was produced by *htrdr*(1) invoked to render an image of
-*800* by *600* pixels. Note that actually the comments and blank lines were
+_800_ by _600_ pixels. Note that actually the comments and blank lines were
 not necessarily written by *htrdr*(1); they are used here only to help the
 reader understand the data layout. The comment after each pixel gives the
 two-dimensional index of the pixel in the image: the first and second integer
 is the index of the line and the column of the pixel in the image,
 respectively.
 
-[verse]
-------
+```
 800 600 # Image definition
 
 # Pixels of the 1st line
 2.55e-4 2.90e-5 3.75e-4 4.48e-5 3.20e-4 3.16e-5 306.484 259.723 # (1,1)
 2.95e-4 3.37e-5 3.39e-4 4.16e-5 3.38e-4 4.60e-5 18.3633 2.66317 # (2,1)
 3.76e-4 5.43e-5 3.13e-4 3.48e-5 3.38e-4 3.32e-5 19.6252 2.67015 # (3,1)
-              ...
+  ...
 7.13e-4 1.14e-4 7.66e-4 1.35e-4 7.97e-4 1.26e-4 119.820 93.7820 # (799,1)
 6.59e-4 1.14e-4 7.47e-4 1.41e-4 4.39e-4 7.33e-5 24.8655 2.46348 # (800,1)
 
@@ -102,25 +97,23 @@ respectively.
 3.33e-4 6.02e-5 4.21e-4 7.66e-5 3.44e-4 3.81e-5 19.4580 2.50692 # (1,2)
 3.50e-4 4.93e-5 3.23e-4 2.52e-5 3.03e-4 2.42e-5 102.566 81.2936 # (2,2)
 2.72e-4 4.69e-5 3.41e-4 4.12e-5 2.52e-4 2.06e-5 25.5801 5.37736 # (3,2)
-              ...
+  ...
 7.52e-4 1.31e-4 8.91e-4 1.84e-4 5.48e-4 1.30e-4 46.5418 12.4728 # (799,2)
 6.82e-4 1.42e-4 6.61e-4 7.85e-5 4.44e-4 5.99e-5 59.8728 32.1468 # (800,2)
 
-              ...
+  ...
 
 # Pixels of the 600th line
 2.69e-4 7.44e-5 2.31e-4 2.56e-5 1.95e-4 2.30e-5 43.8242 15.0047 # (1,600)
 4.32e-4 1.25e-4 2.22e-4 2.22e-5 2.04e-4 2.60e-5 25.5498 1.73942 # (2,600)
 2.78e-4 5.81e-5 2.75e-4 4.99e-5 2.17e-4 3.30e-5 38.4448 7.16199 # (3,600)
-            ...
+  ...
 3.54e-4 4.32e-5 3.07e-4 3.80e-5 2.38e-4 2.49e-5 102.893 36.9865 # (799,600)
 3.07e-4 2.61e-5 4.60e-4 1.13e-4 2.69e-4 4.29e-5 42.75070 11.913 # (800,600)
-------
+```
 
-NOTES
------
-1. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+# SEE ALSO
 
-SEE ALSO
---------
+. Portable PixMap - <http://netpbm.sourceforge.net/doc/ppm.html>
+
 *htpp*(1), *htrdr*(1)
