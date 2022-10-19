@@ -22,7 +22,7 @@ project(htrdr-core C)
 # Check dependencies
 ################################################################################
 find_package(AW 2.0 REQUIRED)
-find_package(MruMtl 0.0 REQUIRED)
+find_package(MruMtl 0.1 REQUIRED)
 find_package(RCMake 0.3 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)

@@ -69,6 +69,7 @@ parse_material
    struct txtrdr* txtrdr,
    struct str* str) /* Scratch string */
 {
+  struct mrumtl_create_args mrumtl_args = MRUMTL_CREATE_ARGS_DEFAULT;
   wordexp_t wexp;
   char* tk = NULL;
   char* tk_ctx = NULL;
@@ -121,11 +122,10 @@ parse_material
 
   /*  Parse the mrumtl file if any */
   if(strcmp(wexp.we_wordv[0], "none")) {
-    res = mrumtl_create
-      (htrdr_get_logger(mats->htrdr),
-       htrdr_get_allocator(mats->htrdr),
-       htrdr_get_verbosity_level(mats->htrdr),
-       &mtl.mrumtl);
+    mrumtl_args.logger = htrdr_get_logger(mats->htrdr);
+    mrumtl_args.allocator = htrdr_get_allocator(mats->htrdr);
+    mrumtl_args.verbose = htrdr_get_verbosity_level(mats->htrdr);
+    res = mrumtl_create(&mrumtl_args, &mtl.mrumtl);
     if(res != RES_OK) {
       htrdr_log_err(mats->htrdr,
         "%s:%lu: error creating the MruMtl loader for the material `%s'-- %s.\n",
@@ -258,8 +258,8 @@ create_bsdf_diffuse
    const size_t ithread,
    struct ssf_bsdf** out_bsdf)
 {
+  struct mrumtl_brdf_lambertian lambert;
   struct ssf_bsdf* bsdf = NULL;
-  double reflectivity = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && brdf && out_bsdf);
   ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_LAMBERTIAN);
@@ -268,8 +268,8 @@ create_bsdf_diffuse
     &ssf_lambertian_reflection, &bsdf);
   if(res != RES_OK) goto error;
 
-  reflectivity = mrumtl_brdf_lambertian_get_reflectivity(brdf);
-  res = ssf_lambertian_reflection_setup(bsdf, reflectivity);
+  MRUMTL(brdf_get_lambertian(brdf, &lambert));
+  res = ssf_lambertian_reflection_setup(bsdf, lambert.reflectivity);
   if(res != RES_OK) goto error;
 
 exit:
@@ -287,10 +287,10 @@ create_bsdf_specular
    const size_t ithread,
    struct ssf_bsdf** out_bsdf)
 {
+  struct mrumtl_brdf_specular spec;
   struct ssf_bsdf* bsdf = NULL;
   struct ssf_fresnel* fresnel = NULL;
   struct mem_allocator* allocator = NULL;
-  double reflectivity = 0;
   res_T res = RES_OK;
   ASSERT(htrdr && brdf && out_bsdf);
   ASSERT(mrumtl_brdf_get_type(brdf) == MRUMTL_BRDF_SPECULAR);
@@ -303,8 +303,8 @@ create_bsdf_specular
   res = ssf_fresnel_create(allocator, &ssf_fresnel_constant, &fresnel);
   if(res != RES_OK) goto error;
 
-  reflectivity = mrumtl_brdf_specular_get_reflectivity(brdf);
-  res =  ssf_fresnel_constant_setup(fresnel, reflectivity);
+  MRUMTL(brdf_get_specular(brdf, &spec));
+  res =  ssf_fresnel_constant_setup(fresnel, spec.reflectivity);
   if(res != RES_OK) goto error;
 
   res = ssf_specular_reflection_setup(bsdf, fresnel);
@@ -416,13 +416,14 @@ htrdr_mtl_create_bsdf
 {
   struct ssf_bsdf* bsdf = NULL;
   const struct mrumtl_brdf* brdf = NULL;
+  size_t ibrdf;
   double r;
   res_T res = RES_OK;
   ASSERT(htrdr && mtl && wavelength && rng && out_bsdf);
 
   r = ssp_rng_canonical(rng);
 
-  res = mrumtl_fetch_brdf2(mtl->mrumtl, wavelength, r, &brdf);
+  res = mrumtl_fetch_brdf(mtl->mrumtl, wavelength, r, &ibrdf);
   if(res != RES_OK) {
     htrdr_log_err(htrdr,
       "%s: error retrieving the MruMtl BRDF for the wavelength %g.\n",
@@ -431,6 +432,7 @@ htrdr_mtl_create_bsdf
     goto error;
   }
 
+  brdf = mrumtl_get_brdf(mtl->mrumtl, ibrdf);
   switch(mrumtl_brdf_get_type(brdf)) {
     case MRUMTL_BRDF_LAMBERTIAN:
       res = create_bsdf_diffuse(htrdr, brdf, ithread, &bsdf);
