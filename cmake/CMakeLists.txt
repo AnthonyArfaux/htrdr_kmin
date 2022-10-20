@@ -29,6 +29,7 @@ set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
 option(HTRDR_BUILD_ATMOSPHERE "Build the htrdr-atmosphere program" ON)
 option(HTRDR_BUILD_COMBUSTION "Build the htrdr-combustion program" ON)
+option(HTRDR_BUILD_PLANETO "Build the htrdr-planeto program" ON)
 
 set(HTRDR_BUILD_COMMANDS "")
 if(HTRDR_BUILD_ATMOSPHERE)
@@ -36,6 +37,9 @@ if(HTRDR_BUILD_ATMOSPHERE)
 endif()
 if(HTRDR_BUILD_COMBUSTION)
   set(HTRDR_BUILD_COMMANDS "${HTRDR_BUILD_COMMANDS};HTRDR_BUILD_COMBUSTION")
+endif()
+if(HTRDR_BUILD_COMBUSTION)
+  set(HTRDR_BUILD_COMMANDS "${HTRDR_BUILD_COMMANDS};HTRDR_BUILD_PLANETO")
 endif()
 
 ################################################################################
@@ -48,6 +52,9 @@ if(HTRDR_BUILD_ATMOSPHERE)
 endif()
 if(HTRDR_BUILD_COMBUSTION)
   add_subdirectory(combustion)
+endif()
+if(HTRDR_BUILD_PLANETO)
+  add_subdirectory(planeto)
 endif()
 
 add_subdirectory(commands)

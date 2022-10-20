@@ -28,6 +28,9 @@ endif()
 if(HTRDR_BUILD_COMBUSTION)
   list(APPEND _link_libraries htrdr-combustion)
 endif()
+if(HTRDR_BUILD_PLANETO)
+  list(APPEND _lin_libraries htrdr-planeto)
+endif()
 
 ################################################################################
 # Check dependencies
@@ -62,10 +65,19 @@ if(HTRDR_BUILD_COMBUSTION)
   target_link_libraries(htrdr_combustion_cmd htrdr-combustion)
 endif()
 
+add_executable(htrdr_planeto_cmd
+  ${HTRDR_SOURCE_DIR}/commands/htrdr_planeto_cmd.c)
+set_target_properties(htrdr_planeto_cmd PROPERTIES
+  COMPILE_DEFINITIONS "${HTRDR_BUILD_COMMANDS}"
+  OUTPUT_NAME htrdr-planeto)
+if(HTRDR_BUILD_PLANETO)
+  target_link_libraries(htrdr_planeto_cmd htrdr-planeto)
+endif()
+
 ################################################################################
 # Define output & install directories
 ################################################################################
-install(TARGETS htrdr_cmd htrdr_atmosphere_cmd htrdr_combustion_cmd
+install(TARGETS htrdr_cmd htrdr_atmosphere_cmd htrdr_combustion_cmd htrdr_planeto_cmd
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

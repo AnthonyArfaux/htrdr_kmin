@@ -1,0 +1,49 @@
+/* Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019, Université Paul Sabatier
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#include "planeto/htrdr_planeto.h"
+#include "planeto/htrdr_planeto_args.h"
+
+int
+htrdr_planeto_main(int argc, char** argv)
+{
+  char cmd_name[] = "htrdr-planeto";
+  struct htrdr_planeto_args cmd_args = HTRDR_PLANETO_ARGS_DEFAULT;
+  int is_mpi_init = 0;
+  res_T res = RES_OK;
+  int err = 0;
+
+  /* Overwrite command name */
+  argv[0] = cmd_name;
+
+  res = htrdr_mpi_init(argc, argv);
+  if(res != RES_OK) goto error;
+  is_mpi_init = 1;
+
+  res = htrdr_planeto_args_init(&cmd_args, argc, argv);
+  if(res != RES_OK) goto error;
+  if(cmd_args.quit) goto exit;
+
+exit:
+  htrdr_planeto_args_release(&cmd_args);
+  if(is_mpi_init) htrdr_mpi_finalize();
+  return err;
+error:
+  err = -1;
+  goto exit;
+}
+

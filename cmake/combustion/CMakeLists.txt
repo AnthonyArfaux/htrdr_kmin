@@ -81,7 +81,7 @@ set(HTRDR_COMBUSTION_FILES_INC
 rcmake_prepend_path(HTRDR_COMBUSTION_FILES_SRC ${HTRDR_SOURCE_DIR}/combustion)
 rcmake_prepend_path(HTRDR_COMBUSTION_FILES_INC ${HTRDR_SOURCE_DIR}/combustion)
 
-# Atmosphere library
+# Combustion library
 add_library(htrdr-combustion SHARED
   ${HTRDR_COMBUSTION_FILES_SRC}
   ${HTRDR_COMBUSTION_FILES_INC})
