@@ -55,7 +55,6 @@ set(MAN1_FILES)
 
 foreach(_src IN LISTS MAN_SOURCES)
   get_filename_component(_man ${_src} NAME_WLE)
-  message(STATUS "${_man}")
   add_custom_command(
     OUTPUT ${_man}
     COMMAND ${SCDOC} < ${_src} > ${_man}
