@@ -54,7 +54,9 @@ set(MAN5_FILES)
 set(MAN1_FILES)
 
 foreach(_src IN LISTS MAN_SOURCES)
-  get_filename_component(_man ${_src} NAME_WLE)
+  get_filename_component(_man ${_src} NAME)
+  string(REGEX MATCH "^.*\.[1-9]" _man "${_man}")
+
   add_custom_command(
     OUTPUT ${_man}
     COMMAND ${SCDOC} < ${_src} > ${_man}
