@@ -25,12 +25,19 @@
 
 #include <limits.h> /* UINT_MAX */
 
+enum htrdr_planeto_args_output_type {
+  HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,
+  HTRDR_PLANETO_ARGS_OUTPUT_OCTREES,
+  HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__
+};
+
 struct htrdr_planeto_ground_args {
   char* smsh_filename; /* The Star-Mesh geometry */
   char* props_filename; /* Per triangle physical properties */
   char* mtllst_filename; /* List of used materials */
+  char* name;
 };
-#define HTRDR_PLANETO_GROUND_ARGS_NULL__ {NULL,NULL,NULL}
+#define HTRDR_PLANETO_GROUND_ARGS_NULL__ {NULL,NULL,NULL,NULL}
 static const struct htrdr_planeto_ground_args HTRDR_PLANETO_GROUND_ARGS_NULL =
   HTRDR_PLANETO_GROUND_ARGS_NULL__;
 
@@ -55,6 +62,7 @@ struct htrdr_planeto_args {
 
   /* Miscellaneous arguments */
   unsigned nthreads; /* Hint on the nimber of threads to use */
+  enum htrdr_planeto_args_output_type output_type;
   int force_output_overwrite; /* Replace output if it exists */
   int verbose; /* Verbose level */
   int quit; /* Stop the command */ 
@@ -75,6 +83,7 @@ struct htrdr_planeto_args {
   HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \
                                                                                \
   UINT_MAX, /* Number of threads */                                            \
+  HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__,                                     \
   0, /* Force output overwrite */                                              \
   0, /* Verbosity level */                                                     \
   0 /* Stop the command */                                                     \
