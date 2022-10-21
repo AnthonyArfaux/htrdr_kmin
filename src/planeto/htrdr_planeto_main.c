@@ -18,11 +18,17 @@
 #include "planeto/htrdr_planeto.h"
 #include "planeto/htrdr_planeto_args.h"
 
+#include "core/htrdr_log.h"
+
+#include <rsys/mem_allocator.h>
+
 int
 htrdr_planeto_main(int argc, char** argv)
 {
   char cmd_name[] = "htrdr-planeto";
   struct htrdr_planeto_args cmd_args = HTRDR_PLANETO_ARGS_DEFAULT;
+  const size_t memsz_begin = mem_allocated_size();
+  size_t memsz_end;
   int is_mpi_init = 0;
   res_T res = RES_OK;
   int err = 0;
@@ -41,6 +47,15 @@ htrdr_planeto_main(int argc, char** argv)
 exit:
   htrdr_planeto_args_release(&cmd_args);
   if(is_mpi_init) htrdr_mpi_finalize();
+
+  /* Check memory leaks */
+  memsz_end = mem_allocated_size();
+  if(memsz_begin != memsz_end) {
+    ASSERT(memsz_end >= memsz_begin);
+    fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n",
+      (unsigned long)(memsz_end - memsz_begin));
+    err = -1;
+  }
   return err;
 error:
   err = -1;
