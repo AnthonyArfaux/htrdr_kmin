@@ -31,7 +31,7 @@ htrdr_atmosphere_main(int argc, char** argv)
   struct htrdr_atmosphere_args cmd_args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
   struct htrdr_atmosphere* cmd = NULL;
-  const size_t memsz_begin = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  const size_t memsz_begin = mem_allocated_size();
   size_t memsz_end;
   int is_mpi_init = 0;
   int err = 0;
@@ -71,7 +71,7 @@ exit:
   if(cmd) htrdr_atmosphere_ref_put(cmd);
 
   /* Check memory leaks */
-  memsz_end = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  memsz_end = mem_allocated_size();
   if(memsz_begin != memsz_end) {
     ASSERT(memsz_end >= memsz_begin);
     fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n",
