@@ -29,6 +29,77 @@
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static INLINE res_T
+check_gas_args(const struct rnatm_gas_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Filenames cannot be NULL */
+  if(!args->smsh_filename
+  || !args->sck_filename
+  || !args->temperatures_filename)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+static INLINE res_T
+check_aerosol_args(const struct rnatm_aerosol_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Filenames cannot be NULL */
+  if(!args->smsh_filename
+  || !args->sars_filename
+  || !args->phase_fn_ids_filename
+  || !args->phase_fn_lst_filename)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+static INLINE res_T
+check_ground_args(const struct htrdr_planeto_ground_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Filenames cannot be NULL */
+  if(!args->smsh_filename
+  || !args->props_filename
+  || !args->mtllst_filename)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+static INLINE res_T
+check_spectral_args(const struct htrdr_args_spectral* spectral_domain)
+{
+  if(!spectral_domain) return RES_BAD_ARG;
+
+  switch(spectral_domain->spectral_type) {
+    case HTRDR_SPECTRAL_LW:
+    case HTRDR_SPECTRAL_SW:
+
+      /* Invalid reference temperature */
+      if(spectral_domain->ref_temperature <= 0)
+        return RES_BAD_ARG;
+
+      /* Invalid spectral range */
+      if(spectral_domain->wlen_range[0]
+      >  spectral_domain->wlen_range[1])
+        return RES_BAD_ARG;
+
+      break;
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      /* Nothing to check since all parameters are implicitly defined */
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+
+  return RES_OK;
+}
+
 static void
 print_help(const char* cmd)
 {
@@ -70,7 +141,7 @@ print_help(const char* cmd)
     HTRDR_PLANETO_ARGS_DEFAULT.optical_thickness);
   printf(
 "  -t threads     hint on the number of threads to use.\n"
-"                 Default assumes as mayn threads as CPU cores\n");
+"                 Default assumes as many threads as CPU cores\n");
   printf(
 "  -V octree_definition\n"
 "                 advice on the definition of the atmospheric\n"
@@ -327,6 +398,9 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         args->aerosols[args->naerosols] = RNATM_AEROSOL_ARGS_NULL;
         args->naerosols += 1;
         res = cstr_parse_list(optarg, ':', parse_aerosol_parameters, args);
+        if(res == RES_OK) {
+          res = check_aerosol_args(args->aerosols+args->naerosols-1);
+        }
         break;
       case 'd':
         args->output_type = HTRDR_PLANETO_ARGS_OUTPUT_OCTREES;
@@ -336,9 +410,15 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         break;
       case 'G':
         res = cstr_parse_list(optarg, ':', parse_ground_parameters, args);
+        if(res == RES_OK) {
+          res = check_ground_args(&args->ground);
+        }
         break;
       case 'g':
         res = cstr_parse_list(optarg, ':', parse_gas_parameters, args);
+        if(res == RES_OK) {
+          res = check_gas_args(&args->gas);
+        }
         break;
       case 'h':
         print_help(argv[0]);
@@ -374,6 +454,18 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     }
   }
 
+
+  res = check_gas_args(&args->gas);
+  if(res != RES_OK) {
+    fprintf(stderr, "missing gas definition -- option '-a'\n");
+    goto error;
+  }
+  res = check_ground_args(&args->ground);
+  if(res != RES_OK) {
+    fprintf(stderr, "missing ground definition -- option '-G'\n");
+    goto error;
+  }
+
 exit:
   return res;
 error:
@@ -406,4 +498,43 @@ htrdr_planeto_args_release(struct htrdr_planeto_args* args)
   sa_release(args->aerosols);
 
   *args = HTRDR_PLANETO_ARGS_DEFAULT;
+}
+
+res_T
+htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
+{
+  size_t i;
+  res_T res = RES_OK;
+
+  if(!args) return RES_BAD_ARG;
+
+  /* Invalid gas */
+  res = check_gas_args(&args->gas);
+  if(res != RES_OK) return res;
+
+  /* Invalid aerosols */
+  FOR_EACH(i, 0, args->naerosols) {
+    res = check_aerosol_args(args->aerosols+i);
+    if(res != RES_OK) return res;
+  }
+
+  /* Invalid ground */
+  res = check_ground_args(&args->ground);
+  if(res != RES_OK) return res;
+
+  /* Invalid octree parameters */
+  if(args->octree_definition_hint == 0
+  || args->optical_thickness < 0)
+    return RES_BAD_ARG;
+
+  /* Invalid spectral domain */
+  res = check_spectral_args(&args->spectral_domain);
+  if(res != RES_OK) return res;
+
+  /* Check miscalleneous parameters */
+  if(args->nthreads == 0
+  || (unsigned)args->output_type >= HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__)
+    return RES_BAD_ARG;
+
+  return RES_OK;
 }
