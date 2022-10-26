@@ -83,7 +83,7 @@ setup_output
   }
 
   /* Setup the output name */
-  str_set(&cmd->output_name, output_name);
+  res = str_set(&cmd->output_name, output_name);
   if(res != RES_OK) {
     htrdr_log_err(cmd->htrdr,
       "Could not store the name of the output stream `%s' -- %s.\n",
