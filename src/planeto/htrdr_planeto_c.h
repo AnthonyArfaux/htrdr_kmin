@@ -38,6 +38,7 @@ struct htrdr_planeto {
 
   FILE* output;
   struct str output_name;
+  enum htrdr_planeto_args_output_type output_type;
 
   ref_T ref;
   struct htrdr* htrdr;

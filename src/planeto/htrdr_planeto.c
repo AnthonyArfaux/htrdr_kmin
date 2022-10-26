@@ -199,6 +199,8 @@ setup_output
     goto error;
   }
 
+  cmd->output_type = args->output_type;
+
 exit:
   return res;
 error:
@@ -207,6 +209,28 @@ error:
     CHK(fclose(cmd->output) == 0);
     cmd->output = NULL;
   }
+  goto exit;
+}
+
+static INLINE res_T
+write_vtk_octrees(const struct htrdr_planeto* cmd)
+{
+  size_t octrees_range[2];
+  res_T res = RES_OK;
+  ASSERT(cmd);
+
+  /* Nothing to do on non master process */
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
+
+  octrees_range[0] = 0;
+  octrees_range[1] = rnatm_get_spectral_items_count(cmd->atmosphere) - 1;
+
+  res = rnatm_write_vtk_octrees(cmd->atmosphere, octrees_range, cmd->output);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
   goto exit;
 }
 
@@ -292,4 +316,27 @@ htrdr_planeto_ref_put(struct htrdr_planeto* cmd)
 {
   ASSERT(cmd);
   ref_put(&cmd->ref, planeto_release);
+}
+
+res_T
+htrdr_planeto_run(struct htrdr_planeto* cmd)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd);
+
+  switch(cmd->output_type) {
+    case HTRDR_PLANETO_ARGS_OUTPUT_IMAGE:
+      htrdr_log_warn(cmd->htrdr, "image rendering is not yet implemented\n");
+      break;
+    case HTRDR_PLANETO_ARGS_OUTPUT_OCTREES:
+      res = write_vtk_octrees(cmd);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+  }
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
 }

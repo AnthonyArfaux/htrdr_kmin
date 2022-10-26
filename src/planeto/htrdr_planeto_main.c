@@ -60,6 +60,9 @@ htrdr_planeto_main(int argc, char** argv)
   res = htrdr_planeto_create(htrdr, &cmd_args, &cmd);
   if(res != RES_OK) goto error;
 
+  res = htrdr_planeto_run(cmd);
+  if(res != RES_OK) goto error;
+
 exit:
   htrdr_planeto_args_release(&cmd_args);
   if(is_mpi_init) htrdr_mpi_finalize();
