@@ -73,6 +73,27 @@ check_ground_args(const struct htrdr_planeto_ground_args* args)
 }
 
 static INLINE res_T
+check_source_args(const struct htrdr_planeto_source_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Invalid position */
+  if(args->latitude <-90
+  || args->latitude > 90
+  || args->longitude <-180
+  || args->longitude > 180
+  || args->distance < 0)
+    return RES_BAD_ARG;
+
+  /* Miscellaneous parameters */
+  if(args->radius < 0
+  || args->temperature < 0)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+static INLINE res_T
 check_spectral_args(const struct htrdr_args_spectral* spectral_domain)
 {
   if(!spectral_domain) return RES_BAD_ARG;
@@ -108,7 +129,7 @@ print_help(const char* cmd)
 "Usage: %s [-dfhv] [-s spectral_domain] [-t threads]\n"
 "                     [-T optical_thickness] [-V octree_definition]\n"
 "                     [-O octrees_storage] [-o output]\n"
-"                     [-a aerosol]... -g gas -G ground\n", cmd);
+"                     [-a aerosol]... -g gas -G ground -S source\n", cmd);
   printf(
 "Simulate radiative transfer in heterogeneous 3D planetary atmosphere.\n"
 "See htrdr-planeto(1) man page for details\n\n");
@@ -131,6 +152,8 @@ print_help(const char* cmd)
   printf(
 "  -o output      file where the result is written. If not defined,\n"
 "                 the result is written to standard output\n");
+  printf(
+"  -S source      define the source\n");
   printf(
 "  -s spectral_domain\n"
 "                 define the spectral domain of integration\n");
@@ -379,6 +402,87 @@ error:
   goto exit;
 }
 
+static res_T
+parse_source_parameters(const char* str, void* ptr)
+{
+  enum {LAT, LON, DST, RADIUS, TEMP} iparam;
+  char buf[BUFSIZ];
+  struct htrdr_planeto_args* args = ptr;
+  struct htrdr_planeto_source_args* src = NULL;
+  char* key;
+  char* val;
+  char* tk_ctx;
+  res_T res = RES_OK;
+  ASSERT(str && ptr);
+
+  src = &args->source;
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr, "Could not duplicate the source parameter `%s'\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &tk_ctx);
+  val = strtok_r(NULL, "", &tk_ctx);
+
+       if(!strcmp(key, "lat")) iparam = LAT;
+  else if(!strcmp(key, "lon")) iparam = LON;
+  else if(!strcmp(key, "dst")) iparam = DST;
+  else if(!strcmp(key, "radius")) iparam = RADIUS;
+  else if(!strcmp(key, "temp")) iparam = TEMP;
+  else {
+    fprintf(stderr, "Invalid source parameter `%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if(!val) {
+    fprintf(stderr, "Invalid null value for the source parameter`%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(iparam) {
+    case LAT:
+      res = cstr_to_double(val, &src->latitude);
+      if(res == RES_OK && (src->latitude < -90 || src->latitude > 90)) {
+        res = RES_BAD_ARG;
+      }
+      break;
+    case LON:
+      res = cstr_to_double(val, &src->longitude);
+      if(res == RES_OK && (src->longitude < -180 || src->longitude > 180)) {
+        res = RES_BAD_ARG;
+      }
+      break;
+    case DST:
+      res = cstr_to_double(val, &src->distance);
+      if(res == RES_OK && src->distance < 0) res = RES_BAD_ARG;
+      break;
+    case RADIUS:
+      res = cstr_to_double(val, &src->radius);
+      if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+      break;
+    case TEMP:
+      res = cstr_to_double(val, &src->temperature);
+      if(res == RES_OK && src->temperature < 0) res = RES_BAD_ARG;
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+  if(res != RES_OK) {
+    fprintf(stderr, "Unable to parse the source parameter `%s' -- %s\n",
+      str, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -391,7 +495,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETO_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:dfG:g:hO:o:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:dfG:g:hO:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
         sa_add(args->aerosols, 1);
@@ -427,6 +531,9 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         goto exit;
       case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
+      case 'S':
+        res = cstr_parse_list(optarg, ':', parse_source_parameters, args);
+        break;
       case 's':
         res = htrdr_args_spectral_parse(&args->spectral_domain, optarg);
         break;
@@ -457,12 +564,17 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   res = check_gas_args(&args->gas);
   if(res != RES_OK) {
-    fprintf(stderr, "missing gas definition -- option '-a'\n");
+    fprintf(stderr, "Missing gas definition -- option '-a'\n");
     goto error;
   }
   res = check_ground_args(&args->ground);
   if(res != RES_OK) {
-    fprintf(stderr, "missing ground definition -- option '-G'\n");
+    fprintf(stderr, "Missing ground definition -- option '-G'\n");
+    goto error;
+  }
+  res = check_source_args(&args->source);
+  if(res != RES_OK) {
+    fprintf(stderr, "Missing source definition -- option '-S'\n");
     goto error;
   }
 
@@ -508,27 +620,31 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
 
   if(!args) return RES_BAD_ARG;
 
-  /* Invalid gas */
+  /* Check the gas */
   res = check_gas_args(&args->gas);
   if(res != RES_OK) return res;
 
-  /* Invalid aerosols */
+  /* Check the aerosols */
   FOR_EACH(i, 0, args->naerosols) {
     res = check_aerosol_args(args->aerosols+i);
     if(res != RES_OK) return res;
   }
 
-  /* Invalid ground */
+  /* Check the ground */
   res = check_ground_args(&args->ground);
   if(res != RES_OK) return res;
 
-  /* Invalid octree parameters */
+  /* Check the octree parameters */
   if(args->octree_definition_hint == 0
   || args->optical_thickness < 0)
     return RES_BAD_ARG;
 
-  /* Invalid spectral domain */
+  /* Check the spectral domain */
   res = check_spectral_args(&args->spectral_domain);
+  if(res != RES_OK) return res;
+
+  /* Check the source */
+  res = check_source_args(&args->source);
   if(res != RES_OK) return res;
 
   /* Check miscalleneous parameters */

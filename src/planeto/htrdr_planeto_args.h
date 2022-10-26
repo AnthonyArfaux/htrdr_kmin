@@ -31,6 +31,17 @@ enum htrdr_planeto_args_output_type {
   HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__
 };
 
+struct htrdr_planeto_source_args {
+  double longitude; /* In [-180, 180] degrees */
+  double latitude; /* In [-90, 90] degrees */
+  double distance; /* In km */
+  double radius; /* In km */
+  double temperature; /* In Kelvin */
+};
+#define HTRDR_PLANETO_SOURCE_ARGS_NULL__ {0,0,0,-1,-1}
+static const struct htrdr_planeto_source_args HTRDR_PLANETO_SOURCE_ARGS_NULL =
+  HTRDR_PLANETO_SOURCE_ARGS_NULL__;
+
 struct htrdr_planeto_ground_args {
   char* smsh_filename; /* The Star-Mesh geometry */
   char* props_filename; /* Per triangle physical properties */
@@ -56,9 +67,8 @@ struct htrdr_planeto_args {
   double optical_thickness; /* Threshold used during octree building */
 
   char* output; /* File where the result is written */
-
-  /* Integration spectral domain */
-  struct htrdr_args_spectral spectral_domain;
+  struct htrdr_args_spectral spectral_domain; /* Integration spectral domain */
+  struct htrdr_planeto_source_args source;
 
   /* Miscellaneous arguments */
   unsigned nthreads; /* Hint on the nimber of threads to use */
@@ -79,8 +89,8 @@ struct htrdr_planeto_args {
   10, /* Optical thickness criteria */                                         \
                                                                                \
   NULL, /* Ouput file */                                                       \
-                                                                               \
   HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \
+  HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
                                                                                \
   UINT_MAX, /* Number of threads */                                            \
   HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__,                                     \
