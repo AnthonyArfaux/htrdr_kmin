@@ -93,7 +93,7 @@ struct htrdr_planeto_args {
   HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
                                                                                \
   UINT_MAX, /* Number of threads */                                            \
-  HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__,                                     \
+  HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,                                             \
   0, /* Force output overwrite */                                              \
   0, /* Verbosity level */                                                     \
   0 /* Stop the command */                                                     \
