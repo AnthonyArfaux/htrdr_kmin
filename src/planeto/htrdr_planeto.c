@@ -67,7 +67,7 @@ setup_octree_storage
   err = stat(args->octrees_storage, &file_stat);
   if(err < 0) { res = RES_IO_ERR; goto error; }
 
-  if(file_stat.st_size == 0) {
+  if(file_stat.st_size != 0) {
     /* The file is not empty and therefore must contain valid octrees */
     rnatm_args->load_octrees_from_storage = 1;
   }
