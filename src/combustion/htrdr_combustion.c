@@ -589,7 +589,7 @@ htrdr_combustion_create
   cmd = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*cmd));
   if(!cmd) {
     htrdr_log_err(htrdr, "Could not allocate the htrdr_combustion data.\n");
-    res = RES_BAD_ARG;
+    res = RES_MEM_ERR;
     goto error;
   }
   ref_init(&cmd->ref);
