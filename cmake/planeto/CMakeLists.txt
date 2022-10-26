@@ -16,7 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.1)
-project(htrdr-planet)
+project(htrdr-planeto)
 
 ################################################################################
 # Check dependencies
@@ -51,11 +51,13 @@ include_directories(
 # Configure and define targets
 ################################################################################
 set(HTRDR_PLANETO_FILES_SRC
+  htrdr_planeto.c
   htrdr_planeto_args.c
   htrdr_planeto_main.c)
 
 set(HTRDR_PLANETO_FILES_INC
   htrdr_planeto.h
+  htrdr_planeto_c.h
   htrdr_planeto_args.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
