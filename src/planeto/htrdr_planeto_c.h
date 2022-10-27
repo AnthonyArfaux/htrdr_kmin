@@ -18,6 +18,8 @@
 #ifndef HTRDR_PLANETO_C_H
 #define HTRDR_PLANETO_C_H
 
+#include "planeto/htrdr_planeto_args.h"
+
 #include "core/htrdr_args.h"
 
 #include <rsys/ref_count.h>

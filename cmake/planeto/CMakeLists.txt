@@ -53,12 +53,14 @@ include_directories(
 set(HTRDR_PLANETO_FILES_SRC
   htrdr_planeto.c
   htrdr_planeto_args.c
-  htrdr_planeto_main.c)
+  htrdr_planeto_main.c
+  htrdr_planeto_source.c)
 
 set(HTRDR_PLANETO_FILES_INC
   htrdr_planeto.h
   htrdr_planeto_c.h
-  htrdr_planeto_args.h)
+  htrdr_planeto_args.h
+  htrdr_planeto_source.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
 rcmake_prepend_path(HTRDR_PLANETO_FILES_SRC ${HTRDR_SOURCE_DIR}/planeto)

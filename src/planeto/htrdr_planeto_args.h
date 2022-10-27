@@ -115,4 +115,8 @@ extern LOCAL_SYM res_T
 htrdr_planeto_args_check
   (const struct htrdr_planeto_args* args);
 
+extern LOCAL_SYM res_T
+htrdr_planeto_source_args_check
+  (const struct htrdr_planeto_source_args* args);
+
 #endif /* HTRDR_PLANETO_ARGS_H */

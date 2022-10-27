@@ -73,27 +73,6 @@ check_ground_args(const struct htrdr_planeto_ground_args* args)
 }
 
 static INLINE res_T
-check_source_args(const struct htrdr_planeto_source_args* args)
-{
-  if(!args) return RES_BAD_ARG;
-
-  /* Invalid position */
-  if(args->latitude <-90
-  || args->latitude > 90
-  || args->longitude <-180
-  || args->longitude > 180
-  || args->distance < 0)
-    return RES_BAD_ARG;
-
-  /* Miscellaneous parameters */
-  if(args->radius < 0
-  || args->temperature < 0)
-    return RES_BAD_ARG;
-
-  return RES_OK;
-}
-
-static INLINE res_T
 check_spectral_args(const struct htrdr_args_spectral* spectral_domain)
 {
   if(!spectral_domain) return RES_BAD_ARG;
@@ -572,7 +551,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     fprintf(stderr, "Missing ground definition -- option '-G'\n");
     goto error;
   }
-  res = check_source_args(&args->source);
+  res = htrdr_planeto_source_args_check(&args->source);
   if(res != RES_OK) {
     fprintf(stderr, "Missing source definition -- option '-S'\n");
     goto error;
@@ -644,12 +623,33 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
   if(res != RES_OK) return res;
 
   /* Check the source */
-  res = check_source_args(&args->source);
+  res = htrdr_planeto_source_args_check(&args->source);
   if(res != RES_OK) return res;
 
   /* Check miscalleneous parameters */
   if(args->nthreads == 0
   || (unsigned)args->output_type >= HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+res_T
+htrdr_planeto_source_args_check(const struct htrdr_planeto_source_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Invalid position */
+  if(args->latitude <-90
+  || args->latitude > 90
+  || args->longitude <-180
+  || args->longitude > 180
+  || args->distance < 0)
+    return RES_BAD_ARG;
+
+  /* Miscellaneous parameters */
+  if(args->radius < 0
+  || args->temperature < 0)
     return RES_BAD_ARG;
 
   return RES_OK;
