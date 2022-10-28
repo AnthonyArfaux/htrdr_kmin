@@ -29,7 +29,9 @@
 
 /* Forward declarations */
 struct htrdr;
+struct htrdr_cie;
 struct htrdr_pixel_format;
+struct htrdr_ran_wlen;
 struct rnatm;
 struct rngrd;
 struct scam;
@@ -68,6 +70,8 @@ struct htrdr_planeto {
   struct htrdr_planeto_source* source;
 
   struct htrdr_args_spectral spectral_domain;
+  struct htrdr_cie_xyz* ran_wlen_cie; /* HTRDR_SPECTRAL_SW_CIE_XYZ */
+  struct htrdr_ran_wlen* ran_wlen_planck; /* HTRDR_SPECTRAL_<LW|SW> */
 
   FILE* octrees_storage;
 
@@ -84,6 +88,10 @@ struct htrdr_planeto {
   ref_T ref;
   struct htrdr* htrdr;
 };
+
+extern LOCAL_SYM res_T
+planeto_draw_map
+  (struct htrdr_planeto* cmd);
 
 extern LOCAL_SYM void
 planeto_get_pixel_format

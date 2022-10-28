@@ -34,7 +34,7 @@ HTRDR_CORE_API res_T
 htrdr_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in  [380, 780] nanometers */
-   const size_t nbands, /* # bands used to discretisze the CIE tristimulus s*/
+   const size_t nbands, /* # bands used to discretize the CIE tristimulus */
    struct htrdr_cie_xyz** cie);
 
 HTRDR_CORE_API void

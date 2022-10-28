@@ -15,9 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* fdopen */
+#define _POSIX_C_SOURCE 200112L /* fdopen, nextafter, rint */
 
 #include "core/htrdr.h"
+#include "core/htrdr_cie_xyz.h"
+#include "core/htrdr_ran_wlen.h"
 #include "core/htrdr_log.h"
 
 #include "planeto/htrdr_planeto.h"
@@ -35,12 +37,78 @@
 #include <rsys/mem_allocator.h>
 
 #include <fcntl.h> /* open */
+#include <math.h> /* nextafter, rint */
 #include <unistd.h> /* close */
 #include <sys/stat.h>
 
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
+/* Calculate the minimum length of the atmospheric spectral bands for the
+ * spectral domain considered */
+static double
+compute_min_band_len(const struct htrdr_planeto* cmd)
+{
+  const double* range = NULL; /* In nm */
+  double len = DBL_MAX;
+  size_t ibands[2];
+  size_t i;
+  ASSERT(cmd);
+
+  range = cmd->spectral_domain.wlen_range;
+
+  /* The spectral range is degenerate to a wavelength */
+  if(eq_eps(range[0], range[1], 1.e-6)) {
+    return 0;
+  }
+
+  RNATM(find_bands(cmd->atmosphere, cmd->spectral_domain.wlen_range, ibands));
+
+  /* At least one band must be overlaped by the spectral domain */
+  ASSERT(ibands[0]<=ibands[1]);
+  FOR_EACH(i, ibands[0], ibands[1]+1) {
+    double band_range[2];
+    RNATM(band_get_range(cmd->atmosphere, i, band_range));
+
+    /* Make the upper bound inclusive */
+    band_range[1] = nextafter(band_range[1], 0);
+
+    /* Clamp the band range to the spectral domain */
+    band_range[0] = MMAX(band_range[0], range[0]);
+    band_range[1] = MMIN(band_range[1], range[1]);
+    len = MMIN(band_range[1] - band_range[0], len);
+  }
+  return len;
+}
+
+/* Calculate the number of fixed size spectral intervals to use for the
+ * cumulative */
+static size_t
+compute_nintervals_for_spectral_cdf(const struct htrdr_planeto* cmd)
+{
+  double range_size;
+  double interval_len;
+  size_t nintervals;
+  ASSERT(cmd);
+
+  range_size =
+    cmd->spectral_domain.wlen_range[1]
+  - cmd->spectral_domain.wlen_range[0];
+
+  /* Initially assume ~one interval per nanometer */
+  nintervals = (size_t)rint(range_size);
+
+  /* Calculate the minimum length of the atmospheric spectral bands fixed to
+   * the spectral integration domain. We ensure that an interval of the
+   * spectral cdf cannot be greater than this length */
+  interval_len = compute_min_band_len(cmd);
+  if(interval_len < (range_size / (double)nintervals)) {
+    nintervals = (size_t)ceil(range_size / interval_len);
+  }
+
+  return nintervals;
+}
+
 static res_T
 setup_octree_storage
   (struct htrdr_planeto* cmd,
@@ -167,9 +235,36 @@ setup_spectral_domain
   (struct htrdr_planeto* cmd,
    const struct htrdr_planeto_args* args)
 {
+  size_t nintervals;
+  res_T res = RES_OK;
   ASSERT(cmd && args);
+
   cmd->spectral_domain = args->spectral_domain;
-  return RES_OK;
+
+  /* Configure the spectral distribution */
+  nintervals = compute_nintervals_for_spectral_cdf(cmd);
+  switch(cmd->spectral_domain.spectral_type) {
+    /* Planck distribution */
+    case HTRDR_SPECTRAL_LW:
+    case HTRDR_SPECTRAL_SW:
+      res = htrdr_ran_wlen_create(cmd->htrdr, cmd->spectral_domain.wlen_range,
+        nintervals, cmd->spectral_domain.ref_temperature,
+        &cmd->ran_wlen_planck);
+      break;
+    /* CIE XYZ distribution */
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      res = htrdr_cie_xyz_create(cmd->htrdr, cmd->spectral_domain.wlen_range,
+        nintervals, &cmd->ran_wlen_cie);
+      break;
+
+    default: FATAL("Unreachable code\n"); break;
+  }
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 static res_T
@@ -343,12 +438,13 @@ planeto_release(ref_T* ref)
 {
   struct htrdr_planeto* cmd = CONTAINER_OF(ref, struct htrdr_planeto, ref);
   struct htrdr* htrdr = NULL;
-
   ASSERT(ref);
 
   if(cmd->atmosphere) RNATM(ref_put(cmd->atmosphere));
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
   if(cmd->source) htrdr_planeto_source_ref_put(cmd->source);
+  if(cmd->ran_wlen_cie) htrdr_cie_xyz_ref_put(cmd->ran_wlen_cie);
+  if(cmd->ran_wlen_planck) htrdr_ran_wlen_ref_put(cmd->ran_wlen_planck);
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
