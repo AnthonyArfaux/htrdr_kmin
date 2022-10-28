@@ -69,6 +69,7 @@ struct htrdr_planeto_args {
   char* output; /* File where the result is written */
   struct htrdr_args_spectral spectral_domain; /* Integration spectral domain */
   struct htrdr_planeto_source_args source;
+  struct htrdr_args_image image;
 
   /* Miscellaneous arguments */
   unsigned nthreads; /* Hint on the nimber of threads to use */
@@ -91,6 +92,7 @@ struct htrdr_planeto_args {
   NULL, /* Ouput file */                                                       \
   HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \
   HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
+  HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
                                                                                \
   UINT_MAX, /* Number of threads */                                            \
   HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,                                             \

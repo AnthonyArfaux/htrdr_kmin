@@ -125,6 +125,8 @@ print_help(const char* cmd)
   printf(
 "  -h             display this help and exit\n");
   printf(
+"  -i image       image to compute\n");
+  printf(
 "  -O octrees_storage\n"
 "                 file where atmospheric acceleration structures are\n"
 "                 stored/loaded\n");
@@ -474,7 +476,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETO_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:dfG:g:hO:o:S:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:dfG:g:hi:O:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
         sa_add(args->aerosols, 1);
@@ -508,6 +510,9 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         htrdr_planeto_args_release(args);
         args->quit = 1;
         goto exit;
+      case 'i':
+        res = htrdr_args_image_parse(&args->image, optarg);
+        break;
       case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
       case 'S':

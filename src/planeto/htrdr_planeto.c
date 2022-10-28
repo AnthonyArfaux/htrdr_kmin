@@ -212,6 +212,41 @@ error:
   goto exit;
 }
 
+static res_T
+setup_buffer
+  (struct htrdr_planeto* cmd,
+   const struct htrdr_planeto_args* args)
+{
+  struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
+  res_T res = RES_OK;
+  ASSERT(cmd && args);
+
+  if(cmd->output != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+    goto exit;
+
+  planeto_get_pixel_format(cmd, &pixfmt);
+
+  /* Setup buffer layout */
+  cmd->buf_layout.width = args->image.definition[0];
+  cmd->buf_layout.height = args->image.definition[1];
+  cmd->buf_layout.pitch = args->image.definition[0] * pixfmt.size;
+  cmd->buf_layout.elmt_size = pixfmt.size;
+  cmd->buf_layout.alignment = pixfmt.alignment;
+
+  /* Create the image buffer only on the master process; Image parts rendered
+   * by other processes are collected there */
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
+
+  res = htrdr_buffer_create(cmd->htrdr, &cmd->buf_layout, &cmd->buf);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  if(cmd->buf) { htrdr_buffer_ref_put(cmd->buf); cmd->buf = NULL; }
+  goto exit;
+}
+
 static INLINE res_T
 write_vtk_octrees(const struct htrdr_planeto* cmd)
 {
@@ -246,6 +281,7 @@ planeto_release(ref_T* ref)
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
+  if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -287,6 +323,8 @@ htrdr_planeto_create
   res = setup_output(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_spectral_domain(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_ground(cmd, args);
   if(res != RES_OK) goto error;
@@ -331,7 +369,7 @@ htrdr_planeto_run(struct htrdr_planeto* cmd)
     case HTRDR_PLANETO_ARGS_OUTPUT_OCTREES:
       res = write_vtk_octrees(cmd);
       break;
-    default: FATAL("Unreachable code.\n"); break;
+    default: FATAL("Unreachable code\n"); break;
   }
   if(res != RES_OK) goto error;
 
@@ -339,4 +377,29 @@ exit:
   return res;
 error:
   goto exit;
+}
+
+/*******************************************************************************
+ * Local function
+ ******************************************************************************/
+void
+planeto_get_pixel_format
+  (const struct htrdr_planeto* cmd,
+   struct htrdr_pixel_format* fmt)
+{
+  ASSERT(cmd && fmt && cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  (void)cmd;
+
+  switch(cmd->spectral_domain.spectral_type) {
+    case HTRDR_SPECTRAL_LW:
+    case HTRDR_SPECTRAL_SW:
+      fmt->size = sizeof(struct planeto_pixel_xwave);
+      fmt->alignment = ALIGNOF(struct planeto_pixel_xwave);
+      break;
+    case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      fmt->size = sizeof(struct planeto_pixel_image);
+      fmt->alignment = ALIGNOF(struct planeto_pixel_image);
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
 }
