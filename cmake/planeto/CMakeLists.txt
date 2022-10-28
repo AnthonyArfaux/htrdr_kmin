@@ -53,6 +53,7 @@ include_directories(
 set(HTRDR_PLANETO_FILES_SRC
   htrdr_planeto.c
   htrdr_planeto_args.c
+  htrdr_planeto_draw_map.c
   htrdr_planeto_main.c
   htrdr_planeto_source.c)
 
