@@ -133,6 +133,10 @@ htrdr_args_camera_perspective_parse
    const char* str);
 
 HTRDR_CORE_API res_T
+htrdr_args_camera_perspective_check
+  (const struct htrdr_args_camera_perspective* cam);
+
+HTRDR_CORE_API res_T
 htrdr_args_camera_orthographic_parse
   (struct htrdr_args_camera_orthographic* cam,
    const char* str);
@@ -146,6 +150,10 @@ HTRDR_CORE_API res_T
 htrdr_args_image_parse
   (struct htrdr_args_image* img,
    const char* str);
+
+HTRDR_CORE_API res_T
+htrdr_args_image_check
+  (const struct htrdr_args_image* img);
 
 HTRDR_CORE_API res_T
 htrdr_args_spectral_parse
