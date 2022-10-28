@@ -444,8 +444,8 @@ parse_spectral_parameter(const char* str, void* ptr)
 
   if(!strcmp(key, "cie_xyz")) {
     args->spectral_type = HTRDR_SPECTRAL_SW_CIE_XYZ;
-    args->wlen_range[0] = HTRDR_CIE_XYZ_RANGE_DEFAULT[0];
-    args->wlen_range[1] = HTRDR_CIE_XYZ_RANGE_DEFAULT[1];
+    args->wlen_range[0] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[0];
+    args->wlen_range[1] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[1];
   } else {
     if(!val) {
       fprintf(stderr, "Missing value to the spectral option `%s'.\n", key);

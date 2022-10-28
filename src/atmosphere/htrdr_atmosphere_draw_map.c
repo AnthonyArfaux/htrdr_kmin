@@ -21,11 +21,11 @@
 
 #include "core/htrdr.h"
 #include "core/htrdr_buffer.h"
-#include "core/htrdr_cie_xyz.h"
 #include "core/htrdr_draw_map.h"
 #include "core/htrdr_interface.h"
 #include "core/htrdr_log.h"
-#include "core/htrdr_ran_wlen.h"
+#include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_rectangle.h"
 
 #include <high_tune/htsky.h>
@@ -160,9 +160,9 @@ draw_pixel_image
 
       /* Sample a spectral band and a quadrature point */
       switch(ichannel) {
-        case 0: wlen = htrdr_cie_xyz_sample_X(cmd->cie, r0, r1, &pdf); break;
-        case 1: wlen = htrdr_cie_xyz_sample_Y(cmd->cie, r0, r1, &pdf); break;
-        case 2: wlen = htrdr_cie_xyz_sample_Z(cmd->cie, r0, r1, &pdf); break;
+        case 0: wlen = htrdr_ran_wlen_cie_xyz_sample_X(cmd->cie, r0, r1, &pdf); break;
+        case 1: wlen = htrdr_ran_wlen_cie_xyz_sample_Y(cmd->cie, r0, r1, &pdf); break;
+        case 2: wlen = htrdr_ran_wlen_cie_xyz_sample_Z(cmd->cie, r0, r1, &pdf); break;
         default: FATAL("Unreachable code.\n"); break;
       }
       pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
@@ -249,7 +249,7 @@ draw_pixel_flux
     r2 = ssp_rng_canonical(args->rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
+    wlen = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &band_pdf);
     band_pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
 
     /* Select the associated band and sample a quadrature point */
@@ -370,7 +370,7 @@ draw_pixel_xwave
     r2 = ssp_rng_canonical(args->rng);
 
     /* Sample a wavelength */
-    wlen = htrdr_ran_wlen_sample(cmd->ran_wlen, r0, r1, &band_pdf);
+    wlen = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &band_pdf);
     band_pdf *= 1.e9; /* Transform the pdf from nm^-1 to m^-1 */
 
     /* Select the associated band and sample a quadrature point */

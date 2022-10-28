@@ -20,7 +20,7 @@
 #include "core/htrdr.h"
 #include "core/htrdr_c.h"
 #include "core/htrdr_log.h"
-#include "core/htrdr_ran_wlen.h"
+#include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_spectral.h"
 
 #include <rsys/algorithm.h>
@@ -31,7 +31,7 @@
 
 #include <math.h> /* nextafter */
 
-struct htrdr_ran_wlen {
+struct htrdr_ran_wlen_planck {
   struct darray_double pdf;
   struct darray_double cdf;
   double range[2]; /* Boundaries of the spectral integration interval */
@@ -47,8 +47,8 @@ struct htrdr_ran_wlen {
  * Helper functions
  ******************************************************************************/
 static res_T
-setup_wlen_ran_cdf
-  (struct htrdr_ran_wlen* wlen_ran,
+setup_wlen_planck_ran_cdf
+  (struct htrdr_ran_wlen_planck* planck,
    const char* func_name)
 {
   double* pdf = NULL;
@@ -56,39 +56,40 @@ setup_wlen_ran_cdf
   double sum = 0;
   size_t i;
   res_T res = RES_OK;
-  ASSERT(wlen_ran && func_name && wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE);
+  ASSERT(planck && func_name);
+  ASSERT(planck->nbands != HTRDR_WLEN_RAN_PLANCK_CONTINUE);
 
-  res = darray_double_resize(&wlen_ran->cdf, wlen_ran->nbands);
+  res = darray_double_resize(&planck->cdf, planck->nbands);
   if(res != RES_OK) {
-    htrdr_log_err(wlen_ran->htrdr,
+    htrdr_log_err(planck->htrdr,
       "%s: Error allocating the CDF of the spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
-  res = darray_double_resize(&wlen_ran->pdf, wlen_ran->nbands);
+  res = darray_double_resize(&planck->pdf, planck->nbands);
   if(res != RES_OK) {
-    htrdr_log_err(wlen_ran->htrdr,
+    htrdr_log_err(planck->htrdr,
       "%s: Error allocating the pdf of the spectral bands -- %s.\n",
       func_name, res_to_cstr(res));
     goto error;
   }
 
-  cdf = darray_double_data_get(&wlen_ran->cdf);
-  pdf = darray_double_data_get(&wlen_ran->pdf); /* Now save pdf to correct weight */
+  cdf = darray_double_data_get(&planck->cdf);
+  pdf = darray_double_data_get(&planck->pdf); /* Now save pdf to correct weight */
 
-  htrdr_log(wlen_ran->htrdr,
+  htrdr_log(planck->htrdr,
     "Number of bands of the spectrum cumulative: %lu\n",
-    (unsigned long)wlen_ran->nbands);
+    (unsigned long)planck->nbands);
 
   /* Compute the *unnormalized* probability to sample a small band */
-  FOR_EACH(i, 0, wlen_ran->nbands) {
-    double lambda_lo = wlen_ran->range[0] + (double)i * wlen_ran->band_len;
-    double lambda_hi = MMIN(lambda_lo + wlen_ran->band_len, wlen_ran->range[1]);
+  FOR_EACH(i, 0, planck->nbands) {
+    double lambda_lo = planck->range[0] + (double)i * planck->band_len;
+    double lambda_hi = MMIN(lambda_lo + planck->band_len, planck->range[1]);
     ASSERT(lambda_lo<= lambda_hi);
-    ASSERT(lambda_lo > wlen_ran->range[0]
-        || eq_eps(lambda_lo, wlen_ran->range[0], 1.e-6));
-    ASSERT(lambda_lo < wlen_ran->range[1]
-        || eq_eps(lambda_lo, wlen_ran->range[1], 1.e-6));
+    ASSERT(lambda_lo > planck->range[0]
+        || eq_eps(lambda_lo, planck->range[0], 1.e-6));
+    ASSERT(lambda_lo < planck->range[1]
+        || eq_eps(lambda_lo, planck->range[1], 1.e-6));
 
     /* Convert from nanometer to meter */
     lambda_lo *= 1.e-9;
@@ -96,14 +97,14 @@ setup_wlen_ran_cdf
 
     /* Compute the probability of the current band */
     pdf[i] = htrdr_blackbody_fraction
-      (lambda_lo, lambda_hi, wlen_ran->ref_temperature);
+      (lambda_lo, lambda_hi, planck->ref_temperature);
 
     /* Update the norm */
     sum += pdf[i];
   }
 
   /* Compute the cumulative of the previously computed probabilities */
-  FOR_EACH(i, 0, wlen_ran->nbands) {
+  FOR_EACH(i, 0, planck->nbands) {
     /* Normalize the probability */
     pdf[i] /= sum;
 
@@ -115,20 +116,20 @@ setup_wlen_ran_cdf
       ASSERT(cdf[i] >= cdf[i-1]);
     }
   }
-  ASSERT(eq_eps(cdf[wlen_ran->nbands-1], 1, 1.e-6));
-  cdf[wlen_ran->nbands - 1] = 1.0; /* Handle numerical issue */
+  ASSERT(eq_eps(cdf[planck->nbands-1], 1, 1.e-6));
+  cdf[planck->nbands - 1] = 1.0; /* Handle numerical issue */
 
 exit:
   return res;
 error:
-  darray_double_clear(&wlen_ran->cdf);
-  darray_double_clear(&wlen_ran->pdf);
+  darray_double_clear(&planck->cdf);
+  darray_double_clear(&planck->pdf);
   goto exit;
 }
 
 static double
 wlen_ran_sample_continue
-  (const struct htrdr_ran_wlen* wlen_ran,
+  (const struct htrdr_ran_wlen_planck* planck,
    const double r,
    const double range[2], /* In nanometer */
    const char* func_name,
@@ -151,7 +152,7 @@ wlen_ran_sample_continue
   size_t i;
 
   /* Check precondition */
-  ASSERT(wlen_ran && func_name);
+  ASSERT(planck && func_name);
   ASSERT(range && range[0] < range[1]);
   ASSERT(0 <= r && r < 1);
 
@@ -163,7 +164,7 @@ wlen_ran_sample_continue
   lambda_m_min = range_m[0];
   lambda_m_max = range_m[1];
   bf_min_max = htrdr_blackbody_fraction
-    (range_m[0], range_m[1], wlen_ran->ref_temperature);
+    (range_m[0], range_m[1], planck->ref_temperature);
 
   /* Numerically search the lambda corresponding to the submitted canonical
    * number */
@@ -171,7 +172,7 @@ wlen_ran_sample_continue
     double r_test;
     lambda_m = (lambda_m_min + lambda_m_max) * 0.5;
     bf = htrdr_blackbody_fraction
-      (range_m[0], lambda_m, wlen_ran->ref_temperature);
+      (range_m[0], lambda_m, planck->ref_temperature);
 
     r_test = bf / bf_min_max;
     if(r_test < r) {
@@ -188,14 +189,14 @@ wlen_ran_sample_continue
     bf_prev = bf;
   }
   if(i >= MAX_ITER) {
-    htrdr_log_warn(wlen_ran->htrdr,
+    htrdr_log_warn(planck->htrdr,
       "%s: could not sample a wavelength in the range [%g, %g] nanometers "
       "for the reference temperature %g Kelvin.\n",
-      func_name, SPLIT2(range), wlen_ran->ref_temperature);
+      func_name, SPLIT2(range), planck->ref_temperature);
   }
 
   if(pdf) {
-    const double Tref = wlen_ran->ref_temperature;
+    const double Tref = planck->ref_temperature;
     const double B_lambda = htrdr_planck(lambda_m, lambda_m, Tref);
     const double B_mean = htrdr_planck(range_m[0], range_m[1], Tref);
     *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
@@ -207,7 +208,7 @@ wlen_ran_sample_continue
 
 static double
 wlen_ran_sample_discrete
-  (const struct htrdr_ran_wlen* wlen_ran,
+  (const struct htrdr_ran_wlen_planck* planck,
    const double r0,
    const double r1,
    const char* func_name,
@@ -222,14 +223,14 @@ wlen_ran_sample_discrete
   double pdf_band = 0;
   size_t cdf_length = 0;
   size_t i;
-  ASSERT(wlen_ran && wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE);
+  ASSERT(planck && planck->nbands != HTRDR_WLEN_RAN_PLANCK_CONTINUE);
   ASSERT(0 <= r0 && r0 < 1);
   ASSERT(0 <= r1 && r1 < 1);
   (void)func_name;
   (void)pdf_band;
 
-  cdf = darray_double_cdata_get(&wlen_ran->cdf);
-  cdf_length = darray_double_size_get(&wlen_ran->cdf);
+  cdf = darray_double_cdata_get(&planck->cdf);
+  cdf_length = darray_double_size_get(&planck->cdf);
   ASSERT(cdf_length > 0);
 
   /* Use r_next rather than r0 in order to find the first entry that is not less
@@ -240,11 +241,11 @@ wlen_ran_sample_discrete
   i = (size_t)(find - cdf);
   ASSERT(i < cdf_length && cdf[i] > r0 && (!i || cdf[i-1] <= r0));
 
-  band_range[0] = wlen_ran->range[0] + (double)i*wlen_ran->band_len;
-  band_range[1] = band_range[0] + wlen_ran->band_len;
+  band_range[0] = planck->range[0] + (double)i*planck->band_len;
+  band_range[1] = band_range[0] + planck->band_len;
 
   /* Fetch the pdf of the sampled band */
-  pdf_band = darray_double_cdata_get(&wlen_ran->pdf)[i];
+  pdf_band = darray_double_cdata_get(&planck->pdf)[i];
 
   /* Uniformly sample a wavelength in the sampled band */
   lambda = band_range[0] + (band_range[1] - band_range[0]) * r1;
@@ -258,63 +259,63 @@ wlen_ran_sample_discrete
 }
 
 static void
-release_wlen_ran(ref_T* ref)
+release_wlen_planck_ran(ref_T* ref)
 {
-  struct htrdr_ran_wlen* wlen_ran = NULL;
+  struct htrdr_ran_wlen_planck* planck = NULL;
   struct htrdr* htrdr = NULL;
   ASSERT(ref);
-  wlen_ran = CONTAINER_OF(ref, struct htrdr_ran_wlen, ref);
-  darray_double_release(&wlen_ran->cdf);
-  darray_double_release(&wlen_ran->pdf);
-  htrdr = wlen_ran->htrdr;
-  MEM_RM(htrdr_get_allocator(htrdr), wlen_ran);
-  htrdr_ref_put(wlen_ran->htrdr);
+  planck = CONTAINER_OF(ref, struct htrdr_ran_wlen_planck, ref);
+  darray_double_release(&planck->cdf);
+  darray_double_release(&planck->pdf);
+  htrdr = planck->htrdr;
+  MEM_RM(htrdr_get_allocator(htrdr), planck);
+  htrdr_ref_put(planck->htrdr);
 }
 
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_ran_wlen_create
+htrdr_ran_wlen_planck_create
   (struct htrdr* htrdr,
    /* range must be included in [200,1000] nm for shortwave or in [1000,100000]
     * nanometers for longwave (thermal) */
    const double range[2],
    const size_t nbands, /* # bands used to discretized CDF */
    const double ref_temperature,
-   struct htrdr_ran_wlen** out_wlen_ran)
+   struct htrdr_ran_wlen_planck** out_wlen_planck_ran)
 {
-  struct htrdr_ran_wlen* wlen_ran = NULL;
+  struct htrdr_ran_wlen_planck* planck = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && range && out_wlen_ran && ref_temperature > 0);
+  ASSERT(htrdr && range && out_wlen_planck_ran && ref_temperature > 0);
   ASSERT(ref_temperature > 0);
   ASSERT(range[0] <= range[1]);
 
-  wlen_ran = MEM_CALLOC(htrdr->allocator, 1, sizeof(*wlen_ran));
-  if(!wlen_ran) {
+  planck = MEM_CALLOC(htrdr->allocator, 1, sizeof(*planck));
+  if(!planck) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
       "%s: could not allocate longwave random variate data structure -- %s.\n",
       FUNC_NAME, res_to_cstr(res));
     goto error;
   }
-  ref_init(&wlen_ran->ref);
-  darray_double_init(htrdr->allocator, &wlen_ran->cdf);
-  darray_double_init(htrdr->allocator, &wlen_ran->pdf);
+  ref_init(&planck->ref);
+  darray_double_init(htrdr->allocator, &planck->cdf);
+  darray_double_init(htrdr->allocator, &planck->pdf);
   htrdr_ref_get(htrdr);
-  wlen_ran->htrdr = htrdr;
+  planck->htrdr = htrdr;
 
-  wlen_ran->range[0] = range[0];
-  wlen_ran->range[1] = range[1];
-  wlen_ran->ref_temperature = ref_temperature;
-  wlen_ran->nbands = nbands;
+  planck->range[0] = range[0];
+  planck->range[1] = range[1];
+  planck->ref_temperature = ref_temperature;
+  planck->nbands = nbands;
 
-  if(nbands == HTRDR_WLEN_RAN_CONTINUE) {
-    wlen_ran->band_len = 0;
+  if(nbands == HTRDR_WLEN_RAN_PLANCK_CONTINUE) {
+    planck->band_len = 0;
   } else {
-    wlen_ran->band_len = (range[1] - range[0]) / (double)wlen_ran->nbands;
+    planck->band_len = (range[1] - range[0]) / (double)planck->nbands;
 
-    res = setup_wlen_ran_cdf(wlen_ran, FUNC_NAME);
+    res = setup_wlen_planck_ran_cdf(planck, FUNC_NAME);
     if(res != RES_OK) goto error;
   }
 
@@ -322,43 +323,43 @@ htrdr_ran_wlen_create
     range[0], range[1]);
 
 exit:
-  *out_wlen_ran = wlen_ran;
+  *out_wlen_planck_ran = planck;
   return res;
 error:
-  if(wlen_ran) htrdr_ran_wlen_ref_put(wlen_ran);
+  if(planck) htrdr_ran_wlen_planck_ref_put(planck);
   goto exit;
 }
 
 void
-htrdr_ran_wlen_ref_get(struct htrdr_ran_wlen* wlen_ran)
+htrdr_ran_wlen_planck_ref_get(struct htrdr_ran_wlen_planck* planck)
 {
-  ASSERT(wlen_ran);
-  ref_get(&wlen_ran->ref);
+  ASSERT(planck);
+  ref_get(&planck->ref);
 }
 
 void
-htrdr_ran_wlen_ref_put(struct htrdr_ran_wlen* wlen_ran)
+htrdr_ran_wlen_planck_ref_put(struct htrdr_ran_wlen_planck* planck)
 {
-  ASSERT(wlen_ran);
-  ref_put(&wlen_ran->ref, release_wlen_ran);
+  ASSERT(planck);
+  ref_put(&planck->ref, release_wlen_planck_ran);
 }
 
 double
-htrdr_ran_wlen_sample
-  (const struct htrdr_ran_wlen* wlen_ran,
+htrdr_ran_wlen_planck_sample
+  (const struct htrdr_ran_wlen_planck* planck,
    const double r0,
    const double r1,
    double* pdf)
 {
-  ASSERT(wlen_ran);
-  if(wlen_ran->nbands != HTRDR_WLEN_RAN_CONTINUE) { /* Discrete */
-    return wlen_ran_sample_discrete(wlen_ran, r0, r1, FUNC_NAME, pdf);
-  } else if(eq_eps(wlen_ran->range[0], wlen_ran->range[1], 1.e-6)) {
+  ASSERT(planck);
+  if(planck->nbands != HTRDR_WLEN_RAN_PLANCK_CONTINUE) { /* Discrete */
+    return wlen_ran_sample_discrete(planck, r0, r1, FUNC_NAME, pdf);
+  } else if(eq_eps(planck->range[0], planck->range[1], 1.e-6)) {
     if(pdf) *pdf = 1;
-    return wlen_ran->range[0];
+    return planck->range[0];
   } else { /* Continue */
     return wlen_ran_sample_continue
-      (wlen_ran, r0, wlen_ran->range, FUNC_NAME, pdf);
+      (planck, r0, planck->range, FUNC_NAME, pdf);
   }
 }
 

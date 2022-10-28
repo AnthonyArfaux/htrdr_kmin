@@ -1,4 +1,6 @@
 /* Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019, Université Paul Sabatier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +19,7 @@
 
 #include "core/htrdr.h"
 #include "core/htrdr_c.h"
-#include "core/htrdr_cie_xyz.h"
+#include "core/htrdr_ran_wlen_cie_xyz.h"
 #include "core/htrdr_log.h"
 
 #include <rsys/algorithm.h>
@@ -28,7 +30,7 @@
 
 #include <math.h> /* nextafter */
 
-struct htrdr_cie_xyz {
+struct htrdr_ran_wlen_cie_xyz {
   struct darray_double cdf_X;
   struct darray_double cdf_Y;
   struct darray_double cdf_Z;
@@ -101,7 +103,7 @@ fit_z_bar_1931(const double lambda)
 
 static INLINE double
 sample_cie_xyz
-  (const struct htrdr_cie_xyz* cie,
+  (const struct htrdr_ran_wlen_cie_xyz* cie,
    const double* cdf,
    const size_t cdf_length,
    double (*f_bar)(const double lambda), /* Function to integrate */
@@ -176,7 +178,7 @@ sample_cie_xyz
 
 static res_T
 setup_cie_xyz
-  (struct htrdr_cie_xyz* cie,
+  (struct htrdr_ran_wlen_cie_xyz* cie,
    const char* func_name,
    const size_t nbands)
 {
@@ -188,8 +190,8 @@ setup_cie_xyz
   res_T res = RES_OK;
 
   ASSERT(cie && func_name && nbands);
-  ASSERT(cie->range[0] >= HTRDR_CIE_XYZ_RANGE_DEFAULT[0]);
-  ASSERT(cie->range[1] <= HTRDR_CIE_XYZ_RANGE_DEFAULT[1]);
+  ASSERT(cie->range[0] >= HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[0]);
+  ASSERT(cie->range[1] <= HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[1]);
   ASSERT(cie->range[0] < cie->range[1]);
 
   /* Allocate and reset the memory space for the tristimulus CDF */
@@ -274,10 +276,10 @@ error:
 static void
 release_cie_xyz(ref_T* ref)
 {
-  struct htrdr_cie_xyz* cie = NULL;
+  struct htrdr_ran_wlen_cie_xyz* cie = NULL;
   struct htrdr* htrdr = NULL;
   ASSERT(ref);
-  cie = CONTAINER_OF(ref, struct htrdr_cie_xyz, ref);
+  cie = CONTAINER_OF(ref, struct htrdr_ran_wlen_cie_xyz, ref);
   darray_double_release(&cie->cdf_X);
   darray_double_release(&cie->cdf_Y);
   darray_double_release(&cie->cdf_Z);
@@ -290,13 +292,13 @@ release_cie_xyz(ref_T* ref)
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_cie_xyz_create
+htrdr_ran_wlen_cie_xyz_create
   (struct htrdr* htrdr,
    const double range[2], /* Must be included in [380, 780] nanometers */
    const size_t bands_count, /* # bands used to discretize the CIE tristimulus */
-   struct htrdr_cie_xyz** out_cie)
+   struct htrdr_ran_wlen_cie_xyz** out_cie)
 {
-  struct htrdr_cie_xyz* cie = NULL;
+  struct htrdr_ran_wlen_cie_xyz* cie = NULL;
   size_t nbands = bands_count;
   res_T res = RES_OK;
   ASSERT(htrdr && range && nbands && out_cie);
@@ -330,27 +332,27 @@ exit:
   *out_cie = cie;
   return res;
 error:
-  if(cie) htrdr_cie_xyz_ref_put(cie);
+  if(cie) htrdr_ran_wlen_cie_xyz_ref_put(cie);
   goto exit;
 }
 
 void
-htrdr_cie_xyz_ref_get(struct htrdr_cie_xyz* cie)
+htrdr_ran_wlen_cie_xyz_ref_get(struct htrdr_ran_wlen_cie_xyz* cie)
 {
   ASSERT(cie);
   ref_get(&cie->ref);
 }
 
 void
-htrdr_cie_xyz_ref_put(struct htrdr_cie_xyz* cie)
+htrdr_ran_wlen_cie_xyz_ref_put(struct htrdr_ran_wlen_cie_xyz* cie)
 {
   ASSERT(cie);
   ref_put(&cie->ref, release_cie_xyz);
 }
 
 double
-htrdr_cie_xyz_sample_X
-  (struct htrdr_cie_xyz* cie,
+htrdr_ran_wlen_cie_xyz_sample_X
+  (struct htrdr_ran_wlen_cie_xyz* cie,
    const double r0,
    const double r1,
    double* pdf)
@@ -362,8 +364,8 @@ htrdr_cie_xyz_sample_X
 }
 
 double
-htrdr_cie_xyz_sample_Y
-  (struct htrdr_cie_xyz* cie,
+htrdr_ran_wlen_cie_xyz_sample_Y
+  (struct htrdr_ran_wlen_cie_xyz* cie,
    const double r0,
    const double r1,
    double* pdf)
@@ -375,8 +377,8 @@ htrdr_cie_xyz_sample_Y
 }
 
 double
-htrdr_cie_xyz_sample_Z
-  (struct htrdr_cie_xyz* cie,
+htrdr_ran_wlen_cie_xyz_sample_Z
+  (struct htrdr_ran_wlen_cie_xyz* cie,
    const double r0,
    const double r1,
    double* pdf)

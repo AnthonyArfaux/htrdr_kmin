@@ -24,10 +24,10 @@
 #include "atmosphere/htrdr_atmosphere_sun.h"
 
 #include "core/htrdr_buffer.h"
-#include "core/htrdr_cie_xyz.h"
 #include "core/htrdr_log.h"
 #include "core/htrdr_materials.h"
-#include "core/htrdr_ran_wlen.h"
+#include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_rectangle.h"
 
 #include <high_tune/htsky.h>
@@ -306,8 +306,8 @@ atmosphere_release(ref_T* ref)
   if(cmd->ground) htrdr_atmosphere_ground_ref_put(cmd->ground);
   if(cmd->mats) htrdr_materials_ref_put(cmd->mats);
   if(cmd->sun) htrdr_atmosphere_sun_ref_put(cmd->sun);
-  if(cmd->cie) htrdr_cie_xyz_ref_put(cmd->cie);
-  if(cmd->ran_wlen) htrdr_ran_wlen_ref_put(cmd->ran_wlen);
+  if(cmd->cie) htrdr_ran_wlen_cie_xyz_ref_put(cmd->cie);
+  if(cmd->planck) htrdr_ran_wlen_planck_ref_put(cmd->planck);
   if(cmd->camera) SCAM(ref_put(cmd->camera));
   if(cmd->flux_map) htrdr_rectangle_ref_put(cmd->flux_map);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
@@ -439,7 +439,8 @@ htrdr_atmosphere_create
   nintervals = compute_spectral_bands_count(cmd);
 
   if(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
-    res = htrdr_cie_xyz_create(htrdr, spectral_range, nintervals, &cmd->cie);
+    res = htrdr_ran_wlen_cie_xyz_create
+      (htrdr, spectral_range, nintervals, &cmd->cie);
     if(res != RES_OK) goto error;
   } else {
     if(cmd->ref_temperature <= 0) {
@@ -448,8 +449,8 @@ htrdr_atmosphere_create
       res = RES_BAD_ARG;
       goto error;
     }
-    res = htrdr_ran_wlen_create
-      (htrdr, spectral_range, nintervals, cmd->ref_temperature, &cmd->ran_wlen);
+    res = htrdr_ran_wlen_planck_create
+      (htrdr, spectral_range, nintervals, cmd->ref_temperature, &cmd->planck);
     if(res != RES_OK) goto error;
   }
 

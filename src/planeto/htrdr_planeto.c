@@ -18,8 +18,8 @@
 #define _POSIX_C_SOURCE 200112L /* fdopen, nextafter, rint */
 
 #include "core/htrdr.h"
-#include "core/htrdr_cie_xyz.h"
-#include "core/htrdr_ran_wlen.h"
+#include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_log.h"
 
 #include "planeto/htrdr_planeto.h"
@@ -247,14 +247,14 @@ setup_spectral_domain
     /* Planck distribution */
     case HTRDR_SPECTRAL_LW:
     case HTRDR_SPECTRAL_SW:
-      res = htrdr_ran_wlen_create(cmd->htrdr, cmd->spectral_domain.wlen_range,
-        nintervals, cmd->spectral_domain.ref_temperature,
-        &cmd->ran_wlen_planck);
+      res = htrdr_ran_wlen_planck_create(cmd->htrdr,
+        cmd->spectral_domain.wlen_range, nintervals,
+        cmd->spectral_domain.ref_temperature, &cmd->planck);
       break;
     /* CIE XYZ distribution */
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
-      res = htrdr_cie_xyz_create(cmd->htrdr, cmd->spectral_domain.wlen_range,
-        nintervals, &cmd->ran_wlen_cie);
+      res = htrdr_ran_wlen_cie_xyz_create(cmd->htrdr,
+        cmd->spectral_domain.wlen_range, nintervals, &cmd->cie);
       break;
 
     default: FATAL("Unreachable code\n"); break;
@@ -443,8 +443,8 @@ planeto_release(ref_T* ref)
   if(cmd->atmosphere) RNATM(ref_put(cmd->atmosphere));
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
   if(cmd->source) htrdr_planeto_source_ref_put(cmd->source);
-  if(cmd->ran_wlen_cie) htrdr_cie_xyz_ref_put(cmd->ran_wlen_cie);
-  if(cmd->ran_wlen_planck) htrdr_ran_wlen_ref_put(cmd->ran_wlen_planck);
+  if(cmd->cie) htrdr_ran_wlen_cie_xyz_ref_put(cmd->cie);
+  if(cmd->planck) htrdr_ran_wlen_planck_ref_put(cmd->planck);
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
