@@ -123,8 +123,12 @@ draw_pixel_image
       ASSERT(iband[0] == iband[1]);
 
       /* TODO Compute the radiance in W/m²/sr/m */
-      /*weight = planeto_compute_radiance(cmd, args->ithread, args->rng,
-        ray.org, ray.dir, wlen, iband, iquad); */
+#if 0
+      weight = planeto_compute_radiance(cmd, args->ithread, args->rng,
+        ray.org, ray.dir, wlen, iband, iquad);
+#else
+      weight = 0;
+#endif
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m²/sr */
