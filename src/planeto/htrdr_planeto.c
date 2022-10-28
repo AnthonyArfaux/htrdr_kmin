@@ -23,6 +23,7 @@
 #include "planeto/htrdr_planeto.h"
 #include "planeto/htrdr_planeto_args.h"
 #include "planeto/htrdr_planeto_c.h"
+#include "planeto/htrdr_planeto_source.h"
 
 #include <rad-net/rnatm.h>
 #include <rad-net/rngrd.h>
@@ -212,6 +213,15 @@ error:
   goto exit;
 }
 
+static INLINE res_T
+setup_source
+  (struct htrdr_planeto* cmd,
+   const struct htrdr_planeto_args* args)
+{
+  ASSERT(cmd && args);
+  return htrdr_planeto_source_create(cmd, &args->source, &cmd->source);
+}
+
 static res_T
 setup_buffer
   (struct htrdr_planeto* cmd,
@@ -279,6 +289,7 @@ planeto_release(ref_T* ref)
 
   if(cmd->atmosphere) RNATM(ref_put(cmd->atmosphere));
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
+  if(cmd->source) htrdr_planeto_source_ref_put(cmd->source);
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
@@ -323,6 +334,8 @@ htrdr_planeto_create
   res = setup_output(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_spectral_domain(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_source(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
