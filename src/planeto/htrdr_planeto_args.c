@@ -107,13 +107,15 @@ print_help(const char* cmd)
   printf(
 "Usage: %s [-dfhv] [-s spectral_domain] [-t threads]\n"
 "                     [-T optical_thickness] [-V octree_definition]\n"
-"                     [-O octrees_storage] [-o output]\n"
-"                     [-a aerosol]... -g gas -G ground -S source\n", cmd);
+"                     [-O octrees_storage] [-o output] [-C camera]\n"
+"                     [-S source] [-G ground] [-a aerosol]... -g gas\n", cmd);
   printf(
 "Simulate radiative transfer in heterogeneous 3D planetary atmosphere.\n"
 "See htrdr-planeto(1) man page for details\n\n");
   printf(
 "  -a aerosol     define an aerosol\n");
+  printf(
+"  -C camera      configure a perspective camera\n");
   printf(
 "  -d             write the atmospheric acceleration structures\n");
   printf(
@@ -476,7 +478,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETO_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:dfG:g:hi:O:o:S:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:O:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
         sa_add(args->aerosols, 1);
@@ -486,6 +488,10 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         if(res == RES_OK) {
           res = check_aerosol_args(args->aerosols+args->naerosols-1);
         }
+        break;
+      case 'C':
+        res = htrdr_args_camera_perspective_parse(&args->cam_persp, optarg);
+        args->output_type = HTRDR_PLANETO_ARGS_OUTPUT_IMAGE;
         break;
       case 'd':
         args->output_type = HTRDR_PLANETO_ARGS_OUTPUT_OCTREES;
@@ -545,21 +551,28 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     }
   }
 
-
   res = check_gas_args(&args->gas);
   if(res != RES_OK) {
     fprintf(stderr, "Missing gas definition -- option '-a'\n");
     goto error;
   }
-  res = check_ground_args(&args->ground);
-  if(res != RES_OK) {
-    fprintf(stderr, "Missing ground definition -- option '-G'\n");
-    goto error;
-  }
-  res = htrdr_planeto_source_args_check(&args->source);
-  if(res != RES_OK) {
-    fprintf(stderr, "Missing source definition -- option '-S'\n");
-    goto error;
+
+  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_OCTREES) {
+    res = check_ground_args(&args->ground);
+    if(res != RES_OK) {
+      fprintf(stderr, "Missing ground definition -- option '-G'\n");
+      goto error;
+    }
+
+    /* Check the source */
+    if(args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
+    || args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+      res = htrdr_planeto_source_args_check(&args->source);
+      if(res != RES_OK) {
+        fprintf(stderr, "Missing source definition -- option '-S'\n");
+        goto error;
+      }
+    }
   }
 
 exit:
@@ -614,10 +627,6 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
     if(res != RES_OK) return res;
   }
 
-  /* Check the ground */
-  res = check_ground_args(&args->ground);
-  if(res != RES_OK) return res;
-
   /* Check the octree parameters */
   if(args->octree_definition_hint == 0
   || args->optical_thickness < 0)
@@ -627,9 +636,26 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
   res = check_spectral_args(&args->spectral_domain);
   if(res != RES_OK) return res;
 
-  /* Check the source */
-  res = htrdr_planeto_source_args_check(&args->source);
-  if(res != RES_OK) return res;
+  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_OCTREES) {
+    /* Check the ground */
+    res = check_ground_args(&args->ground);
+    if(res != RES_OK) return res;
+
+    /* Check the source */
+    if(args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
+    || args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+      res = htrdr_planeto_source_args_check(&args->source);
+      if(res != RES_OK) return res;
+    }
+  }
+
+  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE) {
+    res = htrdr_args_camera_perspective_check(&args->cam_persp);
+    if(res != RES_OK) return res;
+
+    res = htrdr_args_image_check(&args->image);
+    if(res != RES_OK) return res;
+  }
 
   /* Check miscalleneous parameters */
   if(args->nthreads == 0

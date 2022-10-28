@@ -71,6 +71,8 @@ struct htrdr_planeto_args {
   struct htrdr_planeto_source_args source;
   struct htrdr_args_image image;
 
+  struct htrdr_args_camera_perspective cam_persp; /* Perspective camera */
+
   /* Miscellaneous arguments */
   unsigned nthreads; /* Hint on the nimber of threads to use */
   enum htrdr_planeto_args_output_type output_type;
@@ -93,6 +95,8 @@ struct htrdr_planeto_args {
   HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \
   HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
   HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
+                                                                               \
+  HTRDR_ARGS_CAMERA_PERSPECTIVE_DEFAULT__, /* Perspective camera */            \
                                                                                \
   UINT_MAX, /* Number of threads */                                            \
   HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,                                             \

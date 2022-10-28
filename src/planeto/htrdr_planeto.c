@@ -243,6 +243,9 @@ setup_buffer
   cmd->buf_layout.elmt_size = pixfmt.size;
   cmd->buf_layout.alignment = pixfmt.alignment;
 
+  /* Save the number of samples per pixel */
+  cmd->spp = args->image.spp;
+
   /* Create the image buffer only on the master process; Image parts rendered
    * by other processes are collected there */
   if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
