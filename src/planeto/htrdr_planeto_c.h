@@ -32,6 +32,7 @@ struct htrdr;
 struct htrdr_pixel_format;
 struct rnatm;
 struct rngrd;
+struct scam;
 
 struct planeto_pixel_xwave {
   struct htrdr_estimate radiance; /* In W/m²/sr */
@@ -73,6 +74,8 @@ struct htrdr_planeto {
   FILE* output;
   struct str output_name;
   enum htrdr_planeto_args_output_type output_type;
+
+  struct scam* camera;
 
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */

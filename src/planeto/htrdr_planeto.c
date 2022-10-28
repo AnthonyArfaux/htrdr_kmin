@@ -28,7 +28,10 @@
 #include <rad-net/rnatm.h>
 #include <rad-net/rngrd.h>
 
+#include <star/scam.h>
+
 #include <rsys/cstr.h>
+#include <rsys/double3.h>
 #include <rsys/mem_allocator.h>
 
 #include <fcntl.h> /* open */
@@ -135,6 +138,9 @@ setup_ground
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
+  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES)
+    goto exit;
+
   rngrd_args.smsh_filename = args->ground.smsh_filename;
   rngrd_args.props_filename = args->ground.props_filename;
   rngrd_args.mtllst_filename = args->ground.mtllst_filename;
@@ -218,8 +224,58 @@ setup_source
   (struct htrdr_planeto* cmd,
    const struct htrdr_planeto_args* args)
 {
+  res_T res = RES_OK;
   ASSERT(cmd && args);
-  return htrdr_planeto_source_create(cmd, &args->source, &cmd->source);
+
+  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES)
+    goto exit;
+
+  res = htrdr_planeto_source_create(cmd, &args->source, &cmd->source);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+setup_camera
+  (struct htrdr_planeto* cmd,
+   const struct htrdr_planeto_args* args)
+{
+  struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
+  res_T res = RES_OK;
+  ASSERT(cmd && args);
+
+  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+    goto exit;
+
+  ASSERT(htrdr_args_camera_perspective_check(&args->cam_persp) == RES_OK);
+  ASSERT(htrdr_args_image_check(&args->image) == RES_OK);
+
+  d3_set(cam_args.position, args->cam_persp.position);
+  d3_set(cam_args.target, args->cam_persp.target);
+  d3_set(cam_args.up, args->cam_persp.up);
+  cam_args.field_of_view = MDEG2RAD(args->cam_persp.fov_y);
+  cam_args.lens_radius = args->cam_persp.lens_radius;
+  cam_args.focal_distance = args->cam_persp.focal_dst;
+  cam_args.aspect_ratio =
+    (double)args->image.definition[0]
+  / (double)args->image.definition[1];
+
+  res = scam_create_perspective
+    (htrdr_get_logger(cmd->htrdr),
+     htrdr_get_allocator(cmd->htrdr),
+     htrdr_get_verbosity_level(cmd->htrdr),
+     &cam_args,
+     &cmd->camera);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 static res_T
@@ -231,7 +287,7 @@ setup_buffer
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+  if(cmd->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
     goto exit;
 
   planeto_get_pixel_format(cmd, &pixfmt);
@@ -296,6 +352,7 @@ planeto_release(ref_T* ref)
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
+  if(cmd->camera) SCAM(ref_put(cmd->camera));
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -339,6 +396,8 @@ htrdr_planeto_create
   res = setup_spectral_domain(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_source(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_camera(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
