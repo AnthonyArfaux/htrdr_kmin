@@ -343,7 +343,7 @@ setup_camera
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+  if(cmd->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
     goto exit;
 
   ASSERT(htrdr_args_camera_perspective_check(&args->cam_persp) == RES_OK);
