@@ -493,13 +493,13 @@ htrdr_planeto_create
   if(res != RES_OK) goto error;
   res = setup_camera(cmd, args);
   if(res != RES_OK) goto error;
-  res = setup_buffer(cmd, args);
-  if(res != RES_OK) goto error;
   res = setup_ground(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_atmosphere(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_spectral_domain(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
 
 exit:
