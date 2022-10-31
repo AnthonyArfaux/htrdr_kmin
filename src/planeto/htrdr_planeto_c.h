@@ -62,7 +62,20 @@ struct planeto_pixel_image {
   HTRDR_ACCUM_NULL__                                                           \
 }
 
-struct planeto_pixel_xwave;
+struct planeto_compute_radiance_args {
+  struct ssp_rng* rng;
+  size_t ithread; /* Index of the thread executing the function */
+
+  double path_org[3]; /* Origin of the path to trace */
+  double path_dir[3]; /* Initial direction of the path to trace */
+
+  double wlen; /* In nm */
+  size_t iband; /* Spectral band index */
+  size_t iquad; /* Quadrature point */
+};
+#define PLANETO_COMPUTE_RADIANCE_ARGS_NULL__ {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0}
+static const struct planeto_compute_radiance_args
+PLANETO_COMPUTE_RADIANCE_ARGS_NULL = PLANETO_COMPUTE_RADIANCE_ARGS_NULL__;
 
 struct htrdr_planeto {
   struct rnatm* atmosphere;
@@ -97,5 +110,11 @@ extern LOCAL_SYM void
 planeto_get_pixel_format
   (const struct htrdr_planeto* cmd,
    struct htrdr_pixel_format* fmt);
+
+/* Return the radiance in W/m²/sr/m */
+extern LOCAL_SYM double
+planeto_compute_radiance
+  (struct htrdr_planeto* cmd,
+   const struct planeto_compute_radiance_args* args);
 
 #endif /* HTRDR_PLANETO_C_H */

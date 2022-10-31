@@ -67,11 +67,13 @@ compute_min_band_len(const struct htrdr_planeto* cmd)
   /* At least one band must be overlaped by the spectral domain */
   ASSERT(ibands[0]<=ibands[1]);
   FOR_EACH(i, ibands[0], ibands[1]+1) {
+    struct rnatm_band_desc band;
     double band_range[2];
-    RNATM(band_get_range(cmd->atmosphere, i, band_range));
+    RNATM(band_get_desc(cmd->atmosphere, i, &band));
 
     /* Make the upper bound inclusive */
-    band_range[1] = nextafter(band_range[1], 0);
+    band_range[0] = band.lower;
+    band_range[1] = nextafter(band.upper, 0);
 
     /* Clamp the band range to the spectral domain */
     band_range[0] = MMAX(band_range[0], range[0]);
@@ -535,7 +537,7 @@ htrdr_planeto_run(struct htrdr_planeto* cmd)
 
   switch(cmd->output_type) {
     case HTRDR_PLANETO_ARGS_OUTPUT_IMAGE:
-      htrdr_log_warn(cmd->htrdr, "image rendering is not yet implemented\n");
+      res = planeto_draw_map(cmd);
       break;
     case HTRDR_PLANETO_ARGS_OUTPUT_OCTREES:
       res = write_vtk_octrees(cmd);

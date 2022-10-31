@@ -49,6 +49,9 @@ draw_pixel_image
    const struct htrdr_draw_pixel_args* args,
    void* data)
 {
+  struct planeto_compute_radiance_args rad_args =
+    PLANETO_COMPUTE_RADIANCE_ARGS_NULL;
+
   struct htrdr_accum XYZ[3]; /* X, Y, and Z */
   struct htrdr_accum time;
   struct htrdr_planeto* cmd;
@@ -95,7 +98,7 @@ draw_pixel_image
       sample.lens[1] = ssp_rng_canonical(args->rng);
 
       /* Generate a camera ray */
-      scam_generate_ray(cmd->camera, &sample, &ray);
+      SCAM(generate_ray(cmd->camera, &sample, &ray));
 
       r0 = ssp_rng_canonical(args->rng);
       r1 = ssp_rng_canonical(args->rng);
@@ -122,13 +125,15 @@ draw_pixel_image
       RNATM(band_sample_quad_pt(cmd->atmosphere, r2, iband[0], &iquad));
       ASSERT(iband[0] == iband[1]);
 
-      /* TODO Compute the radiance in W/m²/sr/m */
-#if 0
-      weight = planeto_compute_radiance(cmd, args->ithread, args->rng,
-        ray.org, ray.dir, wlen, iband, iquad);
-#else
-      weight = 0;
-#endif
+      /* Compute the radiance in W/m²/sr/m */
+      d3_set(rad_args.path_org, ray.org);
+      d3_set(rad_args.path_dir, ray.dir);
+      rad_args.rng = args->rng;
+      rad_args.ithread = args->ithread;
+      rad_args.wlen = wlen[0];
+      rad_args.iband = iband[0];
+      rad_args.iquad = iquad;
+      weight = planeto_compute_radiance(cmd, &rad_args);
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m²/sr */
