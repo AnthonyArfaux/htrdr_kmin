@@ -292,6 +292,8 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   res = write_buffer(cmd, cmd->buf, &path_time_acc, cmd->output);
   if(res != RES_OK) goto error;
 
+  CHK(fflush(cmd->output) == 0);
+
   /* Log time per realisation */
   htrdr_accum_get_estimation(&path_time_acc, &path_time);
   htrdr_log(cmd->htrdr, "Time per radiative path (in µs): %g +/- %g\n",
