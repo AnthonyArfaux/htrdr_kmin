@@ -38,7 +38,7 @@ struct scattering {
   /* Set to S3D_HIT_NULL if the scattering occurs in volume.*/
   struct s3d_hit hit;
 
-  /* The surface normal defines only if scattering is on the surface. It is
+  /* The surface normal is defined only if scattering is on the surface. It is
    * normalized and looks towards the incoming direction */
   double normal[3];
 
@@ -282,13 +282,14 @@ sample_scattering
    const struct planeto_compute_radiance_args* args,
    const double pos[3],
    const double dir[3],
+   const struct s3d_hit* hit_from,
    struct scattering* sc)
 {
   struct rngrd_trace_ray_args rt = RNGRD_TRACE_RAY_ARGS_DEFAULT;
   struct s3d_hit hit;
   double range[2];
   double dst;
-  ASSERT(cmd && args && pos && dir && sc);
+  ASSERT(cmd && args && pos && dir && hit_from && sc);
 
   *sc = SCATTERING_NULL;
 
@@ -296,6 +297,7 @@ sample_scattering
   d3_set(rt.ray_org, pos);
   d3_set(rt.ray_dir, dir);
   d2(rt.ray_range, 0, INF);
+  rt.hit_from = *hit_from;
   RNGRD(trace_ray(cmd->ground, &rt, &hit));
 
   /* Look for an atmospheric collision */
@@ -491,9 +493,10 @@ planeto_compute_radiance
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args)
 {
+  struct s3d_hit hit_from = S3D_HIT_NULL;
   double pos[3];
   double dir[3];
-  double L = 0; /* Radiance */
+  double L = 0; /* Radiance in W/m²/sr/m */
   double Tr_abs = 1; /* Absorption transmissivity */
   size_t nsc = 0; /* For debug */
   ASSERT(cmd && check_planeto_compute_radiance_args(cmd, args) == RES_OK);
@@ -510,7 +513,7 @@ planeto_compute_radiance
     double sc_pos[3];
     double sc_dir[3];
 
-    sample_scattering(cmd, args, pos, dir, &sc);
+    sample_scattering(cmd, args, pos, dir, &hit_from, &sc);
 
     /* No scattering. Stop the path */
     if(DISTANCE_NONE(sc.distance)) break;
@@ -531,6 +534,9 @@ planeto_compute_radiance
       Ls = volume_scattering(cmd, args, sc_pos, dir, sc_dir);
       L += Tr_abs * Ls;
 
+      /* Reset surface intersection */
+      hit_from = S3D_HIT_NULL;
+
     /* Surface scattering */
     } else {
       double Ls; /* Direct contribution at the scattering position */
@@ -540,6 +546,10 @@ planeto_compute_radiance
 
       /* Russian roulette wrt surface reflectivity */
       if(ssp_rng_canonical(args->rng) >= refl) break;
+
+      /* Save current intersected surface to avoid self-intersection when
+       * sampling next scatter event */
+      hit_from = sc.hit;
     }
 
     d3_set(pos, sc_pos);
