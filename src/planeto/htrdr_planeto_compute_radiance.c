@@ -262,6 +262,7 @@ direct_contribution
   struct s3d_hit hit;
   double Tr;
   double Ld;
+  double src_dst;
   ASSERT(cmd && args && pos && dir);
 
   /* Is the source hidden? */
@@ -271,7 +272,11 @@ direct_contribution
   RNGRD(trace_ray(cmd->ground, &rt, &hit));
   if(!S3D_HIT_NONE(&hit)) return 0;
 
-  Tr = transmissivity(cmd, args, RNATM_RADCOEF_Kext, pos, dir, INF);
+  /* Calculate the distance between the source and `pos' */
+  src_dst = htrdr_planeto_source_distance_to(cmd->source, pos);
+  ASSERT(src_dst >= 0);
+
+  Tr = transmissivity(cmd, args, RNATM_RADCOEF_Kext, pos, dir, src_dst);
   Ld = htrdr_planeto_source_get_radiance(cmd->source, args->wlen);
   return Ld * Tr;
 }
@@ -498,7 +503,7 @@ planeto_compute_radiance
   double dir[3];
   double L = 0; /* Radiance in W/m²/sr/m */
   double Tr_abs = 1; /* Absorption transmissivity */
-  size_t nsc = 0; /* For debug */
+  size_t nsc = 0; /* Number of scatterings (for debug) */
   ASSERT(cmd && check_planeto_compute_radiance_args(cmd, args) == RES_OK);
 
   d3_set(pos, args->path_org);

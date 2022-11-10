@@ -152,6 +152,20 @@ htrdr_planeto_source_get_radiance
     (wlen*1e-9/*From nm to m*/, source->temperature);
 }
 
+double
+htrdr_planeto_source_distance_to
+  (const struct htrdr_planeto_source* source,
+   const double pos[3])
+{
+  double vec[3];
+  double dst;
+  ASSERT(source && pos);
+
+  d3_sub(vec, source->position, pos);
+  dst = d3_len(vec);
+  return dst - source->radius;
+}
+
 int
 htrdr_planeto_source_is_targeted
   (const struct htrdr_planeto_source* source,

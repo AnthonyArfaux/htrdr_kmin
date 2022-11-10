@@ -53,6 +53,13 @@ htrdr_planeto_source_get_radiance
   (const struct htrdr_planeto_source* source,
    const double wlen); /* In nanometers */
 
+/* Return the distance between the source surface and the input position. Can
+ * be negative if the position is in the source */
+extern LOCAL_SYM double /* In m */
+htrdr_planeto_source_distance_to
+  (const struct htrdr_planeto_source* source,
+   const double pos[3]);
+
 /* Return 1 if the source is targeted by the submitted ray and 0 otherwise */
 extern LOCAL_SYM int
 htrdr_planeto_source_is_targeted
