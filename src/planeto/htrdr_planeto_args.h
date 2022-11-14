@@ -76,6 +76,7 @@ struct htrdr_planeto_args {
   /* Miscellaneous arguments */
   unsigned nthreads; /* Hint on the nimber of threads to use */
   enum htrdr_planeto_args_output_type output_type;
+  int precompute_normals; /* Pre-compute tetrahedron normals */
   int force_output_overwrite; /* Replace output if it exists */
   int verbose; /* Verbose level */
   int quit; /* Stop the command */ 
@@ -101,6 +102,7 @@ struct htrdr_planeto_args {
   UINT_MAX, /* Number of threads */                                            \
   HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,                                             \
   0, /* Force output overwrite */                                              \
+  0, /* Precompute normals */                                                  \
   0, /* Verbosity level */                                                     \
   0 /* Stop the command */                                                     \
 }

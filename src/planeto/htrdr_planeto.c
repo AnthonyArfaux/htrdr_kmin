@@ -177,7 +177,7 @@ setup_atmosphere
   rnatm_args.spectral_range[1] = args->spectral_domain.wlen_range[1];
   rnatm_args.optical_thickness = args->optical_thickness;
   rnatm_args.grid_definition_hint = args->octree_definition_hint;
-  rnatm_args.precompute_normals = 0;
+  rnatm_args.precompute_normals = args->precompute_normals;
   rnatm_args.logger = htrdr_get_logger(cmd->htrdr);
   rnatm_args.allocator = htrdr_get_allocator(cmd->htrdr);
   rnatm_args.nthreads = args->nthreads;

@@ -129,6 +129,8 @@ print_help(const char* cmd)
   printf(
 "  -i image       image to compute\n");
   printf(
+"  -N             precompute tetrahedron normals\n");
+  printf(
 "  -O octrees_storage\n"
 "                 file where atmospheric acceleration structures are\n"
 "                 stored/loaded\n");
@@ -478,7 +480,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETO_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:O:o:S:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:N:O:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
         sa_add(args->aerosols, 1);
@@ -519,6 +521,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
       case 'i':
         res = htrdr_args_image_parse(&args->image, optarg);
         break;
+      case 'N': args->precompute_normals = 1; break;
       case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
       case 'S':
