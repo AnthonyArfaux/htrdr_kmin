@@ -89,8 +89,8 @@ struct htrdr_planeto_args {
                                                                                \
   NULL, /* File where to dump octrees */                                       \
                                                                                \
-  512, /* Hint on octree definition */                                         \
-  10, /* Optical thickness criteria */                                         \
+  @HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@, /* octree definition */   \
+  @HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                    \
                                                                                \
   NULL, /* Ouput file */                                                       \
   HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \

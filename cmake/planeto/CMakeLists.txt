@@ -48,6 +48,15 @@ include_directories(
   ${HTRDR_SOURCE_DIR})
 
 ################################################################################
+# Generate files
+################################################################################
+set(HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1" CACHE INTERNAL "")
+set(HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT "512" CACHE INTERNAL "")
+
+configure_file(${HTRDR_SOURCE_DIR}/planeto/htrdr_planeto_args.h.in
+  ${HTRDR_BUILD_DIR}/planeto/htrdr_planeto_args.h @ONLY)
+
+################################################################################
 # Configure and define targets
 ################################################################################
 set(HTRDR_PLANETO_FILES_SRC
@@ -61,7 +70,6 @@ set(HTRDR_PLANETO_FILES_SRC
 set(HTRDR_PLANETO_FILES_INC
   htrdr_planeto.h
   htrdr_planeto_c.h
-  htrdr_planeto_args.h
   htrdr_planeto_source.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
