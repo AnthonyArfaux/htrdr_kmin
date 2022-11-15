@@ -1,0 +1,263 @@
+htrdr-planeto(1)
+
+; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+; Copyright (C) 2018, 2019, 2021 CNRS
+; Copyright (C) 2018, 2019 Université Paul Sabatier
+;                          (contact-edstar@laplace.univ-tlse.fr)
+; 
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# Name
+
+htrdr-planeto - simulate radiative transfer in 3D planetary atmosphere
+
+# SYNOPSIS
+
+htrdr-planeto [_option_] ... -g _gas_
+
+# DESCRIPTION
+
+TODO
+
+# OPTIONS
+
+*-a* <_aerosol-parameter_:...>
+	Define an aerosol. Use this option as many times as there are aerosols to be
+	defined. Available aerosol parameters are:
+
+	*mesh*=_path_
+		Path to the *smsh*(5) file that stores the volumetric mesh of the aerosol.
+
+	*name*=_string_
+		Name assigned to the aerosol.
+
+	*radprop*=_path_
+		Path to the *sars*(5) file that stores the radiative properties of the
+		aerosol. Radiative properties are defined per volumetric mesh node and,
+		therefore, this file and the volumetric mesh file (see *mesh* parameter)
+		must be consistent with each other.
+
+	*phasefn*=_path_
+		Path to the *rnsl*(5) file that lists the *rnsf*(5) files to load; each of
+		theses files stores an aerosol phase function. The phase function to be used
+		per volumetric mesh node is defined in another file (see *phaseids*
+		parameter).
+
+	*phaseids*=_path_
+		Path to the *rnpfi*(5) file that stores the index of the phase function to
+		be used per volumetric mesh node;	the list of phase function is defined in
+		another file (see *phasefn* parameter). Note that this file must be
+		consistent with the volumetric mesh defined in the *mesh* parameter.
+
+*-C* <_camera-parameter_:...>
+	Configure a perspective camera. Available parameters are:
+
+	*focal-dst*=_dst_
+		Distance to focus on with a thin lens camera, that is, a camera whose
+		*lens-radius* is not zero. The default focal distance is
+		@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@ meter.
+
+	*focal-length*=_length_
+		Focal length of a camera lens. It is another way to control the field of
+		view of a thin lens camera. By default, the field of view is directly set
+		through the **fov** parameter.
+
+	*fov*=_angle_
+		Vertical field of view of the camera in
+		\]@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@,
+		@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@[ degrees. By
+		default _angle_ is set to
+		@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
+
+	*lens-radius*=_radius_
+		Radius of the camera lens. A non-zero radius means that the camera is a thin
+		lens camera while a zero radius defines a pinhole camera. By default the
+		lens radius is @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@.
+
+	*pos*=_x_,_y_,_z_
+		Camera lens position. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_POS@}.
+
+	*tgt*=_x_,_y_,_z_
+		Position targeted by the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_TGT@}.
+
+	*up*=_x_,_y_,_z_
+		Up vector of the camera. By default it is set to
+		{@HTRDR_ARGS_DEFAULT_CAMERA_UP@}.
+
+*-d*
+	Write atmospheric acceleration structures to _output_. Each structure is saved
+	in VTK ASCII file format [1]. To divide the resulting output into _n_ files
+	(_n_ > 1), each storing an acceleration structure, one can use the *csplit*(1)
+	command as below:
+
+	```
+	csplit -f octree -k output %^#\ vtk% /^#\ vtk/ {$(grep -ce "^# vtk")}
+	```
+
+*-f*
+	Force overwrite the _output_ file.
+
+*-G* <_ground-parameter_:...>
+	Define the ground of the planet. Available ground parameters are:
+
+	*brdf*=_path_
+		Path to the *rnsl*(5) file that lists the *mrumtl*(5) files to load; each of
+		these files stores a ground BRDF. The BRDF to be used per ground node is
+		defined in another file (see *prop* parameter).
+
+	*mesh*=_path_
+		Path to the *smsh*(5) file that stores the surface mesh of the ground.
+
+	*name*=_string_
+		Name assigned to the ground.
+
+	*prop*=_path_
+		Path to the *rnsp*(5) file that stores ground surface properties. The
+		properties (BRDF index and temperature) are defined per surface mesh node
+		and, therefore, this file and the mesh file (see *mesh* parameter) must be
+		consistent with each other.
+
+*-g* <_gas-parameter_:...>
+	Define the gas mixture. Available gas parameters are:
+
+	*mesh*=_path_
+		Path to the *smsh*(5) file that stores the volumetric mesh of the gas.
+
+	*ck*=_path_
+		Path to the *sck*(5) file that stores the correlated K of the gas. The CKs
+		are defined per volumetric mesh node and, therefore, this file and the
+		volumetric mesh file (see *mesh* parameter) must be consistent with each
+		other.
+
+	*temp*=_path_
+		Path to the *rngt*(5) file that stores the temperature of the gas. The
+		temperature is defined per volumetric mesh node and, therefore, this file
+		and the volumetric mesh file (see *mesh* parameter) must be consistent with
+		each other.
+
+*-h*
+	Display short help and exit.
+
+*-i* <_image-parameter_:...>
+	Define the image to compute. Available image parameters are:
+
+	*def*=<_width_>x<_height_>
+		Image definition. By default the image definition is
+		@HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+
+	*spp*=_samples-count_
+		Number of samples to estimate one pixel, i.e. number of radiative paths
+		sampled per pixel. By default, *spp* is set to
+		@HTRDR_ARGS_DEFAULT_IMG_SPP@.
+
+*-N*
+	Precalculate tetrahedron normals. This speeds up runtime performance by
+	calculating normals once and for all rather than re-evaluating them every time
+	a tetrahedron is queried at a given position. In return, the memory space used
+	to store normals increases the memory footprint.
+
+*-O* _storage_
+	File where atmospheric acceleration structures are stored/loaded. If _storage_
+	does not exist, it is created and is used to store the built acceleration
+	structures.
+
+	If _storage_ exists, acceleration structures are loaded from it rather than
+	built from scratch, resulting in significant acceleration of the preprocessing
+	step. Note that if the data structures stored in _storage_ are not as expected
+	(that is, the input atmospheric data or construction parameters are
+	different), an error is notified and execution is stopped, thus avoiding the
+	use of incorrect acceleration structures.
+
+*-o* _output_
+	File to write the output data. The output data is either an image or atmospheric
+	acceleration structures if the *-d* option is set. If it is not defined, the
+	data is written to the standard output. 
+
+*-S* <_source-parameter_:...>
+	Define the source. Available source parameters are:
+
+	*lat*=_real_
+		The latitude of the source, i.e. its angle between [-90, 90] degrees about
+		the x-axis. The default latitude is set to 0.
+
+	*lon*=_real_
+		The longitude of the source, i.e. its angle between [-180, 180] degrees
+		about the z-axis. The default longitude is set to 0.
+
+	*dst*=_real_
+		Distance in meters from source to origin. The default distance is 0.
+
+	*radius*=_real_
+		Source radius in meters.
+
+	*temp*=_real_
+		Source temperature in Kelvin.
+
+*-s* <_spectral-parameter_:...>
+	Configure spectral integration. Available spectral parameters are:
+
+	*cie_xyz*
+		The radiance is calculated for the visible part of the spectrum between
+		380 nm and 780 nm by sampling the wavelength relative to the XYZ CIE 1931
+		color space. This is the default spectral integration.
+
+	*lw*=_wlen-min_,_wlen-max_
+		Perform continuous spectral sampling in the wavelength range [_wlen-min_, _wlen-max_]
+		(wavelengths must be provided in nanometers) according to the Planck
+		function for a reference temperature (see *Tref* parameter). If _wlen-min_
+		and _wlen-max_ are equal, the calculation is monochromatic. *lw* means long
+		waves but is here a code word that actually means "calculation of radiance
+		using the internal source of radiation": in other words, radiation is
+		emitted by the medium and its limits (ground and space).
+		
+	*sw*=_wlen-min_,_wlen-max_
+		Perform continuous spectral sampling in the wavelength range [_wlen-min_,
+		_wlen-max_] (wavelengths must be provided in nanometers) according to the
+		Planck function for a reference temperatura (see *Tref* parameter)e. If
+		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. In
+		this case, *sw* means that the radiation source is external to the medium.
+		
+	*Tref*=_temperature_
+		The reference temperature in Kelvin of the Planck function used to
+		continuously sample the longwave/shortwave spectral range. In longwave, it
+		is set to 290 K by default while in shortwave, its default value is the
+		temperature of the sun's blackbody (i.e. 5778 K).
+
+*-T* _optical-thickness_
+	Optical thickness used as a criterion to construct atmospheric acceleration
+	structures. Its default value is
+	@HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+
+*-t* _threads-count_
+	Hint on the number of threads to use. Default assumes as many threads as CPU
+	cores.
+
+*-V* _definition_
+	Advice on the definition of the atmospheric acceleration structures. Its
+	default value is
+	@HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+
+*-v*
+	Make the command verbose.
+
+# SEE ALSO
+
+*mrumtl*(5),
+*rnpfi*(5),
+*rnsf*(5),
+*rnsl*(5),
+*sars*(5),
+*smsh*(5)

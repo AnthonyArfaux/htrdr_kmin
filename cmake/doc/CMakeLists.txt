@@ -49,6 +49,12 @@ if(HTRDR_BUILD_COMBUSTION)
   list(APPEND MAN_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/htrdr-combustion.1.scd)
 endif()
 
+if(HTRDR_BUILD_PLANETO)
+  configure_file(${HTRDR_DOC_DIR}/htrdr-planeto.1.scd.in
+    ${CMAKE_CURRENT_BINARY_DIR}/htrdr-planeto.1.scd @ONLY)
+  list(APPEND MAN_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/htrdr-planeto.1.scd)
+endif()
+
 set(MAN_FILES)
 set(MAN5_FILES)
 set(MAN1_FILES)
