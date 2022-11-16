@@ -376,8 +376,7 @@ create_phase_fn
   RNATM(sample_component(cmd->atmosphere, &sample_args, &cpnt));
 
   /* Retrieve the component cell in which the scattering position is located */
-  RNATM(fetch_cell(cmd->atmosphere, pos, cpnt, &phase_fn_args.cell,
-    phase_fn_args.barycentric_coords));
+  RNATM(fetch_cell(cmd->atmosphere, pos, cpnt, &phase_fn_args.cell));
   ASSERT(!SUVM_PRIMITIVE_NONE(&phase_fn_args.cell.prim));
 
   /* Retrieve the component phase function */
