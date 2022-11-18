@@ -42,9 +42,14 @@ struct scattering {
    * normalized and looks towards the incoming direction */
   double normal[3];
 
-  double distance;
+  /* Cells in which the scattering position is located */
+  struct rnatm_cell_pos cells[RNATM_MAX_COMPONENTS_COUNT];
+
+  double distance; /* Distance from ray origin to scattering position */
 };
-#define SCATTERING_NULL__ {S3D_HIT_NULL__, {0,0,0}, DBL_MAX}
+#define SCATTERING_NULL__ {                                                    \
+  S3D_HIT_NULL__, {0,0,0}, {RNATM_CELL_POS_NULL__}, DBL_MAX                    \
+}
 static const struct scattering SCATTERING_NULL = SCATTERING_NULL__;
 
 /* Arguments of the filtering function used to sample a position */
@@ -58,10 +63,11 @@ struct sample_distance_context {
   double Ts; /* Sample optical thickness */
 
   /* Output data */
+  struct rnatm_cell_pos* cells;
   double distance;
 };
 #define SAMPLE_DISTANCE_CONTEXT_NULL__ {                                       \
-  NULL, NULL, 0, 0, 0, RNATM_RADCOEFS_COUNT__, 0, DBL_MAX                      \
+  NULL, NULL, 0, 0, 0, RNATM_RADCOEFS_COUNT__, 0, NULL, DBL_MAX                \
 }
 static const struct sample_distance_context SAMPLE_DISTANCE_CONTEXT_NULL =
   SAMPLE_DISTANCE_CONTEXT_NULL__;
@@ -132,6 +138,7 @@ sample_position_hit_filter
 
   /* Configure the common input arguments to retrieve the radiative coefficient
    * of a given position */
+  get_k_args.cells = ctx->cells;
   get_k_args.iband = ctx->iband;
   get_k_args.iquad = ctx->iquad;
   get_k_args.radcoef = ctx->radcoef;
@@ -152,15 +159,17 @@ sample_position_hit_filter
     /* A collision occurs in the voxel */
     } else {
       const double vox_dst_collision = ctx->Ts / k_max;
+      double pos[3];
       double  k, r;
 
       /* Calculate the distance travelled to the collision to be queried */
       dst_travelled += vox_dst_collision;
 
       /* Retrieve the radiative coefficient at the collision position */
-      get_k_args.pos[0] = org[0] + dst_travelled * dir[0];
-      get_k_args.pos[1] = org[1] + dst_travelled * dir[1];
-      get_k_args.pos[2] = org[2] + dst_travelled * dir[2];
+      pos[0] = org[0] + dst_travelled * dir[0];
+      pos[1] = org[1] + dst_travelled * dir[1];
+      pos[2] = org[2] + dst_travelled * dir[2];
+      RNATM(fetch_cell_list(ctx->atmosphere, pos, get_k_args.cells, NULL));
       RNATM(get_radcoef(ctx->atmosphere, &get_k_args, &k));
 
       r = ssp_rng_canonical(ctx->rng);
@@ -185,6 +194,7 @@ static double
 sample_distance
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args,
+   struct rnatm_cell_pos* cells,
    const enum rnatm_radcoef radcoef,
    const double pos[3],
    const double dir[3],
@@ -193,7 +203,7 @@ sample_distance
   struct rnatm_trace_ray_args rt = RNATM_TRACE_RAY_ARGS_NULL;
   struct sample_distance_context ctx = SAMPLE_DISTANCE_CONTEXT_NULL;
   struct svx_hit hit;
-  ASSERT(cmd && args && pos && dir && d3_is_normalized(dir) && range);
+  ASSERT(cmd && args && cells && pos && dir && d3_is_normalized(dir) && range);
   ASSERT((unsigned)radcoef < RNATM_RADCOEFS_COUNT__);
   ASSERT(range[0] < range[1]);
 
@@ -207,6 +217,7 @@ sample_distance
   ctx.iquad = args->iquad;
   ctx.wavelength = args->wlen;
   ctx.radcoef = radcoef;
+  ctx.cells = cells;
 
   /* Trace the ray into the atmosphere */
   d3_set(rt.ray_org, pos);
@@ -235,13 +246,14 @@ transmissivity
    const double dir[3],
    const double range_max)
 {
+  struct rnatm_cell_pos cells[RNATM_MAX_COMPONENTS_COUNT];
   double range[2];
   double dst = 0;
   ASSERT(range_max >= 0);
 
   range[0] = 0;
   range[1] = range_max;
-  dst = sample_distance(cmd, args, radcoef, pos, dir, range);
+  dst = sample_distance(cmd, args, cells, radcoef, pos, dir, range);
 
   if(DISTANCE_NONE(dst)) {
     return 1.0; /* No collision in the medium */
@@ -308,7 +320,7 @@ sample_scattering
   /* Look for an atmospheric collision */
   range[0] = 0;
   range[1] = hit.distance;
-  dst = sample_distance(cmd, args, RNATM_RADCOEF_Ks, pos, dir, range);
+  dst = sample_distance(cmd, args, sc->cells, RNATM_RADCOEF_Ks, pos, dir, range);
 
   /* Scattering in volume */
   if(!DISTANCE_NONE(dst)) {
@@ -357,7 +369,7 @@ static INLINE struct ssf_phase*
 create_phase_fn
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args,
-   const double pos[3]) /* Scattering position */
+   const struct rnatm_cell_pos* cells) /* Cells in which scattering occurs */
 {
   struct rnatm_sample_component_args sample_args =
     RNATM_SAMPLE_COMPONENT_ARGS_NULL;
@@ -365,10 +377,10 @@ create_phase_fn
     RNATM_CELL_CREATE_PHASE_FN_ARGS_NULL;
   struct ssf_phase* phase = NULL;
   size_t cpnt;
-  ASSERT(cmd && args && pos);
+  ASSERT(cmd && args && cells);
 
   /* Sample the atmospheric scattering component */
-  d3_set(sample_args.pos, pos);
+  sample_args.cells = cells;
   sample_args.iband = args->iband;
   sample_args.iquad = args->iquad;
   sample_args.radcoef = RNATM_RADCOEF_Ks;
@@ -376,7 +388,7 @@ create_phase_fn
   RNATM(sample_component(cmd->atmosphere, &sample_args, &cpnt));
 
   /* Retrieve the component cell in which the scattering position is located */
-  RNATM(fetch_cell(cmd->atmosphere, pos, cpnt, &phase_fn_args.cell));
+  phase_fn_args.cell = RNATM_GET_COMPONENT_CELL(cells, cpnt);
   ASSERT(!SUVM_PRIMITIVE_NONE(&phase_fn_args.cell.prim));
 
   /* Retrieve the component phase function */
@@ -459,6 +471,7 @@ static INLINE double
 volume_scattering
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args,
+   const struct scattering* sc,
    const double sc_pos[3], /* Scattering position */
    const double in_dir[3], /* Incident direction */
    double sc_dir[3]) /* Sampled scattering direction */
@@ -470,9 +483,9 @@ volume_scattering
   double pdf = 0;
   double rho = 0;
   double Ld = 0;
-  ASSERT(cmd && args && sc_pos && in_dir && sc_dir);
+  ASSERT(cmd && args && sc && sc_pos && in_dir && sc_dir);
 
-  phase = create_phase_fn(cmd, args, sc_pos);
+  phase = create_phase_fn(cmd, args, sc->cells);
   d3_minus(wo, in_dir); /* Match StarSF convention */
 
   ssf_phase_sample(phase, args->rng, wo, sc_dir, NULL);
@@ -535,7 +548,7 @@ planeto_compute_radiance
     /* Scattering in volume */
     if(!SURFACE_SCATTERING(&sc)) {
       double Ls; /* Direct contribution at the scattering position */
-      Ls = volume_scattering(cmd, args, sc_pos, dir, sc_dir);
+      Ls = volume_scattering(cmd, args, &sc, sc_pos, dir, sc_dir);
       L += Tr_abs * Ls;
 
       /* Reset surface intersection */
