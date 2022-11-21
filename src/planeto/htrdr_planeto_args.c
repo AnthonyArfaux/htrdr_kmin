@@ -529,6 +529,9 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         break;
       case 's':
         res = htrdr_args_spectral_parse(&args->spectral_domain, optarg);
+        if(res == RES_OK) {
+          res = check_spectral_args(&args->spectral_domain);
+        }
         break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);

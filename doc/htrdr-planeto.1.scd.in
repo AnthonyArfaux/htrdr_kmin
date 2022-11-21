@@ -232,9 +232,7 @@ TODO
 		
 	*Tref*=_temperature_
 		The reference temperature in Kelvin of the Planck function used to
-		continuously sample the longwave/shortwave spectral range. In longwave, it
-		is set to 290 K by default while in shortwave, its default value is the
-		temperature of the sun's blackbody (i.e. 5778 K).
+		continuously sample the longwave/shortwave spectral range.
 
 *-T* _optical-thickness_
 	Optical thickness used as a criterion to construct atmospheric acceleration
