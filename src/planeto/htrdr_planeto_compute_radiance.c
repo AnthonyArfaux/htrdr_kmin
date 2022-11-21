@@ -681,8 +681,8 @@ planeto_compute_radiance_lw
 
     sample_event(cmd, args, RNATM_RADCOEF_Kext, pos, dir, &hit_from, &evt);
 
-    /* No collision on surface or in volume. Stop the path */
-    if(DISTANCE_NONE(evt.distance)) break;
+    /* No event on surface or in volume. Stop the path */
+    if(DISTANCE_NONE(evt.distance)) return 0;
 
     /* Compute the event position */
     next_pos[0] = pos[0] + dir[0] * evt.distance;
@@ -694,7 +694,8 @@ planeto_compute_radiance_lw
       double refl; /* Surface reflectivity */
       surface_bounce(cmd, args, &evt, next_pos, dir, sc_dir, &refl);
 
-      /* Russian roulette wrt surface reflectivity */
+      /* Check the absorption of the surface with a Russian roulette against
+       * the reflectivity of the surface */
       if(ssp_rng_canonical(args->rng) >= refl) break;
 
       /* Save current intersected surface to avoid self-intersection when
