@@ -113,7 +113,13 @@ planeto_get_pixel_format
 
 /* Return the radiance in W/m²/sr/m */
 extern LOCAL_SYM double
-planeto_compute_radiance
+planeto_compute_radiance_sw
+  (struct htrdr_planeto* cmd,
+   const struct planeto_compute_radiance_args* args);
+
+/* Return the radiance in W/m²/sr/m */
+extern LOCAL_SYM double
+planeto_compute_radiance_lw
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args);
 

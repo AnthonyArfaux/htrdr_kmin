@@ -23,6 +23,7 @@
 #include "core/htrdr_draw_map.h"
 #include "core/htrdr_log.h"
 #include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_planck.h"
 
 #include <rad-net/rnatm.h>
 #include <star/scam.h>
@@ -39,8 +40,122 @@ draw_pixel_xwave
    const struct htrdr_draw_pixel_args* args,
    void* data)
 {
-  /* TODO */
-  (void)htrdr, (void)args, (void)data;
+  struct planeto_compute_radiance_args rad_args =
+    PLANETO_COMPUTE_RADIANCE_ARGS_NULL;
+
+  struct htrdr_estimate L;
+  struct htrdr_accum radiance;
+  struct htrdr_accum time;
+  struct htrdr_planeto* cmd;
+  struct planeto_pixel_xwave* pixel = data;
+  size_t isamp = 0;
+  ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
+  (void)htrdr;
+
+  cmd  = args->context;
+  ASSERT(cmd);
+  ASSERT(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
+      || cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW);
+  ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+
+  /* Reset accumulators */
+  radiance = HTRDR_ACCUM_NULL;
+  time = HTRDR_ACCUM_NULL;
+
+  FOR_EACH(isamp, 0, args->spp) {
+    struct time t0, t1;
+    struct scam_sample sample = SCAM_SAMPLE_NULL;
+    struct scam_ray ray = SCAM_RAY_NULL;
+    double weight;
+    double r0, r1, r2;
+    double wlen[2]; /* Sampled wavelength */
+    double pdf;
+    size_t iband[2];
+    size_t iquad;
+    double usec;
+
+    /* Begin the registration of the time spent to in the realisation */
+    time_current(&t0);
+
+    /* Sample a position into the pixel, in the normalized image plane */
+    sample.film[0] = (double)args->pixel_coord[0]+ssp_rng_canonical(args->rng);
+    sample.film[1] = (double)args->pixel_coord[1]+ssp_rng_canonical(args->rng);
+    sample.film[0] *= args->pixel_normalized_size[0];
+    sample.film[1] *= args->pixel_normalized_size[1];
+    sample.lens[0] = ssp_rng_canonical(args->rng);
+    sample.lens[1] = ssp_rng_canonical(args->rng);
+
+    /* Generate a camera ray */
+    scam_generate_ray(cmd->camera, &sample, &ray);
+
+    r0 = ssp_rng_canonical(args->rng);
+    r1 = ssp_rng_canonical(args->rng);
+    r2 = ssp_rng_canonical(args->rng);
+
+    /* Sample a wavelength */
+    wlen[0] = wlen[1] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+    pdf *= 1.e9; /* Transform the pdf from nm⁻¹ to m⁻¹ */
+
+    /* Find the band the wavelength belongs to and sample a quadrature point */
+    RNATM(find_bands(cmd->atmosphere, wlen, iband));
+    RNATM(band_sample_quad_pt(cmd->atmosphere, r2, iband[0], &iquad));
+    ASSERT(iband[0] == iband[1]);
+
+    /* Compute the radiance in W/m²/sr/m */
+    d3_set(rad_args.path_org, ray.org);
+    d3_set(rad_args.path_dir, ray.dir);
+    rad_args.rng = args->rng;
+    rad_args.ithread = args->ithread;
+    rad_args.wlen = wlen[0];
+    rad_args.iband = iband[0];
+    rad_args.iquad = iquad;
+    switch(cmd->spectral_domain.spectral_type) {
+      case HTRDR_SPECTRAL_LW:
+        weight = planeto_compute_radiance_lw(cmd, &rad_args);
+        break;
+      case HTRDR_SPECTRAL_SW:
+        weight = planeto_compute_radiance_sw(cmd, &rad_args);
+        break;
+      default: FATAL("Unreachable code\n"); break;
+    }
+    ASSERT(weight >= 0);
+
+    weight /= pdf; /* In W/m²/sr */
+
+    /* End of time recording per realisation */
+    time_sub(&t0, time_current(&t1), &t0);
+    usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
+
+    /* Update the radiance accumulator */
+    radiance.sum_weights += weight;
+    radiance.sum_weights_sqr += weight*weight;
+    radiance.nweights += 1;
+
+    /* Update the per realisation time accumulator */
+    time.sum_weights += usec;
+    time.sum_weights_sqr += usec*usec;
+    time.nweights += 1;
+  }
+
+  /* Flush pixel data */
+  htrdr_accum_get_estimation(&radiance, &L);
+  pixel->radiance = L;
+  pixel->time = time;
+
+  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW) {
+    /* Wavelength in meters */
+    const double wmin_m = cmd->spectral_domain.wlen_range[0] * 1.e-9;
+    const double wmax_m = cmd->spectral_domain.wlen_range[1] * 1.e-9;
+
+    /* Brightness temperatures in W/m²/sr */
+    double T, Tmin, Tmax;
+    T    = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E);
+    Tmin = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E - L.SE);
+    Tmax = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E + L.SE);
+
+    pixel->radiance_temperature.E = T;
+    pixel->radiance_temperature.SE = Tmax - Tmin;
+  }
 }
 
 static void
@@ -133,7 +248,7 @@ draw_pixel_image
       rad_args.wlen = wlen[0];
       rad_args.iband = iband[0];
       rad_args.iquad = iquad;
-      weight = planeto_compute_radiance(cmd, &rad_args);
+      weight = planeto_compute_radiance_sw(cmd, &rad_args);
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m²/sr */
