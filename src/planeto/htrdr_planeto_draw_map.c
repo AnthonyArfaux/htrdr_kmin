@@ -109,15 +109,7 @@ draw_pixel_xwave
     rad_args.wlen = wlen[0];
     rad_args.iband = iband[0];
     rad_args.iquad = iquad;
-    switch(cmd->spectral_domain.spectral_type) {
-      case HTRDR_SPECTRAL_LW:
-        weight = planeto_compute_radiance_lw(cmd, &rad_args);
-        break;
-      case HTRDR_SPECTRAL_SW:
-        weight = planeto_compute_radiance_sw(cmd, &rad_args);
-        break;
-      default: FATAL("Unreachable code\n"); break;
-    }
+    weight = planeto_compute_radiance(cmd, &rad_args);
     ASSERT(weight >= 0);
 
     weight /= pdf; /* In W/m²/sr */
@@ -248,7 +240,7 @@ draw_pixel_image
       rad_args.wlen = wlen[0];
       rad_args.iband = iband[0];
       rad_args.iquad = iquad;
-      weight = planeto_compute_radiance_sw(cmd, &rad_args);
+      weight = planeto_compute_radiance(cmd, &rad_args);
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m²/sr */

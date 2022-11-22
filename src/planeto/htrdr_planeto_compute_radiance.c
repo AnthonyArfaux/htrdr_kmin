@@ -32,7 +32,7 @@
 
 /* Syntactic sugar */
 #define DISTANCE_NONE(Dst) ((Dst) >= FLT_MAX)
-#define SURFACE_EVENT(Scattering) (!S3D_HIT_NONE(&(Scattering)->hit))
+#define SURFACE_EVENT(Event) (!S3D_HIT_NONE(&(Event)->hit))
 
 struct event {
   /* Set to S3D_HIT_NULL if the event occurs in volume.*/
@@ -42,7 +42,8 @@ struct event {
    * normalized and looks towards the incoming direction */
   double normal[3];
 
-  /* Cells in which the event position is located */
+  /* Cells in which the event position is located. It makes sense only for a
+   * event in volume */
   struct rnatm_cell_pos cells[RNATM_MAX_COMPONENTS_COUNT];
 
   double distance; /* Distance from ray origin to scattering position */
@@ -294,7 +295,7 @@ direct_contribution
 }
 
 static void
-sample_event
+find_event
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args,
    const enum rnatm_radcoef radcoef,
@@ -585,141 +586,80 @@ get_temperature
  * Local functions
  ******************************************************************************/
 double /* Radiance in W/m²/sr/m */
-planeto_compute_radiance_sw
+planeto_compute_radiance
   (struct htrdr_planeto* cmd,
    const struct planeto_compute_radiance_args* args)
 {
   struct s3d_hit hit_from = S3D_HIT_NULL;
+  struct event ev;
   double pos[3];
   double dir[3];
   double L = 0; /* Radiance in W/m²/sr/m */
-  double Tr_abs = 1; /* Absorption transmissivity */
-  size_t nsc = 0; /* Number of scatterings (for debug) */
+  size_t nsc = 0; /* Number of surface or volume scatterings (for debug) */
+  int longwave = 0;
   ASSERT(cmd && check_planeto_compute_radiance_args(cmd, args) == RES_OK);
 
   d3_set(pos, args->path_org);
   d3_set(dir, args->path_dir);
+  longwave = cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW;
 
-  if(htrdr_planeto_source_is_targeted(cmd->source, pos, dir)) {
+  if(!longwave && htrdr_planeto_source_is_targeted(cmd->source, pos, dir)) {
     L = direct_contribution(cmd, args, pos, dir, NULL);
   }
 
   for(;;) {
-    struct event sc;
-    double sc_pos[3];
+    double ev_pos[3];
     double sc_dir[3];
 
-    /* Sample a scattering event */
-    sample_event(cmd, args, RNATM_RADCOEF_Ks, pos, dir, &hit_from, &sc);
-
-    /* No scattering. Stop the path */
-    if(DISTANCE_NONE(sc.distance)) break;
-
-    Tr_abs *= transmissivity(cmd, args, RNATM_RADCOEF_Ka, pos, dir, sc.distance);
-
-    /* Full absorption. Stop the path */
-    if(Tr_abs == 0) break;
-
-    /* Compute the scattering position */
-    sc_pos[0] = pos[0] + dir[0] * sc.distance;
-    sc_pos[1] = pos[1] + dir[1] * sc.distance;
-    sc_pos[2] = pos[2] + dir[2] * sc.distance;
-
-    /* Scattering in volume */
-    if(!SURFACE_EVENT(&sc)) {
-      double Ls; /* Direct contribution at the scattering position */
-      Ls = volume_scattering(cmd, args, &sc, sc_pos, dir, sc_dir);
-      L += Tr_abs * Ls;
-
-      /* Reset surface intersection */
-      hit_from = S3D_HIT_NULL;
-
-    /* Surface bounce */
-    } else {
-      double Ls; /* Direct contribution at the bounce position */
-      double refl; /* Surface reflectivity */
-      Ls = surface_bounce(cmd, args, &sc, sc_pos, dir, sc_dir, &refl);
-      L += Tr_abs * Ls;
-
-      /* Russian roulette wrt surface reflectivity */
-      if(ssp_rng_canonical(args->rng) >= refl) break;
-
-      /* Save current intersected surface to avoid self-intersection when
-       * sampling next scatter event */
-      hit_from = sc.hit;
-    }
-
-    d3_set(pos, sc_pos);
-    d3_set(dir, sc_dir);
-
-    ++nsc;
-  }
-
-  return L;
-}
-
-double /* Radiance in W/m²/sr/m */
-planeto_compute_radiance_lw
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args)
-{
-  struct s3d_hit hit_from = S3D_HIT_NULL;
-  struct event evt;
-  double pos[3];
-  double dir[3];
-  double wlen_m = 0; /* Wavelength in meters */
-  double T = 0; /* Temperature in K */
-  double L = 0; /* Radiance in W/m²/sr/m */
-  ASSERT(cmd && check_planeto_compute_radiance_args(cmd, args) == RES_OK);
-
-  d3_set(pos, args->path_org);
-  d3_set(dir, args->path_dir);
-
-  for(;;) {
-    double next_pos[3];
-    double sc_dir[3];
-
-    sample_event(cmd, args, RNATM_RADCOEF_Kext, pos, dir, &hit_from, &evt);
+    find_event(cmd, args, RNATM_RADCOEF_Kext, pos, dir, &hit_from, &ev);
 
     /* No event on surface or in volume. Stop the path */
-    if(DISTANCE_NONE(evt.distance)) return 0;
+    if(DISTANCE_NONE(ev.distance)) break;
 
     /* Compute the event position */
-    next_pos[0] = pos[0] + dir[0] * evt.distance;
-    next_pos[1] = pos[1] + dir[1] * evt.distance;
-    next_pos[2] = pos[2] + dir[2] * evt.distance;
+    ev_pos[0] = pos[0] + dir[0] * ev.distance;
+    ev_pos[1] = pos[1] + dir[1] * ev.distance;
+    ev_pos[2] = pos[2] + dir[2] * ev.distance;
 
-    /* Surface bounce */
-    if(SURFACE_EVENT(&evt)) {
+    /* The event occurs on the surface */
+    if(SURFACE_EVENT(&ev)) {
       double refl; /* Surface reflectivity */
-      surface_bounce(cmd, args, &evt, next_pos, dir, sc_dir, &refl);
+      L += surface_bounce(cmd, args, &ev, ev_pos, dir, sc_dir, &refl);
 
       /* Check the absorption of the surface with a Russian roulette against
        * the reflectivity of the surface */
       if(ssp_rng_canonical(args->rng) >= refl) break;
 
       /* Save current intersected surface to avoid self-intersection when
-       * sampling next extinction event */
-      hit_from = evt.hit;
+       * sampling next event */
+      hit_from = ev.hit;
 
-    /* Volume scattering */
-    } else if(sample_volume_event_type(cmd, args, &evt) == RNATM_RADCOEF_Ks) {
-      volume_scattering(cmd, args, &evt, next_pos, dir, sc_dir);
-      hit_from = S3D_HIT_NULL; /* Reset surface intersection */
-
-    /* Absorption */
+    /* The event occurs in the volume */
     } else {
-      break;
+      enum rnatm_radcoef ev_type = sample_volume_event_type(cmd, args, &ev);
+      ASSERT(ev_type == RNATM_RADCOEF_Ka || ev_type == RNATM_RADCOEF_Ks);
+
+      /* Absorption. Stop the path */
+      if(ev_type == RNATM_RADCOEF_Ka) break;
+
+      L += volume_scattering(cmd, args, &ev, ev_pos, dir, sc_dir);
+      hit_from = S3D_HIT_NULL; /* Reset surface intersection */
     }
 
-    d3_set(pos, next_pos);
+    d3_set(pos, ev_pos);
     d3_set(dir, sc_dir);
+
+    ++nsc;
   }
 
-  /* Compute the returned weight */
-  wlen_m = args->wlen * 1.e-9;
-  T = get_temperature(cmd, &evt);
-  L = htrdr_planck_monochromatic(wlen_m, T);
+  /* From there, a valid event means that the path has stopped in surface or
+   * volume absorption. In longwave, add the contribution of the internal
+   * source */
+  if(longwave && !DISTANCE_NONE(ev.distance)) {
+    const double wlen_m = args->wlen * 1.e-9; /* wavelength in meters */
+    const double temperature = get_temperature(cmd, &ev); /* In K */
+    L += htrdr_planck_monochromatic(wlen_m, temperature);
+  }
 
   return L;
 }
