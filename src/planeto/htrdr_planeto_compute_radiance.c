@@ -42,7 +42,7 @@ struct event {
    * normalized and looks towards the incoming direction */
   double normal[3];
 
-  /* Cells in which the event position is located. It makes sense only for a
+  /* Cells in which the event position is located. It makes sense only for an
    * event in volume */
   struct rnatm_cell_pos cells[RNATM_MAX_COMPONENTS_COUNT];
 
@@ -661,5 +661,5 @@ planeto_compute_radiance
     L += htrdr_planck_monochromatic(wlen_m, temperature);
   }
 
-  return L;
+  return L; /* In W/m²/sr/m
 }

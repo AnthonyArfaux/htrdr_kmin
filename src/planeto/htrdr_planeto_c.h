@@ -37,14 +37,14 @@ struct rngrd;
 struct scam;
 
 struct planeto_pixel_xwave {
-  struct htrdr_estimate radiance; /* In W/m²/sr */
-  struct htrdr_estimate radiance_temperature; /* In W/m²/sr */
+  struct htrdr_accum radiance; /* In W/m²/sr */
   struct htrdr_accum time; /* In µs */
+  struct htrdr_estimate radiance_temperature; /* In W/m²/sr */
 };
 #define PLANETO_PIXEL_XWAVE_NULL__ {                                           \
-  HTRDR_ESTIMATE_NULL__,                                                       \
-  HTRDR_ESTIMATE_NULL__,                                                       \
-  HTRDR_ACCUM_NULL__                                                           \
+  HTRDR_ACCUM_NULL__,                                                          \
+  HTRDR_ACCUM_NULL__,                                                          \
+  HTRDR_ESTIMATE_NULL__                                                        \
 }
 static const struct planeto_pixel_xwave PLANETO_PIXEL_XWAVE_NULL =
   PLANETO_PIXEL_XWAVE_NULL__;

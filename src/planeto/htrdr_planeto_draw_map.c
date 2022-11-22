@@ -43,7 +43,6 @@ draw_pixel_xwave
   struct planeto_compute_radiance_args rad_args =
     PLANETO_COMPUTE_RADIANCE_ARGS_NULL;
 
-  struct htrdr_estimate L;
   struct htrdr_accum radiance;
   struct htrdr_accum time;
   struct htrdr_planeto* cmd;
@@ -130,17 +129,21 @@ draw_pixel_xwave
   }
 
   /* Flush pixel data */
-  htrdr_accum_get_estimation(&radiance, &L);
-  pixel->radiance = L;
+  pixel->radiance = radiance;
   pixel->time = time;
 
   if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW) {
+    struct htrdr_estimate L;
+
     /* Wavelength in meters */
     const double wmin_m = cmd->spectral_domain.wlen_range[0] * 1.e-9;
     const double wmax_m = cmd->spectral_domain.wlen_range[1] * 1.e-9;
 
     /* Brightness temperatures in W/m²/sr */
     double T, Tmin, Tmax;
+
+    htrdr_accum_get_estimation(&radiance, &L);
+
     T    = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E);
     Tmin = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E - L.SE);
     Tmax = htrdr_radiance_temperature(cmd->htrdr, wmin_m, wmax_m, L.E + L.SE);
@@ -310,15 +313,16 @@ write_pixel_image
 static INLINE void
 write_pixel_xwave
   (const struct planeto_pixel_xwave* pix,
+   struct htrdr_accum* radiance_acc, /* May be NULL */
    struct htrdr_accum* time_acc, /* May be NULL */
    FILE* stream)
 {
   ASSERT(pix && stream);
-  fprintf(stream, "%g %g %f %f 0 0 ",
+  fprintf(stream, "%g %g ",
     pix->radiance_temperature.E,
-    pix->radiance_temperature.SE,
-    pix->radiance.E,
-    pix->radiance.SE);
+    pix->radiance_temperature.SE);
+  write_accum(&pix->radiance, radiance_acc, stream);
+  fprintf(stream, "0 0 ");
   write_accum(&pix->time, time_acc, stream);
   fprintf(stream, "\n");
 }
@@ -327,6 +331,7 @@ static res_T
 write_buffer
   (struct htrdr_planeto* cmd,
    struct htrdr_buffer* buf,
+   struct htrdr_accum* radiance_acc, /* May be NULL */
    struct htrdr_accum* time_acc,
    FILE* stream)
 {
@@ -351,7 +356,7 @@ write_buffer
       switch(cmd->spectral_domain.spectral_type) {
         case HTRDR_SPECTRAL_LW:
         case HTRDR_SPECTRAL_SW:
-          write_pixel_xwave(pix_raw, time_acc, stream);
+          write_pixel_xwave(pix_raw, radiance_acc, time_acc, stream);
           break;
         case HTRDR_SPECTRAL_SW_CIE_XYZ:
           write_pixel_image(pix_raw, time_acc, stream);
@@ -372,6 +377,7 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   struct htrdr_draw_map_args args = HTRDR_DRAW_MAP_ARGS_NULL;
   struct htrdr_estimate path_time = HTRDR_ESTIMATE_NULL;
   struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
+  struct htrdr_accum radiance_acc = HTRDR_ACCUM_NULL;
   res_T res = RES_OK;
   ASSERT(cmd && cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
 
@@ -396,7 +402,7 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
   /* Write output image */
-  res = write_buffer(cmd, cmd->buf, &path_time_acc, cmd->output);
+  res = write_buffer(cmd, cmd->buf, &radiance_acc, &path_time_acc, cmd->output);
   if(res != RES_OK) goto error;
 
   CHK(fflush(cmd->output) == 0);
@@ -405,6 +411,15 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   htrdr_accum_get_estimation(&path_time_acc, &path_time);
   htrdr_log(cmd->htrdr, "Time per radiative path (in µs): %g +/- %g\n",
     path_time.E, path_time.SE);
+
+  /* Log measured radiance on the whole image */
+  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW
+  || cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW) {
+    struct htrdr_estimate L;
+
+    htrdr_accum_get_estimation(&radiance_acc, &L);
+    htrdr_log(cmd->htrdr, "Radiance in W/m²/sr: %g +/- %g\n", L.E, L.SE);
+  }
 
 exit:
   return res;
