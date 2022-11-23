@@ -196,11 +196,14 @@ wlen_ran_sample_continue
   }
 
   if(pdf) {
-    const double Tref = planck->ref_temperature;
+    const double Tref = planck->ref_temperature; /* K */
+
+    /* W/m²/sr/m */
     const double B_lambda = htrdr_planck(lambda_m, lambda_m, Tref);
     const double B_mean = htrdr_planck(range_m[0], range_m[1], Tref);
+
     *pdf = B_lambda / (B_mean * (range_m[1]-range_m[0]));
-    *pdf *= 1.e-9; /* Transform from m^-1 to nm^-1 */
+    *pdf *= 1.e-9; /* Transform from m⁻¹ to nm⁻¹ */
   }
 
   return lambda_m * 1.e9; /* Convert in nanometers */

@@ -604,7 +604,7 @@ planeto_compute_radiance
   longwave = cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW;
 
   if(!longwave && htrdr_planeto_source_is_targeted(cmd->source, pos, dir)) {
-    L = direct_contribution(cmd, args, pos, dir, NULL);
+    L = direct_contribution(cmd, args, pos, dir, NULL); /* In W/m²/sr/m */
   }
 
   for(;;) {
