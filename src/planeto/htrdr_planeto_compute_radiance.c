@@ -661,5 +661,5 @@ planeto_compute_radiance
     L += htrdr_planck_monochromatic(wlen_m, temperature);
   }
 
-  return L; /* In W/m²/sr/m
+  return L; /* In W/m²/sr/m */
 }
