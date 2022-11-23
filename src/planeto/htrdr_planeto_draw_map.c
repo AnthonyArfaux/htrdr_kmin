@@ -416,9 +416,13 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW
   || cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW) {
     struct htrdr_estimate L;
+    double omega; /* Solid angle of the camera */
 
     htrdr_accum_get_estimation(&radiance_acc, &L);
+    SCAM(perspective_get_solid_angle(cmd->camera, &omega));
     htrdr_log(cmd->htrdr, "Radiance in W/m²/sr: %g +/- %g\n", L.E, L.SE);
+    htrdr_log(cmd->htrdr, "Radiance in W/m² (solid angle = %g sr): %g +/- %g\n",
+      omega, L.E*omega, L.SE*omega);
   }
 
 exit:
