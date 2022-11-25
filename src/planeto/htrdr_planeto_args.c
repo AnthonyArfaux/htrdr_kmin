@@ -108,7 +108,7 @@ print_help(const char* cmd)
 "Usage: %s [-dfhv] [-s spectral_domain] [-t threads]\n"
 "                     [-T optical_thickness] [-V octree_definition]\n"
 "                     [-O octrees_storage] [-o output] [-C camera]\n"
-"                     [-S source] [-G ground] [-a aerosol]... -g gas\n", cmd);
+"                     [-S source] [-a aerosol]... -G ground -g gas\n", cmd);
   printf(
 "Simulate radiative transfer in heterogeneous 3D planetary atmosphere.\n"
 "See htrdr-planeto(1) man page for details\n\n");
@@ -560,6 +560,12 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
   res = check_gas_args(&args->gas);
   if(res != RES_OK) {
     fprintf(stderr, "Missing gas definition -- option '-a'\n");
+    goto error;
+  }
+
+  res = check_ground_args(&args->ground);
+  if(res != RES_OK) {
+    fprintf(stderr, "Missing ground definition -- option '-G'\n");
     goto error;
   }
 
