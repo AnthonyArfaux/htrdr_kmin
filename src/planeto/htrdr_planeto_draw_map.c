@@ -132,7 +132,10 @@ draw_pixel_xwave
   pixel->radiance = radiance;
   pixel->time = time;
 
-  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW) {
+  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW) {
+    pixel->radiance_temperature.E = 0;
+    pixel->radiance_temperature.SE = 0;
+  } else {
     struct htrdr_estimate L;
 
     /* Wavelength in meters */
