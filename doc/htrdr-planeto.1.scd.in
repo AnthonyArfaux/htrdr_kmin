@@ -401,6 +401,7 @@ htrdr-planeto -v -N \
 . VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
+*htpp*(1),
 *htrdr-image*(5),
 *mpirun*(1),
 *mrumtl*(5),
