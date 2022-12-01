@@ -24,7 +24,7 @@ htrdr-planeto - simulate radiative transfer in 3D planetary atmosphere
 
 # SYNOPSIS
 
-htrdr-planeto [_option_] ... -g _gas_
+htrdr-planeto [_option_] ... -G _ground_ -g _gas_
 
 # DESCRIPTION
 
