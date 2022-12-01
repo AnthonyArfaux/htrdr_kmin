@@ -289,11 +289,51 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 *-v*
 	Make the command verbose.
 
+# OUTPUT IMAGE
+
+Images calculated by *htrdr-planeto* are saved in *htrdr-image*(5) file format.
+This section describes the nature and arrangement of the output data depending
+on the type of calculation.
+
+## XYZ image
+
+For image rendering in the visible part of the spectrum (default behavior or
+when the *-s cie_xyz* option is set), each pixel stores 4 estimates, or 8
+floating-point values. The first, second and third pairs of numbers store the
+estimated radiation in W/sr/m² for the X, Y, and Z components of the CIE 1931
+XYZ color space. For each pair, the first corresponds to the expected value and
+the second its standard error. Finally, the fourth and last pair records the
+estimate of the calculation time in µs of a radiative path (expected value and
+standard error).
+
+## Longwave image
+
+If the image is an infrared rendering (option
+*-s lw*=_wlen-min_,_wlen-max_:*Tref*=_temperature_), the first and second pixel
+values store the expected value and standard error of the estimated brightness
+temperature in Kelvin. The third and fourth values record the expected value and
+standard error of the estimated radiance, which is either integrated radiance in
+W/sr/m² or spectral radiance in W/sr/m²/nm depending on whether this radiance
+was calculated for a spectral range or at a single wavelength. The fifth and
+sixth values are not used and are therefore set to 0. Finally, the last 2
+components of the pixel record the expected value and the standard error in µs
+of the calculation time per radiative path.
+
+## Shortwave image
+
+For shortwave renderings (option
+*-s sw*=_wlen-min_,_wlen-max_:*Tref*=_temperature_), the image layout is the
+same as for infrared rendering, except for the first and second pixel values
+that are not used. That is, the third and fourth values record the estimated
+radiance per pixel and the seventh and eighth values store the estimate of the
+calculation time by radiative path. The other values are set to 0.
+
 # SEE ALSO
 
 . VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
+*htrdr-image*(5),
 *mpirun*(1),
 *mrumtl*(5),
 *rnpfi*(5),
