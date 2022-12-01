@@ -37,7 +37,7 @@ TODO
 	defined. Available aerosol parameters are:
 
 	*mesh*=_path_
-		Path to the *smsh*(5) file that stores the volumetric mesh of the aerosol.
+		Path to the *smsh*(5) file that stores the aerosol tetrahedral mesh.
 
 	*name*=_string_
 		Name assigned to the aerosol.
@@ -119,22 +119,22 @@ TODO
 		defined in another file (see *prop* parameter).
 
 	*mesh*=_path_
-		Path to the *smsh*(5) file that stores the surface mesh of the ground.
+		Path to the *smsh*(5) file which stores the triangular mesh of the ground.
 
 	*name*=_string_
 		Name assigned to the ground.
 
 	*prop*=_path_
 		Path to the *rnsp*(5) file that stores ground surface properties. The
-		properties (BRDF index and temperature) are defined per surface mesh node
-		and, therefore, this file and the mesh file (see *mesh* parameter) must be
+		properties (BRDF index and temperature) are defined per triangle and,
+		therefore, this file and the mesh file (see *mesh* parameter) must be
 		consistent with each other.
 
 *-g* <_gas-parameter_:...>
 	Define the gas mixture. Available gas parameters are:
 
 	*mesh*=_path_
-		Path to the *smsh*(5) file that stores the volumetric mesh of the gas.
+		Path to the *smsh*(5) file that stores the gas tetrahedral mesh.
 
 	*ck*=_path_
 		Path to the *sck*(5) file that stores the correlated K of the gas. The CKs
@@ -187,7 +187,7 @@ TODO
 	data is written to the standard output. 
 
 *-S* <_source-parameter_:...>
-	Define the source. Available source parameters are:
+	Define the external source. Available source parameters are:
 
 	*lat*=_real_
 		The latitude of the source, i.e. its angle between [-90, 90] degrees about
@@ -218,21 +218,22 @@ TODO
 		Perform continuous spectral sampling in the wavelength range [_wlen-min_, _wlen-max_]
 		(wavelengths must be provided in nanometers) according to the Planck
 		function for a reference temperature (see *Tref* parameter). If _wlen-min_
-		and _wlen-max_ are equal, the calculation is monochromatic. *lw* means long
-		waves but is here a code word that actually means "calculation of radiance
-		using the internal source of radiation": in other words, radiation is
-		emitted by the medium and its limits (ground and space).
+		and _wlen-max_ are equal, the calculation is monochromatic. *lw* means
+		longwaves but is here a code word that actually means "calculation of
+		radiance using the internal source of radiation": in other words, radiation
+		is emitted by the medium and its limits (ground and space).
 		
 	*sw*=_wlen-min_,_wlen-max_
 		Perform continuous spectral sampling in the wavelength range [_wlen-min_,
 		_wlen-max_] (wavelengths must be provided in nanometers) according to the
-		Planck function for a reference temperatura (see *Tref* parameter)e. If
-		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. In
-		this case, *sw* means that the radiation source is external to the medium.
+		Planck function for a reference temperatura (see *Tref* parameter). If
+		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. Here,
+		*sw* means shortwaves, i.e. the radiation source is external to the medium.
 		
 	*Tref*=_temperature_
 		The reference temperature in Kelvin of the Planck function used to
-		continuously sample the longwave/shortwave spectral range.
+		continuously sample the longwave/shortwave spectral range. This is a
+		required parameter for the *lw* and *sw* parameters.
 
 *-T* _optical-thickness_
 	Optical thickness used as a criterion to construct atmospheric acceleration
@@ -252,6 +253,9 @@ TODO
 	Make the command verbose.
 
 # SEE ALSO
+
+. VTK file format -
+  <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
 *mrumtl*(5),
 *rnpfi*(5),
