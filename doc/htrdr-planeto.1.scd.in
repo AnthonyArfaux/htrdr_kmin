@@ -104,7 +104,7 @@ TODO
 	command as below:
 
 	```
-	csplit -f octree -k output %^#\ vtk% /^#\ vtk/ {$(grep -ce "^# vtk")}
+	csplit -f octree -k output %^#\\ vtk% /^#\\ vtk/ {$(($(grep -ce "^#\\ vtk" output)-2))}
 	```
 
 *-f*
