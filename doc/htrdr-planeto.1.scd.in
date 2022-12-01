@@ -28,7 +28,44 @@ htrdr-planeto [_option_] ... -G _ground_ -g _gas_
 
 # DESCRIPTION
 
-TODO
+*htrdr-planeto* simulates the radiative transfer of a terrestrial planet in the
+visible or the infrared part of the spectrum. The planet's soil (option *-G*)
+can be any set of triangles with BRDFs and temperatures defined per triangle.
+The atmosphere is composed of a gas mixture (option *-g*) and a potentially
+empty set of aerosols (option *-a*). Both can have arbitrary tetrahedral meshes
+with per-node radiative properties. Rayleigh is used as a gas phase function and
+the temperature of the gas is defined by the node of the mesh. Aerosol phase
+functions (Henyey and Greenstein or measured) are also defined per node.
+
+*htrdr-planeto* is mainly a renderer that calculates an image (option *-i*)
+for a given observation position (option *-C*). Its internal rendering algorithm
+is based on Monte-Carlo integration, which consists for each pixel of simulating
+a given number of optical paths from the sensor, taking into account the
+phenomena of light absorption and scattering.
+
+*htrdr-planeto* offers three ways to perform spectral integration (*-s* option).
+By default, it calculates an image for the visible part of the spectrum between
+380 and 780 nanometers, for the three components of the CIE 1931 XYZ color space
+which are then recombined to obtain the final color for each pixel, and finally
+the entire image of the scene as seen from the observation position. The other
+two methods are to explicitly define the longwave or shortwave spectral range to
+be integrated and continuously sample a wavelength in this range. In fact,
+longwave and shortwave are keywords that mean that the source of radiation is
+either external or internal to the medium, respectively. In shortwave, only
+radiance is evaluated and stored in the output image. For longwave rendering,
+this estimated radiance is then converted to brightness temperature and both are
+recorded in the image.
+
+In *htrdr-planeto*, the spatial unit 1.0 corresponds to one meter and
+temperatures are expressed in Kelvin. The estimated radiances are given in
+W/sr/m², except for monochromatic calculations where the calculated spectral
+radiance is defined in W/sr/m²/nm.
+
+*htrdr-planeto* implements mixed parallelism. On a single computer (that is, a
+node), it uses shared memory parallelism while it relies on Message Passing
+Interface (MPI) to parallelize calculations between multiple nodes.
+*htrdr-planeto* can therefore be launched either directly or via a process
+launcher such as *mpirun*(1) to distribute the rendering on several computers.
 
 # OPTIONS
 
@@ -257,6 +294,7 @@ TODO
 . VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
+*mpirun*(1),
 *mrumtl*(5),
 *rnpfi*(5),
 *rnsf*(5),
