@@ -328,6 +328,74 @@ that are not used. That is, the third and fourth values record the estimated
 radiance per pixel and the seventh and eighth values store the estimate of the
 calculation time by radiative path. The other values are set to 0.
 
+# EXAMPLES
+
+The following command line runs *htrdr-planeto* in a verbose way (option *-v*)
+to calculate an _800_ by _600_ pixel image by sampling _64_ radiative paths per
+pixel for the 3 components of the CIE XYZ 1931 color space. The external source
+is positioned at _-45_ degrees longitude and _50_ degrees latitude relative to
+the absolute referential. The camera looks at the origin (*tgt=*_0_,_0_,_0_)and
+is positioned at _1.5e7_ meters along the Y axis with an image plane aligned
+along the Z axis (*up=*_0_,_0_,_1_). Its vertical field of view is _70_ degrees.
+The gas of the planetary atmosphere is described by the tetrahedral mesh
+recorded in the _gas.smsh_ file, while its spectral data and temperature are
+given by the files _gas.sck_ and _gas.rngt_, respectively. Two aerosols complete
+the planetary atmosphere: one for _clouds_ and one for _haze_. Their respective
+meshes are stored in the _a<1|2>.smsh_ files while their radiative properties
+are given by the _a<1|2>.sars_ files. Finally, their phase functions are
+described by a set of 2 files: the _a<1|2>.rnsf_ file which lists the aerosol
+phase functions and the _a<1|2>.rnpfi_ file which references them by volumetric
+mesh node. To speed up rendering time, the normals of the tetrahedral meshes of
+the gas and aerosols are precalculated once and for all (option *-N*). The
+ground geometry is stored in the _ground.smsh_ file with its triangle properties
+(temperature and BRDF) defined in the _ground.rnsp_ file. The referenced BRDFs
+are listed in the _ground.rnsl_ file. The definition of acceleration structures
+cannot exceed _512³_ and its voxels can be merged until their optical thickness
+is greater than _10_. These structures are either reloaded from
+_storage_cie.bin_ or built from scratch and stored in _storage_cie.bin_
+depending on whether that file exists or not. Finally, the calculated images are
+stored in the _image_CIE_XYZ.ht_ file even if the file already exists (option
+*-f*).
+
+```
+htrdr-planeto -v -N \
+  -i def=800x600:spp=64 \
+  -s cie_xyz \
+  -S lon=-45:lat=50:dst=1.5e8:radius=6.9e5:temp=5778 \
+  -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \
+  -g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \
+  -a mesh=a1.smsh:radprop=a1.sars:phasefn=a1.rnsf:phaseids=a1.rnpfi:name=clouds \
+  -a mesh=a2.smsh:radprop=a2.sars:phasefn=a2.rnsf:phaseids=a2.rnpfi:name=haze \
+  -G mesh=ground.smsh:prop=ground.rnsp:brdf=ground.rnsl:name=namek \
+  -V 512 -T 10 -O storage_cie.bin \
+  -f -o image_CIE_XYZ.ht
+```
+
+The next command line is the same as the previous one, except that it calculates
+an infrared image between _10,000_ nm and _20,000_ nm with a reference
+temperature of _300_ K (option *-s*). Note that the acceleration structure
+storage file is no longer the same (_storage_lw.bin_ rather than
+_storage_cie.bin_). Indeed, the previous one records the acceleration structures
+for the spectral range of the CIE XYZ color space, while one wants to
+store/reload the acceleration structures for a spectral range between 10 and 20
+µm (see *-O* option). In any case, if the previous storage, incompatible with
+the current spectral range, had been submitted, the command would have stopped
+with an error message, thus avoiding the use of the wrong accelerartion
+structures.
+
+```
+htrdr-planeto -v -N \
+  -i def=800x600:spp=64 \
+  -s lw=10000,20000:Tref=300 \
+  -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \
+  -g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \
+  -a mesh=a1.smsh:radprop=a1.sars:phasefn=a1.rnsf:phaseids=a1.rnpfi:name=clouds \
+  -a mesh=a2.smsh:radprop=a2.sars:phasefn=a2.rnsf:phaseids=a2.rnpfi:name=haze \
+  -G mesh=ground.smsh:prop=ground.rnsp:brdf=ground.rnsl:name=namek \
+  -V 512 -T 10 -O storage_lw.bin \
+  -f -o image_infrared.ht
+```
+
 # SEE ALSO
 
 . VTK file format -
