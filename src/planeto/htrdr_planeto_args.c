@@ -73,33 +73,29 @@ check_ground_args(const struct htrdr_planeto_ground_args* args)
 }
 
 static INLINE res_T
-check_spectral_args(const struct htrdr_args_spectral* spectral_domain)
+check_spectral_args(const struct htrdr_planeto_spectral_args* args)
 {
-  if(!spectral_domain) return RES_BAD_ARG;
+  if(!args) return RES_BAD_ARG;
 
-  switch(spectral_domain->spectral_type) {
+  /* Invalid type */
+  switch(args->type) {
     case HTRDR_SPECTRAL_LW:
     case HTRDR_SPECTRAL_SW:
-
-      /* Invalid reference temperature */
-      if(spectral_domain->ref_temperature <= 0)
-        return RES_BAD_ARG;
-
-      /* Invalid spectral range */
-      if(spectral_domain->wlen_range[0]
-      >  spectral_domain->wlen_range[1])
-        return RES_BAD_ARG;
-
-      break;
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
-      /* Nothing to check since all parameters are implicitly defined */
+      /* Nothing to be done */
       break;
-    default: FATAL("Unreachable code\n"); break;
+    default:
+      return RES_BAD_ARG;
   }
+
+  /* Invalid spectral range */
+  if(args->wlen_range[0] < 0
+  || args->wlen_range[1] < 0
+  || args->wlen_range[0] > args->wlen_range[1])
+    return RES_BAD_ARG;
 
   return RES_OK;
 }
-
 static void
 print_help(const char* cmd)
 {
@@ -468,6 +464,98 @@ error:
   goto exit;
 }
 
+static INLINE res_T
+parse_spectral_range(const char* str, double wlen_range[2])
+{
+  double range[2];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(wlen_range && str);
+
+  res = cstr_to_list_double(str, ',', range, &len, 2);
+  if(res == RES_OK && len != 2) res = RES_BAD_ARG;
+  if(res == RES_OK && range[0] > range[1]) res = RES_BAD_ARG;
+  if(res == RES_OK && (range[0] < 0 || range[1] < 0)) res = RES_BAD_ARG;
+  if(res != RES_OK) goto error;
+
+  wlen_range[0] = range[0];
+  wlen_range[1] = range[1];
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_spectral_parameters(const char* str, void* ptr)
+{
+  enum {CIE_XYZ, LW, SW} iparam;
+  char buf[BUFSIZ];
+  struct htrdr_planeto_args* args = ptr;
+  struct htrdr_planeto_spectral_args* spectral = NULL;
+  char* key;
+  char* val;
+  char* tk_ctx;
+  res_T res = RES_BAD_ARG;
+  ASSERT(str && ptr);
+
+  spectral = &args->spectral_domain;
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr, "Could not duplicate the spectral parameter `%s'\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &tk_ctx);
+  val = strtok_r(NULL, "", &tk_ctx);
+
+       if(!strcmp(key, "cie_xyz")) iparam = CIE_XYZ;
+  else if(!strcmp(key, "lw")) iparam = LW;
+  else if(!strcmp(key, "sw")) iparam = SW;
+  else {
+    fprintf(stderr, "Invalid spectral parameter `%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if((iparam == LW || iparam == SW) && !val) {
+    fprintf(stderr,
+      "Invalid null value for the spectral parameter `%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(iparam) {
+    case CIE_XYZ:
+      spectral->type = HTRDR_SPECTRAL_SW_CIE_XYZ;
+      spectral->wlen_range[0] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[0];
+      spectral->wlen_range[1] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[1];
+      break;
+    case LW:
+      spectral->type = HTRDR_SPECTRAL_LW;
+      res = parse_spectral_range(val, spectral->wlen_range);
+      break;
+    case SW:
+      spectral->type = HTRDR_SPECTRAL_SW;
+      res = parse_spectral_range(val, spectral->wlen_range);
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+  if(res != RES_OK) {
+    fprintf(stderr, "Unable to parse the spectral parameter `%s' -- %s\n",
+      str, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -528,10 +616,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         res = cstr_parse_list(optarg, ':', parse_source_parameters, args);
         break;
       case 's':
-        res = htrdr_args_spectral_parse(&args->spectral_domain, optarg);
-        if(res == RES_OK) {
-          res = check_spectral_args(&args->spectral_domain);
-        }
+        res = cstr_parse_list(optarg, ':', parse_spectral_parameters, args);
         break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
@@ -577,8 +662,8 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     }
 
     /* Check the source */
-    if(args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
-    || args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+    if(args->spectral_domain.type == HTRDR_SPECTRAL_SW
+    || args->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
       res = htrdr_planeto_source_args_check(&args->source);
       if(res != RES_OK) {
         fprintf(stderr, "Missing source definition -- option '-S'\n");
@@ -654,8 +739,8 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
     if(res != RES_OK) return res;
 
     /* Check the source */
-    if(args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
-    || args->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
+    if(args->spectral_domain.type == HTRDR_SPECTRAL_SW
+    || args->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
       res = htrdr_planeto_source_args_check(&args->source);
       if(res != RES_OK) return res;
     }

@@ -254,24 +254,21 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 	*lw*=_wlen-min_,_wlen-max_
 		Perform continuous spectral sampling in the wavelength range [_wlen-min_, _wlen-max_]
 		(wavelengths must be provided in nanometers) according to the Planck
-		function for a reference temperature (see *Tref* parameter). If _wlen-min_
-		and _wlen-max_ are equal, the calculation is monochromatic. *lw* means
-		longwaves but is here a code word that actually means "calculation of
+		function for a reference temperature which is the maximum ground
+		temperature, which is assumed to be the maximum scene temperature. If
+		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. *lw*
+		means longwaves but is here a code word that actually means "calculation of
 		radiance using the internal source of radiation": in other words, radiation
 		is emitted by the medium and its limits (ground and space).
 		
 	*sw*=_wlen-min_,_wlen-max_
-		Perform continuous spectral sampling in the wavelength range [_wlen-min_,
-		_wlen-max_] (wavelengths must be provided in nanometers) according to the
-		Planck function for a reference temperatura (see *Tref* parameter). If
+		Perform continuous spectral sampling in the wavelength range [_wlen-min_, _wlen-max_]
+		(wavelengths must be provided in nanometers) according to the Planck
+		function for a reference temperatura which is the source temperature. If
 		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. Here,
-		*sw* means shortwaves, i.e. the radiation source is external to the medium.
+		*sw* means shortwaves, i.e. the radiation source is external to the medium
+		(option *-S*).
 		
-	*Tref*=_temperature_
-		The reference temperature in Kelvin of the Planck function used to
-		continuously sample the longwave/shortwave spectral range. This is a
-		required parameter for the *lw* and *sw* parameters.
-
 *-T* _optical-thickness_
 	Optical thickness used as a criterion to construct atmospheric acceleration
 	structures. Its default value is
@@ -308,25 +305,24 @@ standard error).
 
 ## Longwave image
 
-If the image is an infrared rendering (option
-*-s lw*=_wlen-min_,_wlen-max_:*Tref*=_temperature_), the first and second pixel
-values store the expected value and standard error of the estimated brightness
-temperature in Kelvin. The third and fourth values record the expected value and
-standard error of the estimated radiance, which is either integrated radiance in
-W/sr/m² or spectral radiance in W/sr/m²/nm depending on whether this radiance
-was calculated for a spectral range or at a single wavelength. The fifth and
-sixth values are not used and are therefore set to 0. Finally, the last 2
-components of the pixel record the expected value and the standard error in µs
-of the calculation time per radiative path.
+If the image is an infrared rendering (option *-s lw*=_wlen-min_,_wlen-max_),
+the first and second pixel values store the expected value and standard error of
+the estimated brightness temperature in Kelvin. The third and fourth values
+record the expected value and standard error of the estimated radiance, which is
+either integrated radiance in W/sr/m² or spectral radiance in W/sr/m²/nm
+depending on whether this radiance was calculated for a spectral range or at a
+single wavelength. The fifth and sixth values are not used and are therefore set
+to 0. Finally, the last 2 components of the pixel record the expected value and
+the standard error in µs of the calculation time per radiative path.
 
 ## Shortwave image
 
-For shortwave renderings (option
-*-s sw*=_wlen-min_,_wlen-max_:*Tref*=_temperature_), the image layout is the
-same as for infrared rendering, except for the first and second pixel values
-that are not used. That is, the third and fourth values record the estimated
-radiance per pixel and the seventh and eighth values store the estimate of the
-calculation time by radiative path. The other values are set to 0.
+For shortwave renderings (option *-s sw*=_wlen-min_,_wlen-max_), the image
+layout is the same as for infrared rendering, except for the first and second
+pixel values that are not used. That is, the third and fourth values record the
+estimated radiance per pixel and the seventh and eighth values store the
+estimate of the calculation time by radiative path. The other values are set to
+0.
 
 # EXAMPLES
 
@@ -372,21 +368,20 @@ htrdr-planeto -v -N \
 ```
 
 The next command line is the same as the previous one, except that it calculates
-an infrared image between _10,000_ nm and _20,000_ nm with a reference
-temperature of _300_ K (option *-s*). Note that the acceleration structure
-storage file is no longer the same (_storage_lw.bin_ rather than
-_storage_cie.bin_). Indeed, the previous one records the acceleration structures
-for the spectral range of the CIE XYZ color space, while one wants to
-store/reload the acceleration structures for a spectral range between 10 and 20
-µm (see *-O* option). In any case, if the previous storage, incompatible with
-the current spectral range, had been submitted, the command would have stopped
-with an error message, thus avoiding the use of the wrong accelerartion
-structures.
+an infrared image between _10,000_ nm and _20,000_ nm (option *-s*). Note that
+the acceleration structure storage file is no longer the same (_storage_lw.bin_
+rather than _storage_cie.bin_). Indeed, the previous one records the
+acceleration structures for the spectral range of the CIE XYZ color space, while
+one wants to store/reload the acceleration structures for a spectral range
+between 10 and 20 µm (see *-O* option). In any case, if the previous storage,
+incompatible with the current spectral range, had been submitted, the command
+would have stopped with an error message, thus avoiding the use of the wrong
+accelerartion structures.
 
 ```
 htrdr-planeto -v -N \
   -i def=800x600:spp=64 \
-  -s lw=10000,20000:Tref=300 \
+  -s lw=10000,20000 \
   -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \
   -g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \
   -a mesh=a1.smsh:radprop=a1.sars:phasefn=a1.rnsf:phaseids=a1.rnpfi:name=clouds \

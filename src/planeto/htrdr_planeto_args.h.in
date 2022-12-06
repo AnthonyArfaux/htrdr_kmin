@@ -31,6 +31,17 @@ enum htrdr_planeto_args_output_type {
   HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__
 };
 
+struct htrdr_planeto_spectral_args {
+  double wlen_range[2]; /* Spectral range in nm */
+  enum htrdr_spectral_type type;
+};
+#define HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__ {                                \
+  HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                 \
+  HTRDR_SPECTRAL_SW_CIE_XYZ, /* Spectral type */                               \
+}
+static const struct htrdr_planeto_spectral_args
+HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT = HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__;
+
 struct htrdr_planeto_source_args {
   double longitude; /* In [-180, 180] degrees */
   double latitude; /* In [-90, 90] degrees */
@@ -67,7 +78,7 @@ struct htrdr_planeto_args {
   double optical_thickness; /* Threshold used during octree building */
 
   char* output; /* File where the result is written */
-  struct htrdr_args_spectral spectral_domain; /* Integration spectral domain */
+  struct htrdr_planeto_spectral_args spectral_domain; /* Integration spectral domain */
   struct htrdr_planeto_source_args source;
   struct htrdr_args_image image;
 
@@ -79,7 +90,7 @@ struct htrdr_planeto_args {
   int precompute_normals; /* Pre-compute tetrahedron normals */
   int force_output_overwrite; /* Replace output if it exists */
   int verbose; /* Verbose level */
-  int quit; /* Stop the command */ 
+  int quit; /* Stop the command */
 };
 #define HTRDR_PLANETO_ARGS_DEFAULT__ {                                         \
   RNATM_GAS_ARGS_NULL__, /* Gas */                                             \
@@ -93,7 +104,7 @@ struct htrdr_planeto_args {
   @HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                    \
                                                                                \
   NULL, /* Ouput file */                                                       \
-  HTRDR_ARGS_SPECTRAL_DEFAULT__, /* Spectral domain */                         \
+  HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__, /* Spectral domain */                 \
   HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
   HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
                                                                                \

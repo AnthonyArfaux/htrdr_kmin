@@ -53,8 +53,8 @@ draw_pixel_xwave
 
   cmd  = args->context;
   ASSERT(cmd);
-  ASSERT(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW
-      || cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW);
+  ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW
+      || cmd->spectral_domain.type == HTRDR_SPECTRAL_LW);
   ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
 
   /* Reset accumulators */
@@ -132,7 +132,7 @@ draw_pixel_xwave
   pixel->radiance = radiance;
   pixel->time = time;
 
-  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW) {
+  if(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW) {
     pixel->radiance_temperature.E = 0;
     pixel->radiance_temperature.SE = 0;
   } else {
@@ -175,7 +175,7 @@ draw_pixel_image
 
   cmd = args->context;
   ASSERT(cmd);
-  ASSERT(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ);
+  ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ);
   ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
 
   /* Reset accumulators */
@@ -356,7 +356,7 @@ write_buffer
       void* pix_raw = htrdr_buffer_at(buf, x, y);
       ASSERT(IS_ALIGNED(pix_raw, pixfmt.alignment));
 
-      switch(cmd->spectral_domain.spectral_type) {
+      switch(cmd->spectral_domain.type) {
         case HTRDR_SPECTRAL_LW:
         case HTRDR_SPECTRAL_SW:
           write_pixel_xwave(pix_raw, radiance_acc, time_acc, stream);
@@ -387,7 +387,7 @@ planeto_draw_map(struct htrdr_planeto* cmd)
   args.buffer_layout = cmd->buf_layout;
   args.spp = cmd->spp;
   args.context = cmd;
-  switch(cmd->spectral_domain.spectral_type) {
+  switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_LW:
     case HTRDR_SPECTRAL_SW:
       args.draw_pixel = draw_pixel_xwave;
@@ -416,8 +416,8 @@ planeto_draw_map(struct htrdr_planeto* cmd)
     path_time.E, path_time.SE);
 
   /* Log measured radiance on the whole image */
-  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW
-  || cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_SW) {
+  if(cmd->spectral_domain.type == HTRDR_SPECTRAL_LW
+  || cmd->spectral_domain.type == HTRDR_SPECTRAL_SW) {
     struct htrdr_estimate L;
     double omega; /* Solid angle of the camera */
 

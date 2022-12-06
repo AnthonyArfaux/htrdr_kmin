@@ -237,6 +237,7 @@ setup_spectral_domain
   (struct htrdr_planeto* cmd,
    const struct htrdr_planeto_args* args)
 {
+  double ground_T_range[2];
   size_t nintervals;
   res_T res = RES_OK;
   ASSERT(cmd && args);
@@ -245,23 +246,39 @@ setup_spectral_domain
 
   /* Configure the spectral distribution */
   nintervals = compute_nintervals_for_spectral_cdf(cmd);
-  switch(cmd->spectral_domain.spectral_type) {
-    /* Planck distribution */
+  switch(cmd->spectral_domain.type) {
+
     case HTRDR_SPECTRAL_LW:
-    case HTRDR_SPECTRAL_SW:
+      res = rngrd_get_temperature_range(cmd->ground, ground_T_range);
+      if(res != RES_OK) goto error;
+
+      /* Use as the reference temperature of the Planck distribution the
+       * maximum scene temperature which, in fact, should be the maximum ground
+       * temperature */
       res = htrdr_ran_wlen_planck_create(cmd->htrdr,
-        cmd->spectral_domain.wlen_range, nintervals,
-        cmd->spectral_domain.ref_temperature, &cmd->planck);
+        cmd->spectral_domain.wlen_range, nintervals, ground_T_range[1],
+        &cmd->planck);
+      if(res != RES_OK) goto error;
       break;
-    /* CIE XYZ distribution */
+
+    case HTRDR_SPECTRAL_SW:
+      /* Use the source temperature as the reference temperature of the Planck
+       * distribution */
+      res = htrdr_ran_wlen_planck_create(cmd->htrdr,
+        cmd->spectral_domain.wlen_range, nintervals, args->source.temperature,
+        &cmd->planck);
+      if(res != RES_OK) goto error;
+      break;
+
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
+      /* CIE XYZ distribution */
       res = htrdr_ran_wlen_cie_xyz_create(cmd->htrdr,
         cmd->spectral_domain.wlen_range, nintervals, &cmd->cie);
+      if(res != RES_OK) goto error;
       break;
 
     default: FATAL("Unreachable code\n"); break;
   }
-  if(res != RES_OK) goto error;
 
 exit:
   return res;
@@ -563,7 +580,7 @@ planeto_get_pixel_format
   ASSERT(cmd && fmt && cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
   (void)cmd;
 
-  switch(cmd->spectral_domain.spectral_type) {
+  switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_LW:
     case HTRDR_SPECTRAL_SW:
       fmt->size = sizeof(struct planeto_pixel_xwave);

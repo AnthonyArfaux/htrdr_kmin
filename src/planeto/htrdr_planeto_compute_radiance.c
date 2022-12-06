@@ -435,7 +435,7 @@ surface_bounce
   if(mask & SSF_TRANSMISSION) reflectivity = 0;
 
   /* No external source in longwave */
-  if(cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW)
+  if(cmd->spectral_domain.type == HTRDR_SPECTRAL_LW)
     goto exit;
 
   /* Calculate direct contribution for specular reflection */
@@ -502,7 +502,7 @@ volume_scattering
   pdf = htrdr_planeto_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
 
   /* In short wave, manage the contribution of the external source */
-  switch(cmd->spectral_domain.spectral_type) {
+  switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_LW:
       /* Nothing to be done */
       break;
@@ -601,7 +601,7 @@ planeto_compute_radiance
 
   d3_set(pos, args->path_org);
   d3_set(dir, args->path_dir);
-  longwave = cmd->spectral_domain.spectral_type == HTRDR_SPECTRAL_LW;
+  longwave = cmd->spectral_domain.type == HTRDR_SPECTRAL_LW;
 
   if(!longwave && htrdr_planeto_source_is_targeted(cmd->source, pos, dir)) {
     L = direct_contribution(cmd, args, pos, dir, NULL); /* In W/m²/sr/m */

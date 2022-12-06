@@ -82,7 +82,7 @@ struct htrdr_planeto {
   struct rngrd* ground;
   struct htrdr_planeto_source* source;
 
-  struct htrdr_args_spectral spectral_domain;
+  struct htrdr_planeto_spectral_args spectral_domain;
   struct htrdr_ran_wlen_cie_xyz* cie; /* HTRDR_SPECTRAL_SW_CIE_XYZ */
   struct htrdr_ran_wlen_planck* planck; /* HTRDR_SPECTRAL_<LW|SW> */
 
