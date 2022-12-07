@@ -215,29 +215,19 @@ parse_aerosol_parameters(const char* str, void* ptr)
   ASSERT(args->naerosols);
   aerosol = args->aerosols + (args->naerosols - 1);
 
+  #define SET_STR(Dst) {                                                       \
+    if(Dst) mem_rm(Dst);                                                       \
+    if(!((Dst) = str_dup(val))) res = RES_MEM_ERR;                             \
+  } (void)0
   switch(iparam) {
-    case MESH:
-      aerosol->smsh_filename = str_dup(val);
-      if(!aerosol->smsh_filename) res = RES_MEM_ERR;
-      break;
-    case NAME:
-      aerosol->name = str_dup(val);
-      if(!aerosol->name) res = RES_MEM_ERR;
-      break;
-    case RADPROP:
-      aerosol->sars_filename = str_dup(val);
-      if(!aerosol->sars_filename) res = RES_MEM_ERR;
-      break;
-    case PHASEFN:
-      aerosol->phase_fn_lst_filename = str_dup(val);
-      if(!aerosol->phase_fn_lst_filename) res = RES_MEM_ERR;
-      break;
-    case PHASEIDS:
-      aerosol->phase_fn_ids_filename = str_dup(val);
-      if(!aerosol->phase_fn_ids_filename) res = RES_MEM_ERR;
-      break;
+    case MESH: SET_STR(aerosol->smsh_filename); break;
+    case NAME: SET_STR(aerosol->name); break;
+    case RADPROP: SET_STR(aerosol->sars_filename); break;
+    case PHASEFN: SET_STR(aerosol->phase_fn_lst_filename); break;
+    case PHASEIDS: SET_STR(aerosol->phase_fn_ids_filename); break;
     default: FATAL("Unreachable code\n"); break;
   }
+  #undef SET_STR
   if(res != RES_OK) {
     fprintf(stderr, "Unable to parse the aerosol parameter `%s' -- %s\n",
       str, res_to_cstr(res));
@@ -288,25 +278,18 @@ parse_ground_parameters(const char* str, void* ptr)
     goto error;
   }
 
+  #define SET_STR(Dst) {                                                       \
+    if(Dst) mem_rm(Dst);                                                       \
+    if(!((Dst) = str_dup(val))) res = RES_MEM_ERR;                             \
+  } (void)0
   switch(iparam) {
-    case BRDF:
-      args->ground.mtllst_filename = str_dup(val);
-      if(!args->ground.mtllst_filename) res = RES_MEM_ERR;
-      goto error;
-    case MESH:
-      args->ground.smsh_filename = str_dup(val);
-      if(!args->ground.smsh_filename) res = RES_MEM_ERR;
-      break;
-    case NAME:
-      args->ground.name = str_dup(val);
-      if(!args->ground.name) res = RES_MEM_ERR;
-      break;
-    case PROP:
-      args->ground.props_filename = str_dup(val);
-      if(!args->ground.props_filename) res = RES_MEM_ERR;
-      break;
+    case BRDF: SET_STR(args->ground.mtllst_filename); break;
+    case MESH: SET_STR(args->ground.smsh_filename); break;
+    case NAME: SET_STR(args->ground.name); break;
+    case PROP: SET_STR(args->ground.props_filename); break;
     default: FATAL("Unreachable code\n"); break;
   }
+  #undef SET_STR
   if(res != RES_OK) {
     fprintf(stderr, "Unable to parse the ground parameter `%s' -- %s\n",
       str, res_to_cstr(res));
@@ -356,21 +339,17 @@ parse_gas_parameters(const char* str, void* ptr)
     goto error;
   }
 
+  #define SET_STR(Dst) {                                                       \
+    if(Dst) mem_rm(Dst);                                                       \
+    if(!((Dst) = str_dup(val))) res = RES_MEM_ERR;                             \
+  } (void)0
   switch(iparam) {
-    case MESH:
-      args->gas.smsh_filename = str_dup(val);
-      if(!args->gas.smsh_filename) res = RES_MEM_ERR;
-      break;
-    case CK:
-      args->gas.sck_filename = str_dup(val);
-      if(!args->gas.sck_filename) res = RES_MEM_ERR;
-      break;
-    case TEMP:
-      args->gas.temperatures_filename = str_dup(val);
-      if(!args->gas.temperatures_filename) res = RES_MEM_ERR;
-      break;
+    case MESH: SET_STR(args->gas.smsh_filename); break;
+    case CK: SET_STR(args->gas.sck_filename); break;
+    case TEMP: SET_STR(args->gas.temperatures_filename); break;
     default: FATAL("Unreachable code\n"); break;
   }
+  #undef SET_STR
   if(res != RES_OK) {
     fprintf(stderr, "Unable to parse the gas parameter `%s' -- %s\n",
       str, res_to_cstr(res));
