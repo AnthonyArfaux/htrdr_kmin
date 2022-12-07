@@ -89,6 +89,7 @@ set(HTRDR_CORE_FILES_SRC
   htrdr_log.c
   htrdr_materials.c
   htrdr_ran_wlen_cie_xyz.c
+  htrdr_ran_wlen_discrete.c
   htrdr_ran_wlen_planck.c
   htrdr_rectangle.c
   htrdr_slab.c
@@ -104,6 +105,7 @@ set(HTRDR_CORE_FILES_INC
   htrdr_log.h
   htrdr_materials.h
   htrdr_ran_wlen_cie_xyz.h
+  htrdr_ran_wlen_discrete.h
   htrdr_ran_wlen_planck.h
   htrdr_rectangle.h
   htrdr_sensor.h
