@@ -386,7 +386,7 @@ error:
 static res_T
 parse_source_parameters(const char* str, void* ptr)
 {
-  enum {LAT, LON, DST, RADIUS, TEMP} iparam;
+  enum {LAT, LON, DST, RADIUS, TEMP, RAD} iparam;
   char buf[BUFSIZ];
   struct htrdr_planeto_args* args = ptr;
   struct htrdr_planeto_source_args* src = NULL;
@@ -411,6 +411,7 @@ parse_source_parameters(const char* str, void* ptr)
        if(!strcmp(key, "lat")) iparam = LAT;
   else if(!strcmp(key, "lon")) iparam = LON;
   else if(!strcmp(key, "dst")) iparam = DST;
+  else if(!strcmp(key, "rad")) iparam = RAD;
   else if(!strcmp(key, "radius")) iparam = RADIUS;
   else if(!strcmp(key, "temp")) iparam = TEMP;
   else {
@@ -442,11 +443,23 @@ parse_source_parameters(const char* str, void* ptr)
       res = cstr_to_double(val, &src->distance);
       if(res == RES_OK && src->distance < 0) res = RES_BAD_ARG;
       break;
+    case RAD:
+      /* Use a per wavelength radiance rather than a constant temperature */
+      src->temperature = -1;
+      if(src->rnrl_filename) mem_rm(src->rnrl_filename);
+      src->rnrl_filename = str_dup(val);
+      if(!src->rnrl_filename) res = RES_MEM_ERR;
+      break;
     case RADIUS:
       res = cstr_to_double(val, &src->radius);
       if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
       break;
     case TEMP:
+      /* Use a constant temperature rather than a per wavelength radiance */
+      if(src->rnrl_filename) {
+        mem_rm(src->rnrl_filename);
+        src->rnrl_filename = NULL;
+      }
       res = cstr_to_double(val, &src->temperature);
       if(res == RES_OK && src->temperature < 0) res = RES_BAD_ARG;
       break;
@@ -692,6 +705,7 @@ htrdr_planeto_args_release(struct htrdr_planeto_args* args)
   if(args->ground.props_filename) mem_rm(args->ground.props_filename);
   if(args->ground.mtllst_filename) mem_rm(args->ground.mtllst_filename);
   if(args->ground.name) mem_rm(args->ground.name);
+  if(args->source.rnrl_filename) mem_rm(args->source.rnrl_filename);
 
   FOR_EACH(i, 0, args->naerosols) {
     struct rnatm_aerosol_args* aerosol = args->aerosols + i;
@@ -775,9 +789,13 @@ htrdr_planeto_source_args_check(const struct htrdr_planeto_source_args* args)
   || args->distance < 0)
     return RES_BAD_ARG;
 
-  /* Miscellaneous parameters */
-  if(args->radius < 0
-  || args->temperature < 0)
+  /* Invalid radius */
+  if(args->radius < 0)
+    return RES_BAD_ARG;
+
+  /* Invalid radiance */
+  if((args->temperature < 0 && !args->rnrl_filename) /* Both are invalids */
+  || (args->temperature >=0 &&  args->rnrl_filename)) /* Both are valids */
     return RES_BAD_ARG;
 
   return RES_OK;

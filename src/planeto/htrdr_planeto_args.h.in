@@ -43,13 +43,16 @@ static const struct htrdr_planeto_spectral_args
 HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT = HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__;
 
 struct htrdr_planeto_source_args {
+  /* Radiance of the source per wavelength. May be NULL */
+  char* rnrl_filename;
+
   double longitude; /* In [-180, 180] degrees */
   double latitude; /* In [-90, 90] degrees */
   double distance; /* In km */
   double radius; /* In km */
   double temperature; /* In Kelvin */
 };
-#define HTRDR_PLANETO_SOURCE_ARGS_NULL__ {0,0,0,-1,-1}
+#define HTRDR_PLANETO_SOURCE_ARGS_NULL__ {NULL,0,0,0,-1,-1}
 static const struct htrdr_planeto_source_args HTRDR_PLANETO_SOURCE_ARGS_NULL =
   HTRDR_PLANETO_SOURCE_ARGS_NULL__;
 

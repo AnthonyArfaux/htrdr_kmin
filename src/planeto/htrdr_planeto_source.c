@@ -21,8 +21,10 @@
 #include "core/htrdr.h"
 #include "core/htrdr_log.h"
 
+#include <star/sbuf.h>
 #include <star/ssp.h>
 
+#include <rsys/cstr.h>
 #include <rsys/double3.h>
 #include <rsys/ref_count.h>
 
@@ -30,7 +32,11 @@ struct htrdr_planeto_source {
   double position[3]; /* In m */
 
   double radius; /* In m */
-  double temperature; /* In Kelvin */
+
+  /* In Kelvin. Defined if the radiances by wavelength is no set */
+  double temperature;
+
+  struct sbuf* per_wlen_radiances; /* List of radiances by wavelength */
 
   ref_T ref;
   struct htrdr* htrdr;
@@ -39,6 +45,32 @@ struct htrdr_planeto_source {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static res_T
+setup_per_wavelength_radiances
+  (struct htrdr_planeto_source* src,
+   const struct htrdr_planeto_source_args* args)
+{
+  struct sbuf_create_args sbuf_args;
+  res_T res = RES_OK;
+  ASSERT(src && args && args->rnrl_filename && args->temperature < 0);
+
+  sbuf_args.logger = htrdr_get_logger(src->htrdr);
+  sbuf_args.allocator = htrdr_get_allocator(src->htrdr);
+  sbuf_args.verbose = htrdr_get_verbosity_level(src->htrdr);
+  res = sbuf_create(&sbuf_args, &src->per_wlen_radiances);
+  if(res != RES_OK) goto error;
+
+  res = sbuf_load(src->per_wlen_radiances, args->rnrl_filename);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(src->htrdr, "error loading %s -- %s\n",
+    args->rnrl_filename, res_to_cstr(res));
+  goto exit;
+}
+
 static void
 release_source(ref_T* ref)
 {
@@ -48,6 +80,7 @@ release_source(ref_T* ref)
 
   source = CONTAINER_OF(ref, struct htrdr_planeto_source, ref);
   htrdr = source->htrdr;
+  if(source->per_wlen_radiances) SBUF(ref_put(source->per_wlen_radiances));
   MEM_RM(htrdr_get_allocator(htrdr), source);
   htrdr_ref_put(htrdr);
 }
@@ -79,7 +112,14 @@ htrdr_planeto_source_create
   htrdr_ref_get(cmd->htrdr);
   src->htrdr = cmd->htrdr;
   src->radius = args->radius * 1e3/*From km to m*/;
-  src->temperature = args->temperature;
+
+  if(!args->rnrl_filename) {
+    src->temperature = args->temperature;
+  } else {
+    res = setup_per_wavelength_radiances(src, args);
+    if(res != RES_OK) goto error;
+    src->temperature = -1; /* Not used */
+  }
 
   /* Convert latitude and longitude to radians and distance in m */
   lat = MDEG2RAD(args->latitude);

@@ -298,7 +298,7 @@ htrdr_ran_wlen_planck_create
   if(!planck) {
     res = RES_MEM_ERR;
     htrdr_log_err(htrdr,
-      "%s: could not allocate longwave random variate data structure -- %s.\n",
+      "%s: could not allocate Planck distribution -- %s.\n",
       FUNC_NAME, res_to_cstr(res));
     goto error;
   }

@@ -26,6 +26,7 @@ find_package(RNATM 0.0 REQUIRED)
 find_package(RNGRD 0.0 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
+find_package(StarBuffer 0.0 REQUIRED)
 find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.12 REQUIRED)
@@ -40,6 +41,7 @@ include_directories(
   ${RNGRD}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
+  ${StarBuffer_INCLUDE_DIR}
   ${StarCamera_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
@@ -81,7 +83,7 @@ add_library(htrdr-planeto SHARED
   ${HTRDR_PLANETO_FILES_SRC}
   ${HTRDR_PLANETO_FILES_INC})
 target_link_libraries(htrdr-planeto
-  htrdr-core RNATM RNGRD RSys Star3D StarCamera StarSF StarSP)
+  htrdr-core RNATM RNGRD RSys Star3D StarBuffer StarCamera StarSF StarSP)
 
 set_target_properties(htrdr-planeto PROPERTIES
   DEFINE_SYMBOL HTRDR_SHARED_BUILD
