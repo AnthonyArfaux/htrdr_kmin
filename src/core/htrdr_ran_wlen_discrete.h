@@ -23,10 +23,10 @@
 
 struct htrdr_ran_wlen_discrete_create_args {
   void (*get)
-    (const size_t i,
+    (void* ctx,
+     const size_t i,
      double* wlen, /* In nanometer */
-     double* radiance, /* In W/m²/sr/m */
-     void* ctx);
+     double* radiance); /* In W/m²/sr/m */
   size_t nwavelengths;
   void* context; /* User defined data */
 };

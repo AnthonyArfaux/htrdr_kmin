@@ -89,7 +89,7 @@ setup_per_wlen_radiance
 
   /* Store the discrete values */
   FOR_EACH(iwlen, 0, args->nwavelengths) {
-    args->get(iwlen, wlens+iwlen, radia+iwlen, args->context);
+    args->get(args->context, iwlen, wlens+iwlen, radia+iwlen);
 
     if(iwlen > 0 && wlens[iwlen] <= wlens[iwlen-1]) {
       htrdr_log_err(ran->htrdr,
@@ -149,8 +149,8 @@ setup_distribution
     double w1, L1;
     double area;
 
-    args->get(iw0, &w0, &L0, args->context);
-    args->get(iw1, &w1, &L1, args->context);
+    args->get(args->context, iw0, &w0, &L0);
+    args->get(args->context, iw1, &w1, &L1);
     ASSERT(w0 < w1);
 
     area = (L0 + L1) * (w1-w0) * 0.5;
@@ -158,6 +158,8 @@ setup_distribution
     proba[iband] = area;
     sum += area;
   }
+
+  htrdr_log(ran->htrdr, "Discrete radiance integral = %g W/m²/sr\n", sum);
 
   /* Normalize the probabilities and setup the cumulative */
   FOR_EACH(iband, 0, ran->nbands) {
