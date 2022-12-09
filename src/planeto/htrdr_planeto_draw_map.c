@@ -16,6 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "planeto/htrdr_planeto_c.h"
+#include "planeto/htrdr_planeto_source.h"
 
 #include "core/htrdr.h"
 #include "core/htrdr_accum.h"
@@ -23,6 +24,7 @@
 #include "core/htrdr_draw_map.h"
 #include "core/htrdr_log.h"
 #include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_discrete.h"
 #include "core/htrdr_ran_wlen_planck.h"
 
 #include <rad-net/rnatm.h>
@@ -92,7 +94,21 @@ draw_pixel_xwave
     r2 = ssp_rng_canonical(args->rng);
 
     /* Sample a wavelength */
-    wlen[0] = wlen[1] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+    switch(cmd->spectral_domain.type) {
+      case HTRDR_SPECTRAL_LW:
+        wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+        break;
+      case HTRDR_SPECTRAL_SW:
+        if(htrdr_planeto_source_does_radiance_vary_spectrally(cmd->source)) {
+          wlen[0] = htrdr_ran_wlen_discrete_sample(cmd->discrete, r0, r1, &pdf);
+        } else {
+          wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+        }
+        break;
+      default: FATAL("Unreachable code\n"); break;
+
+    }
+    wlen[1] = wlen[0];
     pdf *= 1.e9; /* Transform the pdf from nm⁻¹ to m⁻¹ */
 
     /* Find the band the wavelength belongs to and sample a quadrature point */

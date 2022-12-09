@@ -85,6 +85,7 @@ struct htrdr_planeto {
   struct htrdr_planeto_spectral_args spectral_domain;
   struct htrdr_ran_wlen_cie_xyz* cie; /* HTRDR_SPECTRAL_SW_CIE_XYZ */
   struct htrdr_ran_wlen_planck* planck; /* HTRDR_SPECTRAL_<LW|SW> */
+  struct htrdr_ran_wlen_discrete* discrete; /* HTRDR_SPECTRAL_SW */
 
   FILE* octrees_storage;
 

@@ -19,6 +19,7 @@
 
 #include "core/htrdr.h"
 #include "core/htrdr_ran_wlen_cie_xyz.h"
+#include "core/htrdr_ran_wlen_discrete.h"
 #include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_log.h"
 
@@ -232,6 +233,49 @@ error:
   goto exit;
 }
 
+static res_T
+setup_spectral_domain_sw
+  (struct htrdr_planeto* cmd,
+   const struct htrdr_planeto_args* args)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd && args);
+  ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW);
+
+  /* Discrete distribution */
+  if(args->source.rnrl_filename) {
+    struct htrdr_planeto_source_spectrum spectrum;
+    struct htrdr_ran_wlen_discrete_create_args discrete_args;
+
+    res = htrdr_planeto_source_get_spectrum
+      (cmd->source, cmd->spectral_domain.wlen_range, &spectrum);
+    if(res != RES_OK) goto error;
+
+    discrete_args.get = htrdr_planeto_source_spectrum_at;
+    discrete_args.nwavelengths = spectrum.size;
+    discrete_args.context = &spectrum;
+    res = htrdr_ran_wlen_discrete_create
+      (cmd->htrdr, &discrete_args, &cmd->discrete);
+    if(res != RES_OK) goto error;
+
+  /* Planck distribution */
+  } else {
+    const size_t nintervals = compute_nintervals_for_spectral_cdf(cmd);
+
+    /* Use the source temperature as the reference temperature of the Planck
+     * distribution */
+    res = htrdr_ran_wlen_planck_create(cmd->htrdr,
+      cmd->spectral_domain.wlen_range, nintervals, args->source.temperature,
+      &cmd->planck);
+    if(res != RES_OK) goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 static INLINE res_T
 setup_spectral_domain
   (struct htrdr_planeto* cmd,
@@ -245,7 +289,6 @@ setup_spectral_domain
   cmd->spectral_domain = args->spectral_domain;
 
   /* Configure the spectral distribution */
-  nintervals = compute_nintervals_for_spectral_cdf(cmd);
   switch(cmd->spectral_domain.type) {
 
     case HTRDR_SPECTRAL_LW:
@@ -255,6 +298,7 @@ setup_spectral_domain
       /* Use as the reference temperature of the Planck distribution the
        * maximum scene temperature which, in fact, should be the maximum ground
        * temperature */
+      nintervals = compute_nintervals_for_spectral_cdf(cmd);
       res = htrdr_ran_wlen_planck_create(cmd->htrdr,
         cmd->spectral_domain.wlen_range, nintervals, ground_T_range[1],
         &cmd->planck);
@@ -262,16 +306,13 @@ setup_spectral_domain
       break;
 
     case HTRDR_SPECTRAL_SW:
-      /* Use the source temperature as the reference temperature of the Planck
-       * distribution */
-      res = htrdr_ran_wlen_planck_create(cmd->htrdr,
-        cmd->spectral_domain.wlen_range, nintervals, args->source.temperature,
-        &cmd->planck);
+      res = setup_spectral_domain_sw(cmd, args);
       if(res != RES_OK) goto error;
       break;
 
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
       /* CIE XYZ distribution */
+      nintervals = compute_nintervals_for_spectral_cdf(cmd);
       res = htrdr_ran_wlen_cie_xyz_create(cmd->htrdr,
         cmd->spectral_domain.wlen_range, nintervals, &cmd->cie);
       if(res != RES_OK) goto error;
