@@ -447,3 +447,34 @@ exit:
 error:
   goto exit;
 }
+
+void
+htrdr_planeto_source_spectrum_at
+  (void* source_spectrum,
+   const size_t i, /* between [0, spectrum->size[ */
+   double* wavelength, /* In nm */
+   double* radiance) /* In W/m²/sr/m */
+{
+  struct htrdr_planeto_source_spectrum* spectrum = source_spectrum;
+  ASSERT(spectrum && i < spectrum->size && wavelength && radiance);
+
+  /* Lower limit */
+  if(i == 0) {
+    *wavelength = spectrum->range[0];
+    *radiance = htrdr_planeto_source_get_radiance
+      (spectrum->source, spectrum->range[0]);
+
+  /* Upper limit */
+  } else if(i == spectrum->size-1) {
+    *wavelength = spectrum->range[1];
+    *radiance = htrdr_planeto_source_get_radiance
+      (spectrum->source, spectrum->range[1]);
+
+  /* Discrete element */
+  } else {
+    const source_radiance_T* item =
+      (const source_radiance_T*)spectrum->buffer + (i-1);
+    *wavelength = item->wavelength;
+    *radiance = item->radiance;
+  }
+}

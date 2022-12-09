@@ -94,4 +94,14 @@ htrdr_planeto_source_get_spectrum
    const double range[2], /* In nm. Limits are inclusive */
    struct htrdr_planeto_source_spectrum* spectrum);
 
+/* Note that the following function profile corresponds to the type expected by
+ * the discrete wavelength distribution
+ * (see htrdr_ran_wlen_discrete_create_args structure) */
+extern LOCAL_SYM void
+htrdr_planeto_source_spectrum_at
+  (void* spectrum,
+   size_t i, /* between [0, spectrum->size[ */
+   double* wavelength, /* In nm */
+   double* radiance); /* In W/m²/sr/m */
+
 #endif /* HTRDR_PLANETO_SOURCE_H */
