@@ -370,3 +370,11 @@ exit:
 error:
   goto exit;
 }
+
+int
+htrdr_planeto_source_does_radiance_vary_spectrally
+  (const struct htrdr_planeto_source* source)
+{
+  ASSERT(source);
+  return source->per_wlen_radiances != NULL;
+}

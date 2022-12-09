@@ -72,4 +72,8 @@ htrdr_planeto_source_get_spectral_range
   (const struct htrdr_planeto_source* source,
    double range[2]); /* In nm. Limits are inclusive */
 
+extern LOCAL_SYM int
+htrdr_planeto_source_does_radiance_vary_spectrally
+  (const struct htrdr_planeto_source* source);
+
 #endif /* HTRDR_PLANETO_SOURCE_H */
