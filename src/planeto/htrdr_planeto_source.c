@@ -45,12 +45,48 @@ struct htrdr_planeto_source {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static INLINE res_T
+check_per_wlen_radiance_sbuf_desc
+  (const struct htrdr_planeto_source* src,
+   const struct sbuf_desc* desc)
+{
+  const source_radiance_T* spectrum = NULL;
+  size_t i;
+  ASSERT(src && desc);
+
+  /* Invalid size */
+  if(desc->size == 0) {
+    htrdr_log_err(src->htrdr, "invalid empty source spectrum\n");
+    return RES_BAD_ARG;
+  }
+
+  /* Invalid memory layout */
+  if(desc->szitem != 16 || desc->alitem != 16 || desc->pitch != 16) {
+    htrdr_log_err(src->htrdr, "unexpected layout of source spectrum\n");
+    return RES_BAD_ARG;
+  }
+
+  /* Data must be sorted */
+  spectrum = desc->buffer;
+  FOR_EACH(i, 1, desc->size) {
+    if(spectrum[i-1].wavelength >= spectrum[i].wavelength) {
+      htrdr_log_err(src->htrdr,
+        "the source spectrum is not sorted in ascending order "
+        "with respect to wavelengths\n");
+      return RES_BAD_ARG;
+    }
+  }
+
+  return RES_OK;
+}
+
 static res_T
 setup_per_wavelength_radiances
   (struct htrdr_planeto_source* src,
    const struct htrdr_planeto_source_args* args)
 {
   struct sbuf_create_args sbuf_args;
+  struct sbuf_desc desc;
   res_T res = RES_OK;
   ASSERT(src && args && args->rnrl_filename && args->temperature < 0);
 
@@ -61,6 +97,10 @@ setup_per_wavelength_radiances
   if(res != RES_OK) goto error;
 
   res = sbuf_load(src->per_wlen_radiances, args->rnrl_filename);
+  if(res != RES_OK) goto error;
+  res = sbuf_get_desc(src->per_wlen_radiances, &desc);
+  if(res != RES_OK) goto error;
+  res = check_per_wlen_radiance_sbuf_desc(src, &desc);
   if(res != RES_OK) goto error;
 
 exit:
