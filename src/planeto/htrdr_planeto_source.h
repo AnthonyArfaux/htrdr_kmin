@@ -67,4 +67,9 @@ htrdr_planeto_source_is_targeted
    const double pos[3], /* Ray origin */
    const double dir[3]);/* Ray direction */
 
+extern LOCAL_SYM res_T
+htrdr_planeto_source_get_spectral_range
+  (const struct htrdr_planeto_source* source,
+   double range[2]); /* In nm. Limits are inclusive */
+
 #endif /* HTRDR_PLANETO_SOURCE_H */

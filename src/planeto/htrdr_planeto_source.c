@@ -341,3 +341,32 @@ htrdr_planeto_source_is_targeted
 
   return d3_dot(dir, main_dir) >= cos(half_angle);
 }
+
+res_T
+htrdr_planeto_source_get_spectral_range
+  (const struct htrdr_planeto_source* source,
+   double range[2])
+{
+  res_T res = RES_OK;
+  ASSERT(source && range);
+
+  if(!source->per_wlen_radiances) {
+    range[0] = 0;
+    range[1] = INF;
+  } else {
+    struct sbuf_desc desc = SBUF_DESC_NULL;
+    const source_radiance_T* spectrum = NULL;
+
+    res = sbuf_get_desc(source->per_wlen_radiances, &desc);
+    if(res != RES_OK) goto error;
+
+    spectrum = desc.buffer;
+    range[0] = spectrum[0].wavelength;
+    range[1] = spectrum[desc.size-1].wavelength;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
