@@ -378,3 +378,72 @@ htrdr_planeto_source_does_radiance_vary_spectrally
   ASSERT(source);
   return source->per_wlen_radiances != NULL;
 }
+
+res_T
+htrdr_planeto_source_get_spectrum
+  (const struct htrdr_planeto_source* source,
+   const double range[2], /* In nm. Limits are inclusive */
+   struct htrdr_planeto_source_spectrum* source_spectrum)
+{
+  double full_range[2];
+  res_T res = RES_OK;
+  ASSERT(source && range && source_spectrum && range[0] <= range[1]);
+
+  if(!htrdr_planeto_source_does_radiance_vary_spectrally(source)) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = htrdr_planeto_source_get_spectral_range(source, full_range);
+  if(res != RES_OK) goto error;
+
+  if(range[0] < full_range[0] || full_range[1] < range[1]) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  source_spectrum->range[0] = range[0];
+  source_spectrum->range[1] = range[1];
+
+  if(range[0] == range[1]) {
+    /* Degenerated spectral range */
+    source_spectrum->size = 1;
+    source_spectrum->buffer = NULL;
+
+  } else {
+    const source_radiance_T* spectrum;
+    const source_radiance_T* low;
+    const source_radiance_T* upp;
+    struct sbuf_desc desc;
+
+    res = sbuf_get_desc(source->per_wlen_radiances, &desc);
+    if(res != RES_OK) goto error;
+
+    spectrum = desc.buffer;
+    low = search_lower_bound(&range[0], spectrum, desc.size, desc.pitch, cmp_wlen);
+    upp = search_lower_bound(&range[1], spectrum, desc.size, desc.pitch, cmp_wlen);
+    ASSERT(low && upp);
+
+    if(low == upp) {
+      /* The range is fully included in a band */
+      ASSERT(low->radiance > range[0] && upp->radiance >= range[1]);
+      source_spectrum->size = 2;
+      source_spectrum->buffer = NULL;
+
+    } else {
+      source_spectrum->size =
+        2/* Boundaries */ + (size_t)(upp - low)/*discrete items*/;
+
+      if(low->wavelength == range[0]) {
+        /* The lower limit coincide with a discrete element.
+         * Remove the discrete element */
+        source_spectrum->size -= 1;
+      }
+    }
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}

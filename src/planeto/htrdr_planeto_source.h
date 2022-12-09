@@ -26,6 +26,13 @@ struct htrdr_planeto_source;
 struct htrdr_planeto_source_args;
 struct ssp_rng;
 
+struct htrdr_planeto_source_spectrum {
+  struct htrdr_planeto_source* source;
+  double range[2]; /* In nm. Limits are inclusive */
+  size_t size; /* Number of elements representing the spectrum */
+  void* buffer; /* Pointer toward the spectrum data */
+};
+
 extern LOCAL_SYM res_T
 htrdr_planeto_source_create
   (struct htrdr_planeto* cmd,
@@ -75,5 +82,16 @@ htrdr_planeto_source_get_spectral_range
 extern LOCAL_SYM int
 htrdr_planeto_source_does_radiance_vary_spectrally
   (const struct htrdr_planeto_source* source);
+
+/* Get discrete spectrum data for a given range. If the boundaries of the
+ * spectral range do not coincide with a discrete element, their radiance is
+ * recovered from the htrdr_planeto_source_get_radiance function. Note that
+ * this function returns an error if the radiance from the source does not vary
+ * spectrally, that is, its radiance is recovered from a constant temperature */
+extern LOCAL_SYM res_T
+htrdr_planeto_source_get_spectrum
+  (const struct htrdr_planeto_source* source,
+   const double range[2], /* In nm. Limits are inclusive */
+   struct htrdr_planeto_source_spectrum* spectrum);
 
 #endif /* HTRDR_PLANETO_SOURCE_H */
