@@ -24,9 +24,15 @@
 #include <star/sbuf.h>
 #include <star/ssp.h>
 
+#include <rsys/algorithm.h>
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
 #include <rsys/ref_count.h>
+
+typedef struct ALIGN(16) {
+  double wavelength; /* in nm */
+  double radiance; /* in W/m²/sr/m */
+} source_radiance_T;
 
 struct htrdr_planeto_source {
   double position[3]; /* In m */
@@ -109,6 +115,67 @@ error:
   htrdr_log_err(src->htrdr, "error loading %s -- %s\n",
     args->rnrl_filename, res_to_cstr(res));
   goto exit;
+}
+
+static INLINE int
+cmp_wlen(const void* a, const void* b)
+{
+  const double wlen = *((double*)a);
+  const source_radiance_T* src_rad1 = b;
+  ASSERT(a && b);
+
+  if(wlen < src_rad1->wavelength) {
+    return -1;
+  } else if(wlen > src_rad1->wavelength) {
+    return +1;
+  } else {
+    return 0;
+  }
+}
+
+static double
+get_radiance
+  (const struct htrdr_planeto_source* src,
+   const double wlen)
+{
+  struct sbuf_desc desc;
+  const source_radiance_T* spectrum;
+  const source_radiance_T* find;
+  size_t id;
+  ASSERT(src && src->per_wlen_radiances);
+
+  SBUF(get_desc(src->per_wlen_radiances, &desc));
+  spectrum = desc.buffer;
+
+  if(wlen < spectrum[0].wavelength) {
+    htrdr_log_warn(src->htrdr,
+      "The wavelength %g nm is before the spectrum of the source\n", wlen);
+    return spectrum[0].radiance;
+  }
+  if(wlen > spectrum[desc.size-1].wavelength) {
+    htrdr_log_warn(src->htrdr,
+      "The wavelength %g nm is above the spectrum of the source\n", wlen);
+    return spectrum[desc.size-1].radiance;
+  }
+
+  /* Look for the first item whose wavelength is not less than 'wlen' */
+  find = search_lower_bound(&wlen, spectrum, desc.size, desc.pitch, cmp_wlen);
+  ASSERT(find);
+  id = (size_t)(find - spectrum);
+  ASSERT(id < desc.size);
+
+  if(id == 0) {
+    ASSERT(wlen == spectrum[0].wavelength);
+    return spectrum[0].radiance;
+  } else {
+    const double w0 = spectrum[id-1].wavelength;
+    const double w1 = spectrum[id-0].wavelength;
+    const double L0 = spectrum[id-1].radiance;
+    const double L1 = spectrum[id-0].radiance;
+    const double u = (wlen - w0) / (w1 - w0);
+    const double L = L0 + u*(L1 - L0); /* Linear interpolation */
+    return L;
+  }
 }
 
 static void
@@ -223,13 +290,17 @@ htrdr_planeto_source_sample_direction
   return pdf;
 }
 
-double
+double /* In W/m²/sr/m */
 htrdr_planeto_source_get_radiance
   (const struct htrdr_planeto_source* source,
    const double wlen)
 {
-  return htrdr_planck_monochromatic
-    (wlen*1e-9/*From nm to m*/, source->temperature);
+  if(source->per_wlen_radiances) {
+    return get_radiance(source, wlen);
+  } else {
+    return htrdr_planck_monochromatic
+      (wlen*1e-9/*From nm to m*/, source->temperature);
+  }
 }
 
 double
