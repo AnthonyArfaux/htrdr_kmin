@@ -30,6 +30,10 @@ struct htrdr_ran_wlen_discrete_create_args {
   size_t nwavelengths;
   void* context; /* User defined data */
 };
+#define HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL__ {NULL, 0, NULL}
+static const struct htrdr_ran_wlen_discrete_create_args
+HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL =
+  HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL__;
 
 /* Forware declarations */
 struct htrdr;
