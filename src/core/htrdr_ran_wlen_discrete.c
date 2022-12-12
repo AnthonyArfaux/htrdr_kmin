@@ -122,7 +122,7 @@ setup_distribution
   double sum = 0;
   size_t iband;
   res_T res = RES_OK;
-  ASSERT(ran && check_htrdr_ran_wlen_discrete_create_args(args));
+  ASSERT(ran && check_htrdr_ran_wlen_discrete_create_args(args) == RES_OK);
   ASSERT(ran->nbands >= 1); /* At least one band */
 
   res = darray_double_resize(&ran->cumul, ran->nbands);
