@@ -504,6 +504,7 @@ planeto_release(ref_T* ref)
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
   if(cmd->source) htrdr_planeto_source_ref_put(cmd->source);
   if(cmd->cie) htrdr_ran_wlen_cie_xyz_ref_put(cmd->cie);
+  if(cmd->discrete) htrdr_ran_wlen_discrete_ref_put(cmd->discrete);
   if(cmd->planck) htrdr_ran_wlen_planck_ref_put(cmd->planck);
   if(cmd->octrees_storage) CHK(fclose(cmd->octrees_storage) == 0);
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
