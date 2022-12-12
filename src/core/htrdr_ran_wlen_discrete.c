@@ -268,11 +268,8 @@ htrdr_ran_wlen_discrete_sample
   double* find = NULL;
   const double* proba = NULL;
   const double* cumul = NULL;
-  const double* radia = NULL;
   const double* wlens = NULL;
   double w0, w1; /* Wavelengths of the sampled band in nm */
-  double L0, L1; /* Radiance of the sampled band in W/m²/sr/m */
-  double a, b, c, tmp;
   double lambda; /* Sampled wavelength in nm */
   size_t iband = 0;
   double r0_next = nextafter(r0, DBL_MAX);
@@ -281,7 +278,6 @@ htrdr_ran_wlen_discrete_sample
 
   cumul = darray_double_cdata_get(&ran->cumul);
   proba = darray_double_cdata_get(&ran->proba);
-  radia = darray_double_cdata_get(&ran->radia);
   wlens = darray_double_cdata_get(&ran->wlens);
 
   /* Sample a band. Use r0_next rather than r0 to find the first entry that is
@@ -297,39 +293,13 @@ htrdr_ran_wlen_discrete_sample
   /* Retrieve the boundaries of the sampled band */
   w0 = wlens[iband+0];
   w1 = wlens[iband+1];
-  L0 = radia[iband+0];
-  L1 = radia[iband+1];
 
-  /* Compute the parameters of the quadratic equation */
-  tmp = (L1-L0) / (w1-w0);
-  a = 0.5 * tmp;
-  b = L0 - w0 * tmp;
-  c = 0.5 * tmp * w0*w0 - L0*w0 - r1 * 0.5 * (L0+L1)*(w1-w0);
+  /* Uniformely sample the wavelength in [w0, w1[ */
+  lambda = w0 + r1 * (w1 - w0);
 
-  /* Sample lambda in the sampled band */
-  if(a == 0) {
-    lambda = -c/b;
-    ASSERT(w0 <= lambda && lambda <= w1);
-  } else {
-    const double delta = b*b - 4*a*c;
-    const double sqrt_delta = sqrt(delta);
-    const double root0 = (-b + sqrt_delta) / (2*a);
-    const double root1 = (-b - sqrt_delta) / (2*a);
-
-    if(w0 <= root0 && root0 <= w1) {
-      ASSERT(root1 < w0 || w1 < root1);
-      lambda = root0;
-    } else if(w0 <= root1 && root1 <= w1) {
-      ASSERT(root0 < w0 || w1 < root1);
-      lambda = root1;
-    } else {
-      FATAL("Unreachable code\n");
-    }
-  }
-
-  if(*pdf) {
-    const double proba_wlen = L0+(L1-L0)/(w1-w0)*(lambda-w0);
-    *pdf = proba[iband] * proba_wlen;
+  if(pdf) {
+    const double pdf_wlen = 1.f / (w1-w0);
+    *pdf = proba[iband] * pdf_wlen;
   }
 
   return lambda;
