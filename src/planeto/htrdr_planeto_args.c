@@ -563,7 +563,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
   while((opt = getopt(argc, argv, "a:C:dfG:g:hi:NO:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
-        sa_add(args->aerosols, 1);
+        (void)sa_add(args->aerosols, 1);
         args->aerosols[args->naerosols] = RNATM_AEROSOL_ARGS_NULL;
         args->naerosols += 1;
         res = cstr_parse_list(optarg, ':', parse_aerosol_parameters, args);
