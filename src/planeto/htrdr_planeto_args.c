@@ -489,7 +489,7 @@ parse_spectral_parameters(const char* str, void* ptr)
   char* key;
   char* val;
   char* tk_ctx;
-  res_T res = RES_BAD_ARG;
+  res_T res = RES_OK;
   ASSERT(str && ptr);
 
   spectral = &args->spectral_domain;
