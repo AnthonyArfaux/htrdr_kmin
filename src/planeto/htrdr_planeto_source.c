@@ -439,7 +439,11 @@ htrdr_planeto_source_get_spectrum
         /* The lower limit coincide with a discrete element.
          * Remove the discrete element */
         source_spectrum->size -= 1;
+        source_spectrum->buffer = low + 1;
+      } else {
+        source_spectrum->buffer = low;
       }
+
     }
   }
 
