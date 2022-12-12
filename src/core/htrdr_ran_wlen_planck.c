@@ -78,7 +78,7 @@ setup_wlen_planck_ran_cdf
   pdf = darray_double_data_get(&planck->pdf); /* Now save pdf to correct weight */
 
   htrdr_log(planck->htrdr,
-    "Number of bands of the spectrum cumulative: %lu\n",
+    "Number of bands used to speed up Planck distribution: %lu\n",
     (unsigned long)planck->nbands);
 
   /* Compute the *unnormalized* probability to sample a small band */
