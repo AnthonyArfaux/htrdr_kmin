@@ -82,14 +82,14 @@ rcmake_prepend_path(HTRDR_COMBUSTION_FILES_SRC ${HTRDR_SOURCE_DIR}/combustion)
 rcmake_prepend_path(HTRDR_COMBUSTION_FILES_INC ${HTRDR_SOURCE_DIR}/combustion)
 
 # Combustion library
-add_library(htrdr-combustion SHARED
+add_library(htrdr-combustion STATIC
   ${HTRDR_COMBUSTION_FILES_SRC}
   ${HTRDR_COMBUSTION_FILES_INC})
 target_link_libraries(htrdr-combustion
   htrdr-core AtrSTM RSys Star3D StarCamera StarSF StarSP)
 
 set_target_properties(htrdr-combustion PROPERTIES
-  DEFINE_SYMBOL HTRDR_SHARED_BUILD
+  DEFINE_SYMBOL HTRDR_STATIC
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})
 

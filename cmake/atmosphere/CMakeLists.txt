@@ -82,7 +82,7 @@ rcmake_prepend_path(HTRDR_ATMOSPHERE_FILES_INC ${HTRDR_SOURCE_DIR}/atmosphere)
 rcmake_prepend_path(HTRDR_ATMOSPHERE_FILES_INC2 ${HTRDR_BUILD_DIR}/atmosphere)
 
 # Atmosphere library
-add_library(htrdr-atmosphere SHARED
+add_library(htrdr-atmosphere STATIC
   ${HTRDR_ATMOSPHERE_FILES_SRC}
   ${HTRDR_ATMOSPHERE_FILES_INC}
   ${HTRDR_ATMOSPHERE_FILES_INC2})
@@ -94,7 +94,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 set_target_properties(htrdr-atmosphere PROPERTIES
-  DEFINE_SYMBOL HTRDR_SHARED_BUILD
+  DEFINE_SYMBOL HTRDR_STATIC
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})
 

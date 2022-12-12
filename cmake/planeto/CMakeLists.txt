@@ -79,14 +79,14 @@ rcmake_prepend_path(HTRDR_PLANETO_FILES_SRC ${HTRDR_SOURCE_DIR}/planeto)
 rcmake_prepend_path(HTRDR_PLANETO_FILES_INC ${HTRDR_SOURCE_DIR}/planeto)
 
 # Planeto library
-add_library(htrdr-planeto SHARED
+add_library(htrdr-planeto STATIC
   ${HTRDR_PLANETO_FILES_SRC}
   ${HTRDR_PLANETO_FILES_INC})
 target_link_libraries(htrdr-planeto
   htrdr-core RNATM RNGRD RSys Star3D StarBuffer StarCamera StarSF StarSP)
 
 set_target_properties(htrdr-planeto PROPERTIES
-  DEFINE_SYMBOL HTRDR_SHARED_BUILD
+  DEFINE_SYMBOL HTRDR_STATIC
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})
 

@@ -54,21 +54,21 @@ struct htrdr_combustion_laser;
 
 BEGIN_DECLS
 
-HTRDR_API res_T
+extern LOCAL_SYM res_T
 htrdr_combustion_laser_create
   (struct htrdr* htrdr,
    const struct htrdr_combustion_laser_create_args* args,
    struct htrdr_combustion_laser** laser);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_ref_get
   (struct htrdr_combustion_laser* laser);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_ref_put
   (struct htrdr_combustion_laser* laser);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_trace_ray
   (struct htrdr_combustion_laser* laser,
    const double pos[3],
@@ -76,32 +76,32 @@ htrdr_combustion_laser_trace_ray
    const double range[2],
    double distance[2]);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_get_mesh
   (const struct htrdr_combustion_laser* laser,
    /* Max distance of the laser mesh along its infinite dimension */
    const double extent,
    struct htrdr_combustion_laser_mesh* mesh);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_get_position
   (const struct htrdr_combustion_laser* laser,
    double pos[3]);
 
-HTRDR_API void
+extern LOCAL_SYM void
 htrdr_combustion_laser_get_direction
   (const struct htrdr_combustion_laser* laser,
    double dir[3]); /* Normalized */
 
-HTRDR_API double /* In W.m^2 */
+extern LOCAL_SYM double /* In W.m^2 */
 htrdr_combustion_laser_get_flux_density
   (const struct htrdr_combustion_laser* laser);
 
-HTRDR_API double /* In nm */
+extern LOCAL_SYM double /* In nm */
 htrdr_combustion_laser_get_wavelength
   (const struct htrdr_combustion_laser* laser);
 
-HTRDR_API double
+extern LOCAL_SYM double
 htrdr_combustion_laser_compute_surface_plane_distance
   (const struct htrdr_combustion_laser* laser,
    const double pos[3]);
