@@ -19,6 +19,10 @@
 #include "planeto/htrdr_planeto_source.h"
 
 #include "core/htrdr.h"
+#include "core/htrdr_ran_wlen_discrete.h"
+
+#include <rsys/math.h>
+#include <rsys/mem_allocator.h>
 
 #include <stdio.h>
 
@@ -217,18 +221,74 @@ test_spectrum_fail(struct htrdr* htrdr)
   CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
 }
 
+static void
+test_spectrum_from_files(struct htrdr* htrdr, int argc, char** argv)
+{
+  struct htrdr_ran_wlen_discrete_create_args distrib_args =
+    HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL;
+  struct htrdr_ran_wlen_discrete* distrib = NULL;
+
+  struct htrdr_planeto_source_args source_args = HTRDR_PLANETO_SOURCE_ARGS_NULL;
+  struct htrdr_planeto_source_spectrum spectrum = HTRDR_PLANETO_SOURCE_SPECTRUM_NULL;
+  struct htrdr_planeto_source* source = NULL;
+  size_t i;
+
+  source_args.longitude = 0;
+  source_args.latitude = 0;
+  source_args.distance = 0;
+  source_args.radius = 1e8;
+  source_args.temperature = -1;
+
+  FOR_EACH(i, 1, argc) {
+    double range[2];
+    double lambda, pdf;
+    source_args.rnrl_filename = argv[i];
+
+    CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_OK);
+    CHK(htrdr_planeto_source_does_radiance_vary_spectrally(source));
+    CHK(htrdr_planeto_source_get_spectral_range(source, range) == RES_OK);
+
+    range[0] = 250;
+    range[1] = 850;
+    CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+
+    printf("`%s' stores %lu entries between [%g, %g] nm\n",
+      argv[i], spectrum.size, SPLIT2(range));
+
+    distrib_args.get = htrdr_planeto_source_spectrum_at;
+    distrib_args.nwavelengths = spectrum.size;
+    distrib_args.context = &spectrum;
+    CHK(htrdr_ran_wlen_discrete_create(htrdr, &distrib_args, &distrib) == RES_OK);
+
+    lambda = htrdr_ran_wlen_discrete_sample(distrib, 0.3, 0.5, &pdf);
+    printf("lambda = %g nm; pdf = %f nm⁻¹\n", lambda, pdf);
+
+    htrdr_planeto_source_ref_put(source);
+    htrdr_ran_wlen_discrete_ref_put(distrib);
+  }
+}
+
 int
 main(int argc, char** argv)
 {
   struct htrdr_args args = HTRDR_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
+  size_t memsz = 0;
 
   args.verbose = 1;
   htrdr_mpi_init(argc, argv);
   CHK(htrdr_create(NULL, &args, &htrdr) == RES_OK);
 
-  test_spectrum(htrdr);
-  test_spectrum_fail(htrdr);
+  memsz = MEM_ALLOCATED_SIZE(htrdr_get_allocator(htrdr));
+
+  if(argc > 1) {
+    test_spectrum_from_files(htrdr, argc, argv);
+  } else {
+    test_spectrum(htrdr);
+    test_spectrum_fail(htrdr);
+  }
+
+  CHK(MEM_ALLOCATED_SIZE(htrdr_get_allocator(htrdr)) == memsz);
 
   htrdr_ref_put(htrdr);
   htrdr_mpi_finalize();
