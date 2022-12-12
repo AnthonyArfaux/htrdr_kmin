@@ -21,21 +21,21 @@
 #include <rsys/rsys.h>
 
 /* Forward declarations */
-struct htrdr_planeto;
+struct htrdr;
 struct htrdr_planeto_source;
 struct htrdr_planeto_source_args;
 struct ssp_rng;
 
 struct htrdr_planeto_source_spectrum {
-  struct htrdr_planeto_source* source;
+  const struct htrdr_planeto_source* source;
   double range[2]; /* In nm. Limits are inclusive */
   size_t size; /* Number of elements representing the spectrum */
-  void* buffer; /* Pointer toward the spectrum data */
+  const void* buffer; /* Pointer toward the spectrum data */
 };
 
 extern LOCAL_SYM res_T
 htrdr_planeto_source_create
-  (struct htrdr_planeto* cmd,
+  (struct htrdr* htrdr,
    const struct htrdr_planeto_source_args* args,
    struct htrdr_planeto_source** source);
 

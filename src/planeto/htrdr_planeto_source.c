@@ -197,7 +197,7 @@ release_source(ref_T* ref)
  ******************************************************************************/
 res_T
 htrdr_planeto_source_create
-  (struct htrdr_planeto* cmd,
+  (struct htrdr* htrdr,
    const struct htrdr_planeto_source_args* args,
    struct htrdr_planeto_source** out_source)
 {
@@ -206,18 +206,18 @@ htrdr_planeto_source_create
   double lat; /* In radians */
   double lon; /* In radians */
   res_T res = RES_OK;
-  ASSERT(cmd && out_source);
+  ASSERT(htrdr && out_source);
   ASSERT(htrdr_planeto_source_args_check(args) == RES_OK);
 
-  src = MEM_CALLOC(htrdr_get_allocator(cmd->htrdr), 1, sizeof(*src));
+  src = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*src));
   if(!src) {
-    htrdr_log_err(cmd->htrdr, "error allocating source\n");
+    htrdr_log_err(htrdr, "error allocating source\n");
     res = RES_MEM_ERR;
     goto error;
   }
   ref_init(&src->ref);
-  htrdr_ref_get(cmd->htrdr);
-  src->htrdr = cmd->htrdr;
+  htrdr_ref_get(htrdr);
+  src->htrdr = htrdr;
   src->radius = args->radius * 1e3/*From km to m*/;
 
   if(!args->rnrl_filename) {
@@ -402,6 +402,7 @@ htrdr_planeto_source_get_spectrum
     goto error;
   }
 
+  source_spectrum->source = source;
   source_spectrum->range[0] = range[0];
   source_spectrum->range[1] = range[1];
 

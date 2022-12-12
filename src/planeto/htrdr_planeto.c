@@ -385,7 +385,7 @@ setup_source
   if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES)
     goto exit;
 
-  res = htrdr_planeto_source_create(cmd, &args->source, &cmd->source);
+  res = htrdr_planeto_source_create(cmd->htrdr, &args->source, &cmd->source);
   if(res != RES_OK) goto error;
 
 exit:
