@@ -32,6 +32,9 @@ struct htrdr_planeto_source_spectrum {
   size_t size; /* Number of elements representing the spectrum */
   const void* buffer; /* Pointer toward the spectrum data */
 };
+#define HTRDR_PLANETO_SOURCE_SPECTRUM_NULL__ {NULL, {0,0}, 0, NULL}
+static const struct htrdr_planeto_source_spectrum
+HTRDR_PLANETO_SOURCE_SPECTRUM_NULL = HTRDR_PLANETO_SOURCE_SPECTRUM_NULL__;
 
 extern LOCAL_SYM res_T
 htrdr_planeto_source_create
