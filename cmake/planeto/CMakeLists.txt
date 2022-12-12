@@ -91,6 +91,24 @@ set_target_properties(htrdr-planeto PROPERTIES
   SOVERSION ${VERSION_MAJOR})
 
 ################################################################################
+# Add tests
+################################################################################
+if(NOT NO_TEST)
+  function(build_test _name)
+    add_executable(${_name}
+      ${HTRDR_SOURCE_DIR}/planeto/${_name}.c)
+    target_link_libraries(${_name} htrdr-core htrdr-planeto ${ARGN})
+  endfunction()
+
+  function(new_test _name)
+    build_test(${_name} ${ARGN})
+    add_test(${_name} ${_name})
+  endfunction()
+
+  new_test(test_htrdr_planeto_source StarBuffer)
+endif()
+
+################################################################################
 # Define output & install directories
 ################################################################################
 install(TARGETS htrdr-planeto
