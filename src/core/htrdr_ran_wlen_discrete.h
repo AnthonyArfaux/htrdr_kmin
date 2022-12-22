@@ -35,7 +35,7 @@ static const struct htrdr_ran_wlen_discrete_create_args
 HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL =
   HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL__;
 
-/* Forware declarations */
+/* Forward declarations */
 struct htrdr;
 struct htrdr_ran_wlen_discrete;
 
