@@ -636,7 +636,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   res = check_gas_args(&args->gas);
   if(res != RES_OK) {
-    fprintf(stderr, "Missing gas definition -- option '-a'\n");
+    fprintf(stderr, "Missing gas definition -- option '-g'\n");
     goto error;
   }
 
