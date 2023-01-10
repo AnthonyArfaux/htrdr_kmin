@@ -65,18 +65,24 @@ on the
 [MruMtl](https://gitlab.com/meso-star/mrumtl/),
 [RSys](https://gitlab.com/vaplv/rsys/),
 [Star-3D](https://gitlab.com/meso-star/star-3d/),
+[Star-Camera](https://gitlab.com/meso-star/star-camera),
 [Star-SF](https://gitlab.com/meso-star/star-sf/),
 [Star-SP](https://gitlab.com/meso-star/stat-sp/) and
 [Star-VX](https://gitlab.com/meso-star/star-vx/) libraries and on
 [OpenMP](http://www.openmp.org) 1.2 and the
 [MPI](https://www.mpi-forum.org/) 2 specification to parallelize its
-computations.
+computations. It optionally depends on [scdoc](https://sr.ht/~sircmpwn/scdoc/)
+which, if available, is used to generate the man pages.
 
 `htrdr` finally depends on the [HTSky](https://gitlab.com/meso-star/htsky/)
-library if the `HTRDR_BUILD_ATMOSPHERE` option is set and on
+library if the `HTRDR_BUILD_ATMOSPHERE` option is set, on
 [AtrSTM](https://gitlab.com/meso-star/atrstm/) when `HTRDR_BUILD_COMBUSTION` is
-set. These options enable/disable the build of the atmospheric part and the
-combustion part of `htrdr`. By default, both options are activated.
+set, and on [RNAtm](https://gitlab.com/meso-star/rnatm/),
+[RNGrd](https://gitlab.com/meso-star/rngrd/) and
+[Star-Buffer](https://gitlab.com/meso-star/star-buffer/) if
+`HTRDR_BUILD_PLANETO` is enabled. These compilation options enable/disable the
+build of the atmospheric, combustion, and planetology parts of `htrdr`. By
+default, all options are enabled.
 
 To build `htrdr`, first ensure that CMake is installed on your system. Then
 install the RCMake package as well as the aforementioned prerequisites. Finally
