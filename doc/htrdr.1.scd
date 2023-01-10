@@ -1,9 +1,12 @@
 htrdr(1)
 
-; Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
-; Copyright (C) 2018, 2019, 2021 CNRS
-; Copyright (C) 2018, 2019 Université Paul Sabatier
-;                          (contact-edstar@laplace.univ-tlse.fr)
+; Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+; Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+; Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+; Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+; Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+; Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+; Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
 ; 
 ; This program is free software: you can redistribute it and/or modify
 ; it under the terms of the GNU General Public License as published by
@@ -60,9 +63,13 @@ The available _htrdr-<mode>_ commands are:
 
 # COPYRIGHT
 
-Copyright © 2018, 2019, 2020, 2021 |Méso|Star> <contact@meso-star.com>++
-Copyright © 2018, 2019, 2021 Centre National de la Recherche Scientifique++
-Copyright © 2018, 2019 Université Paul Sabatier <contact-edstar@laplace.univ-tlse.fr>
+Copyright © 2018-2019, 2022-2023 Centre National de la Recherche Scientifique++
+Copyright © 2020-2022 Institut Mines Télécom Albi-Carmaux++
+Copyright © 2022-2023 Institut de Physique du Globe de Paris++
+Copyright © 2018-2023 |Méso|Star> <contact@meso-star.com>++
+Copyright © 2022-2023 Université de Reims Champagne-Ardenne++
+Copyright © 2022-2023 Université de Versaille Saint-Quentin++
+Copyright © 2018-2019, 2022-2023 Université Paul Sabatier
 
 # LICENSE
 
