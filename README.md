@@ -94,6 +94,31 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.9
+
+#### Adds simulation of radiative transfer in 3D planetary atmosphere
+
+The new `htrdr-planeto` command simulates radiative transfer in planetology
+context, i.e. in a 3D atmosphere of a terrestrial planet. Both infrared and
+visible computations are supported. `htrdr-planeto` is actually a renderer that
+calculates an image for a given observation position. Its internal rendering
+algorithm is based on Monte-Carlo integration, which consists for each pixel of
+simulating a given number of optical paths from the sensor, taking into account
+the phenomena of light absorption and scattering.
+
+The planet's soil can be any set of triangles with BRDFs and temperatures
+defined per triangle. The atmosphere is composed of a gas mixture and a
+potentially empty set of aerosols. Both can have arbitrary tetrahedral meshes
+with per-node radiative properties.
+
+#### Miscellaneous
+
+- Use scdoc rather than asciidoc as file format for man sources.
+- Update all dependencies. More notably, use
+  [MruMtl 0.1](https://gitlab.com/meso-star/mrumtl/-/tree/0.1) which introduces
+  API breaks.
+- Add the discrete wavelength distribution currently used in `htrdr-planeto` only.
+
 ### Version 0.8.1
 
 Sets the required version of Star-SampPling to 0.12. This version fixes
@@ -106,7 +131,7 @@ compilation errors with gcc 11 but introduces API breaks.
 - Updates the size of a tile from 32x32 pixels to 8x8 pixels. A tile is a
   block of pixels rendered by a thread. However, a size of 32x32 pixels could
   be too large when rendering on several dozen threads: the image definition
-  could be insufficient to give tiles to all threads. 
+  could be insufficient to give tiles to all threads.
 - Fixes the calculation of shortwave radiance by `htrdr-combustion` and the
   calculation of longwave radiance by `htrdr-atmosphere`. At each scattering
   position, the range of the traced ray could be incorrect.
@@ -275,13 +300,13 @@ regular image rendering), longwave or shortwave.
 
 ## Copyright notice
 
-Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique  
-Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux  
-Copyright (C) 2022-2023 Institut de Physique du Globe de Paris  
-Copyright (C) 2018-2023 [|Méso|Star>](http://www.meso-star.com) (<contact@meso-star.com>)  
-Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne  
-Copyright (C) 2022-2023 Université de Versaille Saint-Quentin  
-Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+Copyright © 2018-2019, 2022-2023 Centre National de la Recherche Scientifique  
+Copyright © 2020-2022 Institut Mines Télécom Albi-Carmaux  
+Copyright © 2022-2023 Institut de Physique du Globe de Paris  
+Copyright © 2018-2023 [|Méso|Star>](http://www.meso-star.com) (<contact@meso-star.com>)  
+Copyright © 2022-2023 Université de Reims Champagne-Ardenne  
+Copyright © 2022-2023 Université de Versaille Saint-Quentin  
+Copyright © 2018-2019, 2022-2023 Université Paul Sabatier
 
 ## License
 
