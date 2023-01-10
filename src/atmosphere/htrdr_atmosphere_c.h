@@ -81,17 +81,17 @@ struct htsky;
 struct htrdr;
 struct htrdr_atmosphere_args;
 struct htrdr_buffer;
-struct htrdr_cie_xyz;
 struct htrdr_materials;
-struct htrdr_ran_wlen;
+struct htrdr_ran_wlen_cie_xyz;
+struct htrdr_ran_wlen_planck;
 struct ssp_rng;
 
 struct htrdr_atmosphere {
   struct htrdr_atmosphere_ground* ground;
   struct htrdr_atmosphere_sun* sun;
   struct htrdr_materials* mats;
-  struct htrdr_cie_xyz* cie;
-  struct htrdr_ran_wlen* ran_wlen;
+  struct htrdr_ran_wlen_cie_xyz* cie;
+  struct htrdr_ran_wlen_planck* planck;
 
   struct scam* camera; /* Camera */
   struct htrdr_rectangle* flux_map; /* Flux map */

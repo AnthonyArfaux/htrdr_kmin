@@ -1,0 +1,144 @@
+/* Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019, Université Paul Sabatier
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#ifndef HTRDR_PLANETO_ARGS_H
+#define HTRDR_PLANETO_ARGS_H
+
+#include "core/htrdr_args.h"
+
+#include <rad-net/rnatm.h>
+#include <rsys/rsys.h>
+
+#include <limits.h> /* UINT_MAX */
+
+enum htrdr_planeto_args_output_type {
+  HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,
+  HTRDR_PLANETO_ARGS_OUTPUT_OCTREES,
+  HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__
+};
+
+struct htrdr_planeto_spectral_args {
+  double wlen_range[2]; /* Spectral range in nm */
+  enum htrdr_spectral_type type;
+};
+#define HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__ {                                \
+  HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                 \
+  HTRDR_SPECTRAL_SW_CIE_XYZ, /* Spectral type */                               \
+}
+static const struct htrdr_planeto_spectral_args
+HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT = HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__;
+
+struct htrdr_planeto_source_args {
+  /* Radiance of the source per wavelength. May be NULL */
+  char* rnrl_filename;
+
+  double longitude; /* In [-180, 180] degrees */
+  double latitude; /* In [-90, 90] degrees */
+  double distance; /* In km */
+  double radius; /* In km */
+  double temperature; /* In Kelvin */
+};
+#define HTRDR_PLANETO_SOURCE_ARGS_NULL__ {NULL,0,0,0,-1,-1}
+static const struct htrdr_planeto_source_args HTRDR_PLANETO_SOURCE_ARGS_NULL =
+  HTRDR_PLANETO_SOURCE_ARGS_NULL__;
+
+struct htrdr_planeto_ground_args {
+  char* smsh_filename; /* The Star-Mesh geometry */
+  char* props_filename; /* Per triangle physical properties */
+  char* mtllst_filename; /* List of used materials */
+  char* name;
+};
+#define HTRDR_PLANETO_GROUND_ARGS_NULL__ {NULL,NULL,NULL,NULL}
+static const struct htrdr_planeto_ground_args HTRDR_PLANETO_GROUND_ARGS_NULL =
+  HTRDR_PLANETO_GROUND_ARGS_NULL__;
+
+struct htrdr_planeto_args {
+  /* System data */
+  struct rnatm_gas_args gas;
+  struct rnatm_aerosol_args* aerosols;
+  size_t naerosols;
+  struct htrdr_planeto_ground_args ground;
+
+  /* Read/Write file where octrees are stored. May be NULL => octres are built
+   * at runtime and kept in memory */
+  char* octrees_storage;
+
+  unsigned octree_definition_hint; /* Hint on octree definition */
+  double optical_thickness; /* Threshold used during octree building */
+
+  char* output; /* File where the result is written */
+  struct htrdr_planeto_spectral_args spectral_domain; /* Integration spectral domain */
+  struct htrdr_planeto_source_args source;
+  struct htrdr_args_image image;
+
+  struct htrdr_args_camera_perspective cam_persp; /* Perspective camera */
+
+  /* Miscellaneous arguments */
+  unsigned nthreads; /* Hint on the nimber of threads to use */
+  enum htrdr_planeto_args_output_type output_type;
+  int precompute_normals; /* Pre-compute tetrahedron normals */
+  int force_output_overwrite; /* Replace output if it exists */
+  int verbose; /* Verbose level */
+  int quit; /* Stop the command */
+};
+#define HTRDR_PLANETO_ARGS_DEFAULT__ {                                         \
+  RNATM_GAS_ARGS_NULL__, /* Gas */                                             \
+  NULL, /* List of aerosols */                                                 \
+  0, /* Number of aerosols */                                                  \
+  HTRDR_PLANETO_GROUND_ARGS_NULL__, /* Ground */                               \
+                                                                               \
+  NULL, /* File where to dump octrees */                                       \
+                                                                               \
+  @HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@, /* octree definition */   \
+  @HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                    \
+                                                                               \
+  NULL, /* Ouput file */                                                       \
+  HTRDR_PLANETO_SPECTRAL_ARGS_DEFAULT__, /* Spectral domain */                 \
+  HTRDR_PLANETO_SOURCE_ARGS_NULL__, /* Source */                               \
+  HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
+                                                                               \
+  HTRDR_ARGS_CAMERA_PERSPECTIVE_DEFAULT__, /* Perspective camera */            \
+                                                                               \
+  UINT_MAX, /* Number of threads */                                            \
+  HTRDR_PLANETO_ARGS_OUTPUT_IMAGE,                                             \
+  0, /* Force output overwrite */                                              \
+  0, /* Precompute normals */                                                  \
+  0, /* Verbosity level */                                                     \
+  0 /* Stop the command */                                                     \
+}
+static const struct htrdr_planeto_args HTRDR_PLANETO_ARGS_DEFAULT =
+  HTRDR_PLANETO_ARGS_DEFAULT__;
+
+extern LOCAL_SYM res_T
+htrdr_planeto_args_init
+  (struct htrdr_planeto_args* args,
+   int argc,
+   char** argv);
+
+extern LOCAL_SYM void
+htrdr_planeto_args_release
+  (struct htrdr_planeto_args* args);
+
+extern LOCAL_SYM res_T
+htrdr_planeto_args_check
+  (const struct htrdr_planeto_args* args);
+
+extern LOCAL_SYM res_T
+htrdr_planeto_source_args_check
+  (const struct htrdr_planeto_source_args* args);
+
+#endif /* HTRDR_PLANETO_ARGS_H */

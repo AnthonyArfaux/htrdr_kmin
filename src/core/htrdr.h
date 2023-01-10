@@ -67,9 +67,9 @@ htrdr_fprint_copyright(const char* cmd, FILE* stream)
 {
   (void)cmd;
   fprintf(stream,
-"Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>.\n"
-"Copyright (C) 2018, 2019, 2021 CNRS.\n"
-"Copyright (C) 2018, 2019 Université Paul Sabatier.\n");
+"Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>\n"
+"Copyright (C) 2018, 2019, 2021 CNRS\n"
+"Copyright (C) 2018, 2019 Université Paul Sabatier\n");
 }
 
 static INLINE void
@@ -79,7 +79,7 @@ htrdr_fprint_license(const char* cmd, FILE* stream)
   fprintf(stream,
 "%s is free software released under the GNU GPL license,\n"
 "version 3 or later. You are free to change or redistribute it\n"
-"under certain conditions <http://gnu.org/licenses/gpl.html>.\n",
+"under certain conditions <http://gnu.org/licenses/gpl.html>\n",
     cmd);
 }
 

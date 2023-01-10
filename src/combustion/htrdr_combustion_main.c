@@ -32,7 +32,7 @@ htrdr_combustion_main(int argc, char** argv)
   struct htrdr_combustion_args cmd_args = HTRDR_COMBUSTION_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
   struct htrdr_combustion* cmd = NULL;
-  const size_t memsz_begin = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  const size_t memsz_begin = mem_allocated_size();
   size_t memsz_end;
   int is_mpi_init = 0;
   res_T res = RES_OK;
@@ -72,7 +72,7 @@ exit:
   if(cmd) htrdr_combustion_ref_put(cmd);
 
   /* Check memory leaks */
-  memsz_end = MEM_ALLOCATED_SIZE(&mem_default_allocator);
+  memsz_end = mem_allocated_size();
   if(memsz_begin != memsz_end) {
     ASSERT(memsz_end >= memsz_begin);
     fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"Memory leaks: %lu Bytes\n", 

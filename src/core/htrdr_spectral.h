@@ -36,12 +36,12 @@ enum htrdr_spectral_type {
 struct htrdr;
 
 static FINLINE double /* In nanometer */
-htrdr_wavenumber_to_wavelength(const double nu/*In cm^-1*/)
+htrdr_wavenumber_to_wavelength(const double nu/*In cm⁻¹*/)
 {
   return 1.e7 / nu;
 }
 
-static FINLINE double /* In cm^-1 */
+static FINLINE double /* In cm⁻¹ */
 wavelength_to_wavenumber(const double lambda/*In nanometer*/)
 {
   return htrdr_wavenumber_to_wavelength(lambda);
@@ -92,7 +92,7 @@ htrdr_blackbody_fraction
   return w1 - w0;
 }
 
-/* Return the Planck value in W/m^2/sr/m at a given wavelength */
+/* Return the Planck value in W/m²/sr/m at a given wavelength */
 static INLINE double
 htrdr_planck_monochromatic
   (const double lambda, /* In meters */
@@ -103,13 +103,13 @@ htrdr_planck_monochromatic
   const double k = 1.380649e-23; /* J/K */
   const double lambda2 = lambda*lambda;
   const double lambda5 = lambda2*lambda2*lambda;
-  const double B = ((2.0 * h * c*c) / lambda5) /* W/m^2/sr/m */
+  const double B = ((2.0 * h * c*c) / lambda5) /* W/m²/sr/m */
                  / (exp(h*c/(lambda*k*temperature))-1.0);
   ASSERT(temperature > 0);
   return B;
 }
 
-/* Return the average Planck value in W/m^2/sr/m over the
+/* Return the average Planck value in W/m²/sr/m over the
  * [lambda_min, lambda_max] interval. */
 static INLINE double
 htrdr_planck_interval
@@ -119,14 +119,14 @@ htrdr_planck_interval
 {
   const double T2 = temperature*temperature;
   const double T4 = T2*T2;
-  const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m^2/K^4 */
+  const double BOLTZMANN_CONSTANT = 5.6696e-8; /* W/m²/K⁴ */
   ASSERT(lambda_min < lambda_max && temperature > 0);
   return htrdr_blackbody_fraction(lambda_min, lambda_max, temperature)
-       * BOLTZMANN_CONSTANT * T4 / (PI * (lambda_max-lambda_min)); /* In W/m^2/sr/m */
+       * BOLTZMANN_CONSTANT * T4 / (PI * (lambda_max-lambda_min)); /* In W/m²/sr/m */
 }
 
 /* Invoke planck_monochromatic or planck_interval whether the submitted
- * interval is null or not, respectively. The returned value is in W/m^2/sr/m */
+ * interval is null or not, respectively. The returned value is in W/m²/sr/m */
 static FINLINE double
 htrdr_planck
   (const double lambda_min, /* In meters */
@@ -148,7 +148,7 @@ htrdr_brightness_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */
    const double lambda_max, /* In meters */
-   /* Averaged over [lambda_min, lambda_max]. In W/m^2/sr/m */
+   /* Averaged over [lambda_min, lambda_max]. In W/m²/sr/m */
    const double radiance,
    double* temperature);
 
@@ -157,7 +157,7 @@ htrdr_radiance_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */
    const double lambda_max, /* In meters */
-   const double radiance); /* In W/m^2/sr */
+   const double radiance); /* In W/m²/sr */
 
 END_DECLS
 

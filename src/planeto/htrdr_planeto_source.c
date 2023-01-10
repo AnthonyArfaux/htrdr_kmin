@@ -1,0 +1,485 @@
+/* Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> (contact@meso-star.com)
+ * Copyright (C) 2018, 2019, 2021 CNRS
+ * Copyright (C) 2018, 2019, Université Paul Sabatier
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#include "planeto/htrdr_planeto_c.h"
+#include "planeto/htrdr_planeto_source.h"
+
+#include "core/htrdr.h"
+#include "core/htrdr_log.h"
+
+#include <star/sbuf.h>
+#include <star/ssp.h>
+
+#include <rsys/algorithm.h>
+#include <rsys/cstr.h>
+#include <rsys/double3.h>
+#include <rsys/ref_count.h>
+
+typedef struct ALIGN(16) {
+  double wavelength; /* in nm */
+  double radiance; /* in W/m²/sr/m */
+} source_radiance_T;
+
+struct htrdr_planeto_source {
+  double position[3]; /* In m */
+
+  double radius; /* In m */
+
+  /* In Kelvin. Defined if the radiances by wavelength is no set */
+  double temperature;
+
+  struct sbuf* per_wlen_radiances; /* List of radiances by wavelength */
+
+  ref_T ref;
+  struct htrdr* htrdr;
+};
+
+/*******************************************************************************
+ * Helper functions
+ ******************************************************************************/
+static INLINE res_T
+check_per_wlen_radiance_sbuf_desc
+  (const struct htrdr_planeto_source* src,
+   const struct sbuf_desc* desc)
+{
+  const source_radiance_T* spectrum = NULL;
+  size_t i;
+  ASSERT(src && desc);
+
+  /* Invalid size */
+  if(desc->size == 0) {
+    htrdr_log_err(src->htrdr, "invalid empty source spectrum\n");
+    return RES_BAD_ARG;
+  }
+
+  /* Invalid memory layout */
+  if(desc->szitem != 16 || desc->alitem != 16 || desc->pitch != 16) {
+    htrdr_log_err(src->htrdr, "unexpected layout of source spectrum\n");
+    return RES_BAD_ARG;
+  }
+
+  /* Data must be sorted */
+  spectrum = desc->buffer;
+  FOR_EACH(i, 1, desc->size) {
+    if(spectrum[i-1].wavelength >= spectrum[i].wavelength) {
+      htrdr_log_err(src->htrdr,
+        "the source spectrum is not sorted in ascending order "
+        "with respect to wavelengths\n");
+      return RES_BAD_ARG;
+    }
+  }
+
+  return RES_OK;
+}
+
+static res_T
+setup_per_wavelength_radiances
+  (struct htrdr_planeto_source* src,
+   const struct htrdr_planeto_source_args* args)
+{
+  struct sbuf_create_args sbuf_args;
+  struct sbuf_desc desc;
+  res_T res = RES_OK;
+  ASSERT(src && args && args->rnrl_filename && args->temperature < 0);
+
+  sbuf_args.logger = htrdr_get_logger(src->htrdr);
+  sbuf_args.allocator = htrdr_get_allocator(src->htrdr);
+  sbuf_args.verbose = htrdr_get_verbosity_level(src->htrdr);
+  res = sbuf_create(&sbuf_args, &src->per_wlen_radiances);
+  if(res != RES_OK) goto error;
+
+  res = sbuf_load(src->per_wlen_radiances, args->rnrl_filename);
+  if(res != RES_OK) goto error;
+  res = sbuf_get_desc(src->per_wlen_radiances, &desc);
+  if(res != RES_OK) goto error;
+  res = check_per_wlen_radiance_sbuf_desc(src, &desc);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  htrdr_log_err(src->htrdr, "error loading %s -- %s\n",
+    args->rnrl_filename, res_to_cstr(res));
+  goto exit;
+}
+
+static INLINE int
+cmp_wlen(const void* a, const void* b)
+{
+  const double wlen = *((double*)a);
+  const source_radiance_T* src_rad1 = b;
+  ASSERT(a && b);
+
+  if(wlen < src_rad1->wavelength) {
+    return -1;
+  } else if(wlen > src_rad1->wavelength) {
+    return +1;
+  } else {
+    return 0;
+  }
+}
+
+static double
+get_radiance
+  (const struct htrdr_planeto_source* src,
+   const double wlen)
+{
+  struct sbuf_desc desc;
+  const source_radiance_T* spectrum;
+  const source_radiance_T* find;
+  size_t id;
+  ASSERT(src && src->per_wlen_radiances);
+
+  SBUF(get_desc(src->per_wlen_radiances, &desc));
+  spectrum = desc.buffer;
+
+  if(wlen < spectrum[0].wavelength) {
+    htrdr_log_warn(src->htrdr,
+      "The wavelength %g nm is before the spectrum of the source\n", wlen);
+    return spectrum[0].radiance;
+  }
+  if(wlen > spectrum[desc.size-1].wavelength) {
+    htrdr_log_warn(src->htrdr,
+      "The wavelength %g nm is above the spectrum of the source\n", wlen);
+    return spectrum[desc.size-1].radiance;
+  }
+
+  /* Look for the first item whose wavelength is not less than 'wlen' */
+  find = search_lower_bound(&wlen, spectrum, desc.size, desc.pitch, cmp_wlen);
+  ASSERT(find);
+  id = (size_t)(find - spectrum);
+  ASSERT(id < desc.size);
+
+  if(id == 0) {
+    ASSERT(wlen == spectrum[0].wavelength);
+    return spectrum[0].radiance;
+  } else {
+    const double w0 = spectrum[id-1].wavelength;
+    const double w1 = spectrum[id-0].wavelength;
+    const double L0 = spectrum[id-1].radiance;
+    const double L1 = spectrum[id-0].radiance;
+    const double u = (wlen - w0) / (w1 - w0);
+    const double L = L0 + u*(L1 - L0); /* Linear interpolation */
+    return L;
+  }
+}
+
+static void
+release_source(ref_T* ref)
+{
+  struct htrdr_planeto_source* source;
+  struct htrdr* htrdr;
+  ASSERT(ref);
+
+  source = CONTAINER_OF(ref, struct htrdr_planeto_source, ref);
+  htrdr = source->htrdr;
+  if(source->per_wlen_radiances) SBUF(ref_put(source->per_wlen_radiances));
+  MEM_RM(htrdr_get_allocator(htrdr), source);
+  htrdr_ref_put(htrdr);
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+htrdr_planeto_source_create
+  (struct htrdr* htrdr,
+   const struct htrdr_planeto_source_args* args,
+   struct htrdr_planeto_source** out_source)
+{
+  struct htrdr_planeto_source* src = NULL;
+  double dst; /* In m */
+  double lat; /* In radians */
+  double lon; /* In radians */
+  res_T res = RES_OK;
+  ASSERT(htrdr && out_source);
+  ASSERT(htrdr_planeto_source_args_check(args) == RES_OK);
+
+  src = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*src));
+  if(!src) {
+    htrdr_log_err(htrdr, "error allocating source\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  ref_init(&src->ref);
+  htrdr_ref_get(htrdr);
+  src->htrdr = htrdr;
+  src->radius = args->radius * 1e3/*From km to m*/;
+
+  if(!args->rnrl_filename) {
+    src->temperature = args->temperature;
+  } else {
+    res = setup_per_wavelength_radiances(src, args);
+    if(res != RES_OK) goto error;
+    src->temperature = -1; /* Not used */
+  }
+
+  /* Convert latitude and longitude to radians and distance in m */
+  lat = MDEG2RAD(args->latitude);
+  lon = MDEG2RAD(args->longitude);
+  dst = args->distance * 1e3/*From km to m*/;
+
+  /* Compute the position of the source */
+  src->position[0] = dst * cos(lat) * cos(lon);
+  src->position[1] = dst * cos(lat) * sin(lon);
+  src->position[2] = dst * sin(lat);
+
+exit:
+  *out_source = src;
+  return res;
+error:
+  if(src) { htrdr_planeto_source_ref_put(src); src = NULL; }
+  goto exit;
+}
+
+void
+htrdr_planeto_source_ref_get(struct htrdr_planeto_source* source)
+{
+  ASSERT(source);
+  ref_get(&source->ref);
+}
+
+void htrdr_planeto_source_ref_put(struct htrdr_planeto_source* source)
+{
+  ASSERT(source);
+  ref_put(&source->ref, release_source);
+}
+
+double
+htrdr_planeto_source_sample_direction
+  (const struct htrdr_planeto_source* source,
+   struct ssp_rng* rng,
+   const double pos[3],
+   double dir[3])
+{
+  double main_dir[3];
+  double half_angle; /* In radians */
+  double cos_half_angle;
+  double dst; /* In m */
+  double pdf;
+  ASSERT(source && rng && pos && dir);
+
+  /* compute the direction of `pos' toward the center of the source */
+  d3_sub(main_dir, source->position, pos);
+
+  /* Normalize the direction and keep the distance from `pos' to the center of
+   * the source */
+  dst = d3_normalize(main_dir, main_dir);
+  CHK(dst > source->radius);
+
+  /* Sample the source according to its solid angle,
+   * i.e. 2*PI*(1 - cos(half_angle)) */
+  half_angle = asin(source->radius/dst);
+  cos_half_angle = cos(half_angle);
+  ssp_ran_sphere_cap_uniform(rng, main_dir, cos_half_angle, dir, &pdf);
+
+  return pdf;
+}
+
+double /* In W/m²/sr/m */
+htrdr_planeto_source_get_radiance
+  (const struct htrdr_planeto_source* source,
+   const double wlen)
+{
+  if(source->per_wlen_radiances) {
+    return get_radiance(source, wlen);
+  } else {
+    return htrdr_planck_monochromatic
+      (wlen*1e-9/*From nm to m*/, source->temperature);
+  }
+}
+
+double
+htrdr_planeto_source_distance_to
+  (const struct htrdr_planeto_source* source,
+   const double pos[3])
+{
+  double vec[3];
+  double dst;
+  ASSERT(source && pos);
+
+  d3_sub(vec, source->position, pos);
+  dst = d3_len(vec);
+  return dst - source->radius;
+}
+
+int
+htrdr_planeto_source_is_targeted
+  (const struct htrdr_planeto_source* source,
+   const double pos[3],
+   const double dir[3])
+{
+  double main_dir[3];
+  double half_angle; /* In radians */
+  double dst; /* In m */
+  ASSERT(source && dir && d3_is_normalized(dir));
+
+  /* compute the direction of `pos' toward the center of the source */
+  d3_sub(main_dir, source->position, pos);
+
+  /* Normalize the direction and keep the distance from `pos' to the center of
+   * the source */
+  dst = d3_normalize(main_dir, main_dir);
+  CHK(dst > source->radius);
+
+  /* Compute the the half angle of the source as seen from pos */
+  half_angle = asin(source->radius/dst);
+
+  return d3_dot(dir, main_dir) >= cos(half_angle);
+}
+
+res_T
+htrdr_planeto_source_get_spectral_range
+  (const struct htrdr_planeto_source* source,
+   double range[2])
+{
+  res_T res = RES_OK;
+  ASSERT(source && range);
+
+  if(!source->per_wlen_radiances) {
+    range[0] = 0;
+    range[1] = INF;
+  } else {
+    struct sbuf_desc desc = SBUF_DESC_NULL;
+    const source_radiance_T* spectrum = NULL;
+
+    res = sbuf_get_desc(source->per_wlen_radiances, &desc);
+    if(res != RES_OK) goto error;
+
+    spectrum = desc.buffer;
+    range[0] = spectrum[0].wavelength;
+    range[1] = spectrum[desc.size-1].wavelength;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+int
+htrdr_planeto_source_does_radiance_vary_spectrally
+  (const struct htrdr_planeto_source* source)
+{
+  ASSERT(source);
+  return source->per_wlen_radiances != NULL;
+}
+
+res_T
+htrdr_planeto_source_get_spectrum
+  (const struct htrdr_planeto_source* source,
+   const double range[2], /* In nm. Limits are inclusive */
+   struct htrdr_planeto_source_spectrum* source_spectrum)
+{
+  double full_range[2];
+  res_T res = RES_OK;
+  ASSERT(source && range && source_spectrum && range[0] <= range[1]);
+
+  if(!htrdr_planeto_source_does_radiance_vary_spectrally(source)) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = htrdr_planeto_source_get_spectral_range(source, full_range);
+  if(res != RES_OK) goto error;
+
+  if(range[0] < full_range[0] || full_range[1] < range[1]) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  source_spectrum->source = source;
+  source_spectrum->range[0] = range[0];
+  source_spectrum->range[1] = range[1];
+
+  if(range[0] == range[1]) {
+    /* Degenerated spectral range */
+    source_spectrum->size = 1;
+    source_spectrum->buffer = NULL;
+
+  } else {
+    const source_radiance_T* spectrum;
+    const source_radiance_T* low;
+    const source_radiance_T* upp;
+    struct sbuf_desc desc;
+
+    res = sbuf_get_desc(source->per_wlen_radiances, &desc);
+    if(res != RES_OK) goto error;
+
+    spectrum = desc.buffer;
+    low = search_lower_bound(&range[0], spectrum, desc.size, desc.pitch, cmp_wlen);
+    upp = search_lower_bound(&range[1], spectrum, desc.size, desc.pitch, cmp_wlen);
+    ASSERT(low && upp);
+
+    if(low == upp) {
+      /* The range is fully included in a band */
+      ASSERT(low->radiance > range[0] && upp->radiance >= range[1]);
+      source_spectrum->size = 2;
+      source_spectrum->buffer = NULL;
+
+    } else {
+      source_spectrum->size =
+        2/* Boundaries */ + (size_t)(upp - low)/*discrete items*/;
+
+      if(low->wavelength == range[0]) {
+        /* The lower limit coincide with a discrete element.
+         * Remove the discrete element */
+        source_spectrum->size -= 1;
+        source_spectrum->buffer = low + 1;
+      } else {
+        source_spectrum->buffer = low;
+      }
+
+    }
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+void
+htrdr_planeto_source_spectrum_at
+  (void* source_spectrum,
+   const size_t i, /* between [0, spectrum->size[ */
+   double* wavelength, /* In nm */
+   double* radiance) /* In W/m²/sr/m */
+{
+  struct htrdr_planeto_source_spectrum* spectrum = source_spectrum;
+  ASSERT(spectrum && i < spectrum->size && wavelength && radiance);
+
+  /* Lower limit */
+  if(i == 0) {
+    *wavelength = spectrum->range[0];
+    *radiance = htrdr_planeto_source_get_radiance
+      (spectrum->source, spectrum->range[0]);
+
+  /* Upper limit */
+  } else if(i == spectrum->size-1) {
+    *wavelength = spectrum->range[1];
+    *radiance = htrdr_planeto_source_get_radiance
+      (spectrum->source, spectrum->range[1]);
+
+  /* Discrete element */
+  } else {
+    const source_radiance_T* item =
+      (const source_radiance_T*)spectrum->buffer + (i-1);
+    *wavelength = item->wavelength;
+    *radiance = item->radiance;
+  }
+}

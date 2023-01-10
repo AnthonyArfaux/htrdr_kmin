@@ -55,6 +55,9 @@ The available _htrdr-<mode>_ commands are:
 *htrdr-combustion*(1)
 	Radiative transfer computations in a combustion medium.
 
+*htrdr-planeto*(1)
+	Radiative transfer computations in 3D planetary atmosphere.
+
 # COPYRIGHT
 
 Copyright © 2018, 2019, 2020, 2021 |Méso|Star> <contact@meso-star.com>++
@@ -70,4 +73,5 @@ redistribute it. There is NO WARRANTY, to the extent permitted by law.
 # SEE ALSO
 
 *htrdr-atmosphere*(1),
-*htrdr-combustion*(1)
+*htrdr-combustion*(1),
+*htrdr-planeto*(1)

@@ -18,7 +18,7 @@
 #ifndef HTRDR_ARGS_H
 #define HTRDR_ARGS_H
 
-#include "core/htrdr_cie_xyz.h"
+#include "core/htrdr_ran_wlen_cie_xyz.h"
 #include "core/htrdr_spectral.h"
 
 #include <rsys/rsys.h>
@@ -115,7 +115,7 @@ struct htrdr_args_spectral {
   enum htrdr_spectral_type spectral_type;
 };
 #define HTRDR_ARGS_SPECTRAL_DEFAULT__ {                                        \
-  HTRDR_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                          \
+  HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                 \
   -1, /* Reference temperature */                                              \
   HTRDR_SPECTRAL_SW_CIE_XYZ, /* Spectral type */                               \
 }
@@ -133,6 +133,10 @@ htrdr_args_camera_perspective_parse
    const char* str);
 
 HTRDR_CORE_API res_T
+htrdr_args_camera_perspective_check
+  (const struct htrdr_args_camera_perspective* cam);
+
+HTRDR_CORE_API res_T
 htrdr_args_camera_orthographic_parse
   (struct htrdr_args_camera_orthographic* cam,
    const char* str);
@@ -146,6 +150,10 @@ HTRDR_CORE_API res_T
 htrdr_args_image_parse
   (struct htrdr_args_image* img,
    const char* str);
+
+HTRDR_CORE_API res_T
+htrdr_args_image_check
+  (const struct htrdr_args_image* img);
 
 HTRDR_CORE_API res_T
 htrdr_args_spectral_parse

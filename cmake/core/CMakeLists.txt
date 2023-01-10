@@ -84,12 +84,13 @@ set(HTRDR_CORE_FILES_SRC
   htrdr.c
   htrdr_args.c
   htrdr_buffer.c
-  htrdr_cie_xyz.c
   htrdr_draw_map.c
   htrdr_geometry.c
   htrdr_log.c
   htrdr_materials.c
-  htrdr_ran_wlen.c
+  htrdr_ran_wlen_cie_xyz.c
+  htrdr_ran_wlen_discrete.c
+  htrdr_ran_wlen_planck.c
   htrdr_rectangle.c
   htrdr_slab.c
   htrdr_spectral.c)
@@ -98,13 +99,14 @@ set(HTRDR_CORE_FILES_INC
   htrdr_accum.h
   htrdr_buffer.h
   htrdr_c.h
-  htrdr_cie_xyz.h
   htrdr_draw_map.h
   htrdr_geometry.c
   htrdr_interface.h
   htrdr_log.h
   htrdr_materials.h
-  htrdr_ran_wlen.h
+  htrdr_ran_wlen_cie_xyz.h
+  htrdr_ran_wlen_discrete.h
+  htrdr_ran_wlen_planck.h
   htrdr_rectangle.h
   htrdr_sensor.h
   htrdr_slab.h

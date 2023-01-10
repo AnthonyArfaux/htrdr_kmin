@@ -83,7 +83,7 @@ setup_output
   }
 
   /* Setup the output name */
-  str_set(&cmd->output_name, output_name);
+  res = str_set(&cmd->output_name, output_name);
   if(res != RES_OK) {
     htrdr_log_err(cmd->htrdr,
       "Could not store the name of the output stream `%s' -- %s.\n",
@@ -589,7 +589,7 @@ htrdr_combustion_create
   cmd = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*cmd));
   if(!cmd) {
     htrdr_log_err(htrdr, "Could not allocate the htrdr_combustion data.\n");
-    res = RES_BAD_ARG;
+    res = RES_MEM_ERR;
     goto error;
   }
   ref_init(&cmd->ref);

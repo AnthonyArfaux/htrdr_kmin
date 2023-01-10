@@ -15,47 +15,47 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_RAN_WLEN_H
-#define HTRDR_RAN_WLEN_H
+#ifndef HTRDR_RAN_WLEN_PLANCK_H
+#define HTRDR_RAN_WLEN_PLANCK_H
 
 #include "core/htrdr.h"
 #include <rsys/rsys.h>
 
-#define HTRDR_WLEN_RAN_CONTINUE 0
+#define HTRDR_WLEN_RAN_PLANCK_CONTINUE 0
 
 /* Forward declarations */
 struct htrdr;
-struct htrdr_ran_wlen;
+struct htrdr_ran_wlen_planck;
 
 BEGIN_DECLS
 
 HTRDR_CORE_API res_T
-htrdr_ran_wlen_create
+htrdr_ran_wlen_planck_create
   (struct htrdr* htrdr,
    const double range[2], 
    /* # bands used to discretisze the spectral domain. HTRDR_WLEN_RAN_CONTINUE
     * <=> no discretisation */
    const size_t nbands, /* Hint on #bands used to discretised th CDF */
    const double ref_temperature, /* Reference temperature */
-   struct htrdr_ran_wlen** wlen_ran);
+   struct htrdr_ran_wlen_planck** planck);
 
 HTRDR_CORE_API void
-htrdr_ran_wlen_ref_get
-  (struct htrdr_ran_wlen* wlen_ran);
+htrdr_ran_wlen_planck_ref_get
+  (struct htrdr_ran_wlen_planck* planck);
 
 HTRDR_CORE_API void
-htrdr_ran_wlen_ref_put
-  (struct htrdr_ran_wlen* wlen_ran);
+htrdr_ran_wlen_planck_ref_put
+  (struct htrdr_ran_wlen_planck* planck);
 
 /* Return a wavelength in nanometer */
 HTRDR_CORE_API double
-htrdr_ran_wlen_sample
-  (const struct htrdr_ran_wlen* wlen_ran,
+htrdr_ran_wlen_planck_sample
+  (const struct htrdr_ran_wlen_planck* planck,
    const double r0, /* Canonical number in [0, 1[ */
    const double r1, /* Canonical number in [0, 1[ */
    double* pdf); /* In nm^-1. May be NULL */
 
 END_DECLS
 
-#endif /* HTRDR_RAN_WLEN_H */
+#endif /* HTRDR_RAN_WLEN_PLANCK_H */
 

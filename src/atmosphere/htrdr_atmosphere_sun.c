@@ -74,6 +74,7 @@ htrdr_atmosphere_sun_create
     goto error;
   }
   ref_init(&sun->ref);
+
   sun->half_angle = 4.6524e-3;
   sun->temperature = 5778;
   sun->cos_half_angle = cos(sun->half_angle);

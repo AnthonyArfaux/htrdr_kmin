@@ -16,15 +16,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.1)
-project(htrdr-combustion)
+project(htrdr-planeto)
 
 ################################################################################
 # Check dependencies
 ################################################################################
-find_package(AtrSTM REQUIRED)
-find_package(RCMake 0.3 REQUIRED)
+find_package(RCMake 0.4 REQUIRED)
+find_package(RNATM 0.0 REQUIRED)
+find_package(RNGRD 0.0 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
+find_package(StarBuffer 0.0 REQUIRED)
 find_package(StarCamera 0.0 REQUIRED)
 find_package(StarSF 0.6 REQUIRED)
 find_package(StarSP 0.12 REQUIRED)
@@ -35,9 +37,11 @@ include(rcmake)
 include(rcmake_runtime)
 
 include_directories(
-  ${AtrSTM_INCLUDE_DIR}
+  ${RNATM_INCLUDE_DIR}
+  ${RNGRD}
   ${RSys_INCLUDE_DIR}
   ${Star3D_INCLUDE_DIR}
+  ${StarBuffer_INCLUDE_DIR}
   ${StarCamera_INCLUDE_DIR}
   ${StarSF_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
@@ -48,47 +52,40 @@ include_directories(
 ################################################################################
 # Generate files
 ################################################################################
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY "1" CACHE INTERNAL "")
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION "1.80" CACHE INTERNAL "")
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR "1.30" CACHE INTERNAL "")
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1.0" CACHE INTERNAL "")
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT "256" CACHE INTERNAL "")
-set(HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH "532" CACHE INTERNAL "")
+set(HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD "1" CACHE INTERNAL "")
+set(HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT "512" CACHE INTERNAL "")
 
-configure_file(${HTRDR_SOURCE_DIR}/combustion/htrdr_combustion_args.h.in
-  ${HTRDR_BUILD_DIR}/combustion/htrdr_combustion_args.h @ONLY)
+configure_file(${HTRDR_SOURCE_DIR}/planeto/htrdr_planeto_args.h.in
+  ${HTRDR_BUILD_DIR}/planeto/htrdr_planeto_args.h @ONLY)
 
 ################################################################################
 # Configure and define targets
 ################################################################################
-set(HTRDR_COMBUSTION_FILES_SRC
-  htrdr_combustion.c
-  htrdr_combustion_args.c
-  htrdr_combustion_draw_map.c
-  htrdr_combustion_compute_radiance_sw.c
-  htrdr_combustion_geometry_ray_filter.c
-  htrdr_combustion_laser.c
-  htrdr_combustion_main.c
-  htrdr_combustion_phase_func.c)
+set(HTRDR_PLANETO_FILES_SRC
+  htrdr_planeto.c
+  htrdr_planeto_args.c
+  htrdr_planeto_compute_radiance.c
+  htrdr_planeto_draw_map.c
+  htrdr_planeto_main.c
+  htrdr_planeto_source.c)
 
-set(HTRDR_COMBUSTION_FILES_INC
-  htrdr_combustion.h
-  htrdr_combustion_c.h
-  htrdr_combustion_geometry_ray_filter.h
-  htrdr_combustion_laser.h)
+set(HTRDR_PLANETO_FILES_INC
+  htrdr_planeto.h
+  htrdr_planeto_c.h
+  htrdr_planeto_source.h)
 
 # Prepend each file in the `HTRDR_FILES_<SRC|INC>' list by `HTRDR_SOURCE_DIR'
-rcmake_prepend_path(HTRDR_COMBUSTION_FILES_SRC ${HTRDR_SOURCE_DIR}/combustion)
-rcmake_prepend_path(HTRDR_COMBUSTION_FILES_INC ${HTRDR_SOURCE_DIR}/combustion)
+rcmake_prepend_path(HTRDR_PLANETO_FILES_SRC ${HTRDR_SOURCE_DIR}/planeto)
+rcmake_prepend_path(HTRDR_PLANETO_FILES_INC ${HTRDR_SOURCE_DIR}/planeto)
 
-# Combustion library
-add_library(htrdr-combustion STATIC
-  ${HTRDR_COMBUSTION_FILES_SRC}
-  ${HTRDR_COMBUSTION_FILES_INC})
-target_link_libraries(htrdr-combustion
-  htrdr-core AtrSTM RSys Star3D StarCamera StarSF StarSP)
+# Planeto library
+add_library(htrdr-planeto STATIC
+  ${HTRDR_PLANETO_FILES_SRC}
+  ${HTRDR_PLANETO_FILES_INC})
+target_link_libraries(htrdr-planeto
+  htrdr-core RNATM RNGRD RSys Star3D StarBuffer StarCamera StarSF StarSP)
 
-set_target_properties(htrdr-combustion PROPERTIES
+set_target_properties(htrdr-planeto PROPERTIES
   DEFINE_SYMBOL HTRDR_STATIC
   VERSION ${VERSION}
   SOVERSION ${VERSION_MAJOR})
@@ -99,8 +96,8 @@ set_target_properties(htrdr-combustion PROPERTIES
 if(NOT NO_TEST)
   function(build_test _name)
     add_executable(${_name}
-      ${HTRDR_SOURCE_DIR}/combustion/${_name}.c)
-    target_link_libraries(${_name} htrdr-combustion ${ARGN})
+      ${HTRDR_SOURCE_DIR}/planeto/${_name}.c)
+    target_link_libraries(${_name} htrdr-core htrdr-planeto ${ARGN})
   endfunction()
 
   function(new_test _name)
@@ -108,13 +105,13 @@ if(NOT NO_TEST)
     add_test(${_name} ${_name})
   endfunction()
 
-  new_test(test_htrdr_combustion_laser)
+  new_test(test_htrdr_planeto_source StarBuffer)
 endif()
 
 ################################################################################
 # Define output & install directories
 ################################################################################
-install(TARGETS htrdr-combustion
+install(TARGETS htrdr-planeto
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

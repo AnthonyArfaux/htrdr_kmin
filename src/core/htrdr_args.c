@@ -68,10 +68,10 @@ parse_fov(const char* str, double* out_fov)
     fprintf(stderr, "Invalid field of view `%s'.\n", str);
     return RES_BAD_ARG;
   }
-  if(fov <= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN 
+  if(fov <= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN
   || fov >= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX) {
     fprintf(stderr, "The field of view %g is not in ]%g, %g[.\n", fov,
-      HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN, 
+      HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN,
       HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX);
     return RES_BAD_ARG;
   }
@@ -148,13 +148,13 @@ parse_image_plane_height(const char* str, double* out_height)
 
   res = cstr_to_double(str, &height);
   if(res != RES_OK) {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Invalid height `%s' of the image plane of the orthographic camera.\n",
       str);
     return RES_BAD_ARG;
   }
   if(height <= 0) {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Invalid negative or null height of the image plane "
       "of the orthographic camera.\n");
     return RES_BAD_ARG;
@@ -444,8 +444,8 @@ parse_spectral_parameter(const char* str, void* ptr)
 
   if(!strcmp(key, "cie_xyz")) {
     args->spectral_type = HTRDR_SPECTRAL_SW_CIE_XYZ;
-    args->wlen_range[0] = HTRDR_CIE_XYZ_RANGE_DEFAULT[0];
-    args->wlen_range[1] = HTRDR_CIE_XYZ_RANGE_DEFAULT[1];
+    args->wlen_range[0] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[0];
+    args->wlen_range[1] = HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT[1];
   } else {
     if(!val) {
       fprintf(stderr, "Missing value to the spectral option `%s'.\n", key);
@@ -557,7 +557,7 @@ htrdr_args_camera_perspective_parse
 
   res = cstr_parse_list(str, ':', parse_camera_perspective_parameter, cam);
   if(res != RES_OK) goto error;
-  
+
   if(cam->focal_length < 0) {
     ASSERT(cam->fov_y > 0);
     res = scam_field_of_view_to_focal_length
@@ -565,7 +565,7 @@ htrdr_args_camera_perspective_parse
     if(res != RES_OK) {
       fprintf(stderr,
         "Cannot compute the focal length from the lens radius %g "
-        "and the field of view %g -- %s.\n", 
+        "and the field of view %g -- %s.\n",
         cam->lens_radius,
         cam->fov_y,
         res_to_cstr(res));
@@ -579,7 +579,7 @@ htrdr_args_camera_perspective_parse
     if(res != RES_OK) {
       fprintf(stderr,
         "Cannot compute the field of view from the lens radius %g "
-        "and the focal length %g -- %s.\n", 
+        "and the focal length %g -- %s.\n",
         cam->lens_radius,
         cam->focal_length,
         res_to_cstr(res));
@@ -608,6 +608,36 @@ error:
 }
 
 res_T
+htrdr_args_camera_perspective_check
+  (const struct htrdr_args_camera_perspective* cam)
+{
+  if(!cam) return RES_BAD_ARG;
+
+  /* Invalid Fov */
+  if(cam->fov_y <= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN
+  || cam->fov_y >= HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX) {
+    /* Is the fov defined by the focal length? */
+    if(cam->focal_length < 0) return RES_BAD_ARG;
+  }
+
+  /* Invalid focal length */
+  if(cam->focal_length <= 0) {
+    /* Is the focal length defined by the fov? */
+    if(cam->fov_y < 0) return RES_BAD_ARG;
+  }
+
+  /* Invalid lens radius */
+  if(cam->lens_radius < 0)
+    return RES_BAD_ARG;
+
+  /* Invalid focal distance */
+  if(cam->lens_radius > 0/*!pinhole*/ && cam->focal_dst < 0)
+    return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
+res_T
 htrdr_args_camera_orthographic_parse
   (struct htrdr_args_camera_orthographic* cam,
    const char* str)
@@ -628,6 +658,22 @@ htrdr_args_image_parse(struct htrdr_args_image* img, const char* str)
 {
   if(!img || !str) return RES_BAD_ARG;
   return cstr_parse_list(str, ':', parse_image_parameter, img);
+}
+
+res_T
+htrdr_args_image_check(const struct htrdr_args_image* img)
+{
+  if(!img) return RES_BAD_ARG;
+
+  /* Invalid definition */
+  if(!img->definition[0] || !img->definition[1])
+    return RES_BAD_ARG;
+
+  /* Invalid number of samples per pixel */
+  if(!img->spp)
+    return RES_BAD_ARG;
+
+  return RES_OK;
 }
 
 res_T

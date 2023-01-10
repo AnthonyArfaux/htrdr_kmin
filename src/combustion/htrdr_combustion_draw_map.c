@@ -287,7 +287,7 @@ combustion_draw_map(struct htrdr_combustion* cmd)
   res = htrdr_draw_map(cmd->htrdr, &args, cmd->buf);
   if(res != RES_OK) goto error;
 
-  /* No more to do on non master processes */
+  /* Nothing more to do on non master processes */
   if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
 
   /* Write buffer to output */
