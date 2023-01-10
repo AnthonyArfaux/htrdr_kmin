@@ -96,7 +96,7 @@ informations on CMake.
 
 ### Version 0.9
 
-#### Adds simulation of radiative transfer in 3D planetary atmosphere
+#### Adds radiative transfer simulation in 3D planetary atmospheres
 
 The new `htrdr-planeto` command simulates radiative transfer in planetology
 context, i.e. in a 3D atmosphere of a terrestrial planet. Both infrared and
