@@ -33,7 +33,7 @@ if(HTRDR_BUILD_COMBUSTION)
   list(APPEND _link_libraries htrdr-combustion)
 endif()
 if(HTRDR_BUILD_PLANETO)
-  list(APPEND _lin_libraries htrdr-planeto)
+  list(APPEND _link_libraries htrdr-planeto)
 endif()
 
 ################################################################################

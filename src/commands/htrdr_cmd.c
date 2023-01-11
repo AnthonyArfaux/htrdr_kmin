@@ -25,6 +25,9 @@
 #ifdef HTRDR_BUILD_COMBUSTION
   #include "combustion/htrdr_combustion.h"
 #endif
+#ifdef HTRDR_BUILD_PLANETO
+  #include "planeto/htrdr_planeto.h"
+#endif
 
 #include "core/htrdr_log.h"
 #include "core/htrdr_version.h"
@@ -62,6 +65,8 @@ print_help(const char* cmd)
 "  atmosphere     Radiative transfer computations in a cloudy atmosphere.\n");
   printf(
 "  combustion     Radiative transfer computations in a combustion medium.\n");
+  printf(
+"  planeto        Radiative transfer computations in a 3D planetory atmosphere.\n");
   printf("\n");
 
   htrdr_fprint_license(cmd, stdout);
@@ -102,6 +107,18 @@ main(int argc, char** argv)
 #else
     fprintf(stderr,
       "The combustion mode is not available in this htrdr build.\n");
+    err = 1;
+    goto error;
+#endif
+
+  /* Planeto mode */
+  } else if(!strcmp(argv[1], "planeto")) {
+#ifdef HTRDR_BUILD_PLANETO
+    err = htrdr_planeto_main(argc-1, argv+1);
+    if(err) goto error;
+#else
+    fprintf(stderr,
+      "The planeto mode is not available in this htrdr build.\n");
     err = 1;
     goto error;
 #endif
