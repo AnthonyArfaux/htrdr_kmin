@@ -42,7 +42,7 @@ static void
 print_usage(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [--version] [--help] <mode> [<args>]\n", cmd);
+  printf("Usage: %s [-v] [-h] <mode> [<args>]\n", cmd);
 }
 
 static void
@@ -54,9 +54,9 @@ print_help(const char* cmd)
   printf("\n");
 
   printf(
-"  --version      display version information and exit.\n");
+"  -h             display this help and exit.\n");
   printf(
-"  --help         display this help and exit.\n");
+"  -v             display version information and exit.\n");
   printf("\n");
 
   printf("These are %s modes:\n", cmd);
@@ -124,7 +124,7 @@ main(int argc, char** argv)
 #endif
 
   /* Version */
-  } else if(!strcmp(argv[1], "--version")) {
+  } else if(!strcmp(argv[1], "-v")) {
     printf("%s version %d.%d.%d\n",
       argv[0],
       HTRDR_VERSION_MAJOR,
@@ -133,7 +133,7 @@ main(int argc, char** argv)
     goto exit;
 
   /* Help */
-  } else if(!strcmp(argv[1], "--help")) {
+  } else if(!strcmp(argv[1], "-h")) {
     print_help(cmd_name);
     goto exit;
 
