@@ -32,85 +32,75 @@ static void
 print_help(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [<opions>] -a GAS\n", cmd);
+  printf("Usage: %s [option] ... -a gas\n", cmd);
   printf(
-"Render an image or compute a flux map in both the longwave and\n"
-"shortwave domains, for scenes with a cloudy atmosphere and a ground\n"
-"geometry.\n\n");
+"Simulate radiative transfer in a plane-parallel atmosphere.\n"
+"See htrdr-atmosphere(1) man page for details\n\n");
 
   printf(
-"  -a GAS         filename of the gas optical properties.\n");
+"  -a gas         filename of the gas optical properties\n");
   printf(
-"  -C <perspective-camera>\n"
-"                 define the perspective camera. Refer to the man page\n"
-"                 for the list of camera options.\n");
+"  -C camera      configure a perspective camera\n");
   printf(
-"  -c CLOUDS      filename of the clouds properties.\n");
+"  -c clouds      filename of the clouds properties\n");
   printf(
-"  -D AZIMUTH,ELEVATION\n"
+"  -D azimuth,elevation\n"
 "                 direction in degrees toward the sun center. By default\n"
-"                 AZIMUTH is %g and ELEVATION is %g.\n",
+"                 azimuth is %g and elevation is %g\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sun_azimuth,
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sun_elevation);
   printf(
-"  -d             dump volumetric acceleration structures to OUTPUT\n"
-"                 and exit.\n");
+"  -d             dump volumetric acceleration structures to output\n"
+"                 and exit\n");
   printf(
-"  -f             overwrite the OUTPUT file if it already exists.\n");
+"  -f             overwrite the output file if it already exists\n");
   printf(
-"  -g GROUND      filename of the ground geometry.\n");
+"  -g ground      filename of the ground geometry\n");
   printf(
-"  -h             display this help and exit.\n");
+"  -h             display this help and exit\n");
   printf(
-"  -i <image>     define the image to compute. Refer to the man\n"
-"                 page for the list of image options\n");
+"  -i image       image to compute\n");
   printf(
-"  -M MATERIALS   filename of the ground materials.\n");
+"  -M materials   filename of the ground materials\n");
   printf(
-"  -m MIE         filename of the Mie's data.\n");
+"  -m mie         filename of the Mie's data\n");
   printf(
-"  -n SKY-NAME    name used to identify the sky in the MATERIALS file.\n"
-"                 Its default value is `%s'.\n",
+"  -n sky-name    name used to identify the sky in the materials file.\n"
+"                 Its default value is `%s'\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.sky_mtl_name);
   printf(
-"  -O CACHE       filenaname of the cache file used to store/restore the\n"
-"                 volumetric data. By default do not use any cache.\n");
+"  -O cache       filenaname of the cache file used to store/restore the\n"
+"                 volumetric data. By default do not use any cache\n");
   printf(
-"  -o OUTPUT      file where data are written. If not defined, data are\n"
-"                 written to standard output.\n");
+"  -o output      file where data are written. If not defined, data are\n"
+"                 written to standard output\n");
   printf(
-"  -p <rectangle> switch in flux computation by defining the rectangular\n"
-"                 sensor onto which the flux is computed. Refer to the\n"
-"                 man page for the list of rectangle options.\n");
+"  -p rectangle   switch in flux computation by defining the rectangular\n"
+"                 sensor onto which the flux is computed\n");
   printf(
-"  -P <orthoraphic-camera>\n"
-"                 define the orthoraphic camera. Refer to the man page\n"
-"                 for the list of orthographic camera options.\n");
+"  -P camera      configure an orthoraphic camera\n");
   printf(
-"  -R             infinitely repeat the ground along the X and Y axis.\n");
+"  -R             infinitely repeat the ground along the X and Y axis\n");
   printf(
-"  -r             infinitely repeat the clouds along the X and Y axis.\n");
+"  -r             infinitely repeat the clouds along the X and Y axis\n");
   printf(
-"  -s <spectral>  define the type and range of the spectral\n"
-"                 integration. Refer to the man page for the list\n"
-"                 of spectral options\n");
+"  -s spectral    define the spectral doamin of integration\n");
   printf(
-"  -T THRESHOLD   optical thickness used as threshold during the\n"
-"                 building of the volumetric acceleration structure.\n"
-"                 By default its value is `%g'.\n",
+"  -T optical_thickness\n"
+"                 optical thickness criteria for octree building.\n"
+"                 Default is %g\n",
     HTRDR_ATMOSPHERE_ARGS_DEFAULT.optical_thickness);
   printf(
-"  -t THREADS     hint on the number of threads to use. By default use\n"
-"                 as many threads as CPU cores.\n");
+"  -t threads     hint on the number of threads to use.\n"
+"                 Default assumes as many threads as CPU cores\n");
   printf(
-"  -V X,Y,Z       maximum definition along the 3 axis of the 3D\n"
-"                 volumetric majorant field to partition. By default use\n"
-"                 the definition of the clouds data.\n");
+"  -V octree_definition\n"
+"                 advice on the definition of the atmospheric\n"
+"                 acceleration structures. By default use\n"
+"                 the definition of the clouds data\n");
   printf(
-"  -v             make the command verbose.\n");
+"  -v             make the command verbose\n");
   printf("\n");
-
-  htrdr_fprint_copyright(cmd, stdout);
   htrdr_fprint_license(cmd, stdout);
 }
 
@@ -311,4 +301,3 @@ htrdr_atmosphere_args_release(struct htrdr_atmosphere_args* args)
   ASSERT(args);
   *args = HTRDR_ATMOSPHERE_ARGS_DEFAULT;
 }
-

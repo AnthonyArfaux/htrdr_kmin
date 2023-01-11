@@ -42,7 +42,7 @@ static void
 print_usage(const char* cmd)
 {
   ASSERT(cmd);
-  printf("Usage: %s [-v] [-h] <mode> [<args>]\n", cmd);
+  printf("Usage: %s [-v] [-h] <mode> [option] ...\n", cmd);
 }
 
 static void
@@ -51,22 +51,24 @@ print_help(const char* cmd)
   ASSERT(cmd);
 
   print_usage(cmd);
+  printf("Simulate radiative transfer.\n");
+  printf("See htrdr(1) man page for details\n");
   printf("\n");
 
   printf(
-"  -h             display this help and exit.\n");
+"  -h             display this help and exit\n");
   printf(
-"  -v             display version information and exit.\n");
+"  -v             display version information and exit\n");
   printf("\n");
 
   printf("These are %s modes:\n", cmd);
   printf("\n");
   printf(
-"  atmosphere     Radiative transfer computations in a cloudy atmosphere.\n");
+"  atmosphere     Radiative transfer in a plane-parallel atmosphere\n");
   printf(
-"  combustion     Radiative transfer computations in a combustion medium.\n");
+"  combustion     Radiative transfer within a sooting flame\n");
   printf(
-"  planeto        Radiative transfer computations in a 3D planetory atmosphere.\n");
+"  planeto        Radiative transfer in a 3D planetory atmosphere\n");
   printf("\n");
 
   htrdr_fprint_license(cmd, stdout);

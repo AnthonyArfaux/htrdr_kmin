@@ -36,98 +36,81 @@ print_help(const char* cmd)
 {
   ASSERT(cmd);
   printf(
-"Usage: %s [<options>] -m TETRAHEDRA -p THERMOPROPS -r REFRACT_IDS\n",
+"Usage: %s [option] ... -m mesh -p props -r refids\n",
     cmd);
   printf(
-"Render a monochromatic image within a sooting flame described according\n"
-"to the RDG-FA theory and lightened by a laser source.\n\n");
+"Simulate radiative transfer within a sooting flame.\n"
+"See htrdr-combustion(1) man page for details\n\n");
 
   printf(
-"  -C <perspective-camera>\n"
-"                 define the perspective camera. Refer to the man page\n"
-"                 for the list of camera options.\n");
+"  -C camera      configure a perspective camera\n");
   printf(
-"  -D FLUX_DENSITY\n"
-"                 flux density of the laser in W/m^2\n"
-"                 (default: %g W/m^2).\n",
+"  -D flux_density\n"
+"                 flux density of the laser in W/m²\n"
+"                 (default: %g W/m²)\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.laser_flux_density);
   printf(
 "  -d <laser|octree>\n"
 "                 output geometry of the laser sheet or the volumetric\n"
-"                 acceleration structure and exit.\n");
+"                 acceleration structure and exit\n");
   printf(
-"  -F <fractal-coefs>\n"
+"  -F fractal-coefs\n"
 "                 value of the fractal dimension and fractal prefactor\n"
-"                 to use in the RDG-FA model. Refer to the man page\n"
-"                 for the syntax of the <fractal-coefs> option\n"
-"                 (default fractal prefactor = %g;\n"
-"                  default fractal dimension = %g).\n",
-    HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_prefactor,
-    HTRDR_COMBUSTION_ARGS_DEFAULT.fractal_dimension);
+"                 to use in the RDG-FA model\n");
   printf(
-"  -f             overwrite the OUTPUT file if it already exists.\n");
+"  -f             force overwrite the output file\n");
   printf(
-"  -g <geometry>  define the combustion chamber geometry. Refer to the\n"
-"                 man page for the list of geometry options.\n");
+"  -g geometry    define the combustion chamber geometry\n");
   printf(
-"  -h             display this help and exit.\n");
+"  -h             display this help and exit\n");
   printf(
-"  -I             use an isotropic phase function rather than the RDG-FA.\n");
+"  -I             use an isotropic phase function rather than the RDG-FA\n");
   printf(
-"  -i <image>     define the image to compute. Refer to the man\n"
-"                 page for the list of image options.\n");
+"  -i image       image to compute\n");
   printf(
-"  -l <laser>     define the geometry of the laser sheet. Refer to the\n"
-"                 man page for the list of laser options.\n");
+"  -l laser       configure the geometry of the laser sheet\n");
   printf(
-"  -R <rectangle> switch in flux computation bu defining the\n"
-"                 rectangular sensor onto which the flux is computed.\n"
-"                 Refer to the man page for the list of rectangle\n"
-"                 options.\n");
+"  -R rectangle   switch in flux computation bu defining the\n"
+"                 rectangular sensor onto which the flux is computed\n");
   printf(
-"  -m TETRAHEDRA  path toward the volumetric mesh.\n");
+"  -m mesh        path toward the volumetric mesh\n");
   printf(
-"  -N             precompute the tetrahedra normals.\n");
+"  -N             precompute tetrahedron normals\n");
   printf(
-"  -O CACHE       path of the cache file used to store/restore the\n"
-"                 volumetric data. By default do not use any cache.\n");
+"  -O cache       path of the cache file used to store/restore the\n"
+"                 volumetric data\n");
   printf(
-"  -o OUTPUT      file where data are written\n"
-"                 (default: write data to standard output).\n");
+"  -o output      file where data are written.\n"
+"                 (default: write data to standard output)\n");
   printf(
-"  -p THERMOPROPS path toward the thermodynamic properties.\n");
+"  -p props       path toward the thermodynamic properties\n");
   printf(
-"  -P <orthoraphic-camera>\n"
-"                 define the orthoraphic camera. Refer to the man page\n"
-"                 for the list of orthographic camera options.\n");
+"  -P camera      configure an orthoraphic camera\n");
   printf(
-"  -r REFRACT_ID  path toward the per wavelength refractive\n"
-"                 indices.\n");
+"  -r refids      path toward the per wavelength refractive\n"
+"                 indices\n");
   printf(
-"  -s             use of the SIMD instruction set if available.\n");
+"  -s             use of the SIMD instruction set if available\n");
   printf(
-"  -T THRESHOLD   optical thickness used as threshold during the octree\n"
-"                 building. (default: %g).\n",
+"  -T threshold   optical thickness used as threshold during the octree\n"
+"                 building (default: %g)\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.optical_thickness);
   printf(
-"  -t NTHREADS    hint on the number of threads to use. By default use\n"
-"                 as many threads as CPU cores.\n");
+"  -t threads     hint on the number of threads to use.\n"
+"                 Default assumes as many threads as CPU cores\n");
   printf(
-"  -V <HINT|X,Y,Z>\n"
+"  -V octree_definition\n"
 "                 definition of the volumetric acceleration grids along\n"
 "                 the 3 axis. By default it is computed automatically\n"
-"                 with a hint on the expected definition set to %u.\n",
+"                 with a hint on the expected definition set to %u\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.grid.definition.hint);
   printf(
 "  -v             make the command verbose.\n");
   printf(
 "  -w WAVELENGTH  wavelength definition of the laser in nanometre.\n"
-"                 (default: %g).\n",
+"                 (default: %g)\n",
     HTRDR_COMBUSTION_ARGS_DEFAULT.wavelength);
-
   printf("\n");
-
-  htrdr_fprint_copyright(cmd, stdout);
   htrdr_fprint_license(cmd, stdout);
 }
 
