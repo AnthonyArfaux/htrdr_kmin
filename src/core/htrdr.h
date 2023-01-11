@@ -71,9 +71,13 @@ htrdr_fprint_copyright(const char* cmd, FILE* stream)
 {
   (void)cmd;
   fprintf(stream,
-"Copyright (C) 2018, 2019, 2020, 2021 |Meso|Star> <contact@meso-star.com>\n"
-"Copyright (C) 2018, 2019, 2021 CNRS\n"
-"Copyright (C) 2018, 2019 Université Paul Sabatier\n");
+"Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique\n"
+"Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux\n"
+"Copyright (C) 2022-2023 Institut de Physique du Globe de Paris\n"
+"Copyright (C) 2018-2023 |Méso|Star> <contact@meso-star.com>\n"
+"Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne\n"
+"Copyright (C) 2022-2023 Université de Versaille Saint-Quentin\n"
+"Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier\n");
 }
 
 static INLINE void
