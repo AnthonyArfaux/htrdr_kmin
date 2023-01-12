@@ -39,7 +39,8 @@ set(MAN_SOURCES
   ${HTRDR_DOC_DIR}/htrdr.1.scd
   ${HTRDR_DOC_DIR}/htrdr-image.5.scd
   ${HTRDR_DOC_DIR}/htrdr-materials.5.scd
-  ${HTRDR_DOC_DIR}/htrdr-obj.5.scd)
+  ${HTRDR_DOC_DIR}/htrdr-obj.5.scd
+  ${HTRDR_DOC_DIR}/rnrl.5.scd)
 
 if(HTRDR_BUILD_ATMOSPHERE)
   configure_file(${HTRDR_DOC_DIR}/htrdr-atmosphere.1.scd.in

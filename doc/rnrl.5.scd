@@ -33,15 +33,6 @@ sorted in ascending order.
 
 A *rnrl* file is actually a Star-Buffer file (see *sbuf*(5)). It starts with a
 header of 4 64-bit integers describing the layout of the data. The first integer
-is a power of two (usually 4096) that defines the size of the memory page in
-bytes to which the list of per wavelength radiances aligns (_pagesize_). The
-second integer is the _size_ of the array, i.e. the number of wavelength for
-which a radiance is defined. Finally, the 2 remaining integers store the memory
-size (16 bytes, i.e.  2 double precision values) and the memory alignment (16
-bytes) of a per wavelength radiance.
-
-An *rnrl* file is actually a Star-Buffer file (see *sbuf*(5)). It starts with a
-header of 4 64-bit integers describing the layout of the data. The first integer
 is a power of two (usually 4096) which defines the size of the memory page in
 bytes on which the list of radiances by wavelength aligns (_pagesize_). The
 second integer is the _size_ of the array, that is, the number of wavelengths

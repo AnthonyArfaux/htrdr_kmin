@@ -271,7 +271,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. Here,
 		*sw* means shortwaves, i.e. the radiation source is external to the medium
 		(option *-S*).
-		
+
 *-T* _optical-thickness_
 	Optical thickness used as a criterion to construct atmospheric acceleration
 	structures. Its default value is
@@ -420,6 +420,7 @@ and redistribute it. There is NO WARRANTY, to the extent permitted by law.
 *mpirun*(1),
 *mrumtl*(5),
 *rnpfi*(5),
+*rnrl*(5),
 *rnsf*(5),
 *rnsl*(5),
 *sars*(5),
