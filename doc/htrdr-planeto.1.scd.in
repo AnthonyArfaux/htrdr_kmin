@@ -240,11 +240,19 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 	*dst*=_real_
 		Distance in meters from source to origin. The default distance is 0.
 
+	*rad*=_path_
+		The path to the *rnrl*(5) file that stores the source radiance distribution.
+		This option is not compatible with the temperature setting of the source
+		(parameter *temp*) which also defines its radiance distribution.
+
 	*radius*=_real_
 		Source radius in meters.
 
 	*temp*=_real_
-		Source temperature in Kelvin.
+		Source temperature in Kelvin; when this option is set, the radiance
+		distribution of the source is Planck, at the specified temperature. This
+		option is not compatible with the *rad* parameter that explicitly defines
+		the source radiance distribution.
 
 *-s* <_spectral-parameter_:...>
 	Configure spectral integration. Available spectral parameters are:
