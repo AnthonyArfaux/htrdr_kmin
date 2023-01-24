@@ -29,6 +29,7 @@
 #include <star/s3d.h>
 
 #include <rsys/cstr.h>
+#include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/ref_count.h>
@@ -68,7 +69,7 @@ trace_slab
 
   d3_set(rt_args.ray_org, org);
   d3_set(rt_args.ray_dir, dir);
-  d3_set(rt_args.ray_range, range);
+  d2_set(rt_args.ray_range, range);
   rt_args.hit_from = ctx->hit_prev ? *ctx->hit_prev : S3D_HIT_NULL;
   res = htrdr_geometry_trace_ray(ctx->geom, &rt_args, ctx->hit);
   if(res != RES_OK) return res;
@@ -186,7 +187,7 @@ htrdr_atmosphere_ground_trace_ray
 
     d3_set(rt_args.ray_org, org);
     d3_set(rt_args.ray_dir, dir);
-    d3_set(rt_args.ray_range, range);
+    d2_set(rt_args.ray_range, range);
     if(prev_hit) rt_args.hit_from = *prev_hit;
     res = htrdr_geometry_trace_ray(ground->geom, &rt_args, hit);
     if(res != RES_OK) goto error;
