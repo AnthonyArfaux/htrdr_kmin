@@ -238,7 +238,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 		about the z-axis. The default longitude is set to 0.
 
 	*dst*=_real_
-		Distance in meters from source to origin. The default distance is 0.
+		Distance in kilometers from source to origin. The default distance is 0.
 
 	*rad*=_path_
 		The path to the *rnrl*(5) file that stores the source radiance distribution.
@@ -246,7 +246,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 		(parameter *temp*) which also defines its radiance distribution.
 
 	*radius*=_real_
-		Source radius in meters.
+		Source radius in kilometers.
 
 	*temp*=_real_
 		Source temperature in Kelvin; when this option is set, the radiance
