@@ -79,7 +79,7 @@ sample_rectangle_ray
   if(!S3D_HIT_NONE(&hit)) {
     struct htrdr_interface interf = HTRDR_INTERFACE_NULL;
     const struct htrdr_mtl* mtl = NULL;
-    float N[3]; /* Normalized normal of the hit */
+    float N[3] = {0,0,0}; /* Normalized normal of the hit */
     float wi[3];
     float cos_wi_N;
 
