@@ -27,7 +27,7 @@ htrdr - the Monte-Carlo radiative transfert simulator
 
 # SYNOPSIS
 
-htrdr [--version] [--help] <_mode_> [<_args_>]
+htrdr [-v] [-h] <_mode_> [<_args_>]
 
 # DESCRIPTION
 
@@ -38,10 +38,10 @@ argument that defines the computation context.
 
 # OPTIONS
 
-*--help*
+*-h*
 	Print short help and exit.
 
-*--version*
+*-v*
 	Display version information and exit.
 
 # MODES
