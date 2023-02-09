@@ -144,7 +144,8 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 	command as below:
 
 	```
-	csplit -f octree -k output %^#\\ vtk% /^#\\ vtk/ {$(($(grep -ce "^#\\ vtk" output)-2))}
+	csplit -f octree -k output %^#\\ vtk% /^#\\ vtk/ \\
+		{$(($(grep -ce "^#\\ vtk" output)-2))}
 	```
 
 *-f*
