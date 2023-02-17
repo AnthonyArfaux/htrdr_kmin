@@ -99,14 +99,14 @@ informations on CMake.
 #### Adds radiative transfer simulation in 3D planetary atmospheres
 
 The new `htrdr-planeto` command simulates radiative transfer in planetology
-context, i.e. in a 3D atmosphere of a terrestrial planet. Both infrared and
+context, i.e. in the 3D atmosphere of a telluric planet. Both infrared and
 visible computations are supported. `htrdr-planeto` is actually a renderer that
 calculates an image for a given observation position. Its internal rendering
-algorithm is based on Monte-Carlo integration, which consists for each pixel of
+algorithm is based on Monte-Carlo integration, which consists for each pixel in
 simulating a given number of optical paths from the sensor, taking into account
 the phenomena of light absorption and scattering.
 
-The planet's soil can be any set of triangles with BRDFs and temperatures
+The planet's ground can be any set of triangles with BRDFs and temperatures
 defined per triangle. The atmosphere is composed of a gas mixture and a
 potentially empty set of aerosols. Both can have arbitrary tetrahedral meshes
 with per-node radiative properties.

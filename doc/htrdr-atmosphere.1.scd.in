@@ -32,29 +32,28 @@ htrdr-atmosphere [_option_]... -a _atmosphere_
 # DESCRIPTION
 
 *htrdr-atmosphere* simulates radiative transfer in scenes composed of an
-atmospheric gas mixture, clouds, and a ground. It evaluates the intensity
-incoming on each pixel of the sensor array. The underlying algorithm is based
-on a Monte-Carlo method: it consists in simulating a given number of optical
-paths originating from the sensor, directed into the atmosphere, taking into
-account light absorption and scattering phenomena. This algorithm and the way
-it is efficiently implemented in *htrdr-atmosphere* is presented in the
-following article: "A path-tracing Monte Carlo library for 3-D radiative
-transfer in highly resolved cloudy atmospheres", N. Villefranque et al, JAMES
-2019 [1].
+atmospheric gas mixture, liquid clouds, and a ground. It evaluates the intensity
+incoming on each pixel of the sensor array. The underlying algorithm is based on
+a Monte-Carlo method: it consists in simulating a given number of optical paths
+originating from the sensor, directed into the atmosphere, taking into account
+light absorption and scattering phenomena. This algorithm and the way it is
+efficiently implemented in *htrdr-atmosphere* is presented in the following
+article: "A path-tracing Monte Carlo library for 3-D radiative transfer in
+highly resolved cloudy atmospheres", N. Villefranque et al, JAMES 2019 [1].
 
-Radiative transfer can be evaluated in the visible or the infrared part of the
-spectrum. It uses spectral data that should be provided for the pressure and
-temperature atmospheric vertical profile [2] (*-a* _atmosphere_), the liquid
-water content in suspension within the clouds stored in a *htcp*(5) file (*-c*
-_clouds_), and the optical properties of water droplets that have been obtained
-from a Mie code and formatted according to the *htmie*(5) file format (*-m*
-_mie_). The user also has to set the position of the sun (*-D*
-_azimuth_,_elevation_), the sensor type (*-C* _camera_ or *-p* _rectangle_) and
-its definition (*-i* _image_). It is also possible to provide an *htrdr-obj*(5)
-file representing the ground geometry (*-g* _ground_) whose materials are
-listed in the *htrdr-material*(5) file provided through the *-M* option. Both,
-the clouds and the ground, can be infinitely repeated along the X and Y axis by
-setting the *-r* and the *-R* options, respectively.
+Radiative transfer can be evaluated in any part of the spectrum. It uses
+k distributions that should be provided for the pressure and temperature
+atmospheric vertical profile [2] (*-a* _atmosphere_), the liquid water content
+in suspension within the clouds stored in a *htcp*(5) file (*-c* _clouds_), and
+the optical properties of water droplets that have been obtained from a Mie code
+and formatted according to the *htmie*(5) file format (*-m* _mie_). The user
+also has to set the position of the sun (*-D* _azimuth_,_elevation_), the sensor
+type (*-C* _camera_ or *-p* _rectangle_) and its definition (*-i* _image_). It
+is also possible to provide an *htrdr-obj*(5) file representing the ground
+geometry (*-g* _ground_) whose materials are listed in the *htrdr-material*(5)
+file provided through the *-M* option. Both, the clouds and ground, can be
+infinitely repeated along the X and Y axis by setting the *-r* and the *-R*
+options, respectively.
 
 Four types of sensor are supported by *htrdr-atmosphere*. The pinhole and thin
 lens camera (*-C* _camera_) are used to render an image of the scene from the
@@ -71,7 +70,7 @@ the scene as seen from the set observation position. The two other ways consist
 in explicitly defining the longwave or shortwave spectral range to handle and
 continuously sampling a wavelength in this range. Actually longwave and
 shortwave are keywords that mean that the source of radiation is whether
-external or internal to the medium, respectively. In shortwave rendering, only
+internal or external to the medium, respectively. In shortwave rendering, only
 the pixel radiance is evaluated and stored in the output image. For longwave
 rendering this estimated radiance is then converted to its brightness
 temperature and both are saved in the image. When computing a flux map (*-p*

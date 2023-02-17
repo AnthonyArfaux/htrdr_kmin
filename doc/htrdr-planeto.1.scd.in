@@ -32,13 +32,13 @@ htrdr-planeto [_option_] ... -G _ground_ -g _gas_
 # DESCRIPTION
 
 *htrdr-planeto* simulates the radiative transfer of a terrestrial planet in the
-visible or the infrared part of the spectrum. The planet's soil (option *-G*)
+visible or the infrared part of the spectrum. The planet's ground (option *-G*)
 can be any set of triangles with BRDFs and temperatures defined per triangle.
 The atmosphere is composed of a gas mixture (option *-g*) and a potentially
 empty set of aerosols (option *-a*). Both can have arbitrary tetrahedral meshes
 with per-node radiative properties. Rayleigh is used as a gas phase function and
-the temperature of the gas is defined by the node of the mesh. Aerosol phase
-functions (Henyey and Greenstein or measured) are also defined per node.
+the temperature of the gas is defined on the mesh nodes. Aerosol phase functions
+(Henyey and Greenstein or user defined) are also defined per node.
 
 *htrdr-planeto* is mainly a renderer that calculates an image (option *-i*)
 for a given observation position (option *-C*). Its internal rendering algorithm
@@ -54,7 +54,7 @@ the entire image of the scene as seen from the observation position. The other
 two methods are to explicitly define the longwave or shortwave spectral range to
 be integrated and continuously sample a wavelength in this range. In fact,
 longwave and shortwave are keywords that mean that the source of radiation is
-either external or internal to the medium, respectively. In shortwave, only
+either internal or external to the medium, respectively. In shortwave, only
 radiance is evaluated and stored in the output image. For longwave rendering,
 this estimated radiance is then converted to brightness temperature and both are
 recorded in the image.
@@ -73,8 +73,8 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 # OPTIONS
 
 *-a* <_aerosol-parameter_:...>
-	Define an aerosol. Use this option as many times as there are aerosols to be
-	defined. Available aerosol parameters are:
+	Define an aerosol. Use this option once per aerosol, and duplicate it as many
+	times as necessary.
 
 	*mesh*=_path_
 		Path to the *smsh*(5) file that stores the aerosol tetrahedral mesh.
@@ -90,7 +90,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 
 	*phasefn*=_path_
 		Path to the *rnsl*(5) file that lists the *rnsf*(5) files to load; each of
-		theses files stores an aerosol phase function. The phase function to be used
+		these files stores an aerosol phase function. The phase function to be used
 		per volumetric mesh node is defined in another file (see *phaseids*
 		parameter).
 
@@ -231,7 +231,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 	Define the external source. Available source parameters are:
 
 	*lat*=_real_
-		The latitude of the source, i.e. its angle between [-90, 90] degrees about
+		The latitude of the source, i.e. its angle between [-90, 90] degrees from
 		the x-axis. The default latitude is set to 0.
 
 	*lon*=_real_
@@ -269,9 +269,10 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 		function for a reference temperature which is the maximum ground
 		temperature, which is assumed to be the maximum scene temperature. If
 		_wlen-min_ and _wlen-max_ are equal, the calculation is monochromatic. *lw*
-		means longwaves but is here a code word that actually means "calculation of
-		radiance using the internal source of radiation": in other words, radiation
-		is emitted by the medium and its limits (ground and space).
+		stands for "longwaves" but is only a keyword that actually refers to
+		internal source (emitted within the medium, as opposed to external source
+		like sun): in other words, radiation is emitted by the medium and its limits
+		(ground and space).
 		
 	*sw*=_wlen-min_,_wlen-max_
 		Perform continuous spectral sampling in the wavelength range [_wlen-min_, _wlen-max_]
@@ -342,7 +343,7 @@ The following command line runs *htrdr-planeto* in a verbose way (option *-v*)
 to calculate an _800_ by _600_ pixel image by sampling _64_ radiative paths per
 pixel for the 3 components of the CIE XYZ 1931 color space. The external source
 is positioned at _-45_ degrees longitude and _50_ degrees latitude relative to
-the absolute referential. The camera looks at the origin (*tgt=*_0_,_0_,_0_)and
+the absolute referential. The camera looks at the origin (*tgt=*_0_,_0_,_0_) and
 is positioned at _1.5e7_ meters along the Y axis with an image plane aligned
 along the Z axis (*up=*_0_,_0_,_1_). Its vertical field of view is _70_ degrees.
 The gas of the planetary atmosphere is described by the tetrahedral mesh
