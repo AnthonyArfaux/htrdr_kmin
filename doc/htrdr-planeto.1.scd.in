@@ -96,7 +96,7 @@ launcher such as *mpirun*(1) to distribute the rendering on several computers.
 
 	*phaseids*=_path_
 		Path to the *rnpfi*(5) file that stores the index of the phase function to
-		be used per volumetric mesh node;	the list of phase function is defined in
+		be used per volumetric mesh node; the list of phase function is defined in
 		another file (see *phasefn* parameter). Note that this file must be
 		consistent with the volumetric mesh defined in the *mesh* parameter.
 
