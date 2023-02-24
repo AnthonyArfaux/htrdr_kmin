@@ -1,24 +1,25 @@
 # `htrdr`
 
 `htrdr` evaluates the intensity at any position (probe) of the scene, in any
-direction, in the presence of surfaces and an absorbing and diffusing
-semi-transparent medium, both for radiation sources that are internal to the
-medium (longwave) or external to the medium (shortwave). The intensity is
-calculated using the *Monte-Carlo* method: a number of optical paths are
-simulated backward, from the probe position and into the medium. Various
-algorithms are used, depending on the specificities of the nature and shape of
-the radiation source.
+direction, in the presence of *surfaces* and an *absorbing and diffusing
+semi-transparent medium*, for both *internal* (longwave) or *external*
+(shortwave) *radiation sources*. The intensity is calculated using the
+*Monte-Carlo* method: a number of optical paths are simulated backward, from the
+probe position and into the medium. Various algorithms are used, depending on
+the specificities of the nature and shape of the radiation source.
 
 Applications are theoretically possible to any configuration. However, it all
 eventually comes down to the possibility of using the physical data of
-interest, in their most common formats, in each scientific community. `htrdr`
-is currently suitable for three main application fields:
+interest, in their most common formats, in each scientific community. `htrdr` is
+currently suitable for three main application fields:
 
-1. *Plane-parallel atmospheric radiative transfer*: a clear-sky atmosphere is
-   vertically stratified, cloud thermodynamic data is provided on 3D
-   rectangular grid, and surface optical properties can be provided for an
-   arbitrary number of materials. Internal radiation and solar radiation are
-   taken into account.
+1. *Atmospheric radiative transfer:* a clear-sky atmosphere is vertically
+   stratified, neglecting Earth sphericity, and described in terms of
+   absorption coefficients as a function of height and spectral quadrature
+   point as per a correlated-k model. Cloud physical properties are provided on
+   a 3D rectangular grid. Surface geometrical and optical properties can be
+   provided for an arbitrary number of geometries. Internal radiation and solar
+   radiation are taken into account.
 
 2. *Combustion* processes: thermodynamic data is provided at the nodes of an
    unstructured tetrahedral mesh, while surface properties can still be
@@ -30,12 +31,13 @@ is currently suitable for three main application fields:
    shape, described by a triangular mesh, with the possibility of using an
    arbitrary number of materials. The radiative properties of a gas mixture
    must be provided on a tetrahedral mesh, using the k-distribution spectral
-   model.  The radiative properties of an arbitrary number of aerosol modes can
-   also be provided on their individual tetrahedral mesh. Calculations can be
-   made for both internal and external radiation sources. In the case of an
-   external source, a sphere of arbitrary size and position is used. This
-   sphere can radiate as a Planck source at a specified brightness temperature,
-   or using a high-resolution radiance spectrum.
+   model. The radiative properties of an arbitrary number of aerosol and
+   hydrometeores can also be provided on their individual tetrahedral mesh.
+   Calculations can be made for both internal and external radiation sources.
+   In the case of an external source, a sphere of arbitrary size and position
+   is used. This sphere can radiate as a Planck source at a specified
+   brightness temperature, or be associated with a high-resolution radiance
+   spectrum.
 
 Since any radiative transfer observable is expressed as an integral of the
 intensity, and since there is a strict equivalence between the integral to be
@@ -44,10 +46,11 @@ sampling of a random variable), the algorithms that calculate the radiance are
 used for computing various quantities:
 
 - *Images* on a camera sensor, in a given field of view. For combustion
-  applications, only monochromatic images are supported. In atmospheres, both
-  visible and infrared images are possible: CIE colorimetry is used for visible
-  images, while an infrared image is in fact a temperature map of the brightness
-  temperature over the required spectral interval.
+  applications, only monochromatic images are supported. In atmospheres,
+  spectral integration is also possible, both for solar and thermal images: CIE
+  colorimetry is used for solar images, while thermal images are in fact
+  brightness temperature maps, obtained from the incoming radiative flux over a
+  specified spectral interval.
 
 - *Flux density maps*, on a sensor grid, integrated over an entire
   hemisphere. In the case of combustion chambers, only monochromatic flux maps
