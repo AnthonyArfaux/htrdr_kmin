@@ -302,8 +302,10 @@ regular image rendering), longwave or shortwave.
 
 Copyright © 2018-2019, 2022-2023 Centre National de la Recherche Scientifique  
 Copyright © 2020-2022 Institut Mines Télécom Albi-Carmaux  
+Copyright © 2022-2023 Institut Pierre-Simon Laplace  
 Copyright © 2022-2023 Institut de Physique du Globe de Paris  
 Copyright © 2018-2023 [|Méso|Star>](http://www.meso-star.com) (<contact@meso-star.com>)  
+Copyright © 2022-2023 Observatoire de Paris  
 Copyright © 2022-2023 Université de Reims Champagne-Ardenne  
 Copyright © 2022-2023 Université de Versaille Saint-Quentin  
 Copyright © 2018-2019, 2022-2023 Université Paul Sabatier
