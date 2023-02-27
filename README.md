@@ -97,6 +97,18 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.9.1
+
+- Fix invalid read/write memory access when ray tracing the ground in
+  `htrdr-atmopshere`.
+- Fix compilation warning detected by GCC 12.
+- Fix `htrdr-planeto` man page (-S option): the unit of the
+  radius and the distance from the source is not the meter but the kilometer.
+- Fix `htrdr` man page: replaced long options with short options.
+- Reference and install the rnrl fileformat man page.
+- Proofreading the README and man pages: correcting typos, spelling and
+  formatting errors and turns of phrase
+
 ### Version 0.9
 
 #### Adds radiative transfer simulation in 3D planetary atmospheres
