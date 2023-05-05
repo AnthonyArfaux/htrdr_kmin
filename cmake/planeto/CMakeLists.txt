@@ -28,7 +28,7 @@ project(htrdr-planeto)
 # Check dependencies
 ################################################################################
 find_package(RCMake 0.4 REQUIRED)
-find_package(RNATM 0.0 REQUIRED)
+find_package(RNATM 0.0.1 REQUIRED)
 find_package(RNGRD 0.0 REQUIRED)
 find_package(RSys 0.11 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
