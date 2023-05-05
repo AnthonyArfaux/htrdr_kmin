@@ -629,7 +629,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         if(res != RES_OK && !args->octree_definition_hint) res = RES_BAD_ARG;
         break;
       case 'v': args->verbose = 1; break;
-      default: res = RES_BAD_ARG; goto error;
+      default: res = RES_BAD_ARG; break;
     }
     if(res != RES_OK) {
       if(optarg) {
