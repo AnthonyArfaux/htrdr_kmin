@@ -97,6 +97,17 @@ informations on CMake.
 
 ## Release notes
 
+### Version 0.9.2
+
+- Update the `rnatm` library to version 0.0.1. This versions fixes several
+  bugs when different atmospheric components do not have the same volumetric
+  meshes.
+- Display an error message when parsing unknown arguments to the
+  `htrdr-planeto` command.
+- Fix `htrdr-planeto` man page: there was an error in the `csplit` command
+  provided as an example to extract octrees from the output of `htrdr-planeto`
+  when the -d option is used.
+
 ### Version 0.9.1
 
 - Fix invalid read/write memory access when ray tracing the ground in
