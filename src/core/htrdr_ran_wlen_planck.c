@@ -335,7 +335,10 @@ exit:
   *out_wlen_planck_ran = planck;
   return res;
 error:
-  if(planck) htrdr_ran_wlen_planck_ref_put(planck);
+  if(planck) {
+    htrdr_ran_wlen_planck_ref_put(planck);
+    planck = NULL;
+  }
   goto exit;
 }
 
