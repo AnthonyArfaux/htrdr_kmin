@@ -51,52 +51,12 @@
 /*******************************************************************************
  * Helper function
  ******************************************************************************/
-/* Calculate the minimum length of the atmospheric spectral bands for the
- * spectral domain considered */
-static double
-compute_min_band_len(const struct htrdr_planeto* cmd)
-{
-  const double* range = NULL; /* In nm */
-  double len = DBL_MAX;
-  size_t ibands[2];
-  size_t i;
-  ASSERT(cmd);
-
-  range = cmd->spectral_domain.wlen_range;
-
-  /* The spectral range is degenerate to a wavelength */
-  if(eq_eps(range[0], range[1], 1.e-6)) {
-    return 0;
-  }
-
-  RNATM(find_bands(cmd->atmosphere, cmd->spectral_domain.wlen_range, ibands));
-
-  /* At least one band must be overlaped by the spectral domain */
-  ASSERT(ibands[0]<=ibands[1]);
-  FOR_EACH(i, ibands[0], ibands[1]+1) {
-    struct rnatm_band_desc band;
-    double band_range[2];
-    RNATM(band_get_desc(cmd->atmosphere, i, &band));
-
-    /* Make the upper bound inclusive */
-    band_range[0] = band.lower;
-    band_range[1] = nextafter(band.upper, 0);
-
-    /* Clamp the band range to the spectral domain */
-    band_range[0] = MMAX(band_range[0], range[0]);
-    band_range[1] = MMIN(band_range[1], range[1]);
-    len = MMIN(band_range[1] - band_range[0], len);
-  }
-  return len;
-}
-
 /* Calculate the number of fixed size spectral intervals to use for the
  * cumulative */
 static size_t
 compute_nintervals_for_spectral_cdf(const struct htrdr_planeto* cmd)
 {
   double range_size;
-  double interval_len;
   size_t nintervals;
   ASSERT(cmd);
 
@@ -106,14 +66,6 @@ compute_nintervals_for_spectral_cdf(const struct htrdr_planeto* cmd)
 
   /* Initially assume ~one interval per nanometer */
   nintervals = (size_t)rint(range_size);
-
-  /* Calculate the minimum length of the atmospheric spectral bands fixed to
-   * the spectral integration domain. We ensure that an interval of the
-   * spectral cdf cannot be greater than this length */
-  interval_len = compute_min_band_len(cmd);
-  if(interval_len < (range_size / (double)nintervals)) {
-    nintervals = (size_t)ceil(range_size / interval_len);
-  }
 
   return nintervals;
 }

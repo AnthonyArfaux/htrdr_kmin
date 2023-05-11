@@ -48,37 +48,6 @@
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-static double
-compute_sky_min_band_len(struct htsky* sky, const double range[2])
-{
-  double min_band_len = DBL_MAX;
-  size_t nbands;
-  ASSERT(sky && range && range[0] <= range[1]);
-
-  nbands = htsky_get_spectral_bands_count(sky);
-
-  if(eq_eps(range[0], range[1], 1.e-6)) {
-    ASSERT(nbands == 1);
-    min_band_len = 0;
-  } else {
-    size_t i = 0;
-
-    /* Compute the length of the current band clamped to the submitted range */
-    FOR_EACH(i, 0, nbands) {
-      const size_t iband = htsky_get_spectral_band_id(sky, i);
-      double wlens[2];
-      HTSKY(get_spectral_band_bounds(sky, iband, wlens));
-
-      /* Adjust band boundaries to the submitted range */
-      wlens[0] = MMAX(wlens[0], range[0]);
-      wlens[1] = MMIN(wlens[1], range[1]);
-
-      min_band_len = MMIN(wlens[1] - wlens[0], min_band_len);
-    }
-  }
-  return min_band_len;
-}
-
 /* Compute the number of fixed size bands used to discretized the spectral
  * range */
 static size_t
@@ -87,8 +56,6 @@ compute_spectral_bands_count(const struct htrdr_atmosphere* cmd)
   double wlen_range[2];
   double wlen_range_size;
   size_t nbands;
-  double band_len;
-  double band_len_max;
   ASSERT(cmd);
 
   /* Compute size of the spectral range in nanometers */
@@ -99,18 +66,6 @@ compute_spectral_bands_count(const struct htrdr_atmosphere* cmd)
   /* Define as many intervals as wavelengths count in the spectral range */
   nbands = (size_t)rint(wlen_range_size);
 
-  /* Compute the size in nanometers of an interval */
-  band_len = wlen_range_size / (double)nbands;
-
-  /* Compute the minimum band length of the sky spectral data and define it
-   * as the maximum length that the bands can have */
-  band_len_max = compute_sky_min_band_len(cmd->sky, wlen_range);
-
-  /* Adjust the bands count to ensure that each sky spectral interval is
-   * overlapped by at least one band */
-  if(band_len > band_len_max) {
-    nbands = (size_t)ceil(wlen_range_size / band_len_max);
-  }
   return nbands;
 }
 
@@ -440,8 +395,8 @@ htrdr_atmosphere_create
   cmd->wlen_range_m[0] = spectral_range[0]*1e-9; /* Convert in meters */
   cmd->wlen_range_m[1] = spectral_range[1]*1e-9; /* Convert in meters */
 
-  /* Compute the number of fixed sized bands used to descrised to the spectral
-   * data */
+  /* Compute the number of fixed sized bands used to accelerate the sampling of
+   * spectral data */
   nintervals = compute_spectral_bands_count(cmd);
 
   if(cmd->spectral_type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
