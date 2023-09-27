@@ -1,0 +1,16 @@
+# Used for local building only
+Requires: rsys >= @RSYS_VERSION@
+Requires.private:\
+ atrstm > @ATRSTM_VERSION@,\
+ htrdr-core >= @VERSION@,\
+ s3d >= @S3D_VERSION@,\
+ scam >= @SCAM_VERSION@,\
+ ssf >= @SSF_VERSION@,\
+ star-sp >= @SSP_VERSION@,\
+ svx >= @SVX_VERSION@
+Name: htrdr-combustion
+Description: htrdr Combustion
+Version: @VERSION@
+Libs: -L. -lhtrdr-combustion
+Libs.private: -lm
+CFlags: -DHTRDR_BUILD_COMBUSTION -Isrc
