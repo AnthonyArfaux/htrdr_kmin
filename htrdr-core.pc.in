@@ -1,3 +1,4 @@
+# Used for local building only
 Requires: rsys >= @RSYS_VERSION@
 Requires.private:\
  aw >= @AW_VERSION@,\
