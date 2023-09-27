@@ -37,7 +37,7 @@ endif()
 ################################################################################
 # ROFF man pages
 ################################################################################
-set(MAN_SOURCES 
+set(MAN_SOURCES
   ${HTRDR_DOC_DIR}/htrdr.1.scd
   ${HTRDR_DOC_DIR}/htrdr-image.5.scd
   ${HTRDR_DOC_DIR}/htrdr-materials.5.scd
