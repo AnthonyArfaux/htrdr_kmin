@@ -33,18 +33,21 @@ ATMOSPHERE_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-atmosp
 ATMOSPHERE_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-atmosphere)
 ATMOSPHERE_BUILD_LIB_ENABLE = build_atmosphere
 ATMOSPHERE_BUILD_CMD_ENABLE = build_htrdr_atmosphere
+ATMOSPHERE_LIBNAME_ENABLE = libhtrdr-atmosphere.a
 
 # Define macros when COMBUSTION is set to ENABLE
 COMBUSTION_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-combustion)
 COMBUSTION_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-combustion)
 COMBUSTION_BUILD_LIB_ENABLE = build_combustion
 COMBUSTION_BUILD_CMD_ENABLE = build_htrdr_combustion
+COMBUSTION_LIBNAME_ENABLE = libhtrdr-combustion.a
 
 # Define macros when PLANETO is set to ENABLE
 PLANETO_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planeto)
 PLANETO_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planeto)
 PLANETO_BUILD_LIB_ENABLE = build_planeto
 PLANETO_BUILD_CMD_ENABLE = build_htrdr_planeto
+PLANETO_LIBNAME_ENABLE = libhtrdr-planeto.a
 
 # Default target
 all:\
@@ -97,10 +100,16 @@ HTRDR_DPDC_BUILD =\
  $(COMBUSTION_BUILD_LIB_$(COMBUSTION))\
  $(PLANETO_BUILD_LIB_$(PLANETO))
 
+HTRDR_DPDC_PREREQ =\
+ $(CORE_LIBNAME)\
+ $(ATMOSPHERE_LIBNAME_$(ATMOSPHERE))\
+ $(COMBUSTION_LIBNAME_$(COMBUSTION))\
+ $(PLANETO_LIBNAME_$(PLANETO))
+
 build_htrdr: .config_commands $(HTRDR_DPDC_BUILD) $(HTRDR_DEP)
 	@$(MAKE) -fMakefile -f $(HTRDR_DEP) htrdr
 
-htrdr: config.mk $(HTRDR_OBJ)
+htrdr: config.mk $(HTRDR_OBJ) $(HTRDR_DPDC_PREREQ)
 	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -o $@ \
 	$(HTRDR_OBJ) $(LDFLAGS_EXE) $(HTRDR_DPDC_LIBS)
 
@@ -121,6 +130,7 @@ HTRDR_ATMOSPHERE_DEP = $(HTRDR_ATMOSPHERE_SRC:.c=.d)
 
 HTRDR_ATMOSPHERE_DPDC_LIBS = $(ATMOSPHERE_LIBS_$(ATMOSPHERE))
 HTRDR_ATMOSPHERE_DPDC_BUILD = build_core $(ATMOSPHERE_BUILD_LIB_$(ATMOSPHERE))
+HTRDR_ATMOSPHERE_DPDC_PREREQ = $(CORE_LIBNAME) $(ATMOSPHERE_LIBNAME_$(ATMOSPHERE))
 
 build_htrdr_atmosphere:\
  .config_commands\
@@ -128,7 +138,7 @@ build_htrdr_atmosphere:\
  $(HTRDR_ATMOSPHERE_DEP)
 	@$(MAKE) -fMakefile -f $(HTRDR_ATMOSPHERE_DEP) htrdr-atmosphere
 
-htrdr-atmosphere: config.mk $(HTRDR_ATMOSPHERE_OBJ)
+htrdr-atmosphere: config.mk $(HTRDR_ATMOSPHERE_OBJ) $(HTRDR_ATMOSPHERE_DPDC_PREREQ)
 	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -o $@ \
 	$(HTRDR_ATMOSPHERE_OBJ) $(LDFLAGS_EXE) $(HTRDR_ATMOSPHERE_DPDC_LIBS)
 
@@ -149,6 +159,7 @@ HTRDR_COMBUSTION_DEP = $(HTRDR_COMBUSTION_SRC:.c=.d)
 
 HTRDR_COMBUSTION_DPDC_LIBS = $(COMBUSTION_LIBS_$(COMBUSTION))
 HTRDR_COMBUSTION_DPDC_BUILD = build_core $(COMBUSTION_BUILD_LIB_$(COMBUSTION))
+HTRDR_COMBUSTION_DPDC_PREREQ = $(CORE_LIBNAME) $(COMBUSTION_LIBNAME_$(COMBUSTION))
 
 build_htrdr_combustion:\
  .config_commands\
@@ -156,7 +167,7 @@ build_htrdr_combustion:\
  $(HTRDR_COMBUSTION_DEP)
 	@$(MAKE) -fMakefile -f $(HTRDR_COMBUSTION_DEP) htrdr-combustion
 
-htrdr-combustion: config.mk $(HTRDR_COMBUSTION_OBJ)
+htrdr-combustion: config.mk $(HTRDR_COMBUSTION_OBJ) $(HTRDR_COMBUSTION_DPDC_PREREQ)
 	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -o $@ \
 	$(HTRDR_COMBUSTION_OBJ) $(LDFLAGS_EXE) $(HTRDR_COMBUSTION_DPDC_LIBS)
 
@@ -177,6 +188,7 @@ HTRDR_PLANETO_DEP = $(HTRDR_PLANETO_SRC:.c=.d)
 
 HTRDR_PLANETO_DPDC_LIBS = $(PLANETO_LIBS_$(PLANETO))
 HTRDR_PLANETO_DPDC_BUILD = build_core $(PLANETO_BUILD_LIB_$(PLANETO))
+HTRDR_PLANETO_DPDC_PREREQ = $(CORE_LIBNAME) $(PLANETO_LIBNAME_$(PLANETO))
 
 build_htrdr_planeto:\
  .config_commands\
@@ -184,7 +196,7 @@ build_htrdr_planeto:\
  $(HTRDR_PLANETO_DEP)
 	@$(MAKE) -fMakefile -f $(HTRDR_PLANETO_DEP) htrdr-planeto
 
-htrdr-planeto: config.mk $(HTRDR_PLANETO_OBJ)
+htrdr-planeto: config.mk $(HTRDR_PLANETO_OBJ) $(HTRDR_PLANETO_DPDC_PREREQ)
 	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -o $@ \
 	$(HTRDR_PLANETO_OBJ) $(LDFLAGS_EXE) $(HTRDR_PLANETO_DPDC_LIBS)
 
