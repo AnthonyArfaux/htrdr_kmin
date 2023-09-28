@@ -11,5 +11,6 @@ htrdr_*args.h
 htrdr_version.h
 htrdr
 htrdr-atmosphere
+htrdr-atmosphere.1
 htrdr-combustion
 htrdr-planeto
