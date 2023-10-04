@@ -573,8 +573,8 @@ install: all
 #	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
 	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then \
 	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-atmosphere.1; fi
-#	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
-#	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-combustion.1; fi
+	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-combustion.1; fi
 #	@if [ "$(PLANETO)" = "ENABLE" ]; then \
 #	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-planeto.1; fi
 
@@ -588,7 +588,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/README.md"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr.1"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-atmosphere.1"
-#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
 #	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planeto.1"
 #	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
 #	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
@@ -598,7 +598,7 @@ uninstall:
 ################################################################################
 # Man pages
 ################################################################################
-man: htrdr-atmosphere.1
+man: htrdr-atmosphere.1 htrdr-combustion.1
 
 htrdr-atmosphere.1: htrdr-atmosphere.1.in
 	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
@@ -620,8 +620,32 @@ htrdr-atmosphere.1: htrdr-atmosphere.1.in
 	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
 	    $@.in > $@
 
+htrdr-combustion.1: htrdr-combustion.1.in
+	sed -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY)/g' \
+	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION)/g' \
+	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR)/g' \
+	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
+	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT)/g' \
+	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH)/g' \
+	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
+	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_POS@/$(HTRDR_ARGS_DEFAULT_CAMERA_POS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_TGT@/$(HTRDR_ARGS_DEFAULT_CAMERA_TGT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_UP@/$(HTRDR_ARGS_DEFAULT_CAMERA_UP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_WIDTH@/$(HTRDR_ARGS_DEFAULT_IMG_WIDTH)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@/$(HTRDR_ARGS_DEFAULT_IMG_HEIGHT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_SPP@/$(HTRDR_ARGS_DEFAULT_IMG_SPP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_POS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_TGT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_UP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
+	    $@.in > $@
+
 clean_man:
-	rm -f htrdr-atmosphere.1
+	rm -f htrdr-atmosphere.1 htrdr-combustion.1
 
 ################################################################################
 # Miscellaneous targets
@@ -651,3 +675,4 @@ lint: htrdr-atmosphere.1
 	shellcheck -o all make.sh
 	mandoc -Tlint -Wall htrdr.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall htrdr-atmosphere.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall htrdr-combustion.1 || [ $$? -le 1 ]

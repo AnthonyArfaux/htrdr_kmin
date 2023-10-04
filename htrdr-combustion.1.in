@@ -1,0 +1,602 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd September 29, 2023
+.Dt HTRDR-COMBUSTION 1
+.Os
+.Sh NAME
+.Nm htrdr-combustion
+.Nd simulate radiative transfer in a combustion medium
+.Sh SYNOPSIS
+.Nm
+.Op Fl fhINsv
+.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.Op Fl D Ar laser_flux_density
+.Op Fl d Ar dump_type
+.Op Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt ...
+.Op Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt...
+.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.Op Fl l Ar laser_opt Ns Op : Ns Ar laser_opt ...
+.Op Fl O Pa cache
+.Op Fl o Pa output
+.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+.Op Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+.Op Fl T Ar optical_thickness
+.Op Fl t Ar threads_count
+.Op Fl V Ar accel_struct_definition
+.Op Fl w Ar laser_wavelength
+.Fl m Pa medium_geometry
+.Fl p Pa thermo_properties
+.Fl r Pa refractive_ids
+.Sh DESCRIPTION
+The purpose of
+.Nm
+is to perform radiative transfer computations in a scene representing a
+semi-transparent combustion medium enlightened by a laser sheet.
+The medium may be surrounded by solid boundaries
+.Pq inner limits of the combustion chamber .
+The program will currently compute, in the visible at a given frequency, the
+monochromatic image or the radiative flux density of the combustion medium:
+collected light comes from the laser, and is scattered by soot aggregates
+within the flame before eventually reaching the sensor.
+.Pp
+Data relating to the gaseous medium are stored on the vertices of an
+unstructured tetrahedral mesh: pressure, temperature and concentrations
+of H2O, CO2 and CO are provided for each vertex.
+In the visible range, these data are useless, since the gas is assumed
+to be transparent, but they are part of the data expected to anticipate
+future developments in the longwave domain.
+.Pp
+Soot optical properties are computed using the Rayleigh-Debye Gans theory, for
+Fractal Aggregates (RDG-FA).
+This requires the knowledge of: soot volumic fraction, soot number
+density (number of primary particles per aggregate) and primary
+particles diameter, for each vertex of the tetrahedral mesh.
+For any position in the volume, these quantities are first interpolated
+from the values retrieved at the nodes of the current tetrahedron, and
+are then interpolated for the position of interest.
+Which then makes possible to compute the absorption and scattering
+cross-sections of soot aggregates, as well as their scattering function.
+.Pp
+The Monte-Carlo algorithm that accounts for the visible intensity is inspired
+from the algorithm used for solar radiation in
+.Xr htrdr-atmosphere 1 .
+It was adapted to partially illuminated scenes in order to solve
+onvergence issues.
+.Pp
+In
+.Nm
+the spatial unit 1.0 corresponds to one meter while the
+estimated monochromatic radiances and flux densities are saved in
+W/sr/m^2 and
+W/m^2 respectively.
+The results are written to the output file if the
+.Fl o
+option is set and otherwise to standard output.
+The output image is a list of raw ASCII data formatted using the
+.Xr htrdr-image 5
+file format.
+.Pp
+.Nm
+implements mixed parallelism.
+On a single computer (that is, a node), it uses shared memory
+parallelism while it relies on Message Passing Interface (MPI) to
+parallelize calculations between multiple nodes.
+.Nm
+can therefore be launched either directly or via a process launcher such
+as
+.Xr mpirun 1
+to distribute the calculation on several computers.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+Set up a pinhole or thin-lens perspective camera.
+.Pp
+The options for a perspective camera are as follows:
+.Bl -tag -width Ds
+.It Cm focal-dst= Ns Ar distance
+Distance to focus on with a thin lens camera, that is, a camera whose
+.Cm lens-radius
+is not zero.
+The default focal distance is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@ meters.
+.It Cm focal-length= Ns Ar length
+Focal length of a camera lens.
+It is another way to control the field of view of a thin lens camera.
+By default, the field of view is set through the
+.Cm fov
+parameter.
+.It Cm fov= Ns Ar angle
+Vertical field of view of the camera in
+]@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@,
+@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@[ degrees.
+The default field of view is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
+.It Cm lens-radius= Ar radius
+Radius of the camera lens.
+A non-zero radius means that the camera is a thin lens camera while a
+zero radius defines a pinhole camera.
+The default lens radius is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@.
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Camera position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the camera is pointing towards.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
+.El
+.It Fl D Ar laser_flux_density
+Laser flux density in W/m^2. Default is
+@HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@.
+.It Fl d Ar dump type
+Write the data defined by
+.Ar dump_type
+to
+.Pa output
+instead of performing a normal calculation.
+.Pp
+The
+.Ar dump_type
+values supported are as follows:
+.Bl -tag -width Ds
+.It Cm laser
+Write the geometry of the laser sheet in legacy VTK format.
+.It Cm octree
+Write the leaves of the space partitioning structures used to speed up
+radiative transfer calculations.
+Each leaf stores the minimum and maximum extinction coefficients of the
+tetrahedra it covers.
+Data are written in legacy VTK format.
+.El
+.It Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt ...
+RDG-FA phase function parameters.
+.Pp
+The parameters of the RDG-FA phase function are as follows:
+.Bl -tag -width Ds
+.It Cm dimension= Ns Ar real
+Fractal dimension.
+Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION@.
+.It Cm prefactor= Ns Ar real
+Fractal prefactor.
+Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@.
+.El
+.It Fl f
+Force overwriting of
+.Pa output
+file.
+.It Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt...
+Define the combustion chamber.
+.Pp
+Note that the combustion chamber does not prevent the camera from seeing
+the medium, nor the laser from illuminating the medium, even if either is
+outside the chamber.
+The rendering algorithm ensures that they are not occluded by the
+combustion chamber, like with a two-way mirror.
+When the laser is out of chamber, its emissive surface is seen as if it
+were following its interior surface.
+Likewise, the radiance seen by the camera outside the chamber is the
+radiance that reaches it as if its image plane were following the
+surface of the geometry.
+.Pp
+The combustion chamber options are as follows:
+.Bl -tag -width Ds
+.It Cm mats= Ns Ar materials
+Combustion chamber materials saved in
+.Xr htrdr-materials 5
+format.
+.It Cm obj= Ns Ar mesh
+Combustion chamber geometry saved in
+.Xr htrdr-obj 5
+format.
+.Pp
+In accordance with the
+.Xr htrdr-obj 5
+file format, the mesh interface must be defined as a fine interface,
+i.e. it must be composed of 3 elements separated by the
+.Li \&:
+character.
+By convention,
+.Nm
+expects the external environment to be called "air" and the medium
+inside the combustion chamber to be called "chamber".
+No assumptions are made about the name of the surface material, except
+that it must refer to a valid material.
+.El
+.It Fl h
+Display short help and exit.
+.It Fl I
+Use an isotropic phase function rather than the RDG-FA phase function
+.Pq option Fl F .
+.It Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+Configure sensor image.
+.Pp
+The image options are as follows:
+.Bl -tag -width Ds
+.It Cm def= Ns Ar width Ns x Ns Ar height
+Image definition.
+Default is
+@HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+.It Cm spp= Ns Ar samples_per_pixel
+Number of samples to solve the Monte Carlo estimation of each pixel.
+Default is @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+.El
+.It Fl l Ar laser_opt Ns Op : Ns Ar laser_opt ...
+Laser emission surface.
+.Pp
+The laser options are as follows:
+.Bl -tag -width Ds
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Center of the laser emission surface.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position, i.e.\&
+.Cm tgt No - Cm pos
+is the normal of the laser surface.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of thr laser is pointer towards.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
+.It Cm sz= Ns Ar width , Ns Ar height
+Size of laser surface in meters.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@
+.El
+.It Fl m Ar medium_geometry
+Tetrahedra of the combustion medium saved in
+.Xr smsh 5
+format.
+.It Fl N
+Pre-calculate tetrahedron normals.
+This option should speed up the calculation since normals are calculated
+once per tetrahedron rather than being re-evaluated each time a
+tetrahedron is interrogated at a given position.
+On the other hand, the storage required by these normals increases the
+memory footprint.
+.It Fl O Pa cache
+File where acceleration structure is stored/loaded.
+If the
+.Pa cache
+file does not exist, it is created and filled with the acceleration
+structure constructed from the medium geometry
+.Pq option Fl m ,
+termodynamic properties
+.Pq option Fl p
+and refractive indices
+.Pq option Fl r
+input files.
+This cached data can then be reused in subsequent executions, provided
+that the input files supplied to the command are the same as those used
+to set up the cache, thus considerably speeding up the pre-processing
+stage.
+.Pp
+If
+.Pa cache
+contains data generated from input files that are not those submitted on
+the command line, an error is notified and execution is aborted, thus
+avoiding the use of bad cached data.
+.It Fl o Pa output
+Output file.
+If not defined, data is written to standard output.
+.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+Set up an orthographic camera.
+.Pp
+The options for an orthographic camera are as follows:
+.Bl -tag -width Ds
+.It Cm height= Ns Ar lenght
+Image plane height.
+Its width is calculated from this length and the image ratio
+to guarantee square pixels
+.Pq see Fl i No option .
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Camera position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the camera is pointing towards.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
+.El
+.It Fl p Ar thermo_properties
+Thermodynamic properties of the combustion medium saved in
+.Xr atrtp 5
+format.
+.It Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+Set up a flux sensor.
+.Pp
+The flux sensor options are as follow:
+.Bl -tag -width Ds
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Sensor center.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the sensor is pointing towards.
+Default is  @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
+.It Cm sz= Ns Ar width , Ns Ar height
+Sensor size in meters.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@.
+.El
+.It Fl r Ar refrative_ids
+Refrative indices of the combustion medium as a function of wavelength,
+saved in
+.Xr atrri 5
+format.
+.It Fl s
+Use Single Instruction Multiple Data (SIMD) instruction sets if available.
+This should speed up calculation time.
+.It Fl T Ar optical_thickness
+Optical thickness used as threshold criterion for building the acceleration
+structure.
+Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+.It Fl t
+Indication of the number of threads to be used.
+By default,
+.Nm
+uses many threads as processor cores.
+.It Fl V Ar accel_struct_definition
+Definition of the discrete field storing the upper limit of the
+radiative coefficients from which the acceleration structure is built.
+The extent of the grid corresponds to the axis aligned bounding box of
+the combustion medium.
+.Pp
+The definition can be established as follows:
+.Bl -tag -width Ds
+.It Ar x , Ns Ar y , Ns Ar z
+Define grid definition on X, Y and Z axes.
+.It Ar expected_definition
+Provide an expected definition of the grid along its longest axis.
+The definition along the two remaining axes is then calculated
+internally to tend towards cubic cells.
+This is the default behavior with an expected definition set to
+@HTRDR_COMBUSTION_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+.El
+.It Fl v
+Make
+.Nm
+verbose.
+.It Fl w Ar laser_wavelength
+Laser wavelength in nanometers, which is also the wavelength at which
+calculations are performed.
+Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_WAVELENGTH@.
+.El
+.Sh OUTPUT IMAGE
+Images calculated by
+.Nm
+are saved in
+.Xr htrdr-image 5
+format.
+This section describes the nature and arrangement of image data
+depending on the type of calculation performed.
+.Ss Shortwave monochromatic image
+For a monochromatic image rendering, the expected value and the standard
+deviation of the pixel radiance (in W/sr/m^2) are saved on the first and
+the second components.
+All other components are unused excepted the seventh and eighth
+components that store the estimate of the radiative path computation
+time in microseconds and its standard error.
+.Ss Shortwave flux density map
+A flux density map
+.Pq option Fl R
+store on its first and second component
+the expected value and the standard error of the pixel radiative flux
+density
+.Pq in W/m^2 .
+All other components are unused excepted the seventh and eighth
+components that store the estimate of the radiative path computation
+time
+.Pq in microseconds
+and its standard error.
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Make
+.Nm
+verbose
+.Pq option Fl v
+and render an image of a combustion medium whose tetrahedral mesh is
+stored in
+.Pa tetra.smsh
+and whose associated thermodynamic properties are recorded in
+.Pa thermprops.atrtp .
+Refractive indices are listed in
+.Pa refract_ids.atrri .
+The laser's surface emission center is positioned at the origin and its
+direction aligned with the Y axis
+.Pq option Fl l .
+The calculated image resolution is
+.Ar 800 No by Ar 600
+pixels
+.Pq option Fl i
+and the monochromatic radiance
+of each pixel is estimated at
+.Ar 500
+nanometers
+.Pq option Fl w
+with
+.Ar 64
+Monte Carlo realisations
+.Pq option Fl i .
+The resulting image is written to
+.Pa output
+unless the file already exists, in which case an error is notified, the
+program stops and the output file remains unchanged:
+.Bd -literal -offset Ds
+htrdr-combustion -v \\
+                 -m tetra.smsh \\
+                 -p thermprops.atrtp \\
+                 -r refract_ids.atrri \\
+                 -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \\
+                 -w 500 \\
+                 -C pos=0.06,0,0.01:tgt=0.05,0,0.01:up=0,0,1:fov=30 \\
+                 -i def=800x600:spp=64 \\
+                 -o output
+.Ed
+.Pp
+Add a combustion chamber to the previous example
+.Pq option Fl g :
+its mesh is defined in
+.Pa chamber.obj
+while its materials are listed in
+.Pa materials.mtls .
+Save the acceleration structure in
+.Pa octree.cache
+or reuse it if it has already been filled in a previous run with
+compatible input data.
+Set the finest resolution of this acceleration structure to
+.Ar 1000
+voxels along the main extension of the medium
+.Pq option Fl V
+and use an optical
+thickness criterion of
+.Ar 5
+to build it
+.Pq option Fl T .
+Use the
+.Fl f
+option to force
+overwriting of the
+.Pa output
+file if it exists, and use the
+.Fl s
+option to accelerate rendering with available SIMD instruction sets:
+.Bd -literal -offset Ds
+htrdr-combustion -v \\
+                 -m tetra.smsh \\
+                 -p thermprops.atrtp \\
+                 -r refract_ids.atrri \\
+                 -g obj=chamber.obj:mats=materials.mtls \\
+                 -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \\
+                 -w 500 \\
+                 -C pos=0.06,0,0.01:tgt=0.05,0,0.01:up=0,0,1:fov=30 \\
+                 -i def=800x600:spp=64 \\
+                 -O octree.cache \\
+                 -V 1000 \\
+                 -T 5 \\
+                 -fo output \\
+                 -s
+.Ed
+.Pp
+Calculate a flux density map
+.Pq option Fl R .
+The sensor on which the flux density is calculated is a square with
+sides measuring
+.Ar 0.05
+meters.
+Its center is placed at the origin and points towards the Z axis.
+The flux density map has a resolution of
+.Ar 500 No by Ar 500
+pixels
+.Pq option Fl i .
+The flux density per pixel is estimated with
+.Ar 64
+realisations; the flux density for the entire sensor is therefore
+calculated with 16 million realizations (500*500*64):
+.Bd -literal -offset Ds
+htrdr-combustion -v \\
+                 -m tetra.smsh \\
+                 -p thermprops.atrtp \\
+                 -r refract_ids.atrri \\
+                 -l pos=0,0,0:tgt=0,1,0:up=0,0,1:sz=0.001,0.2 \\
+                 -w 500 \\
+                 -R pos=0,0,0:tgt=0,0,1:up=0,1,0:sz=0.05,0.05 \\
+                 -i def=500x500:spp=64 \\
+                 -O octree.cache \\
+                 -V 1000 \\
+                 -T 5 \\
+                 -fo map.txt
+                 -s
+.Ed
+Write a representation of the acceleratrion structure in
+.Pa accel_struct.vtk
+.Pq option Fl d :
+.Bd -literal -offset Ds
+htrdr-combustion -v \\
+                 -m tetra.smsh \\
+                 -p thermprops.atrtp \\
+                 -r refract_ids.atrri \\
+                 -O octree.cache \\
+                 -d octree \\
+                 -o accel_struct.vtk
+.Ed
+.Sh SEE ALSO
+.Xr htrdr-atmosphere 1 ,
+.Xr atrri 5 ,
+.Xr atrtp 5 ,
+.Xr htrdr-image 5 ,
+.Xr htrdr-materials 5 ,
+.Xr htrdr-obj 5 ,
+.Xr smsh 5
+.Rs
+.%A Morgan Sans
+.%A Mouna El Hafi
+.%A Vincent Eymet
+.%A Vincent Forest
+.%A Richard Fournier
+.%A Najda Villefranque
+.%T Null-collision meshless Monte Carlo - A new reverse Monte Carlo \
+algorithm designed for laser-source emission in absorbing/scattering \
+inhomogeneous media
+.%J Journal of Quantitative Spectroscopy and Radiative Transfer
+.%V 271
+.%D 2021
+.%U https://doi.org/10.1016/j.jqsrt.2021.107725
+.Re
+.Rs
+.%A Jérôme Yon
+.%A Fengshan Liu
+.%A Alexandre Bescond
+.%A Chloé Caumont-Prim
+.%A Claude Rozé
+.%A François-Xavier Ouf
+.%A Alexis Coppalle
+.%T Effects of multiple scattering on radiative properties of soot \
+fractal aggregates
+.%J Journal of Quantitative Spectroscopy and Radiative Transfer
+.%V 133
+.%P 374-381
+.%D 2014
+.%U https://doi.org/10.1016/j.jqsrt.2013.08.022
+.Re
+.Sh STANDARDS
+.Rs
+.%A OpenMP Architecture Review Board
+.%D March 2002
+.%T OpenMP C and C++ Application Interface
+.%O version 2.0
+.Re
+.Pp
+.Rs
+.%A Message Passing Interface Forum
+.%D July 1997
+.%T MPI-2: Extensions to The Message-Passing Interface
+.Re
+.Sh HISTORY
+.Nm
+has been developed as part of
+.Li ANR-18-CE05-0015
+Astoria project.
