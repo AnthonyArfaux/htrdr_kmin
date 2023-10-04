@@ -223,7 +223,7 @@ Write to
 .Pa output
 the space partitioning data structures used to speed up cloud radiative
 transfer calculations.
-The data written are octrees saved in VTK file format.
+The data written are octrees saved in legacy VTK file format.
 Each octree node stores the minimum and maximum extinction coefficients
 of the cloud cells covered by the octree node.
 In the output file, each octree is separated from the previous one
@@ -324,7 +324,7 @@ to guarantee square pixels
 Camera position.
 Default is @HTRDR_ARGS_DEFAULT_CAMERA_POS@.
 .It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
-Targeted position
+Targeted position.
 Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
 .It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
 Upward vector that the top of the camera is pointing towards.
@@ -346,7 +346,7 @@ Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@.
 .It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
 Upward vector that the top of the sensor is pointing towards.
 Default is  @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
-.It Cm sz= Ns Ar width Ns x Ns Ar height
+.It Cm sz= Ns Ar width , Ns Ar height
 Sensor size.
 Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@.
 .El
@@ -423,7 +423,8 @@ verbose.
 .El
 .Sh OUTPUT IMAGE
 Images calculated by
-.Nm are saved in
+.Nm
+are saved in
 .Xr htrdr-image 5
 format.
 This section describes the nature and arrangement of image data
@@ -623,6 +624,12 @@ sed /^---$/d output \\
 | csplit -f octree -k - %^#\\ vtk% /^#\\ vtk/ {$((${N}-2))}
 .Ed
 .Sh SEE ALSO
+.Xr mpirun 1 ,
+.Xr htcp 5 ,
+.Xr htmie 5 ,
+.Xr htrdr-image 5 ,
+.Xr htrdr-materials 5 ,
+.Xr htrdr-obj 5
 .Rs
 .%A |Méso|Star>
 .%T High-Tune: gas optical properties file format
@@ -647,18 +654,12 @@ Highly Resolved Cloudy Atmospheres
 .%D 2019
 .%U https://dx.doi.org/10.1029/2018MS001602
 .Re
-.Pp
-.Xr mpirun 1 ,
-.Xr htcp 5 ,
-.Xr htmie 5 ,
-.Xr htrdr-image 5 ,
-.Xr htrdr-materials 5 ,
-.Xr htrdr-obj 5
 .Sh STANDARDS
 .Rs
-.%A Message Passing Interface Forum
-.%D July 1997
-.%T MPI-2: Extensions to The Message-Passing Interface
+.%A International Organization for Standardization / CIE
+.%R ISO/CIE 11664-1:2019
+.%D June 2019
+.%T Colorimetry - Part 1: CIE standard colorimetric observers
 .Re
 .Pp
 .Rs
@@ -669,14 +670,14 @@ Highly Resolved Cloudy Atmospheres
 .Re
 .Pp
 .Rs
-.%A International Organization for Standardization / CIE
-.%R ISO/CIE 11664-1:2019
-.%D June 2019
-.%T Colorimetry - Part 1: CIE standard colorimetric observers
+.%A Message Passing Interface Forum
+.%D July 1997
+.%T MPI-2: Extensions to The Message-Passing Interface
 .Re
 .Sh HISTORY
 .Nm
-was initially developed in High-Tune
-.Li ANR-16-CE01-0010 .
+has been initially developed as part of
+.Li ANR-16-CE01-0010
+High-Tune project.
 It was then extended in
 .Li MODEVAL-URBA 2019 .
