@@ -688,7 +688,7 @@ distclean:\
  distclean_core\
  clean_man
 
-lint: htrdr-atmosphere.1
+lint: htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
 	shellcheck -o all make.sh
 	mandoc -Tlint -Wall htrdr.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall htrdr-atmosphere.1 || [ $$? -le 1 ]
