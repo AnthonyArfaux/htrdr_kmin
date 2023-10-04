@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd September 29, 2023
+.Dd October 4, 2023
 .Dt HTRDR-COMBUSTION 1
 .Os
 .Sh NAME
@@ -77,7 +77,7 @@ are then interpolated for the position of interest.
 Which then makes possible to compute the absorption and scattering
 cross-sections of soot aggregates, as well as their scattering function.
 .Pp
-The Monte-Carlo algorithm that accounts for the visible intensity is inspired
+The Monte Carlo algorithm that accounts for the visible intensity is inspired
 from the algorithm used for solar radiation in
 .Xr htrdr-atmosphere 1 .
 It was adapted to partially illuminated scenes in order to solve
@@ -268,12 +268,11 @@ Tetrahedra of the combustion medium saved in
 .Xr smsh 5
 format.
 .It Fl N
-Pre-calculate tetrahedron normals.
-This option should speed up the calculation since normals are calculated
-once per tetrahedron rather than being re-evaluated each time a
-tetrahedron is interrogated at a given position.
-On the other hand, the storage required by these normals increases the
-memory footprint.
+This speeds up runtime performance by calculating normals once and for
+all rather than re-evaluating them every time a tetrahedron is queried
+at a given position.
+In return, the memory space used to store normals increases the memory
+footprint.
 .It Fl O Pa cache
 File where acceleration structure is stored/loaded.
 If the
@@ -354,7 +353,7 @@ Optical thickness used as threshold criterion for building the acceleration
 structure.
 Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
 .It Fl t
-Indication of the number of threads to be used.
+Advice on the number of threads to use.
 By default,
 .Nm
 uses many threads as processor cores.

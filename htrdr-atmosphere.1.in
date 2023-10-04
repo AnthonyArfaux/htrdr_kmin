@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd September 27, 2023
+.Dd October 4, 2023
 .Dt HTRDR-ATMOSPHERE 1
 .Os
 .Sh NAME
@@ -347,7 +347,7 @@ Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@.
 Upward vector that the top of the sensor is pointing towards.
 Default is  @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
 .It Cm sz= Ns Ar width , Ns Ar height
-Sensor size.
+Sensor size in meters.
 Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@.
 .El
 .It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
@@ -407,7 +407,7 @@ Default is @HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
 This option is ignored if a cache is used
 .Pq option Fl O .
 .It Fl t
-Indication of the number of threads to be used.
+Advice on the number of threads to use.
 By default,
 .Nm
 uses many threads as processor cores.
