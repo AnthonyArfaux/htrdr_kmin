@@ -103,64 +103,16 @@ check_spectral_args(const struct htrdr_planeto_spectral_args* args)
   return RES_OK;
 }
 static void
-print_help(const char* cmd)
+usage(void)
 {
-  ASSERT(cmd);
-  printf(
-"Usage: %s [-dfhv] [-s spectral_domain] [-t threads]\n"
-"                     [-T optical_thickness] [-V octree_definition]\n"
-"                     [-O octrees_storage] [-o output] [-C camera]\n"
-"                     [-S source] [-a aerosol]... -G ground -g gas\n", cmd);
-  printf(
-"Simulate radiative transfer in heterogeneous 3D planetary atmosphere.\n"
-"See htrdr-planeto(1) man page for details\n\n");
-  printf(
-"  -a aerosol     define an aerosol\n");
-  printf(
-"  -C camera      configure a perspective camera\n");
-  printf(
-"  -d             write the atmospheric acceleration structures\n");
-  printf(
-"  -f             force overwrite the output file\n");
-  printf(
-"  -G ground      define the ground of the planet\n");
-  printf(
-"  -g gas         define the gas mixture\n");
-  printf(
-"  -h             display this help and exit\n");
-  printf(
-"  -i image       image to compute\n");
-  printf(
-"  -N             precompute tetrahedron normals\n");
-  printf(
-"  -O octrees_storage\n"
-"                 file where atmospheric acceleration structures are\n"
-"                 stored/loaded\n");
-  printf(
-"  -o output      file where the result is written. If not defined,\n"
-"                 the result is written to standard output\n");
-  printf(
-"  -S source      define the source\n");
-  printf(
-"  -s spectral_domain\n"
-"                 define the spectral domain of integration\n");
-  printf(
-"  -T optical_thickness\n"
-"                 optical thickness criteria for octree building.\n"
-"                 Default is %g\n",
-    HTRDR_PLANETO_ARGS_DEFAULT.optical_thickness);
-  printf(
-"  -t threads     hint on the number of threads to use.\n"
-"                 Default assumes as many threads as CPU cores\n");
-  printf(
-"  -V octree_definition\n"
-"                 advice on the definition of the atmospheric\n"
-"                 acceleration structures. Default is %u\n",
-    HTRDR_PLANETO_ARGS_DEFAULT.octree_definition_hint);
-  printf(
-"  -v             make the command verbose\n");
-  printf("\n");
-  htrdr_fprint_license(cmd, stdout);
+  printf("usage: htrdr-planeto [-dfhNv] [-a aerosol_opt[:aerosol_opt ...]]\n");
+  printf("                     [-C persp_camera_opt[:persp_camera_opt ...]]\n");
+  printf("                     [-G ground_opt[:ground_opt ...]]\n");
+  printf("                     [-i image_opt[:image_opt ...]] [-O accel_struct_storage]\n");
+  printf("                     [-o output] [-S source_opt[:source_opt ...]]\n");
+  printf("                     [-s spectral_opt[:spectral_opt ...]] [-T optical_thickness]\n");
+  printf("                     [-t threads_count] [-V accel_struct_definition]\n");
+  printf("                     -g gas_opt[:gas_opt ...] \n");
 }
 
 static INLINE char*
@@ -600,7 +552,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         }
         break;
       case 'h':
-        print_help(argv[0]);
+        usage();
         htrdr_planeto_args_release(args);
         args->quit = 1;
         goto exit;
@@ -642,20 +594,14 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 
   res = check_gas_args(&args->gas);
   if(res != RES_OK) {
-    fprintf(stderr, "Missing gas definition -- option '-g'\n");
-    goto error;
-  }
-
-  res = check_ground_args(&args->ground);
-  if(res != RES_OK) {
-    fprintf(stderr, "Missing ground definition -- option '-G'\n");
+    fprintf(stderr, "missing gas definition -- option '-g'\n");
     goto error;
   }
 
   if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_OCTREES) {
     res = check_ground_args(&args->ground);
     if(res != RES_OK) {
-      fprintf(stderr, "Missing ground definition -- option '-G'\n");
+      fprintf(stderr, "missing ground definition -- option '-G'\n");
       goto error;
     }
 
@@ -664,7 +610,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     || args->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
       res = htrdr_planeto_source_args_check(&args->source);
       if(res != RES_OK) {
-        fprintf(stderr, "Missing source definition -- option '-S'\n");
+        fprintf(stderr, "missing source definition -- option '-S'\n");
         goto error;
       }
     }
@@ -673,6 +619,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
 exit:
   return res;
 error:
+  usage();
   htrdr_planeto_args_release(args);
   goto exit;
 }
