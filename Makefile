@@ -556,46 +556,6 @@ distclean_planeto: clean_planeto
 	rm -f $(PLANETO_DEP)
 
 ################################################################################
-# Installation
-################################################################################
-install: all
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-atmosphere
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-combustion
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-planeto
-	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib" $(CORE_LIBNAME_SHARED); fi
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/htrdr" COPYING README.md
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr.1
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-image.5
-#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-materials.5
-#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-obj.5
-#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
-	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-atmosphere.1; fi
-	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-combustion.1; fi
-	@if [ "$(PLANETO)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-planeto.1; fi
-
-uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-atmosphere"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-combustion"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-planeto"
-	rm -f "$(DESTDIR)$(PREFIX)/lib/$(CORE_LIBNAME_SHARED)"
-	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/COPYING"
-	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/README.md"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-atmosphere.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planeto.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
-#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
-#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-obj.5"
-#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/rnrl.5"
-
-################################################################################
 # Man pages
 ################################################################################
 man: htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
@@ -662,6 +622,46 @@ htrdr-planeto.1: htrdr-planeto.1.in
 
 clean_man:
 	rm -f htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
+
+################################################################################
+# Installation
+################################################################################
+install: all
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-atmosphere
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-combustion
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-planeto
+	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib" $(CORE_LIBNAME_SHARED); fi
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/htrdr" COPYING README.md
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr.1
+	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-atmosphere.1; fi
+	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-combustion.1; fi
+	@if [ "$(PLANETO)" = "ENABLE" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-planeto.1; fi
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-image.5
+#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-materials.5
+#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-obj.5
+#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
+
+uninstall:
+	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-atmosphere"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-combustion"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-planeto"
+	rm -f "$(DESTDIR)$(PREFIX)/lib/$(CORE_LIBNAME_SHARED)"
+	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/COPYING"
+	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/README.md"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-atmosphere.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planeto.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
+#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
+#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-obj.5"
+#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/rnrl.5"
 
 ################################################################################
 # Miscellaneous targets
