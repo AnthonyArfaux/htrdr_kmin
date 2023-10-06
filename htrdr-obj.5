@@ -1,0 +1,113 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd October 5, 2023
+.Dt HTRDR-OBJ 5
+.Os
+.Sh NAME
+.Nm htrdr-obj
+.Nd geometric file format
+.Sh DESCRIPTION
+A
+.Nm
+file is an ordinary obj file composed solely of triangular meshes.
+Its special feature is that each triangle must be included in a material
+group as defined by the
+.Li usemtl
+directive.
+And the form of the
+.Li usemtl
+directive must be as follows:
+.Bd -ragged -offset Ds
+.Li usemtl Va front_mtl Ns Oo : Ns Va interface_mtl Oc : Ns Va back_mtl
+.Ed
+.Pp
+with
+.Va front-mtl ,
+.Va interface-mtl
+and
+.Va back-mtl
+the material names of the front, interface and back of the triangles
+belonging to the group.
+The interface material name is optional: it is used for thin geometries,
+i.e. geometries with no thickness.
+Material names can be composed of any character, with the exception of
+spaces, tabs and the colon character used to separate the
+aforementioned names.
+Note that, by convention, a side of a triangle is said to be
+"front-facing" when its vertices are ordered clockwise.
+.Pp
+The grammar of a
+.Nm htrdr-obj
+file is therefore a subset of the obj file format, with only one
+specific convention concerning material names.
+Consequently, any software supporting the obj file format can be used to
+create or view a
+.Nm
+file.
+.Sh EXAMPLES
+Define a sheet of paper at the interface between air and concrete.
+.Bd -literal -offset Ds
+v -1.0  -1.0  0
+v -1.0   1.0  0
+v  1.0  -1.0  0
+v  1.0   1.0  0
+
+usemtl air:paper:concrete
+f 1 2 3
+f 3 2 4
+.Ed
+.Pp
+Define a wooden cube whose faces along the Z axis are against a brick.
+The other faces are in contact with the air:
+.Bd -literal -offset Ds
+v 0 0 0
+v 1 0 0
+v 0 1 0
+v 1 1 0
+v 0 0 1
+v 1 0 1
+v 0 1 1
+v 1 1 1
+
+usemtl wood:air
+f 1 3 2
+f 2 3 4
+f 1 5 3
+f 3 5 7
+f 5 6 7
+f 7 6 8
+f 4 8 2
+f 2 8 6
+
+usemtl wood:brick
+f 3 7 4
+f 4 7 8
+f 1 2 5
+f 5 2 6
+.Ed
+.Sh HISTORY
+The
+.Nm
+format was first developed for the
+.Xr htrdr 1
+program.
