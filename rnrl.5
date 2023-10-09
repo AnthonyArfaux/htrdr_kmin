@@ -1,0 +1,89 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd October 9, 2023
+.Dt RNRL 5
+.Os
+.Sh NAME
+.Nm rnrl
+.Nd radiance distribution format
+.Sh DESCRIPTION
+.Nm
+is a binary file format for storing a radiance distribution, i.e. a set
+of radiances
+.Pq in W/m^2/sr/m
+sorted by ascending wavelength
+.Pq in nm .
+.Pp
+A
+.Nm
+file is actualy a Star-Buffer file
+.Pq see Xr sbuf 5 .
+It starts  with a header of 4 integers
+The first integer is a power of two
+.Pq usually 4096
+that defines the size of the memory page in bytes
+.Pq Va pagesize
+on which the list of radiances by wavelength is aligned.
+By aligning data to pagesize, and depending on system requirements,
+memory mapping can be used to automatically load/unload pages on demand
+.Pq see Xr mmap 2 .
+The second integer is the
+.Va size
+of the array, i.e. the number of wavelengths for which a radiance is
+defined.
+The 2 remaining integers store the memory size (16 bytes) and memory
+alignment (16 bytes) of each entry, i.e. the wavelength
+.Pq in nm
+and its associated radiance
+.Pq in W/m^2/sr/m .
+.Pp
+Padding bytes follow the file header to align the radiance distribution
+to
+.Va pagesize .
+.Pp
+The distribution is finally followed by padding bytes to align the
+overall file size with the size of a page.
+.Pp
+Data are encoded with respect to the little endian bytes ordering,
+i.e.\& least significant bytes are stored first.
+.Pp
+The file format is as follows:
+.Bl -column (distribution) (::=) ()
+.It Ao Va rnsl Ac Ta ::= Ta Ao Va pagesize Ac Ao Va size Ac Li 16 16
+.It Ta Ta Aq Va padding
+.It Ta Ta Aq Va distribution
+.It Ta Ta Aq Va padding
+.It Ao Va pagesize Ac Ta ::= Ta Vt uint64_t
+.It Ao Va distribution Ac Ta ::= Ta
+.Aq Va wavelength
+.Aq Va radiance
+.It Ta Ta Va ...
+.It Ao Va wavelength Ac Ta ::= Ta Vt double
+# In nm
+.It Ao Va radiance Ac Ta ::= Ta Vt double
+# In W/m^2/sr/m
+.It Ao Va padding Ac Ta ::= Ta Op Vt int8_t ...
+.El
+.Sh SEE ALSO
+.Xr mmap 2 ,
+.Xr sbuf 5

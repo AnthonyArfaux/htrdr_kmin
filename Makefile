@@ -644,7 +644,7 @@ install: all
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-image.5
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-materials.5
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-obj.5
-#	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
 
 uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
@@ -661,7 +661,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-obj.5"
-#	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/rnrl.5"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/rnrl.5"
 
 ################################################################################
 # Miscellaneous targets
@@ -697,3 +697,4 @@ lint: htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
 	mandoc -Tlint -Wall htrdr-image.5 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall htrdr-materials.5 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall htrdr-obj.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall rnrl.5 || [ $$? -le 1 ]
