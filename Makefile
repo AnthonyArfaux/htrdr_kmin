@@ -558,9 +558,9 @@ distclean_planeto: clean_planeto
 ################################################################################
 # Man pages
 ################################################################################
-man: htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
+man: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
 
-htrdr-atmosphere.1: htrdr-atmosphere.1.in
+doc/htrdr-atmosphere.1: doc/htrdr-atmosphere.1.in
 	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
 	    -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME)/g' \
 	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
@@ -580,7 +580,7 @@ htrdr-atmosphere.1: htrdr-atmosphere.1.in
 	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
 	    $@.in > $@
 
-htrdr-combustion.1: htrdr-combustion.1.in
+doc/htrdr-combustion.1: doc/htrdr-combustion.1.in
 	sed -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY)/g' \
 	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_DIMENSION)/g' \
 	    -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR)/g' \
@@ -604,7 +604,7 @@ htrdr-combustion.1: htrdr-combustion.1.in
 	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
 	    $@.in > $@
 
-htrdr-planeto.1: htrdr-planeto.1.in
+doc/htrdr-planeto.1: doc/htrdr-planeto.1.in
 	sed -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
 	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX)/g' \
 	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST)/g' \
@@ -621,7 +621,7 @@ htrdr-planeto.1: htrdr-planeto.1.in
 	    $@.in > $@
 
 clean_man:
-	rm -f htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
+	rm -f doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
 
 ################################################################################
 # Installation
@@ -634,17 +634,17 @@ install: all
 	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
 	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib" $(CORE_LIBNAME_SHARED); fi
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/htrdr" COPYING README.md
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr.1
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr.1
 	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-atmosphere.1; fi
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-atmosphere.1; fi
 	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-combustion.1; fi
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-combustion.1; fi
 	@if [ "$(PLANETO)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" htrdr-planeto.1; fi
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-image.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-materials.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" htrdr-obj.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" rnrl.5
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-planeto.1; fi
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-image.5
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-materials.5
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-obj.5
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/rnrl.5
 
 uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
@@ -688,13 +688,13 @@ distclean:\
  distclean_core\
  clean_man
 
-lint: htrdr-atmosphere.1 htrdr-combustion.1 htrdr-planeto.1
+lint: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
 	shellcheck -o all make.sh
-	mandoc -Tlint -Wall htrdr.1 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-atmosphere.1 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-combustion.1 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-planeto.1 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-image.5 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-materials.5 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall htrdr-obj.5 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall rnrl.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-atmosphere.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-combustion.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-planeto.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-image.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-materials.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-obj.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/rnrl.5 || [ $$? -le 1 ]
