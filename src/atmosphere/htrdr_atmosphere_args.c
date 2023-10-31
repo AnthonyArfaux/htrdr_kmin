@@ -31,79 +31,18 @@
  * Helper functions
  ******************************************************************************/
 static void
-print_help(const char* cmd)
+usage(void)
 {
-  ASSERT(cmd);
-  printf("Usage: %s [option] ... -a gas\n", cmd);
-  printf(
-"Simulate radiative transfer in a plane-parallel atmosphere.\n"
-"See htrdr-atmosphere(1) man page for details\n\n");
-
-  printf(
-"  -a gas         filename of the gas optical properties\n");
-  printf(
-"  -C camera      configure a perspective camera\n");
-  printf(
-"  -c clouds      filename of the clouds properties\n");
-  printf(
-"  -D azimuth,elevation\n"
-"                 direction in degrees toward the sun center. By default\n"
-"                 azimuth is %g and elevation is %g\n",
-    HTRDR_ATMOSPHERE_ARGS_DEFAULT.sun_azimuth,
-    HTRDR_ATMOSPHERE_ARGS_DEFAULT.sun_elevation);
-  printf(
-"  -d             dump volumetric acceleration structures to output\n"
-"                 and exit\n");
-  printf(
-"  -f             overwrite the output file if it already exists\n");
-  printf(
-"  -g ground      filename of the ground geometry\n");
-  printf(
-"  -h             display this help and exit\n");
-  printf(
-"  -i image       image to compute\n");
-  printf(
-"  -M materials   filename of the ground materials\n");
-  printf(
-"  -m mie         filename of the Mie's data\n");
-  printf(
-"  -n sky-name    name used to identify the sky in the materials file.\n"
-"                 Its default value is `%s'\n",
-    HTRDR_ATMOSPHERE_ARGS_DEFAULT.sky_mtl_name);
-  printf(
-"  -O cache       filenaname of the cache file used to store/restore the\n"
-"                 volumetric data. By default do not use any cache\n");
-  printf(
-"  -o output      file where data are written. If not defined, data are\n"
-"                 written to standard output\n");
-  printf(
-"  -p rectangle   switch in flux computation by defining the rectangular\n"
-"                 sensor onto which the flux is computed\n");
-  printf(
-"  -P camera      configure an orthoraphic camera\n");
-  printf(
-"  -R             infinitely repeat the ground along the X and Y axis\n");
-  printf(
-"  -r             infinitely repeat the clouds along the X and Y axis\n");
-  printf(
-"  -s spectral    define the spectral doamin of integration\n");
-  printf(
-"  -T optical_thickness\n"
-"                 optical thickness criteria for octree building.\n"
-"                 Default is %g\n",
-    HTRDR_ATMOSPHERE_ARGS_DEFAULT.optical_thickness);
-  printf(
-"  -t threads     hint on the number of threads to use.\n"
-"                 Default assumes as many threads as CPU cores\n");
-  printf(
-"  -V octree_definition\n"
-"                 advice on the definition of the atmospheric\n"
-"                 acceleration structures. By default use\n"
-"                 the definition of the clouds data\n");
-  printf(
-"  -v             make the command verbose\n");
-  printf("\n");
-  htrdr_fprint_license(cmd, stdout);
+  printf("usage: htrdr-atmosphere [-dfhRrv] [-c clouds]\n");
+  printf("                        [-C persp_camera_opt[:persp_camera_opt ...]]\n");
+  printf("                        [-D sun_azimuth,sun_elevation] [-g ground]\n");
+  printf("                        [-i image_opt[:image_opt ...]] [-M materials] [-m mie]\n");
+  printf("                        [-n sky_mtl] [-O cache] [-o output]\n");
+  printf("                        [-P ortho_camera_opt[:ortho_camera_opt ...]]\n");
+  printf("                        [-p flux_sensor_opt[:flux_sensor_opt ...]]\n");
+  printf("                        [-s spectral_opt[:spectral_opt ...]]\n");
+  printf("                        [-T optical_thickness] [-t threads_count] [-V x,y,z]\n");
+  printf("                        -a atmosphere\n");
 }
 
 static res_T
@@ -209,7 +148,7 @@ htrdr_atmosphere_args_init
       case 'f': args->force_overwriting = 1; break;
       case 'g': args->filename_obj = optarg; break;
       case 'h':
-        print_help(argv[0]);
+        usage();
         htrdr_atmosphere_args_release(args);
         args->quit = 1;
         goto exit;
@@ -257,19 +196,19 @@ htrdr_atmosphere_args_init
   }
   if(!args->filename_gas) {
     fprintf(stderr,
-      "Missing the path of the gas optical properties file -- option '-a'\n");
+      "missing the path of the gas optical properties file -- option '-a'\n");
     res = RES_BAD_ARG;
     goto error;
   }
   if(args->filename_obj && !args->filename_mtl) {
     fprintf(stderr,
-      "Missing the path of the file listing the ground materials -- option '-M'\n");
+      "missing the path of the file listing the ground materials -- option '-M'\n");
     res = RES_BAD_ARG;
     goto error;
   }
   if(args->filename_les && !args->filename_mie) {
     fprintf(stderr,
-      "Missing the path toward the file of the Mie's data -- option '-m'\n");
+      "missing the path toward the file of the Mie's data -- option '-m'\n");
     res = RES_BAD_ARG;
     goto error;
   }
@@ -293,6 +232,7 @@ htrdr_atmosphere_args_init
 exit:
   return res;
 error:
+  usage();
   htrdr_atmosphere_args_release(args);
   goto exit;
 }

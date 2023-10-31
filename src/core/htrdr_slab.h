@@ -41,7 +41,7 @@ typedef res_T
 BEGIN_DECLS
 
 /* Trace a ray into a slab composed of a cell infinitely repeated in X and Y */
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_slab_trace_ray
   (struct htrdr* htrdr,
    const double org[3],

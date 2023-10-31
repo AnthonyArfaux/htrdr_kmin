@@ -41,39 +41,9 @@
  * Helper functions
  ******************************************************************************/
 static void
-print_usage(const char* cmd)
+usage(void)
 {
-  ASSERT(cmd);
-  printf("Usage: %s [-v] [-h] <mode> [option] ...\n", cmd);
-}
-
-static void
-print_help(const char* cmd)
-{
-  ASSERT(cmd);
-
-  print_usage(cmd);
-  printf("Simulate radiative transfer.\n");
-  printf("See htrdr(1) man page for details\n");
-  printf("\n");
-
-  printf(
-"  -h             display this help and exit\n");
-  printf(
-"  -v             display version information and exit\n");
-  printf("\n");
-
-  printf("These are %s modes:\n", cmd);
-  printf("\n");
-  printf(
-"  atmosphere     Radiative transfer in a plane-parallel atmosphere\n");
-  printf(
-"  combustion     Radiative transfer within a sooting flame\n");
-  printf(
-"  planeto        Radiative transfer in a 3D planetory atmosphere\n");
-  printf("\n");
-
-  htrdr_fprint_license(cmd, stdout);
+  printf("usage: htrdr [-vh] [mode [options ...]]\n");
 }
 
 /*******************************************************************************
@@ -82,11 +52,10 @@ print_help(const char* cmd)
 int
 main(int argc, char** argv)
 {
-  char cmd_name[] = "htrdr";
   int err = 0;
 
   if(argc < 2) {
-    print_usage(argv[0]);
+    usage();
     err = -1;
     goto error;
   }
@@ -138,13 +107,13 @@ main(int argc, char** argv)
 
   /* Help */
   } else if(!strcmp(argv[1], "-h")) {
-    print_help(cmd_name);
+    usage();
     goto exit;
 
   /* Fallback */
   } else {
     fprintf(stderr, "Unknown option: %s\n", argv[1]);
-    print_usage(cmd_name);
+    usage();
     err = -1;
     goto error;
   }

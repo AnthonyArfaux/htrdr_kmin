@@ -343,7 +343,7 @@ atmosphere_compute_radiance_sw
   for(;;) {
     struct scattering_context scattering_ctx = SCATTERING_CONTEXT_NULL;
     struct ssf_bsdf* bsdf = NULL;
-    struct ssf_phase* phase;
+    struct ssf_phase* phase = NULL;
     double N[3];
     double bounce_reflectivity = 1;
     double sun_dir_pdf;

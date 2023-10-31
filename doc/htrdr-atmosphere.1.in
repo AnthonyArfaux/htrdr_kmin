@@ -1,0 +1,683 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd October 4, 2023
+.Dt HTRDR-ATMOSPHERE 1
+.Os
+.Sh NAME
+.Nm htrdr-atmosphere
+.Nd simulate radiative transfer in cloudy atmospheres
+.Sh SYNOPSIS
+.Nm
+.Op Fl dfhRrv
+.Op Fl c Pa clouds
+.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.Op Fl D Ar sun_azimuth , Ns Ar sun_elevation
+.Op Fl g Pa ground
+.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.Op Fl M Pa materials
+.Op Fl m Pa mie
+.Op Fl n Ar sky_mtl
+.Op Fl O Pa cache
+.Op Fl o Pa output
+.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+.Op Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+.Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+.Op Fl T Ar optical_thickness
+.Op Fl t Ar threads_count
+.Op Fl V Ar x , Ns Ar y , Ns Ar z
+.Fl a Pa atmosphere
+.Sh DESCRIPTION
+.Nm
+simulates radiative transfer in scenes composed of an atmospheric gas
+mixture, liquid clouds, and a ground.
+It evaluates the intensity incoming on each pixel of the sensor array.
+The underlying algorithm is based on a Monte Carlo method: it consists
+in simulating a given number of optical paths originating from the
+sensor, directed into the atmosphere, taking into account light
+absorption and scattering phenomena.
+.Pp
+Radiative transfer can be evaluated in any part of the spectrum.
+It uses the k distributions to be provided for the vertical profile of
+atmospheric pressure and temperature
+.Pq option Fl a .
+For clouds, the user must define the liquid water content suspended in
+clouds
+.Pq option Fl c ,
+and the optical properties of water droplets
+.Pq option Fl m .
+All that remains is to define the position of the sun
+.Pq option Fl D ,
+the properties of the sensor
+.Pq options Fl C , Fl P No or Fl p
+and the definition of the image
+.Pq option Fl i .
+You can also enter the geometry of the ground
+.Pq option Fl g
+and its associated materials
+.Pq option Fl M .
+Note that clouds and ground can be infinitely repeated along the X and Y
+axis
+.Pq option Fl r No and Fl R .
+.Pp
+Four types of sensor are provided.
+The pinhole camera and the thin-lens camera
+.Pq option Fl C
+are used to calculate the image of the scene from a given viewpoint.
+Unlike these two cameras, the orthographic camera
+.Pq option Fl P
+uses parallel projection rather than perspective projection.
+Finally, the rectangular sensor
+.Pq option Fl p
+is used to calculate flux maps.
+.Pp
+The spectral dimension can be integrated in various ways
+.Pq option Fl s .
+When rendering an image
+.Pq options Fl C No and Fl P
+the calculation is by default performed for the visible part of the
+spectrum between
+.Bq 380, 780
+nanometers, for the three components of the CIE 1931 XYZ color space
+which are then recombined to obtain the final color for each pixel.
+The other method consists of explicitly defining the longwave or
+shortwave spectral range to be processed and continuously sampling a
+wavelength within this range.
+Longwave and shortwave are key words here meaning that the source of
+radiation is either internal or external to the medium.
+For short-wave images the radiance of the pixel is evaluated and stored
+at the output.
+For long-wave images this estimated radiance is then converted into
+brightness temperature and both are stored at the output.
+When calculating a flux map
+.Pq option Fl p
+the flux per pixel is stored in the output map regardless of whether the
+spectral range is longwave or shortwave.
+.Pp
+In
+.Nm
+the spatial unit 1.0 corresponds to one meter and temperatures are
+expressed in Kelvin.
+Estimated radiances are given in W/sr/m^2 except for monochromatic
+calculations where the calculated spectral radiance is defined in
+W/sr/m^2/nm.
+Flux densities are recorded in W/m^2.
+The results are written to the output file if the
+.Fl o
+option is set and otherwise to standard output.
+The output image is a list of raw ASCII data formatted using the
+.Xr htrdr-image 5
+file format.
+.Pp
+.Nm
+implements mixed parallelism.
+On a single computer (that is, a node), it uses shared memory
+parallelism while it relies on Message Passing Interface (MPI) to
+parallelize calculations between multiple nodes.
+.Nm
+can therefore be launched either directly or via a process launcher such
+as
+.Xr mpirun 1
+to distribute the calculation on several computers.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl a Ar atmosphere
+Optical properties of atmospheric gases saved in htgop format.
+.It Fl c Pa clouds
+Cloud properties saved in
+.Xr htcp 5
+format.
+.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+Set up a pinhole or thin-lens perspective camera.
+.Pp
+The options for a perspective camera are as follows:
+.Bl -tag -width Ds
+.It Cm focal-dst= Ns Ar distance
+Distance to focus on with a thin lens camera, that is, a camera whose
+.Cm lens-radius
+is not zero.
+The default focal distance is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@ meters.
+.It Cm focal-length= Ns Ar length
+Focal length of a camera lens.
+It is another way to control the field of view of a thin lens camera.
+By default, the field of view is set through the
+.Cm fov
+parameter.
+.It Cm fov= Ns Ar angle
+Vertical field of view of the camera in
+]@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@,
+@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@[ degrees.
+The default field of view is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
+.It Cm lens-radius= Ar radius
+Radius of the camera lens.
+A non-zero radius means that the camera is a thin lens camera while a
+zero radius defines a pinhole camera.
+The default lens radius is
+@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@.
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Camera position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the camera is pointing towards.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
+.El
+.It Fl D Ar sun_azimuth , Ns Ar sun_elevation
+Direction toward the sun center.
+The direction is defined by two angles in degrees:
+the
+.Ar sun_azimuth
+angle in [0, 360[ and the
+.Ar sun_elevation
+angle in [0, 90].
+.Pp
+Following the right-handed convention, the azimuthal rotation is
+counter-clockwise, with 0 degree on the X axis.
+The elevation starts from 0 degree for a direction in the XY plane, up
+to 90 degrees at zenith.
+Thus
+.Li -D\ 0,0 ,
+.Li -D\ 90,0 ,
+.Li -D\ 180,0
+and
+.Li -D\ 270,0
+will produce solar vectors
+.Pq +1,0,0 ,
+.Pq 0,+1,0 ,
+.Pq -1,0,0
+and
+.Pq 0,-1,0
+respectively, while
+.Li -D\  Ns Ar sun_azminuth , Ns 90
+will produce
+.Pq 0,0,+1
+regardless of
+.Ar sun_azimuth
+value.
+.It Fl d
+Write to
+.Pa output
+the space partitioning data structures used to speed up cloud radiative
+transfer calculations.
+The data written are octrees saved in legacy VTK file format.
+Each octree node stores the minimum and maximum extinction coefficients
+of the cloud cells covered by the octree node.
+In the output file, each octree is separated from the previous one
+by a line containing three minus characters, i.e.\&
+.Li --- .
+.It Fl f
+Force overwriting of
+.Pa output
+file.
+.It Fl g Pa ground
+Ground geometry saved in
+.Xr htrdr-obj 5
+format.
+.It Fl h
+Display short help and exit.
+.It Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+Configure sensor image.
+.Pp
+The image options are as follows:
+.Bl -tag -width Ds
+.It Cm def= Ns Ar width Ns x Ns Ar height
+Image definition.
+Default is
+@HTRDR_ARGS_DEFAULT_IMG_WIDTH@x@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@.
+.It Cm spp= Ns Ar samples_per_pixel
+Number of samples to solve the Monte Carlo estimation of each pixel.
+In normal image rendering, a pixel will be estimated with
+.No 3\ *\  Ns Ar samples_per_pixel
+of Monte Carlo realisations, one set of
+.Ar samples_per_pixel
+for each X, Y and Z component of the CIE 1931 XYZ color space.
+In shortwave and longwave
+rendering or flux calculation, only one set of
+.Ar samples_per_pixel
+is used.
+By default,
+.Cm spp
+is set to @HTRDR_ARGS_DEFAULT_IMG_SPP@.
+.El
+.It Fl R
+Repeat the ground along the X and Y axes to infinity.
+.It Fl r
+Repeat the clouds along the X and Y axes to infinity.
+.It Fl M Pa materials
+Ground materials saved in
+.Xr htrdr-materials 5
+format.
+.It Fl m Pa mie
+Optical properties of water droplets saved in
+.Xr htmie 5
+format.
+.It Fl n Ar sky_mtl
+Name in the
+.Pa materials
+file representing the sky, i.e. the semi-transparent material.
+Default is @HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@.
+.It Fl O Pa cache
+File where atmospheric acceleration structures are stored/loaded.
+If the
+.Pa cache
+file does not exist, it is created and filled with acceleration
+structures constructed from the clouds
+.Pq option Fl c ,
+atmosphere
+.Pq option Fl a
+and mie
+.Pq option Fl m
+input files.
+This cached data can then be reused in subsequent executions, provided
+that the input files supplied to the command are the same as those used
+to set up the cache, thus considerably speeding up the pre-processing
+stage.
+.Pp
+If
+.Pa cache
+contains data generated from input files that are not those submitted on
+the command line, an error is notified and execution is aborted, thus
+avoiding the use of bad cached data.
+.Pp
+Note that when the cache is used,
+.Nm
+ignores the options used to build acceleration structures
+.Pq options Fl T No and Fl V .
+.It Fl o Pa output
+Output file.
+If not defined, data is written to standard output.
+.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+Set up an orthographic camera.
+.Pp
+The options for an orthographic camera are as follows:
+.Bl -tag -width Ds
+.It Cm height= Ns Ar lenght
+Image plane height.
+Its width is calculated from this length and the image ratio
+to guarantee square pixels
+.Pq see Fl i No option .
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Camera position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the camera is pointing towards.
+Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
+.El
+.It Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+Set up a flux sensor.
+The flux is computed for the part of the sensor that is outside any
+geometry.
+.Pp
+The flux sensor options are as follow:
+.Bl -tag -width Ds
+.It Cm pos= Ns Ar x , Ns Ar y , Ns Ar z
+Sensor center.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_POS@.
+.It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z
+Targeted position.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@.
+.It Cm up= Ns Ar x , Ns Ar y , Ns Ar z
+Upward vector that the top of the sensor is pointing towards.
+Default is  @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
+.It Cm sz= Ns Ar width , Ns Ar height
+Sensor size in meters.
+Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@.
+.El
+.It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+Configure spectral integration.
+.Pp
+The spectral integration options are as follows:
+.Bl -tag -width Ds
+.It Cm cie_xyz
+Calculate the radiance for the visible part of the spectrum between
+.Bq 380, 780
+nanometers using the XYZ CIE 1931 color matching functions.
+This is the default behavior.
+.It Cm lw= Ns Ar wlen_min , Ns Ar wlen_max
+Calculate the radiance using the internal source of radiation, i.e. the
+radiance emitted by the medium and its boundaries (ground and space).
+.Pp
+Calculations are performed between
+.Bq Ar wlen_min ,  Ar wlen_max
+nanometers according to Planck's function for a reference temperature.
+As the application mainly concerns the earth's atmosphere, internal
+radiation is emitted in the thermal, longwave part of the
+electromagnetic spectrum.
+Consequently, the default reference temperature is set at 290\ K.
+.Pp
+If
+.Ar wlen_min
+and
+.Ar wlen_max
+are equal, the calculation is monochromatic.
+.It Cm sw= Ns Ar wlen_min , Ns Ar wlen_max
+Calculate the radiance using the external source of radiance, i.e. the sun.
+.Pp
+Calculations are performed between
+.Bq Ar wlen_min ,  Ar wlen_max
+nanometers according to Planck's function for a reference temperature.
+As the application mainly concerns the earth's atmosphere, the default
+reference temperature is 5778\ K, i.e. the temperature of the sun's
+black body.
+.Pp
+If
+.Ar wlen_min
+and
+.Ar wlen_max
+are equal, the calculation is monochromatic.
+.It Cm Tref= Ns Ar temperature
+Reference temperature when integrating with respect to the Planck function.
+The default value is 290\ K or 5778\ K, depending on whether the
+radiation source is internal
+.Pq option Cm lw
+or external
+.Pq option Cm sw .
+.El
+.It Fl T Ar optical_thickness
+Optical thickness used as threshold criterion for building acceleration
+structures.
+Default is @HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+This option is ignored if a cache is used
+.Pq option Fl O .
+.It Fl t
+Advice on the number of threads to use.
+By default,
+.Nm
+uses many threads as processor cores.
+.It Fl V Ar x , Ns Ar y , Ns Ar z
+Maximum definition of acceleration structures.
+By default, the finest definition is that of clouds.
+This option is ignored if a cache is used
+.Pq option Fl O .
+.It Fl v
+Make
+.Nm
+verbose.
+.El
+.Sh OUTPUT IMAGE
+Images calculated by
+.Nm
+are saved in
+.Xr htrdr-image 5
+format.
+This section describes the nature and arrangement of image data
+depending on the type of calculation performed.
+.Ss XYZ image
+For an image rendering in the visible part of the spectrum
+.Pq default behavior or option Fl s Cm cie_xyz ,
+the pixel components store 4 estimates.
+The first, second, and third pairs of floating point values encode the
+estimated integrated radiance in W/sr/m^2 for the X, Y, and Z components
+of the CIE 1931 XYZ color space.
+The first value of each pair is the expected value of the
+average radiance of the pixel.
+The second value is its associated standard deviation.
+The fourth and final pair records the microsecond estimate of the
+computation time per radiative path and its standard error.
+.Ss Longwave image
+For infrared calculations
+.Pq option Fl s Cm lw= Ns Ar wlen_min , Ns Ar wlen_max
+the first and second pixel components store the expected value and the
+standard error of the estimated brightness temperature (in K),
+respectively.
+The third and fourth components record the expected value and the
+standard deviation of the pixel radiance which is either an integrated
+radiance in W/sr/m^2 or a spectral radiance in W/sr/m^2/nm depending on
+whether this radiance was calculated for a spectral range or at a single
+wavelength.
+The fifth and sixth pixel components are not used.
+Finally, the last 2 components of the pixel record the estimate in
+microseconds of the computation time per radiative path and its standard
+error.
+.Ss Shortwave image
+For shortwave calculations
+.Pq option Fl s Cm sw= Ns Ar wlen_min , Ns Ar wlen_max
+the output image is formatted as for a longwave image except that the
+first and second components of the pixels are not used, as no brightness
+temperature has been evaluated.
+.Ss Flux density map (shortwave and longwave)
+A flux density map
+.Pq option Fl p
+store on its first and second component
+the expected value and the standard error of the pixel radiative flux
+density
+.Pq in W/m^2 .
+All other components are unused excepted the seventh and eighth
+components that store the estimate of the radiative path computation
+time
+.Pq in microseconds
+and its standard error.
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Render a clear sky scene, i.e. a scene without any cloud, whose sun is at
+zenith.
+The vertical atmospheric gaz mixture along the Z axis is described in
+the
+.Pa gas.txt
+file.
+The ground geometry is a quad repeated to the infinity
+whose materials are listed in the
+.Pa material.mtl
+file.
+The camera is positioned at
+.Ar 400
+meters height and looks toward the positive Y axis.
+The definition of the rendered image is
+.Ar 800 No by Ar 600
+pixels and the radiance of each pixel component is estimated with
+.Ar 64
+Monte-Carlo realisations.
+The resulting image
+is written to
+.Pa output
+excepted if the file already exists; in this case an
+error is notified, the program stops and the
+.Pa output
+file remains unchanged:
+.Bd -literal -offset Ds
+htrdr-atmosphere -D 0,90 \\
+                 -a gas.txt \\
+                 -Rg quad.obj \\
+                 -M materials.mtl \\
+                 -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \\
+                 -i def=800x600:spp=64 \\
+                 -o output
+.Ed
+.Pp
+Add clouds to the previous scene and use a more complex geometry to
+represent the ground; it has been carefully designed to be cyclical and
+can therefore be repeated ad infinitum without visual glitches.
+Use the
+.Fl f
+option to write the rendered
+image to
+.Pa output
+even though the file already exists.
+Use
+.Xr htpp 1
+to convert the output
+.Xr htrdr-image 5
+in a regular PPM image:
+.Bd -literal -offset Ds
+htrdr-atmosphere -D 0,90 \\
+                 -a gas.txt \\
+                 -Rg mountains.obj \\
+                 -M materials.mtl \\
+                 -c clouds.htcp \\
+                 -m Mie.nc \\
+                 -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \\
+                 -i def=800x600:spp=64 \\
+                 -fo output
+htpp -o image.ppm output
+.Ed
+.Pp
+Render the previous scene in infrared for the wavelengths in
+.Bq Ar 9200 , Ar 10000
+nanometers with a reference temperature of
+.Ar 300
+Kelvin:
+.Bd -literal -offset Ds
+htrdr-atmosphere -a gas.txt \\
+                 -Rg mountains.obj -R \\
+                 -M materials.mtl \\
+                 -c clouds.htcp \\
+                 -m Mie.nc \\
+                 -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \\
+                 -i def=800x600:spp=64 \\
+                 -s lw=9200,10000:Tref=300 \\
+                 -fo output
+.Ed
+.Pp
+Move the sun by setting its azimuthal and elevation angles to
+.Ar 120 No and Ar 40
+degrees respectively.
+Use the
+.Fl O
+option to enable the cache mechanism of acceleration structures.
+Increase the image definition to
+.Ar 1280 No by Ar 720
+pixels and set the number of samples per pixel component to
+.Ar 1024 :
+.Bd -literal -offset Ds
+htrdr-atmosphere -D 120,40 \\
+                 -a gas.txt \\
+                 -Rg mountains.obj \\
+                 -M materials.mtl \\
+                 -c clouds.htcp \\
+                 -m Mie.nc \\
+                 -O my_cache \\
+                 -C pos=0,0,400:tgt=0,1,0:up=0,0,1 \\
+                 -i def=1280x720:spp=1024 \\
+                 -fo output
+.Ed
+.Pp
+Compute the downward flux for the shortwave interval
+.Bq Ar 350 , Ar 4000
+nanometers on a square of
+.Ar 100
+meters side positioned at the origin at
+.Ar 1
+meter height.
+The resolution of the flux map is
+.Ar 500 No by Ar 500
+pixels and
+.Ar 1000
+realisations is used to estimate the flux per pixel.
+It is saved in the
+.Pa flux_map.txt
+file even though this file already exists:
+.Bd -literal -offset Ds
+htrdr-atmosphere -D 0,90 \\
+                 -a gas.txt \\
+                 -Rg plane.obj \\
+                 -M materials.mtl \\
+                 -c clouds.htcp \\
+                 -m Mie.nc \\
+                 -O my_cache \\
+                 -p pos=0,0,1:tgt=0,0,2:up=0,1,0:sz=100,100 \\
+                 -i def=500x500:spp=1000 \\
+                 -s sw=350,4000 \\
+                 -fo flux_map.txt
+.Ed
+.Pp
+Write cloud acceleration structures as output.
+Use
+.Xr csplit 1
+to save each of them in a specific VTK file named
+.Pa octree Ns Ar ID ,
+.Ar ID
+being between
+.Bq 0, N-1
+and N being the total number of acceleration structures (N > 1):
+.Bd -literal -offset Ds
+htrdr-atmosphere -a gas.txt -m Mie.nc -c clouds.htcp -d -fo output
+N="$(grep -ce "^# vtk" output)"
+sed /^---$/d output \\
+| csplit -f octree -k - %^#\\ vtk% /^#\\ vtk/ {$((${N}-2))}
+.Ed
+.Sh SEE ALSO
+.Xr mpirun 1 ,
+.Xr htcp 5 ,
+.Xr htmie 5 ,
+.Xr htrdr-image 5 ,
+.Xr htrdr-materials 5 ,
+.Xr htrdr-obj 5
+.Rs
+.%A |Méso|Star>
+.%T High-Tune: gas optical properties file format
+.%D November 2018
+.%U https://www.meso-star.com/projects/htrdr/downloads/gas_opt_prop_en.pdf
+.Re
+.Rs
+.%A Najda Villefranque
+.%A Richard Fournier
+.%A Fleur Couvreux
+.%A Stéphane Blanco
+.%A Céline Cornet
+.%A Vincent Eymet
+.%A Vincent Forest
+.%A Jean-Marc Trégan
+.%T A Path-Tracing Monte Carlo library for 3-D Radiative Transfer in \
+Highly Resolved Cloudy Atmospheres
+.%J Journal of Advances in Modeling Earth Systems
+.%V 11
+.%N 8
+.%P 2449-2473
+.%D 2019
+.%U https://dx.doi.org/10.1029/2018MS001602
+.Re
+.Sh STANDARDS
+.Rs
+.%A International Organization for Standardization / CIE
+.%R ISO/CIE 11664-1:2019
+.%D June 2019
+.%T Colorimetry - Part 1: CIE standard colorimetric observers
+.Re
+.Pp
+.Rs
+.%A OpenMP Architecture Review Board
+.%D March 2002
+.%T OpenMP C and C++ Application Interface
+.%O version 2.0
+.Re
+.Pp
+.Rs
+.%A Message Passing Interface Forum
+.%D July 1997
+.%T MPI-2: Extensions to The Message-Passing Interface
+.Re
+.Sh HISTORY
+.Nm
+has been initially developed as part of
+.Li ANR-16-CE01-0010
+High-Tune project.
+It was then extended in
+.Li MODEVAL-URBA 2019 .

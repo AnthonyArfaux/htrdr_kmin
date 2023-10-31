@@ -1,0 +1,120 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd October 4, 2023
+.Dt HTRDR-IMAGE 5
+.Os
+.Sh NAME
+.Nm htrdr-image
+.Nd two dimensional image format
+.Sh DESCRIPTION
+.Nm
+is an image format where data is stored as plain text.
+Text after the
+.Li \&#
+character is considered a comment and is therefore ignored, as are empty
+lines.
+The first valid line stores 2 unsigned integers representing the image
+definition, i.e. the number of pixels per row and column.
+Next, each line stores the 8 components of a pixel.
+.Pp
+Pixels are sorted line by line, with the origin defined in the top left
+corner of the image.
+With an image definition of N by M pixels, with N the number of pixels
+per line and M the total number of lines in the image, the first N
+pixels correspond to the pixels on the top line of the image, the next N
+pixels are the pixels on the second line and so on.
+.Pp
+.Xr htpp 1
+can be used to convert images in
+.Nm
+format into a regular PPM image.
+Note that the nature and unit of the data stored in a
+.Nm
+file are not determined by the file format itself.
+Please refer to the program that generates the image for a full
+description of the data it contains.
+.Pp
+The file format is as follows:
+.Bl -column (definition) (::=) ()
+.It Ao Va htrdr-image Ac Ta ::= Ta Ao Va definition Ac
+.It Ta Ta Ao Va pixel Ac
+.It Ta Ta Va ...
+.It \  Ta Ta
+.It Ao Va definition Ac Ta ::= Ta Ao Va width Ac Ao Va height Ac
+.It Ao Va width Ac Ta ::= Ta Va integer
+.It Ao Va height Ac Ta ::= Ta Va integer
+.It Ao Va pixel Ac Ta ::= Ta
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.Aq Va cpt
+.It Ao Va cpt Ac Ta ::= Ta Va real
+# Pixel component
+.El
+.Sh EXAMPLES
+Image of 800 by 600 pixels.
+The comment after each pixel is the pixel's index in the image: the
+first and second integers are respectively the pixel's row and column
+index in the image:
+.Bd -literal
+800 600 # Image definition
+
+# Pixels of the 1st line
+2.55e-4 2.90e-5 3.75e-4 4.48e-5 3.20e-4 3.16e-5 306.484 259.7 # (1,1)
+2.95e-4 3.37e-5 3.39e-4 4.16e-5 3.38e-4 4.60e-5 18.3633 2.663 # (2,1)
+3.76e-4 5.43e-5 3.13e-4 3.48e-5 3.38e-4 3.32e-5 19.6252 2.670 # (3,1)
+  ...
+7.13e-4 1.14e-4 7.66e-4 1.35e-4 7.97e-4 1.26e-4 119.820 93.78 # (799,1)
+6.59e-4 1.14e-4 7.47e-4 1.41e-4 4.39e-4 7.33e-5 24.8655 2.463 # (800,1)
+
+# Pixels of the 2nd line
+3.33e-4 6.02e-5 4.21e-4 7.66e-5 3.44e-4 3.81e-5 19.4580 2.506 # (1,2)
+3.50e-4 4.93e-5 3.23e-4 2.52e-5 3.03e-4 2.42e-5 102.566 81.29 # (2,2)
+2.72e-4 4.69e-5 3.41e-4 4.12e-5 2.52e-4 2.06e-5 25.5801 5.377 # (3,2)
+  ...
+7.52e-4 1.31e-4 8.91e-4 1.84e-4 5.48e-4 1.30e-4 46.5418 12.47 # (799,2)
+6.82e-4 1.42e-4 6.61e-4 7.85e-5 4.44e-4 5.99e-5 59.8728 32.14 # (800,2)
+
+  ...
+
+# Pixels of the 600th line
+2.69e-4 7.44e-5 2.31e-4 2.56e-5 1.95e-4 2.30e-5 43.8242 15.00 # (1,600)
+4.32e-4 1.25e-4 2.22e-4 2.22e-5 2.04e-4 2.60e-5 25.5498 1.739 # (2,600)
+2.78e-4 5.81e-5 2.75e-4 4.99e-5 2.17e-4 3.30e-5 38.4448 7.161 # (3,600)
+  ...
+3.54e-4 4.32e-5 3.07e-4 3.80e-5 2.38e-4 2.49e-5 102.893 36.98 # (799,600)
+3.07e-4 2.61e-5 4.60e-4 1.13e-4 2.69e-4 4.29e-5 42.75070 11.9 # (800,600)
+.Ed
+.Sh SEE ALSO
+.Xr htpp 1 ,
+.Xr htrdr 1
+.Sh HISTORY
+The
+.Nm
+format was first developed for the
+.Xr htrdr 1
+program.

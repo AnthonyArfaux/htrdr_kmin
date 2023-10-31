@@ -47,21 +47,21 @@ struct htrdr_ran_wlen_discrete;
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_ran_wlen_discrete_create
   (struct htrdr* htrdr,
    const struct htrdr_ran_wlen_discrete_create_args* args,
    struct htrdr_ran_wlen_discrete** ran);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_ran_wlen_discrete_ref_get
   (struct htrdr_ran_wlen_discrete* ran);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_ran_wlen_discrete_ref_put
   (struct htrdr_ran_wlen_discrete* ran);
 
-HTRDR_CORE_API double /* wavelength in nanometer */
+HTRDR_API double /* wavelength in nanometer */
 htrdr_ran_wlen_discrete_sample
   (struct htrdr_ran_wlen_discrete* ran,
    const double r0, const double r1, /* Canonical number in [0, 1[ */

@@ -86,7 +86,7 @@ htrdr_draw_pixel_args_check(const struct htrdr_draw_pixel_args* args)
  ******************************************************************************/
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_draw_map
   (struct htrdr* htrdr,
    const struct htrdr_draw_map_args* args,

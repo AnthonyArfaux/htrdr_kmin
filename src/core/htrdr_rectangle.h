@@ -33,7 +33,7 @@ struct htrdr_rectangle; /* 2D rectangle transformed in 3D */
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_rectangle_create
   (struct htrdr* htrdr,
    const double sz[2], /* Size of the rectangle along its local X and Y axis */
@@ -42,41 +42,41 @@ htrdr_rectangle_create
    const double up[3], /* vector orthogonal to the rectangle X axis */
    struct htrdr_rectangle** rect);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_ref_get
   (struct htrdr_rectangle* rect);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_ref_put
   (struct htrdr_rectangle* rect);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_sample_pos
   (const struct htrdr_rectangle* rect,
    const double sample[2], /* In [0, 1[ */
    double pos[3]);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_get_normal
   (const struct htrdr_rectangle* rect,
    double normal[3]);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_get_center
   (const struct htrdr_rectangle* rect,
    double center[3]);
 
-HTRDR_CORE_API double*
+HTRDR_API double*
 htrdr_rectangle_get_transform
   (const struct htrdr_rectangle* rect,
    double transform[12]);
 
-HTRDR_CORE_API double*
+HTRDR_API double*
 htrdr_rectangle_get_transform_inverse
   (const struct htrdr_rectangle* rect,
    double transform_inverse[12]);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_rectangle_get_size
   (const struct htrdr_rectangle* rect,
    double size[2]);

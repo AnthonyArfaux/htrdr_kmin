@@ -1,0 +1,96 @@
+.\" Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
+.\" Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+.\" Copyright (C) 2022-2023 Institut Pierre-Simon Laplace
+.\" Copyright (C) 2022-2023 Institut de Physique du Globe de Paris
+.\" Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2022-2023 Observatoire de Paris
+.\" Copyright (C) 2022-2023 Université de Reims Champagne-Ardenne
+.\" Copyright (C) 2022-2023 Université de Versaille Saint-Quentin
+.\" Copyright (C) 2018-2019, 2022-2023 Université Paul Sabatier
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd October 5, 2023
+.Dt HTRDR-MATERIALS 5
+.Os
+.Sh NAME
+.Nm htrdr-materials
+.Nd materials list format
+.Sh DESCRIPTION
+A
+.Nm
+file lists materials in plain text.
+Each line of the file gives the name of the material.
+For opaque materials, the material name is followed by the path to a
+file storing the spectral properties of the associated Bidirectional
+Reflectance Distribution Function
+.Pq BRDF ,
+saved in
+.Xr mrumtl 5
+format.
+The material temperature is defined as the last parameter in the line,
+after the BRDF file mentioned above.
+.Pp
+The material name can be composed of any character except spaces and
+tabs.
+The path to the
+.Xr mrumtl 5
+file must be a valid absolute path in the file system.
+.Pp
+Text after the
+.Li \&#
+character is considered a comment and is therefore ignored, as are empty
+lines.
+.Pp
+The file format is as follows:
+.Bl -column (htrdr-materials) (::=) ()
+.It Ao Va htrdr-materials Ac Ta ::= Ta Ao Va material Ac
+.It Ta Ta Va ...
+.It Ao Va material Ac Ta ::= Ta Ao Va name Ac Ao Va properties Ac
+.It Ao Va properties Ac Ta ::= Ta Li none No \&|
+.Aq Va brdf
+.Aq Va temperature
+.It Ao Va brdf Ac Ta ::= Ta Pa path
+# mrumtl file
+.It Ao Va temperature Ac Ta ::= Ta Va real
+# In Kelvin
+.El
+.Sh EXAMPLES
+The following file lists 3 materials.
+The first,
+.Va grass ,
+has its spectral BRDF defined in file
+.Pa A001.mrumtl .
+The second, named
+.Va sand ,
+has its spectral properties recorded in file
+.Pa B002.mrumtl .
+Both materials have a temperature of
+.Va 300
+Kelvin.
+The final material is a semi-transparent material named
+.Va air
+with no additional properties defined in this file:
+.Bd -literal -offset -Ds
+grass   /opt/materials/A001.mrumtl 300
+sand    /opt/materials/B002.mrumtl 300
+air     none
+.Ed
+.Sh SEE ALSO
+.Xr mrumtl 5
+.Sh HISTORY
+The
+.Nm
+format was first developed for the
+.Xr htrdr 1
+program.

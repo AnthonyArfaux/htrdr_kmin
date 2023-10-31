@@ -58,47 +58,47 @@ HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL = HTRDR_GEOMETRY_TRACE_RAY_ARGS_NULL__;
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_geometry_create
   (struct htrdr* htrdr,
    const char* obj_filename,
    struct htrdr_materials* mats, /* Library of materials */
    struct htrdr_geometry** geometry);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_geometry_ref_get
   (struct htrdr_geometry* geom);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_geometry_ref_put
   (struct htrdr_geometry* geom);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_geometry_get_interface
   (struct htrdr_geometry* geom,
    const struct s3d_hit* hit,
    struct htrdr_interface* interface);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_geometry_get_hit_position
   (const struct htrdr_geometry* geom,
    const struct s3d_hit* hit,
    double position[3]);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_geometry_trace_ray
   (struct htrdr_geometry* geom,
    const struct htrdr_geometry_trace_ray_args* args,
    struct s3d_hit* hit);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_geometry_find_closest_point
   (struct htrdr_geometry* geom,
    const double position[3],
    const double radius,
    struct s3d_hit* hit);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_geometry_get_aabb
   (const struct htrdr_geometry* geom,
    double lower[3],
@@ -106,7 +106,7 @@ htrdr_geometry_get_aabb
 
 /* Empirical value relative to the extent of the geometry that represents the
  * threshold below which a numerical problem could occur. */
-HTRDR_CORE_API double
+HTRDR_API double
 htrdr_geometry_get_epsilon
   (const struct htrdr_geometry* geom);
 
