@@ -95,6 +95,47 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.10
+
+#### Use POSIX make as a build system
+
+The build procedure is now written in POSIX make instead of CMake.
+In addition to the features already provided by its CMake alternative,
+the Makefile supports the use of static libraries and provides an
+uninstall target. In any case, the main motivation behind its writing is
+to use a good old well-established standard with simple features,
+available on all UNIX systems, thus simplifying its portability and
+support while being much lighter
+
+#### Proof-reading and editing manual pages
+
+Write the man pages directly in mdoc's roff macros, instead of using the
+scdoc markup language as a source for man pages.
+
+Unlike writing manuals with man's roff macros, and even more so with
+scdoc, mdoc macros take care of layout, font handling and all the other
+typesetting details which, by construction, guarantee the consistency of
+all manuals without leaving the responsibility to the individual author.
+This also facilitates translation into other formats and documentation
+tools. These are the main reasons for writing manual pages with mdoc
+macros.
+
+A complete re-reading of the manual pages was carried out during the
+translation into mdoc, with several corrections and rewrites to make the
+manual clearer.
+
+#### Bug fixes
+
+- Fix the construction of the planck/CIE cumulative: the memory space
+  required could be prohibitive, leading to a shortage of memory space.
+- Update error handling in `htrdr_ran_wlen_planck_create` to avoid
+  freeing up the same memory space several times, and thus causing a
+  crash.
+- All dependencies have been updated. In particular, the `htmi` and
+  `rnatm` libraries have been updated to version 0.1. They fixe several
+  problems with the atmosphere and planeto commands. See their release
+  note for more information.
+
 ### Version 0.9.2
 
 - Update the `rnatm` library to version 0.0.1. This versions fixes
