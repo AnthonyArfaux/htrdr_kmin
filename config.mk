@@ -63,6 +63,8 @@ HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT = 512
 ################################################################################
 AR = ar
 CC = cc
+LD = ld
+OBJCOPY = objcopy
 PKG_CONFIG = pkg-config
 RANLIB = ranlib
 
@@ -254,3 +256,7 @@ LDFLAGS_RELEASE = -s $(LDFLAGS_HARDENED)
 
 LDFLAGS_SO = $(LDFLAGS_$(BUILD_TYPE)) -shared -Wl,--no-undefined
 LDFLAGS_EXE = $(LDFLAGS_$(BUILD_TYPE)) -pie
+
+OCPFLAGS_DEBUG = --localize-hidden
+OCPFLAGS_RELEASE = --localize-hidden --strip-unneeded
+OCPFLAGS = $(OCPFLAGS_$(BUILD_TYPE))

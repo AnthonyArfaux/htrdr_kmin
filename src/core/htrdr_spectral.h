@@ -149,7 +149,7 @@ htrdr_planck
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_brightness_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */
@@ -158,7 +158,7 @@ htrdr_brightness_temperature
    const double radiance,
    double* temperature);
 
-HTRDR_CORE_API double
+HTRDR_API double
 htrdr_radiance_temperature
   (struct htrdr* htrdr,
    const double lambda_min, /* In meters */

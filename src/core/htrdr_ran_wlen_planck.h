@@ -35,7 +35,7 @@ struct htrdr_ran_wlen_planck;
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_ran_wlen_planck_create
   (struct htrdr* htrdr,
    const double range[2], 
@@ -45,16 +45,16 @@ htrdr_ran_wlen_planck_create
    const double ref_temperature, /* Reference temperature */
    struct htrdr_ran_wlen_planck** planck);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_ran_wlen_planck_ref_get
   (struct htrdr_ran_wlen_planck* planck);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_ran_wlen_planck_ref_put
   (struct htrdr_ran_wlen_planck* planck);
 
 /* Return a wavelength in nanometer */
-HTRDR_CORE_API double
+HTRDR_API double
 htrdr_ran_wlen_planck_sample
   (const struct htrdr_ran_wlen_planck* planck,
    const double r0, /* Canonical number in [0, 1[ */

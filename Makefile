@@ -26,6 +26,10 @@
 
 include config.mk
 
+ATMOSPHERE_LIBNAME = libhtrdr-atmosphere.a
+COMBUSTION_LIBNAME = libhtrdr-combustion.a
+PLANETO_LIBNAME = libhtrdr-planeto.a
+
 PKG_CONFIG_LOCAL = PKG_CONFIG_PATH="./:$${PKG_CONFIG_PATH}" $(PKG_CONFIG)
 
 # Define macros when ATMOSPHERE is set to ENABLE
@@ -33,21 +37,21 @@ ATMOSPHERE_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-atmosp
 ATMOSPHERE_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-atmosphere)
 ATMOSPHERE_BUILD_LIB_ENABLE = build_atmosphere
 ATMOSPHERE_BUILD_CMD_ENABLE = build_htrdr_atmosphere
-ATMOSPHERE_LIBNAME_ENABLE = libhtrdr-atmosphere.a
+ATMOSPHERE_LIBNAME_ENABLE = $(ATMOSPHERE_LIBNAME)
 
 # Define macros when COMBUSTION is set to ENABLE
 COMBUSTION_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-combustion)
 COMBUSTION_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-combustion)
 COMBUSTION_BUILD_LIB_ENABLE = build_combustion
 COMBUSTION_BUILD_CMD_ENABLE = build_htrdr_combustion
-COMBUSTION_LIBNAME_ENABLE = libhtrdr-combustion.a
+COMBUSTION_LIBNAME_ENABLE = $(COMBUSTION_LIBNAME)
 
 # Define macros when PLANETO is set to ENABLE
 PLANETO_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planeto)
 PLANETO_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planeto)
 PLANETO_BUILD_LIB_ENABLE = build_planeto
 PLANETO_BUILD_CMD_ENABLE = build_htrdr_planeto
-PLANETO_LIBNAME_ENABLE = libhtrdr-planeto.a
+PLANETO_LIBNAME_ENABLE = $(PLANETO_LIBNAME)
 
 # Default target
 all:\
@@ -62,7 +66,6 @@ all:\
 	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
 	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
 	@echo "config done" > $@
-
 
 # Inference rules for command build
 .SUFFIXES: .c .d .o
@@ -215,10 +218,6 @@ CORE_LIBNAME_STATIC = libhtrdr-core.a
 CORE_LIBNAME_SHARED = libhtrdr-core.so
 CORE_LIBNAME = $(CORE_LIBNAME_$(LIB_TYPE))
 
-CORE_CFLAGS_SHARED = $(CFLAGS_SO)
-CORE_CFLAGS_STATIC = $(CFLAGS_EXE)
-CORE_CFLAGS = $(CORE_CFLAGS_$(LIB_TYPE))
-
 CORE_SRC =\
  src/core/htrdr.c\
  src/core/htrdr_args.c\
@@ -247,11 +246,15 @@ build_core: .config_core htrdr-core.pc $(CORE_DEP)
 $(CORE_DEP) $(CORE_OBJ): config.mk src/core/htrdr_args.h src/core/htrdr_version.h
 
 $(CORE_LIBNAME_SHARED): $(CORE_OBJ)
-	$(CC) $(CORE_CFLAGS) $(CORE_DPDC_CFLAGS) -o $@ $(CORE_OBJ) $(LDFLAGS_SO) $(CORE_DPDC_LIBS)
+	$(CC) $(CFLAGS_SO) $(CORE_DPDC_CFLAGS) -o $@ $(CORE_OBJ) $(LDFLAGS_SO) $(CORE_DPDC_LIBS)
 
-$(CORE_LIBNAME_STATIC): $(CORE_OBJ)
+$(CORE_LIBNAME_STATIC): libhtrdr-core.o
 	$(AR) -rc $@ $?
 	$(RANLIB) $@
+
+libhtrdr-core.o: $(CORE_OBJ)
+	$(LD) -r $(CORE_OBJ) -o $@
+	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_core: config.mk
 	@if ! $(PKG_CONFIG) --atleast-version $(AW_VERSION) aw; then \
@@ -298,10 +301,10 @@ src/core/htrdr_version.h: config.mk src/core/htrdr_version.h.in
 	    $@.in > $@
 
 $(CORE_DEP):
-	@$(CC) $(CORE_CFLAGS) $(CORE_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+	@$(CC) $(CFLAGS_SO) $(CORE_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
 
 $(CORE_OBJ):
-	$(CC) $(CORE_CFLAGS) $(CORE_DPDC_CFLAGS) -Isrc -DHTRDR_CORE_SHARED_BUILD -c $(@:.o=.c) -o $@
+	$(CC) $(CFLAGS_SO) $(CORE_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
 
 htrdr-core.pc: config.mk htrdr-core.pc.in
 	sed -e 's/@VERSION@/$(VERSION)/g' \
@@ -317,9 +320,9 @@ htrdr-core.pc: config.mk htrdr-core.pc.in
 	    $@.in > $@
 
 clean_core:
-	rm -f $(CORE_OBJ) $(CORE_LIBNAME)
-	rm -f .config_core src/core/htrdr_args.h src/core/htrdr_version.h
-	rm -f htrdr-core.pc
+	rm -f $(CORE_OBJ) $(CORE_LIBNAME) libhtrdr-core.o
+	rm -f .config_core mobhtrdr-core.o htrdr-core.pc
+	rm -f src/core/htrdr_args.h src/core/htrdr_version.h
 
 distclean_core: clean_core
 	rm -f $(CORE_DEP)
@@ -327,8 +330,6 @@ distclean_core: clean_core
 ################################################################################
 # Building the atmosphere library
 ################################################################################
-ATMOSPHERE_LIBNAME = libhtrdr-atmosphere.a
-
 ATMOSPHERE_SRC =\
  src/atmosphere/htrdr_atmosphere_args.c\
  src/atmosphere/htrdr_atmosphere.c\
@@ -347,9 +348,13 @@ build_atmosphere: build_core .config_atmosphere htrdr-atmosphere.pc $(ATMOSPHERE
 
 $(ATMOSPHERE_DEP) $(ATMOSPHERE_OBJ): config.mk src/atmosphere/htrdr_atmosphere_args.h
 
-$(ATMOSPHERE_LIBNAME): $(ATMOSPHERE_OBJ)
+$(ATMOSPHERE_LIBNAME): libhtrdr-atmosphere.o
 	$(AR) -rc $@ $?
 	$(RANLIB) $@
+
+libhtrdr-atmosphere.o: $(ATMOSPHERE_OBJ)
+	$(LD) -r $(ATMOSPHERE_OBJ) -o $@
+	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_atmosphere: config.mk
 	@if ! $(PKG_CONFIG) --atleast-version $(HTSKY_VERSION) htsky; then \
@@ -374,10 +379,10 @@ src/atmosphere/htrdr_atmosphere_args.h: config.mk src/atmosphere/htrdr_atmospher
 	    $@.in > $@
 
 $(ATMOSPHERE_DEP):
-	@$(CC) $(CFLAGS_EXE) $(ATMOSPHERE_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+	@$(CC) $(CFLAGS_SO) $(ATMOSPHERE_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
 
 $(ATMOSPHERE_OBJ):
-	$(CC) $(CFLAGS_EXE) $(ATMOSPHERE_DPDC_CFLAGS) -Isrc -DHTRDR_STATIC -c $(@:.o=.c) -o $@
+	$(CC) $(CFLAGS_SO) $(ATMOSPHERE_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
 
 htrdr-atmosphere.pc: config.mk htrdr-atmosphere.pc.in
 	sed -e 's/@VERSION@/$(VERSION)/g' \
@@ -392,8 +397,8 @@ htrdr-atmosphere.pc: config.mk htrdr-atmosphere.pc.in
 
 clean_atmosphere:
 	rm -f $(ATMOSPHERE_OBJ) $(ATMOSPHERE_LIBNAME)
-	rm -f .config_atmosphere src/atmosphere/htrdr_atmosphere_args.h
-	rm -f htrdr-atmosphere.pc
+	rm -f .config_atmosphere libhtrdr-atmosphere.o htrdr-atmosphere.pc
+	rm -f src/atmosphere/htrdr_atmosphere_args.h
 
 distclean_atmosphere: clean_atmosphere
 	rm -f $(ATMOSPHERE_DEP)
@@ -401,8 +406,6 @@ distclean_atmosphere: clean_atmosphere
 ################################################################################
 # Building the combustion library
 ################################################################################
-COMBUSTION_LIBNAME = libhtrdr-combustion.a
-
 COMBUSTION_SRC =\
  src/combustion/htrdr_combustion.c\
  src/combustion/htrdr_combustion_args.c\
@@ -421,9 +424,13 @@ build_combustion: build_core .config_combustion htrdr-combustion.pc $(COMBUSTION
 
 $(COMBUSTION_DEP) $(COMBUSTION_OBJ): config.mk src/combustion/htrdr_combustion_args.h
 
-$(COMBUSTION_LIBNAME): $(COMBUSTION_OBJ)
+$(COMBUSTION_LIBNAME): libhtrdr-combustion.o
 	$(AR) -rc $@ $?
 	$(RANLIB) $@
+
+libhtrdr-combustion.o: $(COMBUSTION_OBJ)
+	$(LD) -r $(COMBUSTION_OBJ) -o $@
+	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_combustion: config.mk
 	@if ! $(PKG_CONFIG) --atleast-version $(ATRSTM_VERSION) atrstm; then \
@@ -452,11 +459,10 @@ src/combustion/htrdr_combustion_args.h: config.mk src/combustion/htrdr_combustio
 	    $@.in > $@
 
 $(COMBUSTION_DEP):
-	@$(CC) $(CFLAGS_EXE) $(COMBUSTION_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+	@$(CC) $(CFLAGS_SO) $(COMBUSTION_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
 
 $(COMBUSTION_OBJ):
-	$(CC) $(CFLAGS_EXE) $(COMBUSTION_DPDC_CFLAGS) -Isrc -DHTRDR_STATIC -c $(@:.o=.c) -o $@
-
+	$(CC) $(CFLAGS_SO) $(COMBUSTION_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
 
 htrdr-combustion.pc: config.mk htrdr-combustion.pc.in
 	sed -e 's/@VERSION@/$(VERSION)/g' \
@@ -471,8 +477,8 @@ htrdr-combustion.pc: config.mk htrdr-combustion.pc.in
 
 clean_combustion:
 	rm -f $(COMBUSTION_OBJ) $(COMBUSTION_LIBNAME)
-	rm -f .config_combustion src/combustion/htrdr_combustion_args.h
-	rm -f htrdr-combustion.pc
+	rm -f .config_combustion libhtrdr-combustion.o htrdr-combustion.pc
+	rm -f src/combustion/htrdr_combustion_args.h
 
 distclean_combustion: clean_combustion
 	rm -f $(COMBUSTION_DEP)
@@ -498,9 +504,13 @@ build_planeto: build_core .config_planeto htrdr-planeto.pc $(PLANETO_DEP)
 
 $(PLANETO_DEP) $(PLANETO_OBJ): config.mk src/planeto/htrdr_planeto_args.h
 
-$(PLANETO_LIBNAME): $(PLANETO_OBJ)
+$(PLANETO_LIBNAME): libhtrdr-planeto.o
 	$(AR) -rc $@ $?
 	$(RANLIB) $@
+
+libhtrdr-planeto.o: $(PLANETO_OBJ)
+	$(LD) -r $(PLANETO_OBJ) -o $@
+	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_planeto: config.mk
 	@if ! $(PKG_CONFIG) --atleast-version $(RNATM_VERSION) rnatm; then \
@@ -529,10 +539,10 @@ src/planeto/htrdr_planeto_args.h: config.mk src/planeto/htrdr_planeto_args.h.in
 	    $@.in > $@
 
 $(PLANETO_DEP):
-	@$(CC) $(CFLAGS_EXE) $(PLANETO_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+	@$(CC) $(CFLAGS_SO) $(PLANETO_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
 
 $(PLANETO_OBJ):
-	$(CC) $(CFLAGS_EXE) $(PLANETO_DPDC_CFLAGS) -Isrc -DHTRDR_STATIC -c $(@:.o=.c) -o $@
+	$(CC) $(CFLAGS_SO) $(PLANETO_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
 
 htrdr-planeto.pc: config.mk htrdr-planeto.pc.in
 	sed -e 's/@VERSION@/$(VERSION)/g' \
@@ -549,8 +559,8 @@ htrdr-planeto.pc: config.mk htrdr-planeto.pc.in
 
 clean_planeto:
 	rm -f $(PLANETO_OBJ) $(PLANETO_LIBNAME)
-	rm -f .config_planeto src/planeto/htrdr_planeto_args.h
-	rm -f htrdr-planeto.pc
+	rm -f .config_planeto libhtrdr-planeto.o htrdr-planeto.pc
+	rm -f src/planeto/htrdr_planeto_args.h
 
 distclean_planeto: clean_planeto
 	rm -f $(PLANETO_DEP)

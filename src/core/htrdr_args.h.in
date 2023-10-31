@@ -131,44 +131,44 @@ static const struct htrdr_args_spectral HTRDR_ARGS_SPECTRAL_DEFAULT =
  ******************************************************************************/
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_camera_perspective_parse
   (struct htrdr_args_camera_perspective* cam,
    const char* str);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_camera_perspective_check
   (const struct htrdr_args_camera_perspective* cam);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_camera_orthographic_parse
   (struct htrdr_args_camera_orthographic* cam,
    const char* str);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_rectangle_parse
   (struct htrdr_args_rectangle* rect,
    const char* str);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_image_parse
   (struct htrdr_args_image* img,
    const char* str);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_image_check
   (const struct htrdr_args_image* img);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_spectral_parse
   (struct htrdr_args_spectral* spectral,
    const char* str);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_args_geometry_free
   (struct htrdr_args_geometry* geom);
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_args_geometry_parse
   (struct htrdr_args_geometry* geom,
    const char* str);

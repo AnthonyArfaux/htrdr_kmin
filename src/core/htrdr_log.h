@@ -35,7 +35,7 @@ struct htrdr;
 
 BEGIN_DECLS
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_log
   (struct htrdr* htrdr,
    const char* msg,
@@ -45,7 +45,7 @@ htrdr_log
 #endif
   ;
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_log_err
   (struct htrdr* htrdr,
    const char* msg,
@@ -55,7 +55,7 @@ htrdr_log_err
 #endif
   ;
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_log_warn
   (struct htrdr* htrdr,
    const char* msg,

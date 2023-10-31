@@ -82,30 +82,30 @@ struct htrdr_buffer;
 
 BEGIN_DECLS
 
-HTRDR_CORE_API res_T
+HTRDR_API res_T
 htrdr_buffer_create
   (struct htrdr* htrdr,
    const struct htrdr_buffer_layout* layout,
    struct htrdr_buffer** buf);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_buffer_ref_get
   (struct htrdr_buffer* buf);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_buffer_ref_put
   (struct htrdr_buffer* buf);
 
-HTRDR_CORE_API void
+HTRDR_API void
 htrdr_buffer_get_layout
   (const struct htrdr_buffer* buf,
    struct htrdr_buffer_layout* layout);
 
-HTRDR_CORE_API void*
+HTRDR_API void*
 htrdr_buffer_get_data
   (struct htrdr_buffer* buf);
 
-HTRDR_CORE_API void*
+HTRDR_API void*
 htrdr_buffer_at
   (struct htrdr_buffer* buf,
    const size_t x,
