@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/sh
 
 # Copyright (C) 2018-2019, 2022-2023 Centre National de la Recherche Scientifique
 # Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
@@ -22,6 +22,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+set -e
 
 install()
 {
