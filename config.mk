@@ -75,15 +75,15 @@ PCFLAGS_SHARED =
 PCFLAGS_STATIC = --static
 PCFLAGS = $(PCFLAGS_$(LIB_TYPE))
 
-AW_VERSION = 2.0
+AW_VERSION = 2.1
 AW_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags aw)
 AW_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs aw)
 
-ATRSTM_VERSION = 0.0
+ATRSTM_VERSION = 0.1
 ATRSTM_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags atrstm)
 ATRSTM_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs atrstm)
 
-HTSKY_VERSION = 0.2
+HTSKY_VERSION = 0.3
 HTSKY_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags htsky)
 HTSKY_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs htsky)
 
@@ -91,43 +91,43 @@ MPI_VERSION = 2
 MPI_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags $(MPI_PC))
 MPI_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs $(MPI_PC))
 
-MRUMTL_VERSION = 0.1
+MRUMTL_VERSION = 0.2
 MRUMTL_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags mrumtl)
 MRUMTL_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs mrumtl)
 
-RNATM_VERSION = 0.0
+RNATM_VERSION = 0.1
 RNATM_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags rnatm)
 RNATM_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs rnatm)
 
-RNGRD_VERSION = 0.0
+RNGRD_VERSION = 0.1
 RNGRD_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags rngrd)
 RNGRD_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs rngrd)
 
-RSYS_VERSION = 0.13
+RSYS_VERSION = 0.14
 RSYS_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags rsys)
 RSYS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs rsys)
 
-S3D_VERSION = 0.8
+S3D_VERSION = 0.10
 S3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags s3d)
 S3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs s3d)
 
-SBUF_VERSION = 0.0
+SBUF_VERSION = 0.1
 SBUF_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sbuf)
 SBUF_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sbuf)
 
-SCAM_VERSION = 0.1
+SCAM_VERSION = 0.2
 SCAM_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags scam)
 SCAM_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs scam)
 
-SSF_VERSION = 0.8
+SSF_VERSION = 0.9
 SSF_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags ssf)
 SSF_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs ssf)
 
-SSP_VERSION = 0.13
+SSP_VERSION = 0.14
 SSP_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags star-sp)
 SSP_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs star-sp)
 
-SVX_VERSION = 0.2
+SVX_VERSION = 0.3
 SVX_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags svx)
 SVX_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs svx)
 
