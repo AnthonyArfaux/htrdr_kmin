@@ -242,10 +242,12 @@ CFLAGS_COMMON =\
  $(CFLAGS_HARDENED)\
  $(WFLAGS)
 
-CFLAGS_RELEASE = -O2 -DNDEBUG $(CFLAGS_COMMON)
 CFLAGS_DEBUG = -g $(CFLAGS_COMMON)
-CFLAGS_SO = $(CFLAGS_$(BUILD_TYPE)) -fPIC
-CFLAGS_EXE = $(CFLAGS_$(BUILD_TYPE)) -fPIE
+CFLAGS_RELEASE = -O2 -DNDEBUG $(CFLAGS_COMMON)
+CFLAGS = $(CFLAGS_$(BUILD_TYPE))
+
+CFLAGS_SO = $(CFLAGS) -fPIC
+CFLAGS_EXE = $(CFLAGS) -fPIE
 
 ################################################################################
 # Linker options
@@ -253,9 +255,10 @@ CFLAGS_EXE = $(CFLAGS_$(BUILD_TYPE)) -fPIE
 LDFLAGS_HARDENED = -Wl,-z,relro,-z,now
 LDFLAGS_DEBUG = $(LDFLAGS_HARDENED)
 LDFLAGS_RELEASE = -s $(LDFLAGS_HARDENED)
+LDFLAGS = $(LDFLAGS_$(BUILD_TYPE))
 
-LDFLAGS_SO = $(LDFLAGS_$(BUILD_TYPE)) -shared -Wl,--no-undefined
-LDFLAGS_EXE = $(LDFLAGS_$(BUILD_TYPE)) -pie
+LDFLAGS_SO = $(LDFLAGS) -shared -Wl,--no-undefined
+LDFLAGS_EXE = $(LDFLAGS) -pie
 
 OCPFLAGS_DEBUG = --localize-hidden
 OCPFLAGS_RELEASE = --localize-hidden --strip-unneeded
