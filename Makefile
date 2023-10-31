@@ -70,11 +70,11 @@ all:\
 # Inference rules for command build
 .SUFFIXES: .c .d .o
 .c.d:
-	@$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" \
+	@$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -MM -MT "$(@:.d=.o) $@" \
 	$< -MF $@
 
 .c.o:
-	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -Isrc -c $< -o $@
+	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -c $< -o $@
 
 ################################################################################
 # Build the htrdr command
