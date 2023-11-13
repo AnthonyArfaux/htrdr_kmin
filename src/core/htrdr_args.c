@@ -215,7 +215,7 @@ parse_image_parameter(const char* str, void* args)
   #undef PARSE
 
   if(!img->definition[0] || !img->definition[1]) {
-    fprintf(stderr, "The image definition cannot be null.n");
+    fprintf(stderr, "The image definition cannot be null.\n");
     res = RES_BAD_ARG;
     goto error;
   }
