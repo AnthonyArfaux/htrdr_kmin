@@ -570,15 +570,15 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         break;
       case 'T':
         res = cstr_to_double(optarg, &args->optical_thickness);
-        if(res != RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
+        if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
         break;
       case 't':
         res = cstr_to_uint(optarg, &args->nthreads);
-        if(res != RES_OK && !args->nthreads) res = RES_BAD_ARG;
+        if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
         break;
       case 'V':
         res = cstr_to_uint(optarg, &args->octree_definition_hint);
-        if(res != RES_OK && !args->octree_definition_hint) res = RES_BAD_ARG;
+        if(res == RES_OK && !args->octree_definition_hint) res = RES_BAD_ARG;
         break;
       case 'v': args->verbose = 1; break;
       default: res = RES_BAD_ARG; break;
