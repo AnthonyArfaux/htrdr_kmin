@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd October 4, 2023
+.Dd November 14, 2023
 .Dt HTRDR-PLANETO 1
 .Os
 .Sh NAME
@@ -447,6 +447,22 @@ The other values are set to 0.
 .Sh EXIT STATUS
 .Ex -std
 .Sh EXAMPLES
+An
+.Nm
+command line can be lengthy due to the options required to describe the
+system to be simulated.
+For editing reasons, the command lines given as examples in this section
+will take up several lines by using the backslash character
+.Pq Li \e .
+While there's nothing original about this practice, we'd like to
+emphasize the importance of spaces or their absence before the backslash
+character, particularly for options defining aerosols
+.Pq option Fl a
+or ground
+.Pq option Fl G :
+their argument must be a single character string with no spaces other
+than those that may be required for file names.
+.Pp
 The following command line runs
 .Nm
 in a verbose way
@@ -490,28 +506,28 @@ Two aerosols complete the planetary atmosphere: one for
 and one for
 .Ar haze .
 Their respective meshes are stored in the
-.Pa a.smsh No and Pa b.smsh
+.Pa clouds_tetrahedra.smsh No and Pa haze_tetrahedra.smsh
 files while their radiative properties are given by the
-.Pa a.sars No and Pa b.sars
+.Pa clouds_properties.sars No and Pa haze_properties.sars
 files.
 Finally, their phase functions are described by a set of 2 files: the
-.Pa a.rnsf No and Pa b.rnsf
+.Pa clouds_phase_functions.rnsf No and Pa haze_phase_functions.rnsf
 files which list the aerosol phase functions,
 and the
-.Pa a.rnpfi No and Pa b.rnpfi
+.Pa clouds_phase_function_ids.rnpfi No and Pa haze_phase_function_ids.rnpfi
 files which reference them by volumetric mesh node.
 To speed up rendering time, the normals of the tetrahedral meshes of
 the gas and aerosols are precalculated once and for all
 .Pq option Fl N .
 The ground geometry is stored in the
-.Pa ground.smsh
+.Pa ground_triangles.smsh
 file with its triangle properties
 .Pq temperature and BRDF
 defined in the
-.Pa ground.rnsp
+.Pa ground_properties.rnsp
 file.
 The referenced BRDFs are listed in the
-.Pa ground.rnsl
+.Pa ground_brdfs.rnsl
 file.
 The definition of acceleration structures
 cannot exceed
@@ -531,16 +547,27 @@ file even if the file already exists
 .Pq options Fl fo :
 .Bd -literal -offset Ds
 htrdr-planeto -v -N \\
--i def=800x600:spp=64 \\
--s cie_xyz \\
--S lon=-45:lat=50:dst=1.5e8:radius=6.9e5:temp=5778 \\
--C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \\
--g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \\
--a mesh=a.smsh:radprop=a.sars:phasefn=a.rnsf:phaseids=a.rnpfi:name=clouds \\
--a mesh=b.smsh:radprop=b.sars:phasefn=b.rnsf:phaseids=b.rnpfi:name=haze \\
--G mesh=ground.smsh:prop=ground.rnsp:brdf=ground.rnsl:name=namek \\
--V 512 -T 10 -O storage_cie.bin \\
--fo image_CIE_XYZ.ht
+              -i def=800x600:spp=64 \\
+              -s cie_xyz \\
+              -S lon=-45:lat=50:dst=1.5e8:radius=6.9e5:temp=5778 \\
+              -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \\
+              -g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \\
+              -a name=clouds\\
+:mesh=clouds_tetrahedra.smsh\\
+:radprop=clouds_properties.sars\\
+:phasefn=clouds_phase_functions.rnsf\\
+:phaseids=clouds_phase_function_ids.rnpfi \\
+              -a name=haze\\
+:mesh=haze_tetrahedra.smsh\\
+:radprop=haze_properties.sars\\
+:phasefn=haze_phase_functions.rnsf\\
+:phaseids=haze_phase_function_ids.rnpfi \\
+              -G name=namek\\
+:mesh=ground_triangles.smsh\\
+:prop=ground_properties.rnsp\\
+:brdf=ground_brdfs.rnsl \\
+              -V 512 -T 10 -O storage_cie.bin \\
+              -fo image_CIE_XYZ.ht
 .Ed
 .Pp
 The next command line is the same as the previous one, except that it calculates
@@ -563,15 +590,26 @@ wrong acceleration structures
 .Pq see Fl O No option .
 .Bd -literal -offset Ds
 htrdr-planeto -v -N \\
--i def=800x600:spp=64 \\
--s lw=10000,20000 \\
--C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \\
--g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \\
--a mesh=a.smsh:radprop=a.sars:phasefn=a.rnsf:phaseids=a.rnpfi:name=clouds \\
--a mesh=b.smsh:radprop=b.sars:phasefn=b.rnsf:phaseids=b.rnpfi:name=haze \\
--G mesh=ground.smsh:prop=ground.rnsp:brdf=ground.rnsl:name=namek \\
--V 512 -T 10 -O storage_lw.bin \\
--fo image_infrared.ht
+              -i def=800x600:spp=64 \\
+              -s lw=10000,20000 \\
+              -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \\
+              -g mesh=gas.smsh:ck=gas.sck:temp=gas.rngt \\
+              -a name=clouds\\
+:mesh=clouds_tetrahedra.smsh\\
+:radprop=clouds_properties.sars\\
+:phasefn=clouds_phase_functions.rnsf\\
+:phaseids=clouds_phase_function_ids.rnpfi \\
+              -a name=haze\\
+:mesh=haze_tetrahedra.smsh\\
+:radprop=haze_properties.sars\\
+:phasefn=haze_phase_functions.rnsf\\
+:phaseids=haze_phase_function_ids.rnpfi \\
+              -G name=namek\\
+:mesh=ground_triangles.smsh\\
+:prop=ground_properties.rnsp\\
+:brdf=ground_brdfs.rnsl \\
+              -V 512 -T 10 -O storage_lw.bin \\
+              -fo image_infrared.ht
 .Ed
 .Sh SEE ALSO
 .Xr htrdr-image 5 ,
