@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd November 14, 2023
+.Dd January 24, 2024
 .Dt HTRDR-PLANETO 1
 .Os
 .Sh NAME
@@ -29,18 +29,18 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dfhNv
-.Op Fl a Ar aerosol_opt Ns Op : Ns Ar aerosol_opt ...
-.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
-.Op Fl G Ar ground_opt Ns Op : Ns Ar ground_opt ...
-.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.Op Fl a Ar aerosol_opt Ns Op : Ns Ar aerosol_opt No ...
+.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
+.Op Fl G Ar ground_opt Ns Op : Ns Ar ground_opt No ...
+.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 .Op Fl O Pa accel_struct_storage
 .Op Fl o Pa output
-.Op Fl S Ar source_opt Ns Op : Ns Ar source_opt ...
-.Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+.Op Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
+.Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 .Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
 .Op Fl V Ar accel_struct_definition
-.Fl g Ar gas_opt Ns Op : Ns Ar gas_opt ...
+.Fl g Ar gas_opt Ns Op : Ns Ar gas_opt No ...
 .Sh DESCRIPTION
 .Nm
 simulates the radiative transfer of a terrestrial planet in the visible
@@ -107,7 +107,7 @@ to distribute the rendering on several computers.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl a Ar aerosol_opt Ns Op : Ns Ar aerosol_opt ...
+.It Fl a Ar aerosol_opt Ns Op : Ns Ar aerosol_opt No ...
 Define an aerosol.
 Use this option once per aerosol, and duplicate it as many times as
 necessary.
@@ -151,7 +151,7 @@ Note that this file and the tetrahedral mesh
 must be consistent with each other, i.e. the nodes must be
 listed in the same order.
 .El
-.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 Set up a pinhole or thin-lens perspective camera.
 .Pp
 The options for a perspective camera are as follows:
@@ -207,7 +207,7 @@ csplit -f octree -k output %^#\\ vtk% /^#\\ vtk/ \\
 Force overwriting of
 .Pa output
 file.
-.It Fl G Ar ground_opt Ns Op : Ns Ar ground_opt ...
+.It Fl G Ar ground_opt Ns Op : Ns Ar ground_opt No ...
 The planet's ground.
 .Pp
 The ground options are as follows:
@@ -237,7 +237,7 @@ Note that this file and the surface mesh must be consistent
 .Pq option Cm mesh ,
 i.e. the triangles must be listed in the same order.
 .El
-.It Fl g Ar gas_opt Ns Op : Ns Ar gas_opt ...
+.It Fl g Ar gas_opt Ns Op : Ns Ar gas_opt No ...
 Gas mixture.
 .Pp
 The gas options are as follows:
@@ -267,7 +267,7 @@ listed in the same order.
 .El
 .It Fl h
 Display short help and exit.
-.It Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.It Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 Configure sensor image.
 .Pp
 The image options are as follows:
@@ -308,7 +308,7 @@ stopped, thus avoiding the use of incorrect acceleration structures.
 .It Fl o Pa output
 Output file.
 If not defined, data is written to standard output.
-.It Fl S Ar source_opt Ns Op : Ns Ar source_opt ...
+.It Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 Define the external source.
 .Pp
 The source options are as follows:
@@ -342,7 +342,7 @@ This option is not compatible with the
 .Cm rad
 option that explicitly defines the source radiance distribution.
 .El
-.It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+.It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 Configure spectral integration.
 .Pp
 The spectral integration options are as follows:

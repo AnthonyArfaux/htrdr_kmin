@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd October 4, 2023
+.Dd January 24, 2024
 .Dt HTRDR-ATMOSPHERE 1
 .Os
 .Sh NAME
@@ -30,18 +30,18 @@
 .Nm
 .Op Fl dfhRrv
 .Op Fl c Pa clouds
-.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 .Op Fl D Ar sun_azimuth , Ns Ar sun_elevation
 .Op Fl g Pa ground
-.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 .Op Fl M Pa materials
 .Op Fl m Pa mie
 .Op Fl n Ar sky_mtl
 .Op Fl O Pa cache
 .Op Fl o Pa output
-.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
-.Op Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
-.Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt No ...
+.Op Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt No ...
+.Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 .Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
 .Op Fl V Ar x , Ns Ar y , Ns Ar z
@@ -147,7 +147,7 @@ Optical properties of atmospheric gases saved in htgop format.
 Cloud properties saved in
 .Xr htcp 5
 format.
-.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 Set up a pinhole or thin-lens perspective camera.
 .Pp
 The options for a perspective camera are as follows:
@@ -239,7 +239,7 @@ Ground geometry saved in
 format.
 .It Fl h
 Display short help and exit.
-.It Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.It Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 Configure sensor image.
 .Pp
 The image options are as follows:
@@ -310,7 +310,7 @@ ignores the options used to build acceleration structures
 .It Fl o Pa output
 Output file.
 If not defined, data is written to standard output.
-.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt No ...
 Set up an orthographic camera.
 .Pp
 The options for an orthographic camera are as follows:
@@ -330,7 +330,7 @@ Default is @HTRDR_ARGS_DEFAULT_CAMERA_TGT@.
 Upward vector that the top of the camera is pointing towards.
 Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
 .El
-.It Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+.It Fl p Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt No ...
 Set up a flux sensor.
 The flux is computed for the part of the sensor that is outside any
 geometry.
@@ -350,7 +350,7 @@ Default is  @HTRDR_ARGS_DEFAULT_RECTANGLE_UP@.
 Sensor size in meters.
 Default is @HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@.
 .El
-.It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt ...
+.It Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 Configure spectral integration.
 .Pp
 The spectral integration options are as follows:

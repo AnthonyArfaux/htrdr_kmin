@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd October 4, 2023
+.Dd January 24, 2024
 .Dt HTRDR-COMBUSTION 1
 .Os
 .Sh NAME
@@ -29,17 +29,17 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl fhINsv
-.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 .Op Fl D Ar laser_flux_density
 .Op Fl d Ar dump_type
-.Op Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt ...
-.Op Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt...
-.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
-.Op Fl l Ar laser_opt Ns Op : Ns Ar laser_opt ...
+.Op Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt No ...
+.Op Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt No ...
+.Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
+.Op Fl l Ar laser_opt Ns Op : Ns Ar laser_opt No ...
 .Op Fl O Pa cache
 .Op Fl o Pa output
-.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
-.Op Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+.Op Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt No ...
+.Op Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt No ...
 .Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
 .Op Fl V Ar accel_struct_definition
@@ -109,7 +109,7 @@ to distribute the calculation on several computers.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt ...
+.It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 Set up a pinhole or thin-lens perspective camera.
 .Pp
 The options for a perspective camera are as follows:
@@ -171,7 +171,7 @@ Each leaf stores the minimum and maximum extinction coefficients of the
 tetrahedra it covers.
 Data are written in legacy VTK format.
 .El
-.It Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt ...
+.It Fl F Ar rdgfa_opt Ns Op : Ns Ar rdgfa_opt No ...
 RDG-FA phase function parameters.
 .Pp
 The parameters of the RDG-FA phase function are as follows:
@@ -187,7 +187,7 @@ Default is @HTRDR_COMBUSTION_ARGS_DEFAULT_FRACTAL_PREFACTOR@.
 Force overwriting of
 .Pa output
 file.
-.It Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt...
+.It Fl g Ar combustion_chamber_opt Ns Op : Ns Ar combustion_chamber_opt No ...
 Define the combustion chamber.
 .Pp
 Note that the combustion chamber does not prevent the camera from seeing
@@ -230,7 +230,7 @@ Display short help and exit.
 .It Fl I
 Use an isotropic phase function rather than the RDG-FA phase function
 .Pq option Fl F .
-.It Fl i Ar image_opt Ns Op : Ns Ar image_opt ...
+.It Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 Configure sensor image.
 .Pp
 The image options are as follows:
@@ -243,7 +243,7 @@ Default is
 Number of samples to solve the Monte Carlo estimation of each pixel.
 Default is @HTRDR_ARGS_DEFAULT_IMG_SPP@.
 .El
-.It Fl l Ar laser_opt Ns Op : Ns Ar laser_opt ...
+.It Fl l Ar laser_opt Ns Op : Ns Ar laser_opt No ...
 Laser emission surface.
 .Pp
 The laser options are as follows:
@@ -298,7 +298,7 @@ avoiding the use of bad cached data.
 .It Fl o Pa output
 Output file.
 If not defined, data is written to standard output.
-.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt ...
+.It Fl P Ar ortho_camera_opt Ns Op : Ns Ar ortho_camera_opt No ...
 Set up an orthographic camera.
 .Pp
 The options for an orthographic camera are as follows:
@@ -322,7 +322,7 @@ Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
 Thermodynamic properties of the combustion medium saved in
 .Xr atrtp 5
 format.
-.It Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt ...
+.It Fl R Ar flux_sensor_opt Ns Op : Ns Ar flux_sensor_opt No ...
 Set up a flux sensor.
 .Pp
 The flux sensor options are as follow:
