@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd March 18, 2024
+.Dd July 23, 2024
 .Dt HTRDR-PLANETO 1
 .Os
 .Sh NAME
@@ -174,7 +174,7 @@ Vertical field of view of the camera in
 @HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@[ degrees.
 The default field of view is
 @HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@ degrees.
-.It Cm lens-radius= Ar radius
+.It Cm lens-radius= Ns Ar radius
 Radius of the camera lens.
 A non-zero radius means that the camera is a thin lens camera while a
 zero radius defines a pinhole camera.
