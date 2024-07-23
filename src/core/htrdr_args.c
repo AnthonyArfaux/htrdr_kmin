@@ -561,6 +561,8 @@ htrdr_args_camera_perspective_parse
     goto error;
   }
 
+  *cam = HTRDR_ARGS_CAMERA_PERSPECTIVE_DEFAULT;
+
   res = cstr_parse_list(str, ':', parse_camera_perspective_parameter, cam);
   if(res != RES_OK) goto error;
 
