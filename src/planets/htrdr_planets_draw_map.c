@@ -21,8 +21,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "planeto/htrdr_planeto_c.h"
-#include "planeto/htrdr_planeto_source.h"
+#include "planets/htrdr_planets_c.h"
+#include "planets/htrdr_planets_source.h"
 
 #include "core/htrdr.h"
 #include "core/htrdr_accum.h"
@@ -48,13 +48,13 @@ draw_pixel_xwave
    const struct htrdr_draw_pixel_args* args,
    void* data)
 {
-  struct planeto_compute_radiance_args rad_args =
-    PLANETO_COMPUTE_RADIANCE_ARGS_NULL;
+  struct planets_compute_radiance_args rad_args =
+    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
 
   struct htrdr_accum radiance;
   struct htrdr_accum time;
-  struct htrdr_planeto* cmd;
-  struct planeto_pixel_xwave* pixel = data;
+  struct htrdr_planets* cmd;
+  struct planets_pixel_xwave* pixel = data;
   size_t isamp = 0;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
   (void)htrdr;
@@ -63,7 +63,7 @@ draw_pixel_xwave
   ASSERT(cmd);
   ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW
       || cmd->spectral_domain.type == HTRDR_SPECTRAL_LW);
-  ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
 
   /* Reset accumulators */
   radiance = HTRDR_ACCUM_NULL;
@@ -105,7 +105,7 @@ draw_pixel_xwave
         wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
         break;
       case HTRDR_SPECTRAL_SW:
-        if(htrdr_planeto_source_does_radiance_vary_spectrally(cmd->source)) {
+        if(htrdr_planets_source_does_radiance_vary_spectrally(cmd->source)) {
           wlen[0] = htrdr_ran_wlen_discrete_sample(cmd->discrete, r0, r1, &pdf);
         } else {
           wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
@@ -130,7 +130,7 @@ draw_pixel_xwave
     rad_args.wlen = wlen[0];
     rad_args.iband = iband[0];
     rad_args.iquad = iquad;
-    weight = planeto_compute_radiance(cmd, &rad_args);
+    weight = planets_compute_radiance(cmd, &rad_args);
     ASSERT(weight >= 0);
 
     weight /= pdf; /* In W/m²/sr */
@@ -184,13 +184,13 @@ draw_pixel_image
    const struct htrdr_draw_pixel_args* args,
    void* data)
 {
-  struct planeto_compute_radiance_args rad_args =
-    PLANETO_COMPUTE_RADIANCE_ARGS_NULL;
+  struct planets_compute_radiance_args rad_args =
+    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
 
   struct htrdr_accum XYZ[3]; /* X, Y, and Z */
   struct htrdr_accum time;
-  struct htrdr_planeto* cmd;
-  struct planeto_pixel_image* pixel = data;
+  struct htrdr_planets* cmd;
+  struct planets_pixel_image* pixel = data;
   size_t ichannel;
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
   (void)htrdr;
@@ -198,7 +198,7 @@ draw_pixel_image
   cmd = args->context;
   ASSERT(cmd);
   ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ);
-  ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
 
   /* Reset accumulators */
   XYZ[0] = HTRDR_ACCUM_NULL;
@@ -268,7 +268,7 @@ draw_pixel_image
       rad_args.wlen = wlen[0];
       rad_args.iband = iband[0];
       rad_args.iquad = iquad;
-      weight = planeto_compute_radiance(cmd, &rad_args);
+      weight = planets_compute_radiance(cmd, &rad_args);
       ASSERT(weight >= 0);
 
       weight /= pdf; /* In W/m²/sr */
@@ -323,7 +323,7 @@ write_accum
 
 static INLINE void
 write_pixel_image
-  (const struct planeto_pixel_image* pix,
+  (const struct planets_pixel_image* pix,
    struct htrdr_accum* time_acc, /* May be NULL */
    FILE* stream)
 {
@@ -337,7 +337,7 @@ write_pixel_image
 
 static INLINE void
 write_pixel_xwave
-  (const struct planeto_pixel_xwave* pix,
+  (const struct planets_pixel_xwave* pix,
    struct htrdr_accum* radiance_acc, /* May be NULL */
    struct htrdr_accum* time_acc, /* May be NULL */
    FILE* stream)
@@ -354,7 +354,7 @@ write_pixel_xwave
 
 static res_T
 write_buffer
-  (struct htrdr_planeto* cmd,
+  (struct htrdr_planets* cmd,
    struct htrdr_buffer* buf,
    struct htrdr_accum* radiance_acc, /* May be NULL */
    struct htrdr_accum* time_acc,
@@ -364,9 +364,9 @@ write_buffer
   struct htrdr_buffer_layout layout;
   size_t x, y;
   ASSERT(cmd && buf && time_acc && stream);
-  ASSERT(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
 
-  planeto_get_pixel_format(cmd, &pixfmt);
+  planets_get_pixel_format(cmd, &pixfmt);
   htrdr_buffer_get_layout(buf, &layout);
   CHK(pixfmt.size == layout.elmt_size);
 
@@ -397,14 +397,14 @@ write_buffer
  * Local functions
  ******************************************************************************/
 res_T
-planeto_draw_map(struct htrdr_planeto* cmd)
+planets_draw_map(struct htrdr_planets* cmd)
 {
   struct htrdr_draw_map_args args = HTRDR_DRAW_MAP_ARGS_NULL;
   struct htrdr_estimate path_time = HTRDR_ESTIMATE_NULL;
   struct htrdr_accum path_time_acc = HTRDR_ACCUM_NULL;
   struct htrdr_accum radiance_acc = HTRDR_ACCUM_NULL;
   res_T res = RES_OK;
-  ASSERT(cmd && cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  ASSERT(cmd && cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
 
   args.buffer_layout = cmd->buf_layout;
   args.spp = cmd->spp;

@@ -21,21 +21,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "planeto/htrdr_planeto.h"
-#include "planeto/htrdr_planeto_args.h"
+#include "planets/htrdr_planets.h"
+#include "planets/htrdr_planets_args.h"
 
 #include "core/htrdr_log.h"
 
 #include <rsys/mem_allocator.h>
 
 int
-htrdr_planeto_main(int argc, char** argv)
+htrdr_planets_main(int argc, char** argv)
 {
-  char cmd_name[] = "htrdr-planeto";
+  char cmd_name[] = "htrdr-planets";
   struct htrdr_args htrdr_args = HTRDR_ARGS_DEFAULT;
-  struct htrdr_planeto_args cmd_args = HTRDR_PLANETO_ARGS_DEFAULT;
+  struct htrdr_planets_args cmd_args = HTRDR_PLANETS_ARGS_DEFAULT;
   struct htrdr* htrdr = NULL;
-  struct htrdr_planeto* cmd = NULL;
+  struct htrdr_planets* cmd = NULL;
   const size_t memsz_begin = mem_allocated_size();
   size_t memsz_end;
   int is_mpi_init = 0;
@@ -49,7 +49,7 @@ htrdr_planeto_main(int argc, char** argv)
   if(res != RES_OK) goto error;
   is_mpi_init = 1;
 
-  res = htrdr_planeto_args_init(&cmd_args, argc, argv);
+  res = htrdr_planets_args_init(&cmd_args, argc, argv);
   if(res != RES_OK) goto error;
   if(cmd_args.quit) goto exit;
 
@@ -58,22 +58,22 @@ htrdr_planeto_main(int argc, char** argv)
   res = htrdr_create(&mem_default_allocator, &htrdr_args, &htrdr);
   if(res != RES_OK) goto error;
 
-  if(cmd_args.output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES
+  if(cmd_args.output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES
   && htrdr_get_mpi_rank(htrdr) != 0) {
     goto exit; /* Nothing to do except for the master process */
   }
 
-  res = htrdr_planeto_create(htrdr, &cmd_args, &cmd);
+  res = htrdr_planets_create(htrdr, &cmd_args, &cmd);
   if(res != RES_OK) goto error;
 
-  res = htrdr_planeto_run(cmd);
+  res = htrdr_planets_run(cmd);
   if(res != RES_OK) goto error;
 
 exit:
-  htrdr_planeto_args_release(&cmd_args);
+  htrdr_planets_args_release(&cmd_args);
   if(is_mpi_init) htrdr_mpi_finalize();
   if(htrdr) htrdr_ref_put(htrdr);
-  if(cmd) htrdr_planeto_ref_put(cmd);
+  if(cmd) htrdr_planets_ref_put(cmd);
 
   /* Check memory leaks */
   memsz_end = mem_allocated_size();

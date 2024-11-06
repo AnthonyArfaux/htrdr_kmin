@@ -28,7 +28,7 @@ include config.mk
 
 ATMOSPHERE_LIBNAME = libhtrdr-atmosphere.a
 COMBUSTION_LIBNAME = libhtrdr-combustion.a
-PLANETO_LIBNAME = libhtrdr-planeto.a
+PLANETS_LIBNAME = libhtrdr-planets.a
 
 PKG_CONFIG_LOCAL = PKG_CONFIG_PATH="./:$${PKG_CONFIG_PATH}" $(PKG_CONFIG)
 
@@ -46,19 +46,19 @@ COMBUSTION_BUILD_LIB_ENABLE = build_combustion
 COMBUSTION_BUILD_CMD_ENABLE = build_htrdr_combustion
 COMBUSTION_LIBNAME_ENABLE = $(COMBUSTION_LIBNAME)
 
-# Define macros when PLANETO is set to ENABLE
-PLANETO_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planeto)
-PLANETO_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planeto)
-PLANETO_BUILD_LIB_ENABLE = build_planeto
-PLANETO_BUILD_CMD_ENABLE = build_htrdr_planeto
-PLANETO_LIBNAME_ENABLE = $(PLANETO_LIBNAME)
+# Define macros when PLANETS is set to ENABLE
+PLANETS_CFLAGS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planets)
+PLANETS_LIBS_ENABLE = $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planets)
+PLANETS_BUILD_LIB_ENABLE = build_planets
+PLANETS_BUILD_CMD_ENABLE = build_htrdr_planets
+PLANETS_LIBNAME_ENABLE = $(PLANETS_LIBNAME)
 
 # Default target
 all:\
  build_htrdr\
  build_htrdr_atmosphere\
  build_htrdr_combustion\
- build_htrdr_planeto\
+ build_htrdr_planets\
  man
 
 # Check commands dependencies
@@ -87,27 +87,27 @@ HTRDR_DPDC_CFLAGS =\
  $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --cflags htrdr-core)\
  $(ATMOSPHERE_CFLAGS_$(ATMOSPHERE))\
  $(COMBUSTION_CFLAGS_$(COMBUSTION))\
- $(PLANETO_CFLAGS_$(PLANETO))\
+ $(PLANETS_CFLAGS_$(PLANETS))\
  $(RSYS_CFLAGS)
 
 HTRDR_DPDC_LIBS =\
  $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs htrdr-core)\
  $(ATMOSPHERE_LIBS_$(ATMOSPHERE))\
  $(COMBUSTION_LIBS_$(COMBUSTION))\
- $(PLANETO_LIBS_$(PLANETO))\
+ $(PLANETS_LIBS_$(PLANETS))\
  $(RSYS_LIBS)
 
 HTRDR_DPDC_BUILD =\
  build_core\
  $(ATMOSPHERE_BUILD_LIB_$(ATMOSPHERE))\
  $(COMBUSTION_BUILD_LIB_$(COMBUSTION))\
- $(PLANETO_BUILD_LIB_$(PLANETO))
+ $(PLANETS_BUILD_LIB_$(PLANETS))
 
 HTRDR_DPDC_PREREQ =\
  $(CORE_LIBNAME)\
  $(ATMOSPHERE_LIBNAME_$(ATMOSPHERE))\
  $(COMBUSTION_LIBNAME_$(COMBUSTION))\
- $(PLANETO_LIBNAME_$(PLANETO))
+ $(PLANETS_LIBNAME_$(PLANETS))
 
 build_htrdr: .config_commands $(HTRDR_DPDC_BUILD) $(HTRDR_DEP)
 	@$(MAKE) -fMakefile -f $(HTRDR_DEP) htrdr
@@ -183,33 +183,33 @@ distclean_htrdr-combustion: clean_htrdr-combustion
 	rm -f $(HTRDR_COMBUSTION_DEP) .config_commands
 
 ################################################################################
-# Build the htrdr-planeto command
+# Build the htrdr-planets command
 ################################################################################
-HTRDR_PLANETO_SRC = src/commands/htrdr_planeto_cmd.c
-HTRDR_PLANETO_OBJ = $(HTRDR_PLANETO_SRC:.c=.o)
-HTRDR_PLANETO_DEP = $(HTRDR_PLANETO_SRC:.c=.d)
+HTRDR_PLANETS_SRC = src/commands/htrdr_planets_cmd.c
+HTRDR_PLANETS_OBJ = $(HTRDR_PLANETS_SRC:.c=.o)
+HTRDR_PLANETS_DEP = $(HTRDR_PLANETS_SRC:.c=.d)
 
-HTRDR_PLANETO_DPDC_LIBS = $(PLANETO_LIBS_$(PLANETO))
-HTRDR_PLANETO_DPDC_BUILD = build_core $(PLANETO_BUILD_LIB_$(PLANETO))
-HTRDR_PLANETO_DPDC_PREREQ = $(CORE_LIBNAME) $(PLANETO_LIBNAME_$(PLANETO))
+HTRDR_PLANETS_DPDC_LIBS = $(PLANETS_LIBS_$(PLANETS))
+HTRDR_PLANETS_DPDC_BUILD = build_core $(PLANETS_BUILD_LIB_$(PLANETS))
+HTRDR_PLANETS_DPDC_PREREQ = $(CORE_LIBNAME) $(PLANETS_LIBNAME_$(PLANETS))
 
-build_htrdr_planeto:\
+build_htrdr_planets:\
  .config_commands\
- $(HTRDR_PLANETO_DPDC_BUILD)\
- $(HTRDR_PLANETO_DEP)
-	@$(MAKE) -fMakefile -f $(HTRDR_PLANETO_DEP) htrdr-planeto
+ $(HTRDR_PLANETS_DPDC_BUILD)\
+ $(HTRDR_PLANETS_DEP)
+	@$(MAKE) -fMakefile -f $(HTRDR_PLANETS_DEP) htrdr-planets
 
-htrdr-planeto: config.mk $(HTRDR_PLANETO_OBJ) $(HTRDR_PLANETO_DPDC_PREREQ)
+htrdr-planets: config.mk $(HTRDR_PLANETS_OBJ) $(HTRDR_PLANETS_DPDC_PREREQ)
 	$(CC) $(CFLAGS_EXE) $(HTRDR_DPDC_CFLAGS) -o $@ \
-	$(HTRDR_PLANETO_OBJ) $(LDFLAGS_EXE) $(HTRDR_PLANETO_DPDC_LIBS)
+	$(HTRDR_PLANETS_OBJ) $(LDFLAGS_EXE) $(HTRDR_PLANETS_DPDC_LIBS)
 
-$(HTRDR_PLANETO_OBJ) $(HTRDR_PLANETO_DEP): config.mk
+$(HTRDR_PLANETS_OBJ) $(HTRDR_PLANETS_DEP): config.mk
 
-clean_htrdr-planeto:
-	rm -f $(HTRDR_PLANETO_OBJ) htrdr-planeto
+clean_htrdr-planets:
+	rm -f $(HTRDR_PLANETS_OBJ) htrdr-planets
 
-distclean_htrdr-planeto: clean_htrdr-planeto
-	rm -f $(HTRDR_PLANETO_DEP) .config_commands
+distclean_htrdr-planets: clean_htrdr-planets
+	rm -f $(HTRDR_PLANETS_DEP) .config_commands
 
 ################################################################################
 # Building the core
@@ -484,35 +484,35 @@ distclean_combustion: clean_combustion
 	rm -f $(COMBUSTION_DEP)
 
 ################################################################################
-# Building the planeto library
+# Building the planets library
 ################################################################################
-PLANETO_LIBNAME = libhtrdr-planeto.a
+PLANETS_LIBNAME = libhtrdr-planets.a
 
-PLANETO_SRC =\
- src/planeto/htrdr_planeto.c\
- src/planeto/htrdr_planeto_args.c\
- src/planeto/htrdr_planeto_compute_radiance.c\
- src/planeto/htrdr_planeto_draw_map.c\
- src/planeto/htrdr_planeto_main.c\
- src/planeto/htrdr_planeto_source.c
-PLANETO_OBJ = $(PLANETO_SRC:.c=.o)
-PLANETO_DEP = $(PLANETO_SRC:.c=.d)
+PLANETS_SRC =\
+ src/planets/htrdr_planets.c\
+ src/planets/htrdr_planets_args.c\
+ src/planets/htrdr_planets_compute_radiance.c\
+ src/planets/htrdr_planets_draw_map.c\
+ src/planets/htrdr_planets_main.c\
+ src/planets/htrdr_planets_source.c
+PLANETS_OBJ = $(PLANETS_SRC:.c=.o)
+PLANETS_DEP = $(PLANETS_SRC:.c=.d)
 
-build_planeto: build_core .config_planeto htrdr-planeto.pc $(PLANETO_DEP)
-	@$(MAKE) -fMakefile $$(for i in $(PLANETO_DEP); do echo -f $${i}; done) \
-	$(PLANETO_LIBNAME)
+build_planets: build_core .config_planets htrdr-planets.pc $(PLANETS_DEP)
+	@$(MAKE) -fMakefile $$(for i in $(PLANETS_DEP); do echo -f $${i}; done) \
+	$(PLANETS_LIBNAME)
 
-$(PLANETO_DEP) $(PLANETO_OBJ): config.mk src/planeto/htrdr_planeto_args.h
+$(PLANETS_DEP) $(PLANETS_OBJ): config.mk src/planets/htrdr_planets_args.h
 
-$(PLANETO_LIBNAME): libhtrdr-planeto.o
+$(PLANETS_LIBNAME): libhtrdr-planets.o
 	$(AR) -rc $@ $?
 	$(RANLIB) $@
 
-libhtrdr-planeto.o: $(PLANETO_OBJ)
-	$(LD) -r $(PLANETO_OBJ) -o $@
+libhtrdr-planets.o: $(PLANETS_OBJ)
+	$(LD) -r $(PLANETS_OBJ) -o $@
 	$(OBJCOPY) $(OCPFLAGS) $@
 
-.config_planeto: config.mk
+.config_planets: config.mk
 	@if ! $(PKG_CONFIG) --atleast-version $(RNATM_VERSION) rnatm; then \
 	  echo "rnatm $(RNATM_VERSION) not found" >&2; exit 1; fi
 	@if ! $(PKG_CONFIG) --atleast-version $(RNGRD_VERSION) rngrd; then \
@@ -533,18 +533,18 @@ libhtrdr-planeto.o: $(PLANETO_OBJ)
 	  echo "svx $(SVX_VERSION) not found" >&2; exit 1; fi
 	@echo "config done" > $@
 
-src/planeto/htrdr_planeto_args.h: config.mk src/planeto/htrdr_planeto_args.h.in
-	sed -e 's/@HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
-	    -e 's/@HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@/$(HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT)/g' \
+src/planets/htrdr_planets_args.h: config.mk src/planets/htrdr_planets_args.h.in
+	sed -e 's/@HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
+	    -e 's/@HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@/$(HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT)/g' \
 	    $@.in > $@
 
-$(PLANETO_DEP):
-	@$(CC) $(CFLAGS_SO) $(PLANETO_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+$(PLANETS_DEP):
+	@$(CC) $(CFLAGS_SO) $(PLANETS_DPDC_CFLAGS) -Isrc -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
 
-$(PLANETO_OBJ):
-	$(CC) $(CFLAGS_SO) $(PLANETO_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
+$(PLANETS_OBJ):
+	$(CC) $(CFLAGS_SO) $(PLANETS_DPDC_CFLAGS) -Isrc -DHTRDR_SHARED_BUILD -c $(@:.o=.c) -o $@
 
-htrdr-planeto.pc: config.mk htrdr-planeto.pc.in
+htrdr-planets.pc: config.mk htrdr-planets.pc.in
 	sed -e 's/@VERSION@/$(VERSION)/g' \
 	    -e 's/@RNATM_VERSION@/$(RNATM_VERSION)/g' \
 	    -e 's/@RNGRD_VERSION@/$(RNGRD_VERSION)/g' \
@@ -557,18 +557,18 @@ htrdr-planeto.pc: config.mk htrdr-planeto.pc.in
 	    -e 's/@SVX_VERSION@/$(SVX_VERSION)/g' \
 	    $@.in > $@
 
-clean_planeto:
-	rm -f $(PLANETO_OBJ) $(PLANETO_LIBNAME)
-	rm -f .config_planeto libhtrdr-planeto.o htrdr-planeto.pc
-	rm -f src/planeto/htrdr_planeto_args.h
+clean_planets:
+	rm -f $(PLANETS_OBJ) $(PLANETS_LIBNAME)
+	rm -f .config_planets libhtrdr-planets.o htrdr-planets.pc
+	rm -f src/planets/htrdr_planets_args.h
 
-distclean_planeto: clean_planeto
-	rm -f $(PLANETO_DEP)
+distclean_planets: clean_planets
+	rm -f $(PLANETS_DEP)
 
 ################################################################################
 # Man pages
 ################################################################################
-man: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
+man: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planets.1
 
 doc/htrdr-atmosphere.1: doc/htrdr-atmosphere.1.in
 	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
@@ -614,7 +614,7 @@ doc/htrdr-combustion.1: doc/htrdr-combustion.1.in
 	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
 	    $@.in > $@
 
-doc/htrdr-planeto.1: doc/htrdr-planeto.1.in
+doc/htrdr-planets.1: doc/htrdr-planets.1.in
 	sed -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
 	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX)/g' \
 	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST)/g' \
@@ -626,12 +626,12 @@ doc/htrdr-planeto.1: doc/htrdr-planeto.1.in
 	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_WIDTH@/$(HTRDR_ARGS_DEFAULT_IMG_WIDTH)/g' \
 	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@/$(HTRDR_ARGS_DEFAULT_IMG_HEIGHT)/g' \
 	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_SPP@/$(HTRDR_ARGS_DEFAULT_IMG_SPP)/g' \
-	    -e 's/@HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
-	    -e 's/@HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@/$(HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT)/g' \
+	    -e 's/@HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
+	    -e 's/@HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@/$(HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT)/g' \
 	    $@.in > $@
 
 clean_man:
-	rm -f doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
+	rm -f doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planets.1
 
 ################################################################################
 # Installation
@@ -640,7 +640,7 @@ install: all
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-atmosphere
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-combustion
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-planeto
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-planets
 	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
 	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib" $(CORE_LIBNAME_SHARED); fi
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/htrdr" COPYING README.md
@@ -649,8 +649,8 @@ install: all
 	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-atmosphere.1; fi
 	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
 	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-combustion.1; fi
-	@if [ "$(PLANETO)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-planeto.1; fi
+	@if [ "$(PLANETS)" = "ENABLE" ]; then \
+	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-planets.1; fi
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-image.5
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-materials.5
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-obj.5
@@ -660,14 +660,14 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
 	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-atmosphere"
 	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-combustion"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-planeto"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-planets"
 	rm -f "$(DESTDIR)$(PREFIX)/lib/$(CORE_LIBNAME_SHARED)"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/COPYING"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/README.md"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr.1"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-atmosphere.1"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planeto.1"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planets.1"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-obj.5"
@@ -680,10 +680,10 @@ clean:\
  clean_htrdr\
  clean_htrdr-atmosphere\
  clean_htrdr-combustion\
- clean_htrdr-planeto\
+ clean_htrdr-planets\
  clean_atmosphere\
  clean_combustion\
- clean_planeto\
+ clean_planets\
  clean_core\
  clean_man
 
@@ -691,19 +691,19 @@ distclean:\
  distclean_htrdr\
  distclean_htrdr-atmosphere\
  distclean_htrdr-combustion\
- distclean_htrdr-planeto\
+ distclean_htrdr-planets\
  distclean_atmosphere\
  distclean_combustion\
- distclean_planeto\
+ distclean_planets\
  distclean_core\
  clean_man
 
-lint: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planeto.1
+lint: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planets.1
 	shellcheck -o all make.sh
 	mandoc -Tlint -Wall doc/htrdr.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-atmosphere.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-combustion.1 || [ $$? -le 1 ]
-	mandoc -Tlint -Wall doc/htrdr-planeto.1 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/htrdr-planets.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-image.5 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-materials.5 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-obj.5 || [ $$? -le 1 ]

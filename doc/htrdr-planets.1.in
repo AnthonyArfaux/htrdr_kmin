@@ -20,11 +20,11 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd July 23, 2024
-.Dt HTRDR-PLANETO 1
+.Dd November 6, 2024
+.Dt HTRDR-PLANETS 1
 .Os
 .Sh NAME
-.Nm htrdr-planeto
+.Nm htrdr-planets
 .Nd simulate radiative transfer in 3D planetary atmosphere
 .Sh SYNOPSIS
 .Nm
@@ -385,7 +385,7 @@ are equal, the calculation is monochromatic.
 .It Fl T Ar optical_thickness
 Optical thickness used as threshold criterion for building the acceleration
 structures.
-Default is @HTRDR_PLANETO_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
+Default is @HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
 .It Fl t
 Advice on the number of threads to use.
 By default,
@@ -393,7 +393,7 @@ By default,
 uses many threads as processor cores.
 .It Fl V Ar accel_struct_definition
 Advice on the definition of the atmospheric acceleration structures.
-Default is @HTRDR_PLANETO_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+Default is @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
 .It Fl v
 Make
 .Nm
@@ -546,7 +546,7 @@ stored in the
 file even if the file already exists
 .Pq options Fl fo :
 .Bd -literal -offset Ds
-htrdr-planeto -v -N \\
+htrdr-planets -v -N \\
               -i def=800x600:spp=64 \\
               -s cie_xyz \\
               -S lon=-45:lat=50:dst=1.5e8:radius=6.9e5:temp=5778 \\
@@ -589,7 +589,7 @@ would have stopped with an error message, thus avoiding the use of the
 wrong acceleration structures
 .Pq see Fl O No option .
 .Bd -literal -offset Ds
-htrdr-planeto -v -N \\
+htrdr-planets -v -N \\
               -i def=800x600:spp=64 \\
               -s lw=10000,20000 \\
               -C pos=0,1.5e7,0:tgt=0,0,0:up=0,0,1:fov=70 \\

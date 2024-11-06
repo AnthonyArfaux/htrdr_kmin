@@ -21,8 +21,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "planeto/htrdr_planeto_c.h"
-#include "planeto/htrdr_planeto_source.h"
+#include "planets/htrdr_planets_c.h"
+#include "planets/htrdr_planets_source.h"
 
 #include <rad-net/rnatm.h>
 #include <rad-net/rngrd.h>
@@ -83,9 +83,9 @@ static const struct sample_distance_context SAMPLE_DISTANCE_CONTEXT_NULL =
  * Helper functions
  ******************************************************************************/
 static INLINE res_T
-check_planeto_compute_radiance_args
-  (const struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args)
+check_planets_compute_radiance_args
+  (const struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args)
 {
   struct rnatm_band_desc band = RNATM_BAND_DESC_NULL;
   res_T res = RES_OK;
@@ -199,8 +199,8 @@ sample_position_hit_filter
 
 static double
 sample_distance
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    struct rnatm_cell_pos* cells,
    const enum rnatm_radcoef radcoef,
    const double pos[3],
@@ -246,8 +246,8 @@ sample_distance
 
 static INLINE double
 transmissivity
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const enum rnatm_radcoef radcoef,
    const double pos[3],
    const double dir[3],
@@ -271,8 +271,8 @@ transmissivity
 
 static double
 direct_contribution
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const double pos[3],
    const double dir[3],
    const struct s3d_hit* hit_from)
@@ -292,18 +292,18 @@ direct_contribution
   if(!S3D_HIT_NONE(&hit)) return 0;
 
   /* Calculate the distance between the source and `pos' */
-  src_dst = htrdr_planeto_source_distance_to(cmd->source, pos);
+  src_dst = htrdr_planets_source_distance_to(cmd->source, pos);
   ASSERT(src_dst >= 0);
 
   Tr = transmissivity(cmd, args, RNATM_RADCOEF_Kext, pos, dir, src_dst);
-  Ld = htrdr_planeto_source_get_radiance(cmd->source, args->wlen);
+  Ld = htrdr_planets_source_get_radiance(cmd->source, args->wlen);
   return Ld * Tr;
 }
 
 static void
 find_event
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const enum rnatm_radcoef radcoef,
    const double pos[3],
    const double dir[3],
@@ -353,8 +353,8 @@ find_event
 
 static INLINE struct ssf_bsdf*
 create_bsdf
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const struct s3d_hit* hit)
 {
   struct rngrd_create_bsdf_args bsdf_args = RNGRD_CREATE_BSDF_ARGS_NULL;
@@ -375,8 +375,8 @@ create_bsdf
 
 static INLINE struct ssf_phase*
 create_phase_fn
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const struct rnatm_cell_pos* cells) /* Cells in which scattering occurs */
 {
   struct rnatm_sample_component_args sample_args =
@@ -412,8 +412,8 @@ create_phase_fn
  * position. In longwave, simply return 0 */
 static double
 surface_bounce
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const struct event* sc,
    const double sc_pos[3], /* Scattering position */
    const double in_dir[3], /* Incident direction */
@@ -447,7 +447,7 @@ surface_bounce
   /* Calculate direct contribution for specular reflection */
   if((mask & SSF_SPECULAR)
   && (mask & SSF_REFLECTION)
-  && htrdr_planeto_source_is_targeted(cmd->source, sc_pos, sc_dir)) {
+  && htrdr_planets_source_is_targeted(cmd->source, sc_pos, sc_dir)) {
     const double Ld = direct_contribution(cmd, args, sc_pos, sc_dir, &sc->hit);
     L = Ld * reflectivity;
 
@@ -456,7 +456,7 @@ surface_bounce
     double wi[3], pdf;
 
     /* Sample a direction toward the source */
-    pdf = htrdr_planeto_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
+    pdf = htrdr_planets_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
 
     /* The source is behind the surface */
     if(d3_dot(wi, N) <= 0) {
@@ -483,8 +483,8 @@ exit:
  * external source. Returns 0 in long wave */
 static INLINE double
 volume_scattering
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    const struct event* sc,
    const double sc_pos[3], /* Scattering position */
    const double in_dir[3], /* Incident direction */
@@ -505,7 +505,7 @@ volume_scattering
   ssf_phase_sample(phase, args->rng, wo, sc_dir, NULL);
 
   /* Sample a direction toward the source */
-  pdf = htrdr_planeto_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
+  pdf = htrdr_planets_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
 
   /* In short wave, manage the contribution of the external source */
   switch(cmd->spectral_domain.type) {
@@ -530,8 +530,8 @@ volume_scattering
 
 static INLINE enum rnatm_radcoef
 sample_volume_event_type
-  (const struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args,
+  (const struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
    struct event* evt)
 {
   struct rnatm_get_radcoef_args get_k_args = RNATM_GET_RADCOEF_ARGS_NULL;
@@ -561,7 +561,7 @@ sample_volume_event_type
 
 static INLINE double
 get_temperature
-  (const struct htrdr_planeto* cmd,
+  (const struct htrdr_planets* cmd,
    const struct event* evt)
 {
   double T = 0;
@@ -592,9 +592,9 @@ get_temperature
  * Local functions
  ******************************************************************************/
 double /* Radiance in W/m²/sr/m */
-planeto_compute_radiance
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args)
+planets_compute_radiance
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args)
 {
   struct s3d_hit hit_from = S3D_HIT_NULL;
   struct event ev;
@@ -603,13 +603,13 @@ planeto_compute_radiance
   double L = 0; /* Radiance in W/m²/sr/m */
   size_t nsc = 0; /* Number of surface or volume scatterings (for debug) */
   int longwave = 0;
-  ASSERT(cmd && check_planeto_compute_radiance_args(cmd, args) == RES_OK);
+  ASSERT(cmd && check_planets_compute_radiance_args(cmd, args) == RES_OK);
 
   d3_set(pos, args->path_org);
   d3_set(dir, args->path_dir);
   longwave = cmd->spectral_domain.type == HTRDR_SPECTRAL_LW;
 
-  if(!longwave && htrdr_planeto_source_is_targeted(cmd->source, pos, dir)) {
+  if(!longwave && htrdr_planets_source_is_targeted(cmd->source, pos, dir)) {
     L = direct_contribution(cmd, args, pos, dir, NULL); /* In W/m²/sr/m */
   }
 

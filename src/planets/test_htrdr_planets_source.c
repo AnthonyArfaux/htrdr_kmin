@@ -21,8 +21,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "planeto/htrdr_planeto_args.h"
-#include "planeto/htrdr_planeto_source.h"
+#include "planets/htrdr_planets_args.h"
+#include "planets/htrdr_planets_source.h"
 
 #include "core/htrdr.h"
 #include "core/htrdr_ran_wlen_discrete.h"
@@ -72,9 +72,9 @@ write_per_wlen_radiances
 static void
 test_spectrum(struct htrdr* htrdr)
 {
-  struct htrdr_planeto_source_args source_args = HTRDR_PLANETO_SOURCE_ARGS_NULL;
-  struct htrdr_planeto_source_spectrum spectrum;
-  struct htrdr_planeto_source* source = NULL;
+  struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
+  struct htrdr_planets_source_spectrum spectrum;
+  struct htrdr_planets_source* source = NULL;
 
   FILE* fp = NULL;
   char rnrl_filename[] = "rnrl.bin";
@@ -91,96 +91,96 @@ test_spectrum(struct htrdr* htrdr)
   source_args.distance = 0;
   source_args.radius = 1e8;
   source_args.temperature = -1;
-  CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_OK);
-  CHK(htrdr_planeto_source_does_radiance_vary_spectrally(source) == 1);
-  CHK(htrdr_planeto_source_get_spectral_range(source, range) == RES_OK);
+  CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_OK);
+  CHK(htrdr_planets_source_does_radiance_vary_spectrally(source) == 1);
+  CHK(htrdr_planets_source_get_spectral_range(source, range) == RES_OK);
   CHK(range[0] == 0);
   CHK(range[1] == 9);
 
   range[0] = 0; range[1] = 10;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_BAD_ARG);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_BAD_ARG);
 
   range[0] = 1; range[1] = 3;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.source == source);
   CHK(spectrum.range[0] == 1);
   CHK(spectrum.range[1] == 3);
   CHK(spectrum.size == 3);
 
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 1 && L == 101);
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 2 && L == 102);
-  htrdr_planeto_source_spectrum_at(&spectrum, 2, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 2, &w, &L);
   CHK(w == 3 && L == 103);
 
   range[0] = 1.7; range[1] = 1.95;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.source == source);
   CHK(spectrum.range[0] = 1.7);
   CHK(spectrum.range[1] = 1.95);
   CHK(spectrum.size == 2);
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 1.7 && eq_eps(L, 101.7, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 1.95 && eq_eps(L, 101.95, 1.e-6));
 
   range[0] = 2; range[1] = 2.01;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.size == 2);
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 2 && L == 102);
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 2.01 && eq_eps(L, 102.01, 1.e-6));
 
   range[0] = 5.1; range[1] = 6;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.size == 2);
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 5.1 && eq_eps(L, 105.1, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 6 && L == 106);
 
   range[0] = 7.5; range[1] = 9;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.size == 3);
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 7.5 && eq_eps(L, 107.5, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 8 && L == 108);
-  htrdr_planeto_source_spectrum_at(&spectrum, 2, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 2, &w, &L);
   CHK(w == 9 && L == 109);
 
   range[0] = 0.9; range[1] = 7.456;
-  CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
   CHK(spectrum.size == 9);
-  htrdr_planeto_source_spectrum_at(&spectrum, 0, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 0, &w, &L);
   CHK(w == 0.9 && eq_eps(L, 100.9, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 1, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 1, &w, &L);
   CHK(w == 1 && eq_eps(L, 101, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 2, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 2, &w, &L);
   CHK(w == 2 && eq_eps(L, 102, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 3, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 3, &w, &L);
   CHK(w == 3 && eq_eps(L, 103, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 4, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 4, &w, &L);
   CHK(w == 4 && eq_eps(L, 104, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 5, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 5, &w, &L);
   CHK(w == 5 && eq_eps(L, 105, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 6, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 6, &w, &L);
   CHK(w == 6 && eq_eps(L, 106, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 7, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 7, &w, &L);
   CHK(w == 7 && eq_eps(L, 107, 1.e-6));
-  htrdr_planeto_source_spectrum_at(&spectrum, 8, &w, &L);
+  htrdr_planets_source_spectrum_at(&spectrum, 8, &w, &L);
   CHK(w == 7.456 && eq_eps(L, 107.456, 1.e-6));
 
-  htrdr_planeto_source_ref_put(source);
+  htrdr_planets_source_ref_put(source);
 }
 
 static void
 test_spectrum_fail(struct htrdr* htrdr)
 {
-  struct htrdr_planeto_source_args source_args = HTRDR_PLANETO_SOURCE_ARGS_NULL;
-  struct htrdr_planeto_source* source = NULL;
+  struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
+  struct htrdr_planets_source* source = NULL;
   FILE* fp = NULL;
   char rnrl_filename[] = "rnrl.bin";
   double w, L;
@@ -196,13 +196,13 @@ test_spectrum_fail(struct htrdr* htrdr)
   CHK(fp = fopen(rnrl_filename, "w"));
   write_per_wlen_radiances(fp, 4096, 10, 8, 16);
   CHK(fclose(fp) == 0);
-  CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
+  CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
 
   /* Wrong item alignment */
   CHK(fp = fopen(rnrl_filename, "w"));
   write_per_wlen_radiances(fp, 4096, 10, 16, 32);
   CHK(fclose(fp) == 0);
-  CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
+  CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
 
   CHK(fp = fopen(rnrl_filename, "w"));
   write_per_wlen_radiances(fp, 4096, 4, 16, 16);
@@ -224,7 +224,7 @@ test_spectrum_fail(struct htrdr* htrdr)
   CHK(fclose(fp) == 0);
 
   /* Unsorted items */
-  CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
+  CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_BAD_ARG);
 }
 
 static void
@@ -234,9 +234,9 @@ test_spectrum_from_files(struct htrdr* htrdr, int argc, char** argv)
     HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL;
   struct htrdr_ran_wlen_discrete* distrib = NULL;
 
-  struct htrdr_planeto_source_args source_args = HTRDR_PLANETO_SOURCE_ARGS_NULL;
-  struct htrdr_planeto_source_spectrum spectrum = HTRDR_PLANETO_SOURCE_SPECTRUM_NULL;
-  struct htrdr_planeto_source* source = NULL;
+  struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
+  struct htrdr_planets_source_spectrum spectrum = HTRDR_PLANETS_SOURCE_SPECTRUM_NULL;
+  struct htrdr_planets_source* source = NULL;
   size_t i;
 
   source_args.longitude = 0;
@@ -250,18 +250,18 @@ test_spectrum_from_files(struct htrdr* htrdr, int argc, char** argv)
     double lambda, pdf;
     source_args.rnrl_filename = argv[i];
 
-    CHK(htrdr_planeto_source_create(htrdr, &source_args, &source) == RES_OK);
-    CHK(htrdr_planeto_source_does_radiance_vary_spectrally(source));
-    CHK(htrdr_planeto_source_get_spectral_range(source, range) == RES_OK);
+    CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_OK);
+    CHK(htrdr_planets_source_does_radiance_vary_spectrally(source));
+    CHK(htrdr_planets_source_get_spectral_range(source, range) == RES_OK);
 
     range[0] = 250;
     range[1] = 850;
-    CHK(htrdr_planeto_source_get_spectrum(source, range, &spectrum) == RES_OK);
+    CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
 
     printf("`%s' stores %lu entries between [%g, %g] nm\n",
       argv[i], spectrum.size, SPLIT2(range));
 
-    distrib_args.get = htrdr_planeto_source_spectrum_at;
+    distrib_args.get = htrdr_planets_source_spectrum_at;
     distrib_args.nwavelengths = spectrum.size;
     distrib_args.context = &spectrum;
     CHK(htrdr_ran_wlen_discrete_create(htrdr, &distrib_args, &distrib) == RES_OK);
@@ -269,7 +269,7 @@ test_spectrum_from_files(struct htrdr* htrdr, int argc, char** argv)
     lambda = htrdr_ran_wlen_discrete_sample(distrib, 0.3, 0.5, &pdf);
     printf("lambda = %g nm; pdf = %f nm⁻¹\n", lambda, pdf);
 
-    htrdr_planeto_source_ref_put(source);
+    htrdr_planets_source_ref_put(source);
     htrdr_ran_wlen_discrete_ref_put(distrib);
   }
 }

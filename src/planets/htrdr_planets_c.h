@@ -21,10 +21,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_PLANETO_C_H
-#define HTRDR_PLANETO_C_H
+#ifndef HTRDR_PLANETS_C_H
+#define HTRDR_PLANETS_C_H
 
-#include "planeto/htrdr_planeto_args.h"
+#include "planets/htrdr_planets_args.h"
 
 #include "core/htrdr_accum.h"
 #include "core/htrdr_args.h"
@@ -42,33 +42,33 @@ struct rnatm;
 struct rngrd;
 struct scam;
 
-struct planeto_pixel_xwave {
+struct planets_pixel_xwave {
   struct htrdr_accum radiance; /* In W/m²/sr */
   struct htrdr_accum time; /* In µs */
   struct htrdr_estimate radiance_temperature; /* In W/m²/sr */
 };
-#define PLANETO_PIXEL_XWAVE_NULL__ {                                           \
+#define PLANETS_PIXEL_XWAVE_NULL__ {                                           \
   HTRDR_ACCUM_NULL__,                                                          \
   HTRDR_ACCUM_NULL__,                                                          \
   HTRDR_ESTIMATE_NULL__                                                        \
 }
-static const struct planeto_pixel_xwave PLANETO_PIXEL_XWAVE_NULL =
-  PLANETO_PIXEL_XWAVE_NULL__;
+static const struct planets_pixel_xwave PLANETS_PIXEL_XWAVE_NULL =
+  PLANETS_PIXEL_XWAVE_NULL__;
 
-struct planeto_pixel_image {
+struct planets_pixel_image {
   struct htrdr_estimate X; /* In W/m²/sr */
   struct htrdr_estimate Y; /* In W/m²/sr */
   struct htrdr_estimate Z; /* In W/m²/sr */
   struct htrdr_accum time; /* In µs */
 };
-#define PLANETO_PIXEL_IMAGE_NULL__ {                                           \
+#define PLANETS_PIXEL_IMAGE_NULL__ {                                           \
   HTRDR_ESTIMATE_NULL__,                                                       \
   HTRDR_ESTIMATE_NULL__,                                                       \
   HTRDR_ESTIMATE_NULL__,                                                       \
   HTRDR_ACCUM_NULL__                                                           \
 }
 
-struct planeto_compute_radiance_args {
+struct planets_compute_radiance_args {
   struct ssp_rng* rng;
   size_t ithread; /* Index of the thread executing the function */
 
@@ -79,16 +79,16 @@ struct planeto_compute_radiance_args {
   size_t iband; /* Spectral band index */
   size_t iquad; /* Quadrature point */
 };
-#define PLANETO_COMPUTE_RADIANCE_ARGS_NULL__ {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0}
-static const struct planeto_compute_radiance_args
-PLANETO_COMPUTE_RADIANCE_ARGS_NULL = PLANETO_COMPUTE_RADIANCE_ARGS_NULL__;
+#define PLANETS_COMPUTE_RADIANCE_ARGS_NULL__ {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0}
+static const struct planets_compute_radiance_args
+PLANETS_COMPUTE_RADIANCE_ARGS_NULL = PLANETS_COMPUTE_RADIANCE_ARGS_NULL__;
 
-struct htrdr_planeto {
+struct htrdr_planets {
   struct rnatm* atmosphere;
   struct rngrd* ground;
-  struct htrdr_planeto_source* source;
+  struct htrdr_planets_source* source;
 
-  struct htrdr_planeto_spectral_args spectral_domain;
+  struct htrdr_planets_spectral_args spectral_domain;
   struct htrdr_ran_wlen_cie_xyz* cie; /* HTRDR_SPECTRAL_SW_CIE_XYZ */
   struct htrdr_ran_wlen_planck* planck; /* HTRDR_SPECTRAL_<LW|SW> */
   struct htrdr_ran_wlen_discrete* discrete; /* HTRDR_SPECTRAL_SW */
@@ -97,7 +97,7 @@ struct htrdr_planeto {
 
   FILE* output;
   struct str output_name;
-  enum htrdr_planeto_args_output_type output_type;
+  enum htrdr_planets_args_output_type output_type;
 
   struct scam* camera;
 
@@ -110,18 +110,18 @@ struct htrdr_planeto {
 };
 
 extern LOCAL_SYM res_T
-planeto_draw_map
-  (struct htrdr_planeto* cmd);
+planets_draw_map
+  (struct htrdr_planets* cmd);
 
 extern LOCAL_SYM void
-planeto_get_pixel_format
-  (const struct htrdr_planeto* cmd,
+planets_get_pixel_format
+  (const struct htrdr_planets* cmd,
    struct htrdr_pixel_format* fmt);
 
 /* Return the radiance in W/m²/sr/m */
 extern LOCAL_SYM double
-planeto_compute_radiance
-  (struct htrdr_planeto* cmd,
-   const struct planeto_compute_radiance_args* args);
+planets_compute_radiance
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args);
 
-#endif /* HTRDR_PLANETO_C_H */
+#endif /* HTRDR_PLANETS_C_H */

@@ -29,10 +29,10 @@
 #include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_log.h"
 
-#include "planeto/htrdr_planeto.h"
-#include "planeto/htrdr_planeto_args.h"
-#include "planeto/htrdr_planeto_c.h"
-#include "planeto/htrdr_planeto_source.h"
+#include "planets/htrdr_planets.h"
+#include "planets/htrdr_planets_args.h"
+#include "planets/htrdr_planets_c.h"
+#include "planets/htrdr_planets_source.h"
 
 #include <rad-net/rnatm.h>
 #include <rad-net/rngrd.h>
@@ -54,7 +54,7 @@
 /* Calculate the number of fixed size spectral intervals to use for the
  * cumulative */
 static size_t
-compute_nintervals_for_spectral_cdf(const struct htrdr_planeto* cmd)
+compute_nintervals_for_spectral_cdf(const struct htrdr_planets* cmd)
 {
   double range_size;
   size_t nintervals;
@@ -72,8 +72,8 @@ compute_nintervals_for_spectral_cdf(const struct htrdr_planeto* cmd)
 
 static res_T
 setup_octree_storage
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args,
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args,
    struct rnatm_create_args* rnatm_args)
 {
   struct stat file_stat;
@@ -121,8 +121,8 @@ error:
 
 static res_T
 setup_atmosphere
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   struct rnatm_create_args rnatm_args = RNATM_CREATE_ARGS_DEFAULT;
   res_T res = RES_OK;
@@ -160,14 +160,14 @@ error:
 
 static res_T
 setup_ground
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   struct rngrd_create_args rngrd_args = RNGRD_CREATE_ARGS_DEFAULT;
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES)
+  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES)
     goto exit;
 
   rngrd_args.smsh_filename = args->ground.smsh_filename;
@@ -193,8 +193,8 @@ error:
 
 static res_T
 setup_spectral_domain_sw
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   res_T res = RES_OK;
   ASSERT(cmd && args);
@@ -202,14 +202,14 @@ setup_spectral_domain_sw
 
   /* Discrete distribution */
   if(args->source.rnrl_filename) {
-    struct htrdr_planeto_source_spectrum spectrum;
+    struct htrdr_planets_source_spectrum spectrum;
     struct htrdr_ran_wlen_discrete_create_args discrete_args;
 
-    res = htrdr_planeto_source_get_spectrum
+    res = htrdr_planets_source_get_spectrum
       (cmd->source, cmd->spectral_domain.wlen_range, &spectrum);
     if(res != RES_OK) goto error;
 
-    discrete_args.get = htrdr_planeto_source_spectrum_at;
+    discrete_args.get = htrdr_planets_source_spectrum_at;
     discrete_args.nwavelengths = spectrum.size;
     discrete_args.context = &spectrum;
     res = htrdr_ran_wlen_discrete_create
@@ -236,8 +236,8 @@ error:
 
 static INLINE res_T
 setup_spectral_domain
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   double ground_T_range[2];
   size_t nintervals;
@@ -287,8 +287,8 @@ error:
 
 static res_T
 setup_output
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   const char* output_name = NULL;
   res_T res = RES_OK;
@@ -334,16 +334,16 @@ error:
 
 static INLINE res_T
 setup_source
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_OCTREES)
+  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES)
     goto exit;
 
-  res = htrdr_planeto_source_create(cmd->htrdr, &args->source, &cmd->source);
+  res = htrdr_planets_source_create(cmd->htrdr, &args->source, &cmd->source);
   if(res != RES_OK) goto error;
 
 exit:
@@ -354,14 +354,14 @@ error:
 
 static res_T
 setup_camera
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   struct scam_perspective_args cam_args = SCAM_PERSPECTIVE_ARGS_DEFAULT;
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+  if(cmd->output_type != HTRDR_PLANETS_ARGS_OUTPUT_IMAGE)
     goto exit;
 
   ASSERT(htrdr_args_camera_perspective_check(&args->cam_persp) == RES_OK);
@@ -393,17 +393,17 @@ error:
 
 static res_T
 setup_buffer
-  (struct htrdr_planeto* cmd,
-   const struct htrdr_planeto_args* args)
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
 {
   struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE)
+  if(cmd->output_type != HTRDR_PLANETS_ARGS_OUTPUT_IMAGE)
     goto exit;
 
-  planeto_get_pixel_format(cmd, &pixfmt);
+  planets_get_pixel_format(cmd, &pixfmt);
 
   /* Setup buffer layout */
   cmd->buf_layout.width = args->image.definition[0];
@@ -430,7 +430,7 @@ error:
 }
 
 static INLINE res_T
-write_vtk_octrees(const struct htrdr_planeto* cmd)
+write_vtk_octrees(const struct htrdr_planets* cmd)
 {
   size_t octrees_range[2];
   res_T res = RES_OK;
@@ -452,15 +452,15 @@ error:
 }
 
 static void
-planeto_release(ref_T* ref)
+planets_release(ref_T* ref)
 {
-  struct htrdr_planeto* cmd = CONTAINER_OF(ref, struct htrdr_planeto, ref);
+  struct htrdr_planets* cmd = CONTAINER_OF(ref, struct htrdr_planets, ref);
   struct htrdr* htrdr = NULL;
   ASSERT(ref);
 
   if(cmd->atmosphere) RNATM(ref_put(cmd->atmosphere));
   if(cmd->ground) RNGRD(ref_put(cmd->ground));
-  if(cmd->source) htrdr_planeto_source_ref_put(cmd->source);
+  if(cmd->source) htrdr_planets_source_ref_put(cmd->source);
   if(cmd->cie) htrdr_ran_wlen_cie_xyz_ref_put(cmd->cie);
   if(cmd->discrete) htrdr_ran_wlen_discrete_ref_put(cmd->discrete);
   if(cmd->planck) htrdr_ran_wlen_planck_ref_put(cmd->planck);
@@ -479,25 +479,25 @@ planeto_release(ref_T* ref)
  * Exported functions
  ******************************************************************************/
 res_T
-htrdr_planeto_create
+htrdr_planets_create
   (struct htrdr* htrdr,
-   const struct htrdr_planeto_args* args,
-   struct htrdr_planeto** out_cmd)
+   const struct htrdr_planets_args* args,
+   struct htrdr_planets** out_cmd)
 {
-  struct htrdr_planeto* cmd = NULL;
+  struct htrdr_planets* cmd = NULL;
   res_T res = RES_OK;
   ASSERT(htrdr && out_cmd);
 
-  res = htrdr_planeto_args_check(args);
+  res = htrdr_planets_args_check(args);
   if(res != RES_OK) {
-    htrdr_log_err(htrdr, "Invalid htrdr_planeto arguments -- %s\n",
+    htrdr_log_err(htrdr, "Invalid htrdr_planets arguments -- %s\n",
       res_to_cstr(res));
     goto error;
   }
 
   cmd = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*cmd));
   if(!cmd) {
-    htrdr_log_err(htrdr, "Error allocating htrdr_planeto command\n");
+    htrdr_log_err(htrdr, "Error allocating htrdr_planets command\n");
     res = RES_MEM_ERR;
     goto error;
   }
@@ -526,37 +526,37 @@ exit:
   return res;
 error:
   if(cmd) {
-    htrdr_planeto_ref_put(cmd);
+    htrdr_planets_ref_put(cmd);
     cmd = NULL;
   }
   goto exit;
 }
 
 void
-htrdr_planeto_ref_get(struct htrdr_planeto* cmd)
+htrdr_planets_ref_get(struct htrdr_planets* cmd)
 {
   ASSERT(cmd);
   ref_get(&cmd->ref);
 }
 
 void
-htrdr_planeto_ref_put(struct htrdr_planeto* cmd)
+htrdr_planets_ref_put(struct htrdr_planets* cmd)
 {
   ASSERT(cmd);
-  ref_put(&cmd->ref, planeto_release);
+  ref_put(&cmd->ref, planets_release);
 }
 
 res_T
-htrdr_planeto_run(struct htrdr_planeto* cmd)
+htrdr_planets_run(struct htrdr_planets* cmd)
 {
   res_T res = RES_OK;
   ASSERT(cmd);
 
   switch(cmd->output_type) {
-    case HTRDR_PLANETO_ARGS_OUTPUT_IMAGE:
-      res = planeto_draw_map(cmd);
+    case HTRDR_PLANETS_ARGS_OUTPUT_IMAGE:
+      res = planets_draw_map(cmd);
       break;
-    case HTRDR_PLANETO_ARGS_OUTPUT_OCTREES:
+    case HTRDR_PLANETS_ARGS_OUTPUT_OCTREES:
       res = write_vtk_octrees(cmd);
       break;
     default: FATAL("Unreachable code\n"); break;
@@ -573,22 +573,22 @@ error:
  * Local function
  ******************************************************************************/
 void
-planeto_get_pixel_format
-  (const struct htrdr_planeto* cmd,
+planets_get_pixel_format
+  (const struct htrdr_planets* cmd,
    struct htrdr_pixel_format* fmt)
 {
-  ASSERT(cmd && fmt && cmd->output_type == HTRDR_PLANETO_ARGS_OUTPUT_IMAGE);
+  ASSERT(cmd && fmt && cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
   (void)cmd;
 
   switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_LW:
     case HTRDR_SPECTRAL_SW:
-      fmt->size = sizeof(struct planeto_pixel_xwave);
-      fmt->alignment = ALIGNOF(struct planeto_pixel_xwave);
+      fmt->size = sizeof(struct planets_pixel_xwave);
+      fmt->alignment = ALIGNOF(struct planets_pixel_xwave);
       break;
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
-      fmt->size = sizeof(struct planeto_pixel_image);
-      fmt->alignment = ALIGNOF(struct planeto_pixel_image);
+      fmt->size = sizeof(struct planets_pixel_image);
+      fmt->alignment = ALIGNOF(struct planets_pixel_image);
       break;
     default: FATAL("Unreachable code\n"); break;
   }

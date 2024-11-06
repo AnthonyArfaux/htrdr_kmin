@@ -21,8 +21,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include "planeto/htrdr_planeto_c.h"
-#include "planeto/htrdr_planeto_source.h"
+#include "planets/htrdr_planets_c.h"
+#include "planets/htrdr_planets_source.h"
 
 #include "core/htrdr.h"
 #include "core/htrdr_log.h"
@@ -40,7 +40,7 @@ typedef struct ALIGN(16) {
   double radiance; /* in W/m²/sr/m */
 } source_radiance_T;
 
-struct htrdr_planeto_source {
+struct htrdr_planets_source {
   double position[3]; /* In m */
 
   double radius; /* In m */
@@ -59,7 +59,7 @@ struct htrdr_planeto_source {
  ******************************************************************************/
 static INLINE res_T
 check_per_wlen_radiance_sbuf_desc
-  (const struct htrdr_planeto_source* src,
+  (const struct htrdr_planets_source* src,
    const struct sbuf_desc* desc)
 {
   const source_radiance_T* spectrum = NULL;
@@ -94,8 +94,8 @@ check_per_wlen_radiance_sbuf_desc
 
 static res_T
 setup_per_wavelength_radiances
-  (struct htrdr_planeto_source* src,
-   const struct htrdr_planeto_source_args* args)
+  (struct htrdr_planets_source* src,
+   const struct htrdr_planets_source_args* args)
 {
   struct sbuf_create_args sbuf_args;
   struct sbuf_desc desc;
@@ -141,7 +141,7 @@ cmp_wlen(const void* a, const void* b)
 
 static double
 get_radiance
-  (const struct htrdr_planeto_source* src,
+  (const struct htrdr_planets_source* src,
    const double wlen)
 {
   struct sbuf_desc desc;
@@ -187,11 +187,11 @@ get_radiance
 static void
 release_source(ref_T* ref)
 {
-  struct htrdr_planeto_source* source;
+  struct htrdr_planets_source* source;
   struct htrdr* htrdr;
   ASSERT(ref);
 
-  source = CONTAINER_OF(ref, struct htrdr_planeto_source, ref);
+  source = CONTAINER_OF(ref, struct htrdr_planets_source, ref);
   htrdr = source->htrdr;
   if(source->per_wlen_radiances) SBUF(ref_put(source->per_wlen_radiances));
   MEM_RM(htrdr_get_allocator(htrdr), source);
@@ -202,18 +202,18 @@ release_source(ref_T* ref)
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_planeto_source_create
+htrdr_planets_source_create
   (struct htrdr* htrdr,
-   const struct htrdr_planeto_source_args* args,
-   struct htrdr_planeto_source** out_source)
+   const struct htrdr_planets_source_args* args,
+   struct htrdr_planets_source** out_source)
 {
-  struct htrdr_planeto_source* src = NULL;
+  struct htrdr_planets_source* src = NULL;
   double dst; /* In m */
   double lat; /* In radians */
   double lon; /* In radians */
   res_T res = RES_OK;
   ASSERT(htrdr && out_source);
-  ASSERT(htrdr_planeto_source_args_check(args) == RES_OK);
+  ASSERT(htrdr_planets_source_args_check(args) == RES_OK);
 
   src = MEM_CALLOC(htrdr_get_allocator(htrdr), 1, sizeof(*src));
   if(!src) {
@@ -248,26 +248,26 @@ exit:
   *out_source = src;
   return res;
 error:
-  if(src) { htrdr_planeto_source_ref_put(src); src = NULL; }
+  if(src) { htrdr_planets_source_ref_put(src); src = NULL; }
   goto exit;
 }
 
 void
-htrdr_planeto_source_ref_get(struct htrdr_planeto_source* source)
+htrdr_planets_source_ref_get(struct htrdr_planets_source* source)
 {
   ASSERT(source);
   ref_get(&source->ref);
 }
 
-void htrdr_planeto_source_ref_put(struct htrdr_planeto_source* source)
+void htrdr_planets_source_ref_put(struct htrdr_planets_source* source)
 {
   ASSERT(source);
   ref_put(&source->ref, release_source);
 }
 
 double
-htrdr_planeto_source_sample_direction
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_sample_direction
+  (const struct htrdr_planets_source* source,
    struct ssp_rng* rng,
    const double pos[3],
    double dir[3])
@@ -297,8 +297,8 @@ htrdr_planeto_source_sample_direction
 }
 
 double /* In W/m²/sr/m */
-htrdr_planeto_source_get_radiance
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_get_radiance
+  (const struct htrdr_planets_source* source,
    const double wlen)
 {
   if(source->per_wlen_radiances) {
@@ -310,8 +310,8 @@ htrdr_planeto_source_get_radiance
 }
 
 double
-htrdr_planeto_source_distance_to
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_distance_to
+  (const struct htrdr_planets_source* source,
    const double pos[3])
 {
   double vec[3];
@@ -324,8 +324,8 @@ htrdr_planeto_source_distance_to
 }
 
 int
-htrdr_planeto_source_is_targeted
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_is_targeted
+  (const struct htrdr_planets_source* source,
    const double pos[3],
    const double dir[3])
 {
@@ -349,8 +349,8 @@ htrdr_planeto_source_is_targeted
 }
 
 res_T
-htrdr_planeto_source_get_spectral_range
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_get_spectral_range
+  (const struct htrdr_planets_source* source,
    double range[2])
 {
   res_T res = RES_OK;
@@ -378,29 +378,29 @@ error:
 }
 
 int
-htrdr_planeto_source_does_radiance_vary_spectrally
-  (const struct htrdr_planeto_source* source)
+htrdr_planets_source_does_radiance_vary_spectrally
+  (const struct htrdr_planets_source* source)
 {
   ASSERT(source);
   return source->per_wlen_radiances != NULL;
 }
 
 res_T
-htrdr_planeto_source_get_spectrum
-  (const struct htrdr_planeto_source* source,
+htrdr_planets_source_get_spectrum
+  (const struct htrdr_planets_source* source,
    const double range[2], /* In nm. Limits are inclusive */
-   struct htrdr_planeto_source_spectrum* source_spectrum)
+   struct htrdr_planets_source_spectrum* source_spectrum)
 {
   double full_range[2];
   res_T res = RES_OK;
   ASSERT(source && range && source_spectrum && range[0] <= range[1]);
 
-  if(!htrdr_planeto_source_does_radiance_vary_spectrally(source)) {
+  if(!htrdr_planets_source_does_radiance_vary_spectrally(source)) {
     res = RES_BAD_ARG;
     goto error;
   }
 
-  res = htrdr_planeto_source_get_spectral_range(source, full_range);
+  res = htrdr_planets_source_get_spectral_range(source, full_range);
   if(res != RES_OK) goto error;
 
   if(range[0] < full_range[0] || full_range[1] < range[1]) {
@@ -460,25 +460,25 @@ error:
 }
 
 void
-htrdr_planeto_source_spectrum_at
+htrdr_planets_source_spectrum_at
   (void* source_spectrum,
    const size_t i, /* between [0, spectrum->size[ */
    double* wavelength, /* In nm */
    double* radiance) /* In W/m²/sr/m */
 {
-  struct htrdr_planeto_source_spectrum* spectrum = source_spectrum;
+  struct htrdr_planets_source_spectrum* spectrum = source_spectrum;
   ASSERT(spectrum && i < spectrum->size && wavelength && radiance);
 
   /* Lower limit */
   if(i == 0) {
     *wavelength = spectrum->range[0];
-    *radiance = htrdr_planeto_source_get_radiance
+    *radiance = htrdr_planets_source_get_radiance
       (spectrum->source, spectrum->range[0]);
 
   /* Upper limit */
   } else if(i == spectrum->size-1) {
     *wavelength = spectrum->range[1];
-    *radiance = htrdr_planeto_source_get_radiance
+    *radiance = htrdr_planets_source_get_radiance
       (spectrum->source, spectrum->range[1]);
 
   /* Discrete element */

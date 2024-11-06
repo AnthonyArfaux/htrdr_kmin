@@ -30,7 +30,7 @@ fields:
    external: a monochromatic laser sheet illuminates the inside of the
    combustion chamber for diagnostic purposes.
 
-3. *Planetology*: takes into account the geometry of a "ground" of
+3. *Planetary science*: takes into account the geometry of a "ground" of
    arbitrary shape, described by a triangular mesh, with the possibility
    of using an arbitrary number of materials. The radiative properties
    of a gas mixture must be provided on a tetrahedral mesh, using the
@@ -75,13 +75,13 @@ that calculate the radiance are used for computing various quantities:
   (optional; required by ATMOSHPERE)
 - [ModRadUrb: MaTeriaL](https://gitlab.com/meso-star/mrumtl)
 - [Rad-Net ATMopshere](https://gitlab.com/meso-star/rnatm)
-  (optional; required by PLANETO)
+  (optional; required by PLANETS)
 - [Rad-Net GRounD](https://gitlab.com/meso-star/rngrd)
-  (optional; required by PLANETO)
+  (optional; required by PLANETS)
 - [RSys](https://gitlab.com/vaplv/rsys)
 - [Star 3D](https://gitlab.com/meso-star/star-3d)
 - [Star Buffer](https://gitlab.com/meso-star/star-buffer)
-  (optional; required by PLANETO)
+  (optional; required by PLANETS)
 - [Star Camera](https://gitlab.com/meso-star/star-camera)
 - [Star Scattering Functions](https://gitlab.com/meso-star/star-sf)
 - [Star SamPling](https://gitlab.com/meso-star/star-sp)
@@ -391,4 +391,3 @@ Copyright © 2018-2019, 2022-2023 Université Paul Sabatier
 `htrdr` is free software released under the GPL v3+ license: GNU GPL
 version 3 or later. You are welcome to redistribute it under certain
 conditions; refer to the COPYING file for details.
-

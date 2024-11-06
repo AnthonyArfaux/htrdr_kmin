@@ -27,8 +27,8 @@
 #ifdef HTRDR_BUILD_COMBUSTION
   #include "combustion/htrdr_combustion.h"
 #endif
-#ifdef HTRDR_BUILD_PLANETO
-  #include "planeto/htrdr_planeto.h"
+#ifdef HTRDR_BUILD_PLANETS
+  #include "planets/htrdr_planets.h"
 #endif
 
 #include "core/htrdr_log.h"
@@ -85,13 +85,13 @@ main(int argc, char** argv)
 #endif
 
   /* Planeto mode */
-  } else if(!strcmp(argv[1], "planeto")) {
-#ifdef HTRDR_BUILD_PLANETO
-    err = htrdr_planeto_main(argc-1, argv+1);
+  } else if(!strcmp(argv[1], "planets")) {
+#ifdef HTRDR_BUILD_PLANETS
+    err = htrdr_planets_main(argc-1, argv+1);
     if(err) goto error;
 #else
     fprintf(stderr,
-      "The planeto mode is not available in this htrdr build.\n");
+      "The planets mode is not available in this htrdr build.\n");
     err = 1;
     goto error;
 #endif

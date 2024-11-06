@@ -10,9 +10,9 @@ Requires.private:\
  ssf >= @SSF_VERSION@,\
  star-sp >= @SSP_VERSION@,\
  svx >= @SVX_VERSION@
-Name: htrdr-planeto
-Description: htrdr Planeto
+Name: htrdr-planets
+Description: htrdr Planets
 Version: @VERSION@
-Libs: -L. -lhtrdr-planeto
+Libs: -L. -lhtrdr-planets
 Libs.private: -lm
-CFlags: -DHTRDR_BUILD_PLANETO -Isrc
+CFlags: -DHTRDR_BUILD_PLANETS -Isrc

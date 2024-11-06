@@ -21,41 +21,41 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef HTRDR_PLANETO_H
-#define HTRDR_PLANETO_H
+#ifndef HTRDR_PLANETS_H
+#define HTRDR_PLANETS_H
 
 #include "core/htrdr.h"
 #include <rsys/rsys.h>
 
 struct htrdr;
-struct htrdr_planeto;
-struct htrdr_planeto_args;
+struct htrdr_planets;
+struct htrdr_planets_args;
 
 BEGIN_DECLS
 
 HTRDR_API res_T
-htrdr_planeto_create
+htrdr_planets_create
   (struct htrdr* htrdr,
-   const struct htrdr_planeto_args* args,
-   struct htrdr_planeto** cmd);
+   const struct htrdr_planets_args* args,
+   struct htrdr_planets** cmd);
 
 HTRDR_API void
-htrdr_planeto_ref_get
-  (struct htrdr_planeto* cmd);
+htrdr_planets_ref_get
+  (struct htrdr_planets* cmd);
 
 HTRDR_API void
-htrdr_planeto_ref_put
-  (struct htrdr_planeto* cmd);
+htrdr_planets_ref_put
+  (struct htrdr_planets* cmd);
 
 HTRDR_API res_T
-htrdr_planeto_run
-  (struct htrdr_planeto* cmd);
+htrdr_planets_run
+  (struct htrdr_planets* cmd);
 
 HTRDR_API int
-htrdr_planeto_main
+htrdr_planets_main
   (int argc,
    char** argv);
 
 END_DECLS
 
-#endif /* HTRDR_PLANETO_H */
+#endif /* HTRDR_PLANETS_H */

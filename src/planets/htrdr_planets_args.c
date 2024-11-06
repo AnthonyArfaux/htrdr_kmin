@@ -23,7 +23,7 @@
 
 #define _POSIX_C_SOURCE 200112L /* strtok_r support */
 
-#include "planeto/htrdr_planeto_args.h"
+#include "planets/htrdr_planets_args.h"
 
 #include <rsys/cstr.h>
 #include <rsys/stretchy_array.h>
@@ -65,7 +65,7 @@ check_aerosol_args(const struct rnatm_aerosol_args* args)
 }
 
 static INLINE res_T
-check_ground_args(const struct htrdr_planeto_ground_args* args)
+check_ground_args(const struct htrdr_planets_ground_args* args)
 {
   if(!args) return RES_BAD_ARG;
 
@@ -79,7 +79,7 @@ check_ground_args(const struct htrdr_planeto_ground_args* args)
 }
 
 static INLINE res_T
-check_spectral_args(const struct htrdr_planeto_spectral_args* args)
+check_spectral_args(const struct htrdr_planets_spectral_args* args)
 {
   if(!args) return RES_BAD_ARG;
 
@@ -105,7 +105,7 @@ check_spectral_args(const struct htrdr_planeto_spectral_args* args)
 static void
 usage(void)
 {
-  printf("usage: htrdr-planeto [-dfhNv] [-a aerosol_opt[:aerosol_opt ...]]\n");
+  printf("usage: htrdr-planets [-dfhNv] [-a aerosol_opt[:aerosol_opt ...]]\n");
   printf("                     [-C persp_camera_opt[:persp_camera_opt ...]]\n");
   printf("                     [-G ground_opt[:ground_opt ...]]\n");
   printf("                     [-i image_opt[:image_opt ...]] [-O accel_struct_storage]\n");
@@ -136,7 +136,7 @@ parse_aerosol_parameters(const char* str, void* ptr)
   enum { MESH, NAME, RADPROP, PHASEFN, PHASEIDS } iparam;
   struct rnatm_aerosol_args* aerosol = NULL;
   char buf[BUFSIZ];
-  struct htrdr_planeto_args* args = ptr;
+  struct htrdr_planets_args* args = ptr;
   char* key;
   char* val;
   char* tk_ctx;
@@ -203,7 +203,7 @@ parse_ground_parameters(const char* str, void* ptr)
 {
   enum { BRDF, MESH, NAME, PROP } iparam;
   char buf[BUFSIZ];
-  struct htrdr_planeto_args* args = ptr;
+  struct htrdr_planets_args* args = ptr;
   char* key;
   char* val;
   char* tk_ctx;
@@ -265,7 +265,7 @@ parse_gas_parameters(const char* str, void* ptr)
 {
   enum { MESH, CK, TEMP } iparam;
   char buf[BUFSIZ];
-  struct htrdr_planeto_args* args = ptr;
+  struct htrdr_planets_args* args = ptr;
   char* key;
   char* val;
   char* tk_ctx;
@@ -325,8 +325,8 @@ parse_source_parameters(const char* str, void* ptr)
 {
   enum {LAT, LON, DST, RADIUS, TEMP, RAD} iparam;
   char buf[BUFSIZ];
-  struct htrdr_planeto_args* args = ptr;
-  struct htrdr_planeto_source_args* src = NULL;
+  struct htrdr_planets_args* args = ptr;
+  struct htrdr_planets_source_args* src = NULL;
   char* key;
   char* val;
   char* tk_ctx;
@@ -442,8 +442,8 @@ parse_spectral_parameters(const char* str, void* ptr)
 {
   enum {CIE_XYZ, LW, SW} iparam;
   char buf[BUFSIZ];
-  struct htrdr_planeto_args* args = ptr;
-  struct htrdr_planeto_spectral_args* spectral = NULL;
+  struct htrdr_planets_args* args = ptr;
+  struct htrdr_planets_spectral_args* spectral = NULL;
   char* key;
   char* val;
   char* tk_ctx;
@@ -510,13 +510,13 @@ error:
  * Local functions
  ******************************************************************************/
 res_T
-htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
+htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
 {
   int opt;
   res_T res = RES_OK;
   ASSERT(args && argc && argv);
 
-  *args = HTRDR_PLANETO_ARGS_DEFAULT;
+  *args = HTRDR_PLANETS_ARGS_DEFAULT;
 
   while((opt = getopt(argc, argv, "a:C:dfG:g:hi:NO:o:S:s:T:t:V:v")) != -1) {
     switch(opt) {
@@ -531,10 +531,10 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         break;
       case 'C':
         res = htrdr_args_camera_perspective_parse(&args->cam_persp, optarg);
-        args->output_type = HTRDR_PLANETO_ARGS_OUTPUT_IMAGE;
+        args->output_type = HTRDR_PLANETS_ARGS_OUTPUT_IMAGE;
         break;
       case 'd':
-        args->output_type = HTRDR_PLANETO_ARGS_OUTPUT_OCTREES;
+        args->output_type = HTRDR_PLANETS_ARGS_OUTPUT_OCTREES;
         break;
       case 'f':
         args->force_output_overwrite = 1;
@@ -553,7 +553,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
         break;
       case 'h':
         usage();
-        htrdr_planeto_args_release(args);
+        htrdr_planets_args_release(args);
         args->quit = 1;
         goto exit;
       case 'i':
@@ -598,7 +598,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     goto error;
   }
 
-  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_OCTREES) {
+  if(args->output_type != HTRDR_PLANETS_ARGS_OUTPUT_OCTREES) {
     res = check_ground_args(&args->ground);
     if(res != RES_OK) {
       fprintf(stderr, "missing ground definition -- option '-G'\n");
@@ -608,7 +608,7 @@ htrdr_planeto_args_init(struct htrdr_planeto_args* args, int argc, char** argv)
     /* Check the source */
     if(args->spectral_domain.type == HTRDR_SPECTRAL_SW
     || args->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
-      res = htrdr_planeto_source_args_check(&args->source);
+      res = htrdr_planets_source_args_check(&args->source);
       if(res != RES_OK) {
         fprintf(stderr, "missing source definition -- option '-S'\n");
         goto error;
@@ -620,12 +620,12 @@ exit:
   return res;
 error:
   usage();
-  htrdr_planeto_args_release(args);
+  htrdr_planets_args_release(args);
   goto exit;
 }
 
 void
-htrdr_planeto_args_release(struct htrdr_planeto_args* args)
+htrdr_planets_args_release(struct htrdr_planets_args* args)
 {
   size_t i;
   ASSERT(args);
@@ -649,11 +649,11 @@ htrdr_planeto_args_release(struct htrdr_planeto_args* args)
   }
   sa_release(args->aerosols);
 
-  *args = HTRDR_PLANETO_ARGS_DEFAULT;
+  *args = HTRDR_PLANETS_ARGS_DEFAULT;
 }
 
 res_T
-htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
+htrdr_planets_args_check(const struct htrdr_planets_args* args)
 {
   size_t i;
   res_T res = RES_OK;
@@ -679,7 +679,7 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
   res = check_spectral_args(&args->spectral_domain);
   if(res != RES_OK) return res;
 
-  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_OCTREES) {
+  if(args->output_type != HTRDR_PLANETS_ARGS_OUTPUT_OCTREES) {
     /* Check the ground */
     res = check_ground_args(&args->ground);
     if(res != RES_OK) return res;
@@ -687,12 +687,12 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
     /* Check the source */
     if(args->spectral_domain.type == HTRDR_SPECTRAL_SW
     || args->spectral_domain.type == HTRDR_SPECTRAL_SW_CIE_XYZ) {
-      res = htrdr_planeto_source_args_check(&args->source);
+      res = htrdr_planets_source_args_check(&args->source);
       if(res != RES_OK) return res;
     }
   }
 
-  if(args->output_type != HTRDR_PLANETO_ARGS_OUTPUT_IMAGE) {
+  if(args->output_type != HTRDR_PLANETS_ARGS_OUTPUT_IMAGE) {
     res = htrdr_args_camera_perspective_check(&args->cam_persp);
     if(res != RES_OK) return res;
 
@@ -702,14 +702,14 @@ htrdr_planeto_args_check(const struct htrdr_planeto_args* args)
 
   /* Check miscalleneous parameters */
   if(args->nthreads == 0
-  || (unsigned)args->output_type >= HTRDR_PLANETO_ARGS_OUTPUT_TYPES_COUNT__)
+  || (unsigned)args->output_type >= HTRDR_PLANETS_ARGS_OUTPUT_TYPES_COUNT__)
     return RES_BAD_ARG;
 
   return RES_OK;
 }
 
 res_T
-htrdr_planeto_source_args_check(const struct htrdr_planeto_source_args* args)
+htrdr_planets_source_args_check(const struct htrdr_planets_source_args* args)
 {
   if(!args) return RES_BAD_ARG;
 
