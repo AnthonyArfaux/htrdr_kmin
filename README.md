@@ -95,6 +95,13 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.11
+
+- Renamed `planeto` sub-command to `planets`.
+- Fix typos in manual pages and formatting problems.
+- Ensure correct default value for a camera.
+- Correct error handling when parsing planeto input arguments.
+
 ### Version 0.10
 
 #### Use POSIX make as a build system
