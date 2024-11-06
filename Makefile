@@ -63,9 +63,8 @@ all:\
 
 # Check commands dependencies
 .config_commands: config.mk
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@echo "config done" > $@
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	echo 'config done' > $@
 
 # Inference rules for command build
 .SUFFIXES: .c .d .o
@@ -119,10 +118,8 @@ htrdr: config.mk $(HTRDR_OBJ) $(HTRDR_DPDC_PREREQ)
 $(HTRDR_OBJ) $(HTRDR_DEP): config.mk
 
 clean_htrdr:
-	rm -f $(HTRDR_OBJ) htrdr .config_commands
-
-distclean_htrdr: clean_htrdr
-	rm -f $(HTRDR_DEP)
+	rm -f htrdr $(HTRDR_OBJ) $(HTRDR_DEP)
+	rm -f .config_commands
 
 ################################################################################
 # Build the htrdr-atmosphere command
@@ -148,10 +145,8 @@ htrdr-atmosphere: config.mk $(HTRDR_ATMOSPHERE_OBJ) $(HTRDR_ATMOSPHERE_DPDC_PRER
 $(HTRDR_ATMOSPHERE_OBJ) $(HTRDR_ATMOSPHERE_DEP): config.mk
 
 clean_htrdr-atmosphere:
-	rm -f $(HTRDR_ATMOSPHERE_OBJ) htrdr-atmosphere
-
-distclean_htrdr-atmosphere: clean_htrdr-atmosphere
-	rm -f $(HTRDR_ATMOSPHERE_DEP) .config_commands
+	rm -f htrdr-atmosphere $(HTRDR_ATMOSPHERE_OBJ) $(HTRDR_ATMOSPHERE_DEP)
+	rm -f .config_commands
 
 ################################################################################
 # Build the htrdr-combustion command
@@ -177,10 +172,8 @@ htrdr-combustion: config.mk $(HTRDR_COMBUSTION_OBJ) $(HTRDR_COMBUSTION_DPDC_PRER
 $(HTRDR_COMBUSTION_OBJ) $(HTRDR_COMBUSTION_DEP): config.mk
 
 clean_htrdr-combustion:
-	rm -f $(HTRDR_COMBUSTION_OBJ) htrdr-combustion
-
-distclean_htrdr-combustion: clean_htrdr-combustion
-	rm -f $(HTRDR_COMBUSTION_DEP) .config_commands
+	rm -f htrdr-combustion $(HTRDR_COMBUSTION_OBJ) $(HTRDR_COMBUSTION_DEP)
+	rm -f .config_commands
 
 ################################################################################
 # Build the htrdr-planets command
@@ -206,10 +199,8 @@ htrdr-planets: config.mk $(HTRDR_PLANETS_OBJ) $(HTRDR_PLANETS_DPDC_PREREQ)
 $(HTRDR_PLANETS_OBJ) $(HTRDR_PLANETS_DEP): config.mk
 
 clean_htrdr-planets:
-	rm -f $(HTRDR_PLANETS_OBJ) htrdr-planets
-
-distclean_htrdr-planets: clean_htrdr-planets
-	rm -f $(HTRDR_PLANETS_DEP) .config_commands
+	rm -f htrdr-planets $(HTRDR_PLANETS_OBJ) $(HTRDR_PLANETS_DEP)
+	rm -f .config_commands
 
 ################################################################################
 # Building the core
@@ -257,23 +248,15 @@ libhtrdr-core.o: $(CORE_OBJ)
 	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_core: config.mk
-	@if ! $(PKG_CONFIG) --atleast-version $(AW_VERSION) aw; then \
-	  echo "aw $(AW_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(MPI_VERSION) $(MPI_PC); then \
-	  echo "$(MPI_PC) $(MPI_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(MRUMTL_VERSION) mrumtl; then \
-	  echo "mrumtl $(MRUMTL_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d; then \
-	  echo "s3d $(S3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam; then \
-	  echo "scam $(SCAM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf; then \
-	  echo "ssf $(SSF_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp; then \
-	  echo "star-sp $(SSP_VERSION) not found" >&2; exit 1; fi
-	@echo "config done" > $@
+	$(PKG_CONFIG) --atleast-version $(AW_VERSION) aw
+	$(PKG_CONFIG) --atleast-version $(MPI_VERSION) $(MPI_PC)
+	$(PKG_CONFIG) --atleast-version $(MRUMTL_VERSION) mrumtl
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	echo 'config done' > $@
 
 src/core/htrdr_args.h: config.mk src/core/htrdr_args.h.in
 	sed -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
@@ -320,12 +303,9 @@ htrdr-core.pc: config.mk htrdr-core.pc.in
 	    $@.in > $@
 
 clean_core:
-	rm -f $(CORE_OBJ) $(CORE_LIBNAME) libhtrdr-core.o
-	rm -f .config_core mobhtrdr-core.o htrdr-core.pc
+	rm -f $(CORE_LIBNAME) $(CORE_OBJ) $(CORE_DEP)
+	rm -f libhtrdr-core.o .config_core htrdr-core.pc
 	rm -f src/core/htrdr_args.h src/core/htrdr_version.h
-
-distclean_core: clean_core
-	rm -f $(CORE_DEP)
 
 ################################################################################
 # Building the atmosphere library
@@ -357,21 +337,14 @@ libhtrdr-atmosphere.o: $(ATMOSPHERE_OBJ)
 	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_atmosphere: config.mk
-	@if ! $(PKG_CONFIG) --atleast-version $(HTSKY_VERSION) htsky; then \
-	  echo "htsky $(HTSKY_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d; then \
-	  echo "s3d $(S3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam; then \
-	  echo "scam $(SCAM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf; then \
-	  echo "ssf $(SSF_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp; then \
-	  echo "star-sp $(SSP_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx; then \
-	  echo "svx $(SVX_VERSION) not found" >&2; exit 1; fi
-	@echo "config done" > $@
+	$(PKG_CONFIG) --atleast-version $(HTSKY_VERSION) htsky
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	$(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx
+	echo 'config done' > $@
 
 src/atmosphere/htrdr_atmosphere_args.h: config.mk src/atmosphere/htrdr_atmosphere_args.h.in
 	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
@@ -396,12 +369,9 @@ htrdr-atmosphere.pc: config.mk htrdr-atmosphere.pc.in
 	    $@.in > $@
 
 clean_atmosphere:
-	rm -f $(ATMOSPHERE_OBJ) $(ATMOSPHERE_LIBNAME)
+	rm -f $(ATMOSPHERE_LIBNAME) $(ATMOSPHERE_OBJ) $(ATMOSPHERE_DEP)
 	rm -f .config_atmosphere libhtrdr-atmosphere.o htrdr-atmosphere.pc
 	rm -f src/atmosphere/htrdr_atmosphere_args.h
-
-distclean_atmosphere: clean_atmosphere
-	rm -f $(ATMOSPHERE_DEP)
 
 ################################################################################
 # Building the combustion library
@@ -433,21 +403,14 @@ libhtrdr-combustion.o: $(COMBUSTION_OBJ)
 	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_combustion: config.mk
-	@if ! $(PKG_CONFIG) --atleast-version $(ATRSTM_VERSION) atrstm; then \
-	  echo "atrstm $(ATRSTM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d; then \
-	  echo "s3d $(S3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam; then \
-	  echo "scam $(SCAM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf; then \
-	  echo "ssf $(SSF_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp; then \
-	  echo "star-sp $(SSP_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx; then \
-	  echo "svx $(SVX_VERSION) not found" >&2; exit 1; fi
-	@echo "config done" > $@
+	$(PKG_CONFIG) --atleast-version $(ATRSTM_VERSION) atrstm
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	$(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx
+	echo 'config done' > $@
 
 src/combustion/htrdr_combustion_args.h: config.mk src/combustion/htrdr_combustion_args.h.in
 	sed -e 's/@HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY@/$(HTRDR_COMBUSTION_ARGS_DEFAULT_LASER_FLUX_DENSITY)/g' \
@@ -476,12 +439,9 @@ htrdr-combustion.pc: config.mk htrdr-combustion.pc.in
 	    $@.in > $@
 
 clean_combustion:
-	rm -f $(COMBUSTION_OBJ) $(COMBUSTION_LIBNAME)
+	rm -f $(COMBUSTION_LIBNAME) $(COMBUSTION_OBJ) $(COMBUSTION_DEP)
 	rm -f .config_combustion libhtrdr-combustion.o htrdr-combustion.pc
 	rm -f src/combustion/htrdr_combustion_args.h
-
-distclean_combustion: clean_combustion
-	rm -f $(COMBUSTION_DEP)
 
 ################################################################################
 # Building the planets library
@@ -513,25 +473,16 @@ libhtrdr-planets.o: $(PLANETS_OBJ)
 	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_planets: config.mk
-	@if ! $(PKG_CONFIG) --atleast-version $(RNATM_VERSION) rnatm; then \
-	  echo "rnatm $(RNATM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RNGRD_VERSION) rngrd; then \
-	  echo "rngrd $(RNGRD_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d; then \
-	  echo "s3d $(S3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SBUF_VERSION) sbuf; then \
-	  echo "sbuf $(SBUF_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam; then \
-	  echo "scam $(SCAM_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf; then \
-	  echo "ssf $(SSF_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp; then \
-	  echo "star-sp $(SSP_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx; then \
-	  echo "svx $(SVX_VERSION) not found" >&2; exit 1; fi
-	@echo "config done" > $@
+	$(PKG_CONFIG) --atleast-version $(RNATM_VERSION) rnatm
+	$(PKG_CONFIG) --atleast-version $(RNGRD_VERSION) rngrd
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SBUF_VERSION) sbuf
+	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	$(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx
+	echo 'config done' > $@
 
 src/planets/htrdr_planets_args.h: config.mk src/planets/htrdr_planets_args.h.in
 	sed -e 's/@HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
@@ -558,12 +509,9 @@ htrdr-planets.pc: config.mk htrdr-planets.pc.in
 	    $@.in > $@
 
 clean_planets:
-	rm -f $(PLANETS_OBJ) $(PLANETS_LIBNAME)
+	rm -f $(PLANETS_LIBNAME) $(PLANETS_OBJ) $(PLANETS_DEP)
 	rm -f .config_planets libhtrdr-planets.o htrdr-planets.pc
 	rm -f src/planets/htrdr_planets_args.h
-
-distclean_planets: clean_planets
-	rm -f $(PLANETS_DEP)
 
 ################################################################################
 # Man pages
@@ -637,41 +585,41 @@ clean_man:
 # Installation
 ################################################################################
 install: all
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-atmosphere
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-combustion
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" htrdr-planets
+	@$(SHELL) install.sh 755 "$(DESTDIR)$(BINPREFIX)" htrdr
+	@$(SHELL) install.sh 755 "$(DESTDIR)$(BINPREFIX)" htrdr-atmosphere
+	@$(SHELL) install.sh 755 "$(DESTDIR)$(BINPREFIX)" htrdr-combustion
+	@$(SHELL) install.sh 755 "$(DESTDIR)$(BINPREFIX)" htrdr-planets
 	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib" $(CORE_LIBNAME_SHARED); fi
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/htrdr" COPYING README.md
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr.1
+	 $(SHELL) install.sh 755 "$(DESTDIR)$(LIBPREFIX)" $(CORE_LIBNAME_SHARED); fi
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(DOCPREFIX)/htrdr" COPYING README.md
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/htrdr.1
 	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-atmosphere.1; fi
+	 $(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/htrdr-atmosphere.1; fi
 	@if [ "$(COMBUSTION)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-combustion.1; fi
+	 $(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/htrdr-combustion.1; fi
 	@if [ "$(PLANETS)" = "ENABLE" ]; then \
-	 $(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/htrdr-planets.1; fi
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-image.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-materials.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/htrdr-obj.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/rnrl.5
+	 $(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/htrdr-planets.1; fi
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/htrdr-image.5
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/htrdr-materials.5
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/htrdr-obj.5
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/rnrl.5
 
 uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-atmosphere"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-combustion"
-	rm -f "$(DESTDIR)$(PREFIX)/bin/htrdr-planets"
-	rm -f "$(DESTDIR)$(PREFIX)/lib/$(CORE_LIBNAME_SHARED)"
-	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/COPYING"
-	rm -f "$(DESTDIR)$(PREFIX)/share/doc/htrdr/README.md"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-atmosphere.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-combustion.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/htrdr-planets.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-image.5"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-materials.5"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/htrdr-obj.5"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/rnrl.5"
+	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr"
+	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr-atmosphere"
+	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr-combustion"
+	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr-planets"
+	rm -f "$(DESTDIR)$(LIBPREFIX)/$(CORE_LIBNAME_SHARED)"
+	rm -f "$(DESTDIR)$(DOCPREFIX)/htrdr/COPYING"
+	rm -f "$(DESTDIR)$(DOCPREFIX)/htrdr/README.md"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/htrdr.1"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/htrdr-atmosphere.1"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/htrdr-combustion.1"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/htrdr-planets.1"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/htrdr-image.5"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/htrdr-materials.5"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/htrdr-obj.5"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/rnrl.5"
 
 ################################################################################
 # Miscellaneous targets
@@ -687,19 +635,8 @@ clean:\
  clean_core\
  clean_man
 
-distclean:\
- distclean_htrdr\
- distclean_htrdr-atmosphere\
- distclean_htrdr-combustion\
- distclean_htrdr-planets\
- distclean_atmosphere\
- distclean_combustion\
- distclean_planets\
- distclean_core\
- clean_man
-
 lint: doc/htrdr-atmosphere.1 doc/htrdr-combustion.1 doc/htrdr-planets.1
-	shellcheck -o all make.sh
+	shellcheck -o all install.sh
 	mandoc -Tlint -Wall doc/htrdr.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-atmosphere.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/htrdr-combustion.1 || [ $$? -le 1 ]

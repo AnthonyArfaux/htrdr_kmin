@@ -25,23 +25,20 @@
 
 set -e
 
-install()
-{
-  prefix=$1
-  shift 1
+mode=$1
+prefix=$2
+shift 2
 
-  mkdir -p "${prefix}"
+mkdir -p "${prefix}"
 
-  for i in "$@"; do
-    dst="${prefix}/${i##*/}"
+for i in "$@"; do
+  dst="${prefix}/${i##*/}"
 
-    if cmp -s "${i}" "${dst}"; then
-      printf "Up to date %s\n" "${dst}"
-    else
-      printf "Installing %s\n" "${dst}"
-      cp "${i}" "${prefix}"
-    fi
-  done
-}
-
-"$@"
+  if cmp -s "${i}" "${dst}"; then
+    printf 'Up to date %s\n' "${dst}"
+  else
+    printf 'Installing %s\n' "${dst}"
+    cp "${i}" "${prefix}"
+    chmod "${mode}" "${prefix}/$(basename "${i}")"
+  fi
+done
