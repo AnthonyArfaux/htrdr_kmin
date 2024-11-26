@@ -33,25 +33,37 @@
 static void
 print_out(const char* msg, void* ctx)
 {
+  struct htrdr* htrdr = ctx;
   ASSERT(msg);
-  (void)ctx;
-  fprintf(stderr, HTRDR_LOG_INFO_PREFIX"%s", msg);
+
+  /* Log standard message only on master process */
+  if(htrdr->verbose && htrdr->mpi_rank == 0) {
+    fprintf(stderr, HTRDR_LOG_INFO_PREFIX"%s", msg);
+  }
 }
 
 static void
 print_err(const char* msg, void* ctx)
 {
+  struct htrdr* htrdr = ctx;
   ASSERT(msg);
-  (void)ctx;
-  fprintf(stderr, HTRDR_LOG_ERROR_PREFIX"%s", msg);
+
+  /* Log errors on all processes */
+  if(htrdr->verbose) {
+    fprintf(stderr, HTRDR_LOG_ERROR_PREFIX"%s", msg);
+  }
 }
 
 static void
 print_warn(const char* msg, void* ctx)
 {
-  ASSERT(msg);
-  (void)ctx;
-  fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"%s", msg);
+  struct htrdr* htrdr = ctx;
+  ASSERT(msg && ctx);
+
+  /* Log warnings only on master process */
+  if(htrdr->verbose && htrdr->mpi_rank == 0) {
+    fprintf(stderr, HTRDR_LOG_WARNING_PREFIX"%s", msg);
+  }
 }
 
 static void
@@ -62,9 +74,7 @@ log_msg
    va_list vargs)
 {
   ASSERT(htrdr && msg);
-  if(htrdr->verbose) {
-    CHK(logger_vprint(&htrdr->logger, stream, msg, vargs) == RES_OK);
-  }
+  CHK(logger_vprint(&htrdr->logger, stream, msg, vargs) == RES_OK);
 }
 
 /*******************************************************************************
@@ -73,14 +83,11 @@ log_msg
 void
 htrdr_log(struct htrdr* htrdr, const char* msg, ...)
 {
+  va_list vargs_list;
   ASSERT(htrdr && msg);
-  /* Log standard message only on master process */
-  if(htrdr->mpi_rank == 0) {
-    va_list vargs_list;
-    va_start(vargs_list, msg);
-    log_msg(htrdr, LOG_OUTPUT, msg, vargs_list);
-    va_end(vargs_list);
-  }
+  va_start(vargs_list, msg);
+  log_msg(htrdr, LOG_OUTPUT, msg, vargs_list);
+  va_end(vargs_list);
 }
 
 void
@@ -88,7 +95,6 @@ htrdr_log_err(struct htrdr* htrdr, const char* msg, ...)
 {
   va_list vargs_list;
   ASSERT(htrdr && msg);
-  /* Log errors on all processes */
   va_start(vargs_list, msg);
   log_msg(htrdr, LOG_ERROR, msg, vargs_list);
   va_end(vargs_list);
@@ -97,14 +103,11 @@ htrdr_log_err(struct htrdr* htrdr, const char* msg, ...)
 void
 htrdr_log_warn(struct htrdr* htrdr, const char* msg, ...)
 {
+  va_list vargs_list;
   ASSERT(htrdr && msg);
-  /* Log warnings only on master process */
-  if(htrdr->mpi_rank == 0) {
-    va_list vargs_list;
-    va_start(vargs_list, msg);
-    log_msg(htrdr, LOG_WARNING, msg, vargs_list);
-    va_end(vargs_list);
-  }
+  va_start(vargs_list, msg);
+  log_msg(htrdr, LOG_WARNING, msg, vargs_list);
+  va_end(vargs_list);
 }
 
 /*******************************************************************************
@@ -114,7 +117,7 @@ void
 setup_logger(struct htrdr* htrdr)
 {
   logger_init(htrdr->allocator, &htrdr->logger);
-  logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, NULL);
-  logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, NULL);
-  logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, NULL);
+  logger_set_stream(&htrdr->logger, LOG_OUTPUT, print_out, htrdr);
+  logger_set_stream(&htrdr->logger, LOG_ERROR, print_err, htrdr);
+  logger_set_stream(&htrdr->logger, LOG_WARNING, print_warn, htrdr);
 }
