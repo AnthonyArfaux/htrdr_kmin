@@ -718,6 +718,7 @@ htrdr_draw_map
   size_t itile;
   struct proc_work work;
   size_t proc_ntiles_adjusted;
+  size_t remaining_tiles;
   double pix_sz[2];
 
   ATOMIC probe_thieves = 1;
@@ -752,9 +753,15 @@ htrdr_draw_map
 
   /* Define the initial number of tiles of the current process */
   proc_ntiles_adjusted = ntiles_adjusted / (size_t)htrdr->mpi_nprocs;
-  if(htrdr->mpi_rank == 0) { /* Affect the remaining tiles to the master proc */
-    proc_ntiles_adjusted +=
-      ntiles_adjusted - proc_ntiles_adjusted*(size_t)htrdr->mpi_nprocs;
+
+  remaining_tiles =
+    ntiles_adjusted - proc_ntiles_adjusted*(size_t)htrdr->mpi_nprocs;
+
+  /* Distribute the remaining tiles among the processes. Each process whose
+   * rank is lower than the number of remaining tiles takes an additional
+   * tile  */
+  if((size_t)htrdr->mpi_rank < remaining_tiles) {
+    ++proc_ntiles_adjusted;
   }
 
   /* Define the initial list of tiles of the process */
