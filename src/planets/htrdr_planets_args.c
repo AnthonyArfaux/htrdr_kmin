@@ -102,6 +102,21 @@ check_spectral_args(const struct htrdr_planets_spectral_args* args)
 
   return RES_OK;
 }
+
+static INLINE res_T
+check_volrad_budget_args(const struct htrdr_planets_volrad_budget_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Filename could not be NULL */
+  if(!args->mesh) return RES_BAD_ARG;
+
+  /* Samples per tetrahedron could not be zero */
+  if(!args->spt) return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
 static void
 usage(void)
 {
@@ -507,6 +522,70 @@ error:
   goto exit;
 }
 
+static res_T
+parse_volrad_budget_parameters(const char* str, void* ptr)
+{
+  enum { MESH, SPT } iparam;
+  char buf[BUFSIZ];
+  struct htrdr_planets_args* args = ptr;
+  char* key;
+  char* val;
+  char* tk_ctx;
+  res_T res = RES_OK;
+  ASSERT(str && ptr);
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the parameters "
+      "of the volumic radiative budget calculation `%s'\n",
+      str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &tk_ctx);
+  val = strtok_r(NULL, "", &tk_ctx);
+
+       if(!strcmp(key, "mesh")) iparam = MESH;
+  else if(!strcmp(key, "spt")) iparam = SPT;
+  else {
+    fprintf(stderr, "Invalid volumic radiative budget parameter `%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if(!val) {
+    fprintf(stderr,
+      "Invalid null value for the volumic radiative budget parameter `%s'.\n",
+      key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(iparam) {
+    case MESH:
+      if(args->volrad_budget.mesh) mem_rm(args->volrad_budget.mesh);
+      if(!(args->volrad_budget.mesh = str_dup(val))) res = RES_MEM_ERR;
+      break;
+    case SPT: /* Sample Per Tetrahedron */
+      res = cstr_to_uint(val, &args->volrad_budget.spt);
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+  if(res != RES_OK) {
+    fprintf(stderr,
+      "Unable to parse the volumic radiative budget parameter `%s' -- %s\n",
+      str, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -564,7 +643,7 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
       case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r':
-        args->volrad_budget_mesh = optarg;
+        res = cstr_parse_list(optarg, ':', parse_volrad_budget_parameters, args);
         args->output_type = HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET;
         break;
       case 'S':
@@ -697,11 +776,16 @@ htrdr_planets_args_check(const struct htrdr_planets_args* args)
     }
   }
 
-  if(args->output_type != HTRDR_PLANETS_ARGS_OUTPUT_IMAGE) {
+  if(args->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE) {
     res = htrdr_args_camera_perspective_check(&args->cam_persp);
     if(res != RES_OK) return res;
 
     res = htrdr_args_image_check(&args->image);
+    if(res != RES_OK) return res;
+  }
+
+  if(args->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET) {
+    res = check_volrad_budget_args(&args->volrad_budget);
     if(res != RES_OK) return res;
   }
 

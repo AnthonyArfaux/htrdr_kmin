@@ -41,7 +41,7 @@
 .Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
 .Op Fl O Ar accel_struct_storage
 .Op Fl o Ar output
-.Op Fl r Ar volrad_budget_mesh
+.Op Fl r Ar volrad_budget_opt Ns Op : Ns Ar volrad_budget_opt No ...
 .Op Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 .Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 .Op Fl T Ar optical_thickness
@@ -135,7 +135,7 @@ necessary.
 .Pp
 The aerosol options are as follows:
 .Bl -tag -width Ds
-.It Cm mesh= Ns Ar volumetric_mesh
+.It Cm mesh= Ns Ar volume_mesh
 Aerosol tetrahedral mesh saved in
 .Xr smsh 5
 format.
@@ -329,21 +329,27 @@ stopped, thus avoiding the use of incorrect acceleration structures.
 .It Fl o Ar output
 Output file.
 If not defined, data is written to standard output.
-.It Fl r Ar volrad_budget_mesh
-Tetrahedral mesh in
-.Xr smsh 5
-format on which the volumic radiative budget is estimated per
-tetrahedron
-.Po see
-.Sx OUTPUT DATA
-section
-.Pc .
-The calculation is no longer an image rendering:
+.It Fl r Ar volrad_budget_opt Ns Op : Ns Ar volrad_budget_opt No ...
+Define the calculation of the volumic radiative budget.
+Calculation is no longer a rendering:
 neither a camera
 .Pq option Fl C
 nor an image
 .Pq option Fl i
 is required.
+.Pp
+The volume radiative budget options are as follows:
+.Bl -tag -width Ds
+.It Cm mesh= Ns Ar volume_mesh
+Tetrahedral mesh in
+.Xr smsh 5
+format on which the volumic radiative budget is estimated per
+tetrahedron.
+.It Cm spt= Ns Ar samples_per_tetrahedron
+Number of samples to estimate the volumic radiative budget of each
+tetrahedron.
+Default is @HTRDR_PLANETS_ARGS_DEFAULT_VOLRAD_BUDGET_SPT@.
+.El
 .It Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 Define the external source.
 .Pp
@@ -442,8 +448,7 @@ verbose.
 The output of
 .Nm
 depends on the type of calculation invoked.
-This section describes the nature and layout of output data, depending
-on the type of calculation.
+This section describes the nature and layout of these output data.
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss XYZ image
 For an image rendering in the visible part of the spectrum
@@ -500,14 +505,14 @@ there are tetrahedra in the volume mesh as an argument to the
 .Fl r
 option.
 The lines follow the order of the input meshes.
-For each line, the first 2 values correspond to the estimated volumic
-radiative budget of the corresponding tetrahedron (in W/m^3) and its
+For each line, the first 2 values correspond to the expected value of
+the volumic radiative budget of the tetrahedron (in W/m^3) and its
 standard error.
 The remaining 3 values are the sum of the Monte Carlo weights, the sum
 of the Monte Carlo weights squared, and the total number of Monte Carlo
 weights used to calculate the preceding quantities.
-Their purpose is to help calculate the estimate and standard error of
-the volumic radiative budget for a set of tetrahedra.
+Their purpose is to help calculate the expected value and standard error
+of the volumic radiative budget for a set of tetrahedra.
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .\" Returned status
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
