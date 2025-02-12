@@ -99,11 +99,15 @@ struct htrdr_planets {
   struct str output_name;
   enum htrdr_planets_args_output_type output_type;
 
+  /* Image rendering */
   struct scam* camera;
-
   struct htrdr_buffer_layout buf_layout;
   struct htrdr_buffer* buf; /* NULL on non master processes */
   size_t spp; /* Samples per pixel */
+
+  /* Volumic radiative budget */
+  struct smsh* volrad_mesh;
+  size_t spt; /* Samples per tetrahedron */
 
   ref_T ref;
   struct htrdr* htrdr;

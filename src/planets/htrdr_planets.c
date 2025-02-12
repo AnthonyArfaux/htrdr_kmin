@@ -38,6 +38,7 @@
 #include <rad-net/rngrd.h>
 
 #include <star/scam.h>
+#include <star/smsh.h>
 
 #include <rsys/cstr.h>
 #include <rsys/double3.h>
@@ -429,6 +430,59 @@ error:
   goto exit;
 }
 
+static res_T
+setup_volrad_budget_mesh
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
+{
+  struct smsh_create_args create_args = SMSH_CREATE_ARGS_DEFAULT;
+  struct smsh_load_args load_args = SMSH_LOAD_ARGS_NULL;
+  struct smsh_desc desc = SMSH_DESC_NULL;
+  res_T res = RES_OK;
+  ASSERT(cmd && args);
+
+  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET)
+    goto exit;
+
+  /* Store the number of samples per tetrahedron to be used */
+  cmd->spt = args->volrad_budget.spt;
+
+  create_args.logger = htrdr_get_logger(cmd->htrdr);
+  create_args.allocator = htrdr_get_allocator(cmd->htrdr);
+  create_args.verbose = htrdr_get_verbosity_level(cmd->htrdr);
+  res = smsh_create(&create_args, &cmd->volrad_mesh);
+  if(res != RES_OK) goto error;
+
+  load_args.path = args->volrad_budget.smsh_filename;
+  res = smsh_load(cmd->volrad_mesh, &load_args);
+  if(res != RES_OK) goto error;
+
+  res = smsh_get_desc(cmd->volrad_mesh, &desc);
+  if(res != RES_OK) goto error;
+
+  /* Check that the loaded mesh is effectively a volume mesh */
+  if(desc.dnode != 3 || desc.dcell != 4) {
+    htrdr_log_err(cmd->htrdr,
+      "%s: the volumic radiative budget calculation "
+      "expects a 3D tetrahedral mesh "
+      "(dimension of mesh: %u; dimension of the vertices: %u)\n",
+      args->volrad_budget.smsh_filename,
+      desc.dnode,
+      desc.dcell);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  if(cmd->volrad_mesh) {
+    SMSH(ref_put(cmd->volrad_mesh));
+    cmd->volrad_mesh = NULL;
+  }
+  goto exit;
+}
+
 static INLINE res_T
 write_vtk_octrees(const struct htrdr_planets* cmd)
 {
@@ -468,6 +522,7 @@ planets_release(ref_T* ref)
   if(cmd->output && cmd->output != stdout) CHK(fclose(cmd->output) == 0);
   if(cmd->buf) htrdr_buffer_ref_put(cmd->buf);
   if(cmd->camera) SCAM(ref_put(cmd->camera));
+  if(cmd->volrad_mesh) SMSH(ref_put(cmd->volrad_mesh));
   str_release(&cmd->output_name);
 
   htrdr = cmd->htrdr;
@@ -519,6 +574,8 @@ htrdr_planets_create
   res = setup_spectral_domain(cmd, args);
   if(res != RES_OK) goto error;
   res = setup_buffer(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_volrad_budget_mesh(cmd, args);
   if(res != RES_OK) goto error;
 
 exit:
