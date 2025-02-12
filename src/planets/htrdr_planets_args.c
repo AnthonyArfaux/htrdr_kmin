@@ -124,7 +124,7 @@ usage(void)
   printf("                     [-C persp_camera_opt[:persp_camera_opt ...]]\n");
   printf("                     [-G ground_opt[:ground_opt ...]]\n");
   printf("                     [-i image_opt[:image_opt ...]] [-O accel_struct_storage]\n");
-  printf("                     [-o output] [-r volrad_budget_mesh]\n");
+  printf("                     [-o output] [-r volrad_budget_opt[:volrad_budget_opt ...]]\n");
   printf("                     [-S source_opt[:source_opt ...]]\n");
   printf("                     [-s spectral_opt[:spectral_opt ...]] [-T optical_thickness]\n");
   printf("                     [-t threads_count] [-V accel_struct_definition]\n");
