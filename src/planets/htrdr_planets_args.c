@@ -109,7 +109,7 @@ check_volrad_budget_args(const struct htrdr_planets_volrad_budget_args* args)
   if(!args) return RES_BAD_ARG;
 
   /* Filename could not be NULL */
-  if(!args->mesh) return RES_BAD_ARG;
+  if(!args->smsh_filename) return RES_BAD_ARG;
 
   /* Samples per tetrahedron could not be zero */
   if(!args->spt) return RES_BAD_ARG;
@@ -565,8 +565,12 @@ parse_volrad_budget_parameters(const char* str, void* ptr)
 
   switch(iparam) {
     case MESH:
-      if(args->volrad_budget.mesh) mem_rm(args->volrad_budget.mesh);
-      if(!(args->volrad_budget.mesh = str_dup(val))) res = RES_MEM_ERR;
+      if(args->volrad_budget.smsh_filename) {
+        mem_rm(args->volrad_budget.smsh_filename);
+      }
+      if(!(args->volrad_budget.smsh_filename = str_dup(val))) {
+        res = RES_MEM_ERR;
+      }
       break;
     case SPT: /* Sample Per Tetrahedron */
       res = cstr_to_uint(val, &args->volrad_budget.spt);

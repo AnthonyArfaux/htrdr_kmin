@@ -72,7 +72,7 @@ static const struct htrdr_planets_ground_args HTRDR_PLANETS_GROUND_ARGS_NULL =
   HTRDR_PLANETS_GROUND_ARGS_NULL__;
 
 struct htrdr_planets_volrad_budget_args {
-  char* mesh; /* The Star-Mesh geometry */
+  char* smsh_filename; /* The Star-Mesh geometry */
   unsigned spt; /* Number of MC realisations per tetrahedron */
 };
 #define HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL__ {                              \
