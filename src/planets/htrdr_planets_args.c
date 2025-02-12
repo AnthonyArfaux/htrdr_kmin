@@ -726,6 +726,7 @@ htrdr_planets_args_release(struct htrdr_planets_args* args)
   if(args->ground.mtllst_filename) mem_rm(args->ground.mtllst_filename);
   if(args->ground.name) mem_rm(args->ground.name);
   if(args->source.rnrl_filename) mem_rm(args->source.rnrl_filename);
+  if(args->volrad_budget.smsh_filename) mem_rm(args->volrad_budget.smsh_filename);
 
   FOR_EACH(i, 0, args->naerosols) {
     struct rnatm_aerosol_args* aerosol = args->aerosols + i;
