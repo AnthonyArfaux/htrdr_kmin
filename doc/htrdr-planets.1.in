@@ -23,9 +23,15 @@
 .Dd November 6, 2024
 .Dt HTRDR-PLANETS 1
 .Os
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Name and Short description
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh NAME
 .Nm htrdr-planets
 .Nd simulate radiative transfer in 3D planetary atmosphere
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Summary of options
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh SYNOPSIS
 .Nm
 .Op Fl dfhNv
@@ -33,21 +39,26 @@
 .Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 .Op Fl G Ar ground_opt Ns Op : Ns Ar ground_opt No ...
 .Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
-.Op Fl O Pa accel_struct_storage
-.Op Fl o Pa output
+.Op Fl O Ar accel_struct_storage
+.Op Fl o Ar output
+.Op Fl r Ar volrad_budget_mesh
 .Op Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 .Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 .Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
 .Op Fl V Ar accel_struct_definition
 .Fl g Ar gas_opt Ns Op : Ns Ar gas_opt No ...
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Detailed description
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh DESCRIPTION
 .Nm
 simulates the radiative transfer of a terrestrial planet in the visible
 or the infrared part of the spectrum.
 The planet's ground
 .Pq option Fl G
-can be any set of triangles with BRDFs and temperatures defined per triangle.
+can be any set of triangles with BRDFs and temperatures defined per
+triangle.
 The atmosphere is composed of a gas mixture
 .Pq option Fl g
 and a potentially empty set of aerosols
@@ -61,21 +72,30 @@ Aerosol phase functions
 are also defined per node.
 .Pp
 .Nm
-is mainly a renderer that calculates an image
+is a renderer that calculates an image
 .Pq option Fl i
 for a given observation position
 .Pq option Fl C .
-Its internal rendering algorithm is based on Monte Carlo integration,
-which consists for each pixel of simulating a given number of optical
-paths from the sensor, taking into account the phenomena of light
-absorption and scattering.
+In addition to rendering images, it can also be used to estimate the
+volumic radiative budget for a set of tetrehedra
+.Pq option Fl r .
+Its algorithms are based on Monte Carlo integration, which involves
+simulating a given number of optical paths for each estimate, taking
+into account light absorption and scattering phenomena.
+Thanks to the Monte Carlo,
+.Nm
+calculates not only the quantities of interest, but also their
+uncertainty
+.Pq standard deviation of the distribution of weights
+at no extra cost.
 .Pp
 .Nm
 offers three ways to perform spectral integration
 .Pq option Fl s .
-By default, it calculates an image for the visible part of the spectrum between
-380 and 780 nanometers, for the three components of the CIE 1931 XYZ color space
-which are then recombined to obtain the final color for each pixel.
+By default, it calculates an image for the visible part of the spectrum
+between 380 and 780 nanometers, for the three components of the CIE 1931
+XYZ color space which are then recombined to obtain the final color for
+each pixel.
 The other two methods are to explicitly define the longwave or shortwave
 spectral range to be integrated and continuously sample a wavelength in
 this range.
@@ -92,6 +112,7 @@ expressed in Kelvin.
 The estimated radiances are given in W/sr/m^2, except for monochromatic
 calculations where the calculated spectral radiance is defined in
 W/sr/m^2/nm.
+Finally, the estimated volumic radiative budgets is given in W/m^3.
 .Pp
 .Nm
 implements mixed parallelism.
@@ -114,13 +135,13 @@ necessary.
 .Pp
 The aerosol options are as follows:
 .Bl -tag -width Ds
-.It Cm mesh= Ns Pa volumetric_mesh
+.It Cm mesh= Ns Ar volumetric_mesh
 Aerosol tetrahedral mesh saved in
 .Xr smsh 5
 format.
 .It Cm name= Ns Ar string
 Name assigned to the aerosol.
-.It Cm radprop= Ns Pa radiative_properties
+.It Cm radprop= Ns Ar radiative_properties
 Radiatve properties of the aerosol saved in
 .Xr sars 5
 format.
@@ -129,7 +150,7 @@ This file and the tetrahedral mesh
 .Pq option Cm mesh
 must therefore be consistent with each other, i.e. the nodes must be
 listed in the same order.
-.It Cm phasefn= Ns Pa phase_functions_list
+.It Cm phasefn= Ns Ar phase_functions_list
 List in
 .Xr rnsl 5
 format of phase functions to be loaded.
@@ -139,7 +160,7 @@ format.
 The correspondence between these phase functions and the nodes of the
 volumetric mesh is defined in another file
 .Pq option Cm phaseids .
-.It Cm phaseids= Ns Pa per_node_phase_function
+.It Cm phaseids= Ns Ar per_node_phase_function
 Path to the
 .Xr rnpfi 5
 file that stores the index of the phase function to be used per
@@ -192,7 +213,7 @@ Default is @HTRDR_ARGS_DEFAULT_CAMERA_UP@.
 .El
 .It Fl d
 Write atmospheric acceleration structures to
-.Pa output .
+.Ar output .
 Each structure is saved in legacy VTK format.
 To divide the resulting output into N files
 .Pq N > 1 ,
@@ -205,14 +226,14 @@ csplit -f octree -k output %^#\\ vtk% /^#\\ vtk/ \\
 .Ed
 .It Fl f
 Force overwriting of
-.Pa output
+.Ar output
 file.
 .It Fl G Ar ground_opt Ns Op : Ns Ar ground_opt No ...
 The planet's ground.
 .Pp
 The ground options are as follows:
 .Bl -tag -width Ds
-.It Cm brdf= Ns Pa brdfs_list
+.It Cm brdf= Ns Ar brdfs_list
 List in
 .Xr rnsl 5
 format of the BRDFs to be loaded.
@@ -222,7 +243,7 @@ format.
 The correspondence between these BRDFs and the triangles of the surface
 mesh is defined in another file
 .Pq option Cm prop .
-.It Cm mesh= Ns Pa surface_mesh
+.It Cm mesh= Ns Ar surface_mesh
 Ground triangular mesh saved in
 .Xr smsh 5
 format.
@@ -242,11 +263,11 @@ Gas mixture.
 .Pp
 The gas options are as follows:
 .Bl -tag -width Ds
-.It Cm mesh= Ns Pa volumetric_mesh
+.It Cm mesh= Ns Ar volumetric_mesh
 Gas tetrahedral mesh saved in
 .Xr smsh 5
 format.
-.It Cm ck= Ns Pa correlated_k
+.It Cm ck= Ns Ar correlated_k
 Correlated K fof the gas saved in
 .Xr sck 5
 format.
@@ -255,7 +276,7 @@ This file and the tetrahedral mesh
 .Pq option Cm mesh
 must therefore be consistent with each other, i.e. the nodes must be
 listed in the same order.
-.It Cm temp= Ns Pa temperature
+.It Cm temp= Ns Ar temperature
 Gas temperatures saved in
 .Xr rngt 5
 format.
@@ -287,27 +308,42 @@ all rather than re-evaluating them every time a tetrahedron is queried
 at a given position.
 In return, the memory space used to store normals increases the memory
 footprint.
-.It Fl O Pa accel_struct_storage
+.It Fl O Ar accel_struct_storage
 File where atmospheric acceleration structures are stored/loaded.
 .Pp
 If
-.Pa accel_struct_storage
+.Ar accel_struct_storage
 does not exist, it is created and is used to store the built
 acceleration structures.
 .Pp
 If
-.Pa accel_struct_storage
+.Ar accel_struct_storage
 exists, acceleration structures are loaded from it rather than built
 from scratch, resulting in significant acceleration of the preprocessing
 step.
 Note that if the data structures stored in
-.Pa accel_struct_storage
+.Ar accel_struct_storage
 are not as expected (that is, the input atmospheric data or construction
 parameters are different), an error is notified and execution is
 stopped, thus avoiding the use of incorrect acceleration structures.
-.It Fl o Pa output
+.It Fl o Ar output
 Output file.
 If not defined, data is written to standard output.
+.It Fl r Ar volrad_budget_mesh
+Tetrahedral mesh in
+.Xr smsh 5
+format on which the volumic radiative budget is estimated per
+tetrahedron
+.Po see
+.Sx OUTPUT DATA
+section
+.Pc .
+The calculation is no longer an image rendering:
+neither a camera
+.Pq option Fl C
+nor an image
+.Pq option Fl i
+is required.
 .It Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 Define the external source.
 .Pp
@@ -399,18 +435,22 @@ Make
 .Nm
 verbose.
 .El
-.Sh OUTPUT IMAGE
-Images calculated by
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Output data
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh OUTPUT DATA
+The output of
 .Nm
-are saved in
-.Xr htrdr-image 5
-format.
-This section describes the nature and arrangement of image data
-depending on the type of calculation performed.
+depends on the type of calculation invoked.
+This section describes the nature and layout of output data, depending
+on the type of calculation.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss XYZ image
 For an image rendering in the visible part of the spectrum
 .Pq default behavior or option Fl s Cm cie_xyz ,
-the pixel components store 4 estimates.
+the output is an
+.Xr htrdr-image 5
+whose pixel components store 4 estimates.
 The first, second, and third pairs of floating point values encode the
 estimated integrated radiance in W/sr/m^2 for the X, Y, and Z components
 of the CIE 1931 XYZ color space.
@@ -419,11 +459,15 @@ average radiance of the pixel.
 The second value is its associated standard deviation.
 The fourth and final pair records the microsecond estimate of the
 computation time per radiative path and its standard error.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Longwave image
 For infrared calculations
 .Pq option Fl s Cm lw= Ns Ar wlen_min , Ns Ar wlen_max
-the first and second pixel components store the expected value and the
-standard error of the estimated brightness temperature (in K),
+the output is an
+.Xr htrdr-image 5
+whose first and second pixel components store the expected value and the
+standard error of the estimated brightness temperature
+.Pq in K ,
 respectively.
 The third and fourth components record the expected value and the
 standard deviation of the pixel radiance which is either an integrated
@@ -434,18 +478,44 @@ The fifth and sixth pixel components are not used.
 Finally, the last 2 components of the pixel record the estimate in
 microseconds of the computation time per radiative path and its standard
 error.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Shortwave image
 For shortwave calculations
 .Pq option Fl s Cm sw= Ns Ar wlen_min , Ns Ar wlen_max
-the output image is formatted as for a longwave image except that the
-first and second components of the pixels are not used, as no brightness
-temperature has been evaluated.
+the output is an
+.Xr htrdr-image 5
+formatted as for a longwave image except that the first and second
+components of the pixels are not used, as no brightness temperature has
+been evaluated.
 That is, the third and fourth values record the estimated radiance per
 pixel and the seventh and eighth values store the estimate of the
 calculation time by radiative path.
 The other values are set to 0.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Ss Volumic Radiative Budget
+For volumic radiative budget
+.Pq option Fl r
+the output is a list of 5 ASCII values per line, with as many lines as
+there are tetrahedra in the volume mesh as an argument to the
+.Fl r
+option.
+The lines follow the order of the input meshes.
+For each line, the first 2 values correspond to the estimated volumic
+radiative budget of the corresponding tetrahedron (in W/m^3) and its
+standard error.
+The remaining 3 values are the sum of the Monte Carlo weights, the sum
+of the Monte Carlo weights squared, and the total number of Monte Carlo
+weights used to calculate the preceding quantities.
+Their purpose is to help calculate the estimate and standard error of
+the volumic radiative budget for a set of tetrahedra.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Returned status
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh EXIT STATUS
 .Ex -std
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Examples of use
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh EXAMPLES
 An
 .Nm
@@ -611,6 +681,9 @@ htrdr-planets -v -N \\
               -V 512 -T 10 -O storage_lw.bin \\
               -fo image_infrared.ht
 .Ed
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" References
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh SEE ALSO
 .Xr htrdr-image 5 ,
 .Xr mrumtl 5 ,
@@ -621,6 +694,9 @@ htrdr-planets -v -N \\
 .Xr sars 5 ,
 .Xr sck 5 ,
 .Xr smsh 5
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Used and implemented standards
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh STANDARDS
 .Rs
 .%A International Organization for Standardization / CIE
@@ -641,6 +717,9 @@ htrdr-planets -v -N \\
 .%D July 1997
 .%T MPI-2: Extensions to The Message-Passing Interface
 .Re
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Brief implementation history
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Sh HISTORY
 .Nm
 has been developed as part of

@@ -109,10 +109,11 @@ usage(void)
   printf("                     [-C persp_camera_opt[:persp_camera_opt ...]]\n");
   printf("                     [-G ground_opt[:ground_opt ...]]\n");
   printf("                     [-i image_opt[:image_opt ...]] [-O accel_struct_storage]\n");
-  printf("                     [-o output] [-S source_opt[:source_opt ...]]\n");
+  printf("                     [-o output] [-r volrad_budget_mesh]\n");
+  printf("                     [-S source_opt[:source_opt ...]]\n");
   printf("                     [-s spectral_opt[:spectral_opt ...]] [-T optical_thickness]\n");
   printf("                     [-t threads_count] [-V accel_struct_definition]\n");
-  printf("                     -g gas_opt[:gas_opt ...] \n");
+  printf("                     -g gas_opt[:gas_opt ...]\n");
 }
 
 static INLINE char*
@@ -518,7 +519,7 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETS_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:NO:o:S:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:NO:o:r:S:s:T:t:V:v")) != -1) {
     switch(opt) {
       case 'a':
         (void)sa_add(args->aerosols, 1);
@@ -562,6 +563,10 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
       case 'N': args->precompute_normals = 1; break;
       case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
+      case 'r':
+        args->volrad_budget_mesh = optarg;
+        args->output_type = HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET;
+        break;
       case 'S':
         res = cstr_parse_list(optarg, ':', parse_source_parameters, args);
         break;

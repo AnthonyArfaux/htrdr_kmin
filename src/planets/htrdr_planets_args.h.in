@@ -32,6 +32,7 @@
 enum htrdr_planets_args_output_type {
   HTRDR_PLANETS_ARGS_OUTPUT_IMAGE,
   HTRDR_PLANETS_ARGS_OUTPUT_OCTREES,
+  HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET,
   HTRDR_PLANETS_ARGS_OUTPUT_TYPES_COUNT__
 };
 
@@ -81,6 +82,10 @@ struct htrdr_planets_args {
    * at runtime and kept in memory */
   char* octrees_storage;
 
+  /* Input volume mesh in smsh(5) format, on which the volumic radiative budget
+   * per-tetrahedron is estimated */
+  char* volrad_budget_mesh;
+
   unsigned octree_definition_hint; /* Hint on octree definition */
   double optical_thickness; /* Threshold used during octree building */
 
@@ -106,6 +111,7 @@ struct htrdr_planets_args {
   HTRDR_PLANETS_GROUND_ARGS_NULL__, /* Ground */                               \
                                                                                \
   NULL, /* File where to dump octrees */                                       \
+  NULL, /* Volumic mesh for volumic radiative budget estimations */            \
                                                                                \
   @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@, /* octree definition */   \
   @HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                    \

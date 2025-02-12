@@ -559,6 +559,9 @@ htrdr_planets_run(struct htrdr_planets* cmd)
     case HTRDR_PLANETS_ARGS_OUTPUT_OCTREES:
       res = write_vtk_octrees(cmd);
       break;
+    case HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET:
+      htrdr_log_err(cmd->htrdr, "Not implemented yet\n");
+      break;
     default: FATAL("Unreachable code\n"); break;
   }
   if(res != RES_OK) goto error;
