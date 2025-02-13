@@ -217,6 +217,7 @@ CORE_SRC =\
  src/core/htrdr_geometry.c\
  src/core/htrdr_log.c\
  src/core/htrdr_materials.c\
+ src/core/htrdr_proc_work.c\
  src/core/htrdr_ran_wlen_cie_xyz.c\
  src/core/htrdr_ran_wlen_discrete.c\
  src/core/htrdr_ran_wlen_planck.c\
