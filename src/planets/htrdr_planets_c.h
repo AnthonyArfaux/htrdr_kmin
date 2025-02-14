@@ -56,10 +56,10 @@ static const struct planets_pixel_xwave PLANETS_PIXEL_XWAVE_NULL =
   PLANETS_PIXEL_XWAVE_NULL__;
 
 struct planets_pixel_image {
-  struct htrdr_estimate X; /* In W/m²/sr */
-  struct htrdr_estimate Y; /* In W/m²/sr */
-  struct htrdr_estimate Z; /* In W/m²/sr */
-  struct htrdr_accum time; /* In µs */
+  struct htrdr_estimate X; /* In W/m^2/sr */
+  struct htrdr_estimate Y; /* In W/m^2/sr */
+  struct htrdr_estimate Z; /* In W/m^2/sr */
+  struct htrdr_accum time; /* In us */
 };
 #define PLANETS_PIXEL_IMAGE_NULL__ {                                           \
   HTRDR_ESTIMATE_NULL__,                                                       \
@@ -69,11 +69,11 @@ struct planets_pixel_image {
 }
 
 struct planets_voxel_radiative_budget {
-  struct htrdr_estimate estim; /* W/m^3 */
-  struct htrdr_accum accum; /* W/m^3 */
+  struct htrdr_accum volrad_budget; /* W/m^3 */
+  struct htrdr_accum time; /* In us */
 };
 #define PLANETS_VOXEL_RADIATIVE_BUDGET {                                       \
-  HTRDR_ESTIMATE_NULL__,                                                       \
+  HTRDR_ACCUM_NULL__,                                                          \
   HTRDR_ACCUM_NULL__                                                           \
 }
 
