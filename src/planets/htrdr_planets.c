@@ -683,9 +683,7 @@ htrdr_planets_run(struct htrdr_planets* cmd)
       res = write_vtk_octrees(cmd);
       break;
     case HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET:
-      htrdr_log_err(cmd->htrdr,
-        "The calculation of volumic radiative budget "
-        "has not yet been implemented.\n");
+      res = planets_solve_volrad_budget(cmd);
       break;
     default: FATAL("Unreachable code\n"); break;
   }

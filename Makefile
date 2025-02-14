@@ -456,6 +456,7 @@ PLANETS_SRC =\
  src/planets/htrdr_planets_compute_radiance.c\
  src/planets/htrdr_planets_draw_map.c\
  src/planets/htrdr_planets_main.c\
+ src/planets/htrdr_planets_solve_volrad_budget.c\
  src/planets/htrdr_planets_source.c
 PLANETS_OBJ = $(PLANETS_SRC:.c=.o)
 PLANETS_DEP = $(PLANETS_SRC:.c=.d)

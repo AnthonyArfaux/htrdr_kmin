@@ -126,6 +126,10 @@ extern LOCAL_SYM res_T
 planets_draw_map
   (struct htrdr_planets* cmd);
 
+extern LOCAL_SYM res_T
+planets_solve_volrad_budget
+  (struct htrdr_planets* cmd);
+
 extern LOCAL_SYM void
 planets_get_pixel_format
   (const struct htrdr_planets* cmd,
