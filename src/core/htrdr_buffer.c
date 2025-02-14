@@ -67,9 +67,8 @@ htrdr_buffer_create
   res_T res = RES_OK;
   ASSERT(htrdr && layout && out_buf);
 
-  if(!htrdr_buffer_layout_check(layout)) {
+  if((res = htrdr_buffer_layout_check(layout)) != RES_OK) {
     htrdr_log_err(htrdr, "Invalid buffer memory layout.\n");
-    res = RES_BAD_ARG;
     goto error;
   }
 

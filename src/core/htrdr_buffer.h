@@ -65,15 +65,32 @@ htrdr_buffer_layout_eq
       && a->alignment == b->alignment;
 }
 
-static INLINE int
+static INLINE res_T
 htrdr_buffer_layout_check(const struct htrdr_buffer_layout* layout)
 {
-  return layout
-      && layout->width
-      && layout->height
-      && layout->elmt_size
-      && layout->width*layout->elmt_size <= layout->pitch
-      && IS_POW2(layout->alignment);
+  if(!layout) return RES_BAD_ARG;
+
+  /* Invalid resolution */
+  if(!layout->width || !layout->height) {
+    return RES_BAD_ARG;
+  }
+
+  /* An element cannot be empty */
+  if(!layout->elmt_size) {
+    return RES_BAD_ARG;
+  }
+
+  /* Check pitch consistency */
+  if(!layout->width*layout->elmt_size > layout->pitch) {
+    return RES_BAD_ARG;
+  }
+
+  /* Ensure that the alignement is a power of two */
+  if(!IS_POW2(layout->alignment)) {
+    return RES_BAD_ARG;
+  }
+
+  return RES_OK;
 }
 
 /* Forward declarations */

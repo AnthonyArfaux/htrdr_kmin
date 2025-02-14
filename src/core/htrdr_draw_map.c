@@ -65,20 +65,26 @@ struct tile {
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-static INLINE int
+static INLINE res_T
 check_draw_map_args(const struct htrdr_draw_map_args* args)
 {
-  return args
-    && args->draw_pixel
-    && args->spp
-    && htrdr_buffer_layout_check(&args->buffer_layout);
+  if(!args) return RES_BAD_ARG;
+
+  /* A functor must be defined */
+  if(!args->draw_pixel) return RES_BAD_ARG;
+
+  /* The number of realisations cannot be null */
+  if(!args->spp) return RES_BAD_ARG;
+
+  /* Check buffer layout consistency */
+  return htrdr_buffer_layout_check(&args->buffer_layout);
 }
 
 static INLINE void
 tile_ref_get(struct tile* tile)
 {
   ASSERT(tile);
-  tile_ref_get(tile);
+  ref_get(&tile->ref);
 }
 
 static INLINE void
@@ -192,7 +198,8 @@ mpi_gather_tiles
   struct list_node* node = NULL;
   struct tile* tile = NULL;
   res_T res = RES_OK;
-  ASSERT(htrdr && tiles && htrdr_buffer_layout_check(buf_layout));
+  ASSERT(htrdr && tiles);
+  ASSERT(htrdr_buffer_layout_check(buf_layout) == RES_OK);
   ASSERT(htrdr->mpi_rank != 0 || buf);
   (void)ntiles;
 
@@ -278,7 +285,7 @@ draw_tile
   size_t npixels;
   size_t mcode; /* Morton code of tile pixel */
   ASSERT(htrdr && tile_org && tile_sz && pix_sz && rng && tile);
-  ASSERT(check_draw_map_args(args));
+  ASSERT(check_draw_map_args(args) == RES_OK);
   (void)tile_mcode;
 
   /* Adjust the #pixels to process them wrt a morton order */
@@ -332,9 +339,14 @@ draw_map
   size_t proc_ntiles = 0;
   ATOMIC nsolved_tiles = 0;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && check_draw_map_args(args) && work && tiles);
+
+  /* Pre conditions */
+  ASSERT(check_draw_map_args(args) == RES_OK);
+  ASSERT(htrdr && work && tiles);
   ASSERT(ntiles_x && ntiles_y && ntiles_adjusted >= ntiles_x*ntiles_y);
   ASSERT(pix_sz && pix_sz[0] > 0 && pix_sz[1] > 0);
+
+  /* Avoid the "unused variable" warning */
   (void)ntiles_x, (void)ntiles_y;
 
   res = ssp_rng_create(htrdr->allocator, SSP_RNG_MT19937_64, &rng_proc);
@@ -501,7 +513,7 @@ htrdr_draw_map
 
   ATOMIC probe_thieves = 1;
   ATOMIC res = RES_OK;
-  ASSERT(htrdr && check_draw_map_args(args));
+  ASSERT(htrdr && check_draw_map_args(args) == RES_OK);
   ASSERT(htrdr->mpi_rank != 0 || buf);
 
 #ifndef NDEBUG
@@ -553,6 +565,8 @@ htrdr_draw_map
     proc_work_add_chunk(&work, mcode);
   }
 
+  /* On the master process, request and print the progress report, since the
+   * other processes have been able to start the calculation */
   if(htrdr->mpi_rank == 0) {
     fetch_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
     print_mpi_progress(htrdr, HTRDR_MPI_PROGRESS_RENDERING);
