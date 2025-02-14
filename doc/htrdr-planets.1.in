@@ -338,7 +338,7 @@ nor an image
 .Pq option Fl i
 is required.
 .Pp
-The volume radiative budget options are as follows:
+The volumic radiative budget options are as follows:
 .Bl -tag -width Ds
 .It Cm mesh= Ns Ar volume_mesh
 Tetrahedral mesh in
