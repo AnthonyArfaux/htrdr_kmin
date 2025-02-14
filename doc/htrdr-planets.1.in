@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd November 6, 2024
+.Dd February 14, 2025
 .Dt HTRDR-PLANETS 1
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -456,12 +456,14 @@ For an image rendering in the visible part of the spectrum
 the output is an
 .Xr htrdr-image 5
 whose pixel components store 4 estimates.
+.Pp
 The first, second, and third pairs of floating point values encode the
 estimated integrated radiance in W/sr/m^2 for the X, Y, and Z components
 of the CIE 1931 XYZ color space.
 The first value of each pair is the expected value of the
 average radiance of the pixel.
 The second value is its associated standard deviation.
+.Pp
 The fourth and final pair records the microsecond estimate of the
 computation time per radiative path and its standard error.
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -474,12 +476,15 @@ whose first and second pixel components store the expected value and the
 standard error of the estimated brightness temperature
 .Pq in K ,
 respectively.
+.Pp
 The third and fourth components record the expected value and the
 standard deviation of the pixel radiance which is either an integrated
 radiance in W/sr/m^2 or a spectral radiance in W/sr/m^2/nm depending on
 whether this radiance was calculated for a spectral range or at a single
 wavelength.
+.Pp
 The fifth and sixth pixel components are not used.
+.Pp
 Finally, the last 2 components of the pixel record the estimate in
 microseconds of the computation time per radiative path and its standard
 error.
@@ -500,19 +505,24 @@ The other values are set to 0.
 .Ss Volumic Radiative Budget
 For volumic radiative budget
 .Pq option Fl r
-the output is a list of 5 ASCII values per line, with as many lines as
+the output is a list of 7 ASCII values per line, with as many lines as
 there are tetrahedra in the volume mesh as an argument to the
 .Fl r
 option.
 The lines follow the order of the input meshes.
+.Pp
 For each line, the first 2 values correspond to the expected value of
 the volumic radiative budget of the tetrahedron (in W/m^3) and its
 standard error.
-The remaining 3 values are the sum of the Monte Carlo weights, the sum
+.Pp
+The following 3 values are the sum of the Monte Carlo weights, the sum
 of the Monte Carlo weights squared, and the total number of Monte Carlo
 weights used to calculate the preceding quantities.
 Their purpose is to help calculate the expected value and standard error
 of the volumic radiative budget for a set of tetrahedra.
+.Pp
+Finally, the last two values are the estimate and associated standard
+error of the calculation time per radiative path.
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .\" Returned status
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
