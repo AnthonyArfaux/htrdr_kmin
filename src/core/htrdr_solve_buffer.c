@@ -37,8 +37,8 @@
 
 #include <star/ssp.h>
 
-#include <omp.h>
 #include <mpi.h>
+#include <omp.h>
 
 #define CHUNK_SIZE 32 /* Number of items in one chunk */
 
@@ -339,6 +339,7 @@ mpi_gather_chunks
   }
 
 exit:
+  if(chunk) chunk_ref_put(chunk);
   return res;
 error:
   htrdr_log_err(htrdr, "Error while gathering results -- %s\n",
