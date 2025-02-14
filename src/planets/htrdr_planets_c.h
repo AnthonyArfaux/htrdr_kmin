@@ -68,6 +68,15 @@ struct planets_pixel_image {
   HTRDR_ACCUM_NULL__                                                           \
 }
 
+struct planets_voxel_radiative_budget {
+  struct htrdr_estimate estim; /* W/m^3 */
+  struct htrdr_accum accum; /* W/m^3 */
+};
+#define PLANETS_VOXEL_RADIATIVE_BUDGET {                                       \
+  HTRDR_ESTIMATE_NULL__,                                                       \
+  HTRDR_ACCUM_NULL__                                                           \
+}
+
 struct planets_compute_radiance_args {
   struct ssp_rng* rng;
   size_t ithread; /* Index of the thread executing the function */

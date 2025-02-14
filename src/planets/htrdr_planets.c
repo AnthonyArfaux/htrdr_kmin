@@ -393,16 +393,14 @@ error:
 }
 
 static res_T
-setup_buffer
+setup_buffer_image
   (struct htrdr_planets* cmd,
    const struct htrdr_planets_args* args)
 {
   struct htrdr_pixel_format pixfmt = HTRDR_PIXEL_FORMAT_NULL;
   res_T res = RES_OK;
   ASSERT(cmd && args);
-
-  if(cmd->output_type != HTRDR_PLANETS_ARGS_OUTPUT_IMAGE)
-    goto exit;
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_IMAGE);
 
   planets_get_pixel_format(cmd, &pixfmt);
 
@@ -427,6 +425,74 @@ exit:
   return res;
 error:
   if(cmd->buf) { htrdr_buffer_ref_put(cmd->buf); cmd->buf = NULL; }
+  goto exit;
+}
+
+static res_T
+setup_buffer_raw
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
+{
+  struct smsh_desc desc = SMSH_DESC_NULL;
+  size_t sz = 0; /* Size of a voxel storing volumic radiative budget */
+  size_t al = 0; /* Alignment of a voxel storing volumic radiative budget */
+  res_T res = RES_OK;
+
+  ASSERT(cmd && args);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
+  ASSERT(cmd->volrad_mesh != NULL); /* The volurad mesh must be defined */
+
+  res = smsh_get_desc(cmd->volrad_mesh, &desc);
+  if(res != RES_OK) goto error;
+
+  /* Setup buffer layout for volumic radiative budget calculation */
+  sz = sizeof(struct planets_voxel_radiative_budget);
+  al = ALIGNOF(struct planets_voxel_radiative_budget);
+  cmd->buf_layout.width = desc.ncells;
+  cmd->buf_layout.height = 1;
+  cmd->buf_layout.pitch = desc.ncells * sz;
+  cmd->buf_layout.elmt_size = sz;
+  cmd->buf_layout.alignment = al;
+
+  /* Save the number of samples per tetrahedron */
+  cmd->spt = args->volrad_budget.spt;
+
+  /* Create the raw buffer only on master process; buffer parts calculated by
+   * other processes are collected there */
+  if(htrdr_get_mpi_rank(cmd->htrdr) != 0) goto exit;
+
+  res = htrdr_buffer_create(cmd->htrdr, &cmd->buf_layout, &cmd->buf);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  if(cmd->buf) { htrdr_buffer_ref_put(cmd->buf); cmd->buf = NULL; }
+  goto exit;
+}
+
+static res_T
+setup_buffer
+  (struct htrdr_planets* cmd,
+   const struct htrdr_planets_args* args)
+{
+  res_T res = RES_OK;
+  ASSERT(cmd && args);
+
+  switch(cmd->output_type) {
+    case HTRDR_PLANETS_ARGS_OUTPUT_IMAGE:
+      res = setup_buffer_image(cmd, args);
+      break;
+    case HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET:
+      res = setup_buffer_raw(cmd, args);
+      break;
+    default: /* Nothing to do */ break;
+  }
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
   goto exit;
 }
 
@@ -573,9 +639,9 @@ htrdr_planets_create
   if(res != RES_OK) goto error;
   res = setup_spectral_domain(cmd, args);
   if(res != RES_OK) goto error;
-  res = setup_buffer(cmd, args);
-  if(res != RES_OK) goto error;
   res = setup_volrad_budget_mesh(cmd, args);
+  if(res != RES_OK) goto error;
+  res = setup_buffer(cmd, args);
   if(res != RES_OK) goto error;
 
 exit:
