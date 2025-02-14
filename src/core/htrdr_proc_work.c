@@ -197,7 +197,7 @@ mpi_probe_thieves
     }
 
     /* Don't constantly check for thieves */
-    t.tv_nsec = 500000000; /* 500ms */
+    t.tv_nsec = 10000000; /* 10ms */
     nanosleep(&t, NULL);
   }
   #undef P_MPI
@@ -216,7 +216,7 @@ mpi_steal_work
   int proc_to_steal; /* Rank of the process to steal */
 
   /* Empircally set the number of chunks to steal */
-  const uint8_t nchunks_to_steal = MMIN((uint8_t)(htrdr->nthreads*2), 16);
+  const uint8_t nchunks_to_steal = MMIN((uint8_t)(htrdr->nthreads*4), 32);
   uint8_t i = 0;
 
   ASSERT(htrdr && rng && work && htrdr->nthreads < UINT8_MAX);
