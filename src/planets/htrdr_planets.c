@@ -507,7 +507,7 @@ setup_volrad_budget_mesh
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET)
+  if(cmd->output_type != HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET)
     goto exit;
 
   /* Store the number of samples per tetrahedron to be used */
