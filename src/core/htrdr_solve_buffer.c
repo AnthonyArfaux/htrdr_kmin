@@ -522,9 +522,9 @@ htrdr_solve_buffer
   proc_work_init(htrdr->allocator, &work);
 
   nitems = args->buffer_layout.width;
-  nchunks_proc = nitems / (size_t)htrdr->mpi_nprocs;
-  nchunks_remain = nitems - nchunks_proc*(size_t)htrdr->mpi_nprocs;
-  nchunks = nchunks_remain + nchunks_proc*(size_t)htrdr->mpi_nprocs;
+  nchunks = (nitems + (CHUNK_SIZE-1)/*ceil*/) / CHUNK_SIZE;
+  nchunks_proc = nchunks / (size_t)htrdr->mpi_nprocs;
+  nchunks_remain = nchunks - nchunks_proc*(size_t)htrdr->mpi_nprocs;
 
   /* Distribute the remaining chunks among the processes. Each process whose
    * rank is lower than the number of remaining chunks takes an additional
