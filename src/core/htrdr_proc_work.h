@@ -57,7 +57,7 @@ proc_work_reset
 extern LOCAL_SYM void
 proc_work_add_chunk
   (struct proc_work* work,
-   const size_t ichunk);
+   const uint64_t ichunk);
 
 /* Return the index of the next chunk to be processed */
 extern LOCAL_SYM uint64_t

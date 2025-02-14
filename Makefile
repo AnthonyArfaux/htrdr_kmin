@@ -223,6 +223,7 @@ CORE_SRC =\
  src/core/htrdr_ran_wlen_planck.c\
  src/core/htrdr_rectangle.c\
  src/core/htrdr_slab.c\
+ src/core/htrdr_solve_buffer.c\
  src/core/htrdr_spectral.c
 CORE_OBJ = $(CORE_SRC:.c=.o)
 CORE_DEP = $(CORE_SRC:.c=.d)

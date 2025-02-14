@@ -59,7 +59,6 @@ sample_working_process(struct htrdr* htrdr, struct ssp_rng* rng)
   return dst_rank;
 }
 
-
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -90,7 +89,7 @@ proc_work_reset(struct proc_work* work)
 }
 
 void
-proc_work_add_chunk(struct proc_work* work, const size_t ichunk)
+proc_work_add_chunk(struct proc_work* work, const uint64_t ichunk)
 {
   mutex_lock(work->mutex);
   CHK(darray_u64_push_back(&work->chunks, &ichunk) == RES_OK);

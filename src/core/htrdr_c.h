@@ -34,11 +34,15 @@
   #define MPI(Func) MPI_##Func
 #endif
 
+/* Number of consecutively generated random numbers assigned to a thread */
+#define RNG_SEQUENCE_SIZE 10000
+
 enum htrdr_mpi_message {
   HTRDR_MPI_PROGRESS_RENDERING,
   HTRDR_MPI_STEAL_REQUEST,
   HTRDR_MPI_WORK_STEALING,
-  HTRDR_MPI_TILE_DATA
+  HTRDR_MPI_TILE_DATA,
+  HTRDR_MPI_CHUNK_DATA
 };
 
 struct s3d_device;
