@@ -22,24 +22,222 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "planets/htrdr_planets_c.h"
+#include "planets/htrdr_planets_source.h"
 
 #include "core/htrdr_accum.h"
 #include "core/htrdr_log.h"
+#include "core/htrdr_ran_wlen_discrete.h"
+#include "core/htrdr_ran_wlen_planck.h"
 #include "core/htrdr_solve_buffer.h"
 
-#include <rsys/clock_time.h>
-
+#include <star/smsh.h>
 #include <star/ssp.h>
+
+#include <rsys/clock_time.h>
 
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
+static void
+spectral_sampling
+  (struct htrdr_planets* cmd,
+   const struct htrdr_solve_item_args* args,
+   double* out_wlen, /* Sampled wavelength [nm] */
+   double* out_wlen_pdf, /* [nm^-1] */
+   size_t* out_iband, /* Spectral band in which the sampled wavelength falls */
+   size_t* out_iquad) /* Sampled quadrature point in the spectral band */
+{
+  size_t iband_range[2] = {0, 0};
+  size_t iband = 0;
+  size_t iquad = 0;
+  double r0, r1, r2; /* Random Numbers */
+  double wlen[2] = {0,0}; /* [nm] */
+  double pdf = 0; /* [nm^1] */
+
+  /* Preconditions */
+  ASSERT(cmd && args && out_wlen && out_wlen_pdf && out_iband && out_iquad);
+
+  r0 = ssp_rng_canonical(args->rng);
+  r1 = ssp_rng_canonical(args->rng);
+  r2 = ssp_rng_canonical(args->rng);
+
+  /* Sample a wavelength with respect to the type of spectral integration */
+  switch(cmd->spectral_domain.type) {
+    /* Longwave */
+    case HTRDR_SPECTRAL_LW:
+      wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+      break;
+    /* Shortwave */
+    case HTRDR_SPECTRAL_SW:
+      if(htrdr_planets_source_does_radiance_vary_spectrally(cmd->source)) {
+        wlen[0] = htrdr_ran_wlen_discrete_sample(cmd->discrete, r0, r1, &pdf);
+      } else {
+        wlen[0] = htrdr_ran_wlen_planck_sample(cmd->planck, r0, r1, &pdf);
+      }
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+  wlen[0] = wlen[1];
+
+  /* Find the band the wavelength belongs to */
+  RNATM(find_bands(cmd->atmosphere, wlen, iband_range));
+  ASSERT(iband_range[0] == iband_range[1]);
+  iband = iband_range[0];
+
+  /* Sample a quadrature point */
+  RNATM(band_sample_quad_pt(cmd->atmosphere, r2, iband, &iquad));
+
+  *out_wlen = wlen[0];
+  *out_wlen_pdf = pdf;
+  *out_iband = iband;
+  *out_iquad = iquad;
+}
+
+static INLINE void
+position_sampling
+  (const struct htrdr_solve_item_args* args,
+   const struct smsh_desc* desc,
+   double pos[3])
+{
+  const double* v0 = NULL;
+  const double* v1 = NULL;
+  const double* v2 = NULL;
+  const double* v3 = NULL;
+
+  /* Preconditions */
+  ASSERT(args && desc && pos);
+
+  /* Retrieve the vertices of the tetrahedron */
+  v0 = desc->nodes + desc->cells[args->item_id*4/*#vertices*/+0]*3/*#coords*/;
+  v1 = desc->nodes + desc->cells[args->item_id*4/*#vertices*/+1]*3/*#coords*/;
+  v2 = desc->nodes + desc->cells[args->item_id*4/*#vertices*/+2]*3/*#coords*/;
+  v3 = desc->nodes + desc->cells[args->item_id*4/*#vertices*/+3]*3/*#coords*/;
+
+  ssp_ran_tetrahedron_uniform(args->rng, v0, v1, v2, v3, pos, NULL/*pdf*/);
+}
+
+static double /* [W/m^2/sr/m] */
+get_source
+  (struct htrdr_planets* cmd,
+   const double pos[3],
+   const double wlen) /* [nm] */
+{
+  struct rnatm_cell_pos cell_pos = RNATM_CELL_POS_NULL;
+  double temperature = 0; /* [K] */
+  double source = 0; /* [W/m^2/sr/m] */
+  const double wlen_m = wlen * 1.e-9; /* Wavelength [m] */
+  ASSERT(cmd && pos);
+
+  switch(cmd->spectral_domain.type) {
+    case HTRDR_SPECTRAL_SW:
+      /* In shortwave, the source is external to the system */
+      source = 0;
+      break;
+
+    case HTRDR_SPECTRAL_LW:
+      RNATM(fetch_cell(cmd->atmosphere, pos, RNATM_GAS, &cell_pos));
+      RNATM(cell_get_gas_temperature(cmd->atmosphere, &cell_pos, &temperature));
+      source = htrdr_planck_monochromatic(wlen_m, temperature); /* [W/m^2/sr/m] */
+      break;
+
+    default: FATAL("Unreachable code\n"); break;
+  }
+
+  return source;
+}
+
+/* Return the total absorption coefficient,
+ * i.e. the sum of the gas and aerosol ka */
+static double
+get_ka
+  (struct htrdr_planets* cmd,
+   const double pos[3],
+   const size_t iband, /* Spectral band */
+   const size_t iquad) /* Quadrature point */
+{
+  struct rnatm_cell_pos cells[RNATM_MAX_COMPONENTS_COUNT];
+  struct rnatm_get_radcoef_args get_k_args = RNATM_GET_RADCOEF_ARGS_NULL;
+  double ka = 0;
+
+  ASSERT(cmd && pos);
+
+  get_k_args.cells = cells;
+  get_k_args.iband = iband;
+  get_k_args.iquad = iquad;
+  get_k_args.radcoef = RNATM_RADCOEF_Ka;
+
+  /* Retrieve the list of aerosol and gas cells in which pos lies */
+  RNATM(fetch_cell_list(cmd->atmosphere, pos, get_k_args.cells, NULL));
+
+  /* Retrive the total absorption coefficient */
+  RNATM(get_radcoef(cmd->atmosphere, &get_k_args, &ka));
+
+  return ka;
+}
+
+static double
+realisation
+  (struct htrdr_planets* cmd,
+   const struct htrdr_solve_item_args* args,
+   const struct smsh_desc* volrad_mesh_desc)
+{
+  struct planets_compute_radiance_args rad_args =
+    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
+
+  /* Spectral integration */
+  double wlen = 0; /* Wavelength [nm] */
+  double wlen_pdf_nm = 0; /* Wavelength pdf [nm^-1] */
+  double wlen_pdf_m = 0; /* Wavelength pdf [m^-1] */
+  size_t iband = 0; /* Spectral band */
+  size_t iquad = 0; /* Quadrature point */
+
+  /* Spatial & angular integration */
+  double dir[3] = {0,0,0};
+  double pos[3] = {0,0,0};
+
+  double S = 0; /* Source [W/m^2/sr/m] */
+  double L = 0; /* Radiance [W/m^2/sr/m] */
+  double ka = 0; /* Absorption coefficient */
+
+  /* Monte Carlo weight */
+  double weight = 0; /* weight [W/m^3] */
+
+  /* Preconditions */
+  ASSERT(cmd && args && volrad_mesh_desc);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
+
+  spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
+  position_sampling(args, volrad_mesh_desc, pos);
+  ssp_ran_sphere_uniform(args->rng, dir, NULL/*pdf*/);
+
+  /* Compute the radiance in W/m^2/sr/m */
+  d3_set(rad_args.path_org, pos);
+  d3_set(rad_args.path_dir, dir);
+  rad_args.rng = args->rng;
+  rad_args.ithread = args->ithread;
+  rad_args.wlen = wlen; /* [nm] */
+  rad_args.iband = iband;
+  rad_args.iquad = iquad;
+  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
+
+  ka = get_ka(cmd, pos, iband, iquad);
+  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
+
+  weight = ka * (L - S) * 4*PI / wlen_pdf_m; /* [W/m^3] */
+  return weight;
+}
+
 static void
 solve_volumic_radiative_budget
   (struct htrdr* htrdr,
    const struct htrdr_solve_item_args* args,
    void* data)
 {
+  /* Volumic mesh on which volumic radiative budget is estimated */
+  struct smsh_desc volrad_mesh_desc = SMSH_DESC_NULL;
+
   /* Monte Carlo accumulators */
   struct htrdr_accum budget = HTRDR_ACCUM_NULL;
   struct htrdr_accum time = HTRDR_ACCUM_NULL;
@@ -57,26 +255,21 @@ solve_volumic_radiative_budget
   ASSERT(cmd);
   ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
 
+  SMSH(get_desc(cmd->volrad_mesh, &volrad_mesh_desc));
+
   FOR_EACH(i, 0, args->nrealisations) {
     /* Time recording */
     struct time t0, t1;
-    double usec = 0;
 
-    /* Miscellaneous */
-    double w = 0;
-    double r = 0;
+    /* Monte Carlo weights */
+    double w = 0; /* [W/m^3] */
+    double usec = 0; /* [us] */
 
     /* Start of realisation time recording */
     time_current(&t0);
 
-    /* For now, the realisation statistically evaluates 4+1
-     * TODO implement the actual calculation */
-    r = ssp_rng_canonical(args->rng);
-    if(r < 0.5) {
-      w = 2;
-    } else {
-      w = 8;
-    }
+    /* Run the realisation */
+    w = realisation(cmd, args, &volrad_mesh_desc);
 
     /* Stop time recording */
     time_sub(&t0, time_current(&t1), &t0);
