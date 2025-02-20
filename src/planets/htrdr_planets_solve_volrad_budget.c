@@ -131,19 +131,27 @@ get_source
   switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_SW:
       /* In shortwave, the source is external to the system */
-      source = 0;
+      source = 0; /* [W/m^2/sr/m] */
       break;
 
     case HTRDR_SPECTRAL_LW:
       RNATM(fetch_cell(cmd->atmosphere, pos, RNATM_GAS, &cell_pos));
-      RNATM(cell_get_gas_temperature(cmd->atmosphere, &cell_pos, &temperature));
-      source = htrdr_planck_monochromatic(wlen_m, temperature); /* [W/m^2/sr/m] */
+
+      if(SUVM_PRIMITIVE_NONE(&cell_pos.prim)) {
+        /* The position is not in the gas */
+        source = 0; /* [W/m^2/sr/m] */
+
+      } else {
+        /* Fetch the source temperature */
+        RNATM(cell_get_gas_temperature(cmd->atmosphere, &cell_pos, &temperature));
+        source = htrdr_planck_monochromatic(wlen_m, temperature); /* [W/m^2/sr/m] */
+      }
       break;
 
     default: FATAL("Unreachable code\n"); break;
   }
 
-  return source;
+  return source; /* [W/m^2/sr/m] */
 }
 
 /* Return the total absorption coefficient,
