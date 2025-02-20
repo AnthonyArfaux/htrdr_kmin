@@ -77,7 +77,7 @@ spectral_sampling
       break;
     default: FATAL("Unreachable code\n"); break;
   }
-  wlen[0] = wlen[1];
+  wlen[1] = wlen[0];
 
   /* Find the band the wavelength belongs to */
   RNATM(find_bands(cmd->atmosphere, wlen, iband_range));
