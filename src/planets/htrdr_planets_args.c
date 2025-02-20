@@ -704,6 +704,16 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
     }
   }
 
+  if(args->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET
+  && args->spectral_domain.type != HTRDR_SPECTRAL_LW
+  && args->spectral_domain.type != HTRDR_SPECTRAL_SW) {
+    fprintf(stderr,
+      "volumic radiative budget can be evaluated in "
+      "longwave or shortwave only -- option '-s'\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
 exit:
   return res;
 error:
@@ -792,6 +802,13 @@ htrdr_planets_args_check(const struct htrdr_planets_args* args)
   if(args->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET) {
     res = check_volrad_budget_args(&args->volrad_budget);
     if(res != RES_OK) return res;
+
+    /* The volumic radiative budget can be evaluated
+     * in longwave or shortwave only */
+    if(args->spectral_domain.type != HTRDR_SPECTRAL_LW
+    && args->spectral_domain.type != HTRDR_SPECTRAL_SW) {
+      return RES_BAD_ARG;
+    }
   }
 
   /* Check miscalleneous parameters */
