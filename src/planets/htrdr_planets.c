@@ -341,7 +341,8 @@ setup_source
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES)
+  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES
+  || cmd->spectral_domain.type == HTRDR_SPECTRAL_LW) /* No source in Longwave */
     goto exit;
 
   res = htrdr_planets_source_create(cmd->htrdr, &args->source, &cmd->source);
