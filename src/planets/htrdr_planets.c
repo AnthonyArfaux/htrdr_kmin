@@ -245,6 +245,10 @@ setup_spectral_domain
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
+  /* No spectral distribution required to write octrees */
+  if(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_OCTREES)
+    goto exit;
+
   cmd->spectral_domain = args->spectral_domain;
 
   /* Configure the spectral distribution */
