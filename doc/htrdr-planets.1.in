@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 14, 2025
+.Dd March 17, 2025
 .Dt HTRDR-PLANETS 1
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -46,7 +46,7 @@
 .Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
 .Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
-.Op Fl V Ar accel_struct_definition
+.Op Fl V Ar accel_struct_opt Ns Op : Ns Ar accel_struct_opt No ...
 .Fl g Ar gas_opt Ns Op : Ns Ar gas_opt No ...
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .\" Detailed description
@@ -433,9 +433,57 @@ Advice on the number of threads to use.
 By default,
 .Nm
 uses many threads as processor cores.
-.It Fl V Ar accel_struct_definition
+.It Fl V Ar accel_struct_opt Ns Op : Ns Ar accel_struct_opt No ...
+Configure the building of the acceleration structures.
+.Pp
+The acceleration structures building options are as follows:
+.Bl -tag -width Ds
+.It Cm def= Ns Ar definition
 Advice on the definition of the atmospheric acceleration structures.
 Default is @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+.It Cm nthreads= Ns Ar threads_count
+Advice on the number of threads to use.
+This number is different from that defined by the
+.Fl t
+option, as the construction of acceleration structures is not based on
+the same parallelization model as Monte Carlo integration.
+This construction may not benefit from too many threads, on the
+contrary.
+.Pp
+The default value is 8, i.e. a maximum of 8 threads are used to build
+acceleration structures.
+.It Cm proc= Ns Ar processes
+This option is only used when
+.Nm
+is run with multiple processes
+.Pq see Xr mpirun 1 .
+It defines the processes that must build the acceleration structures.
+.Pp
+The value
+.Cm all
+means that all processes build their own set of acceleration structures.
+This is the de facto configuration when no storage is used
+.Po
+i.e. the
+.Fl O
+option is not set
+.Pc .
+.Pp
+If acceleration structure storage is defined
+.Pq Fl O No option ,
+a value of
+.Cm all
+should only be used if each process has its own disk space on which its
+own set of acceleration structures is stored.
+If processes share a common disk space, the value should be
+.Cm master .
+This means that only the main process builds the acceleration
+structures, which are in fine shared with the other processes by
+storing the saved acceleration structures on a common disk space.
+.Pp
+The default value is
+.Cm master .
+.El
 .It Fl v
 Make
 .Nm
@@ -651,7 +699,7 @@ htrdr-planets -v -N \\
 :mesh=ground_triangles.smsh\\
 :prop=ground_properties.rnsp\\
 :brdf=ground_brdfs.rnsl \\
-              -V 512 -T 10 -O storage_cie.bin \\
+              -V def=512 -T 10 -O storage_cie.bin \\
               -fo image_CIE_XYZ.ht
 .Ed
 .Pp
@@ -693,7 +741,7 @@ htrdr-planets -v -N \\
 :mesh=ground_triangles.smsh\\
 :prop=ground_properties.rnsp\\
 :brdf=ground_brdfs.rnsl \\
-              -V 512 -T 10 -O storage_lw.bin \\
+              -V def=512 -T 10 -O storage_lw.bin \\
               -fo image_infrared.ht
 .Ed
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
