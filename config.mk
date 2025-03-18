@@ -118,10 +118,10 @@ CORE_DPDC_LIBS =\
  -fopenmp -lm
 
 # Planets
-PLANETS_DPDC_CFLAGS=\
- $$($(PKG_CONFIG) $(PCFLAGS) --cflags rnatm rngrd rsys s3d sbuf scam ssf star-sp svx)
-PLANETS_DPDC_LIBS=\
- $$($(PKG_CONFIG) $(PCFLAGS) --libs rnatm rngrd rsys s3d sbuf scam ssf star-sp svx) -lm
+PLANETS_DPDC_CFLAGS=$$($(PKG_CONFIG) $(PCFLAGS) --cflags $(MPI_PC) \
+ rnatm rngrd rsys s3d sbuf scam ssf star-sp svx)
+PLANETS_DPDC_LIBS=$$($(PKG_CONFIG) $(PCFLAGS) --libs $(MPI_PC) \
+ rnatm rngrd rsys s3d sbuf scam ssf star-sp svx) -lm
 
 ################################################################################
 # Compilation options

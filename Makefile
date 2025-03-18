@@ -476,6 +476,7 @@ libhtrdr-planets.o: $(PLANETS_OBJ)
 	$(OBJCOPY) $(OCPFLAGS) $@
 
 .config_planets: config.mk
+	$(PKG_CONFIG) --atleast-version $(MPI_VERSION) $(MPI_PC)
 	$(PKG_CONFIG) --atleast-version $(RNATM_VERSION) rnatm
 	$(PKG_CONFIG) --atleast-version $(RNGRD_VERSION) rngrd
 	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
