@@ -433,7 +433,7 @@ htrdr_planets_source_get_spectrum
 
     if(low == upp) {
       /* The range is fully included in a band */
-      ASSERT(low->radiance > range[0] && upp->radiance >= range[1]);
+      ASSERT(low->wavelength > range[0] && upp->wavelength >= range[1]);
       source_spectrum->size = 2;
       source_spectrum->buffer = NULL;
 
