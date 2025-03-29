@@ -1,0 +1,166 @@
+# Copyright (C) 2018-2019, 2022-2025 Centre National de la Recherche Scientifique
+# Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+# Copyright (C) 2022-2025 Institut Pierre-Simon Laplace
+# Copyright (C) 2022-2025 Institut de Physique du Globe de Paris
+# Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
+# Copyright (C) 2022-2025 Observatoire de Paris
+# Copyright (C) 2022-2025 Université de Reims Champagne-Ardenne
+# Copyright (C) 2022-2025 Université de Versaille Saint-Quentin
+# Copyright (C) 2018-2019, 2022-2025 Université Paul Sabatier
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+.POSIX:
+.SUFFIXES: # Clean up default inference rules
+
+include config.mk
+
+LIBNAME = libhtrdr-atmosphere.a
+
+default: command
+
+################################################################################
+# Build the library
+################################################################################
+SRC =\
+ src/atmosphere/htrdr_atmosphere_args.c\
+ src/atmosphere/htrdr_atmosphere.c\
+ src/atmosphere/htrdr_atmosphere_compute_radiance_lw.c\
+ src/atmosphere/htrdr_atmosphere_compute_radiance_sw.c\
+ src/atmosphere/htrdr_atmosphere_draw_map.c\
+ src/atmosphere/htrdr_atmosphere_ground.c\
+ src/atmosphere/htrdr_atmosphere_main.c\
+ src/atmosphere/htrdr_atmosphere_sun.c
+OBJ = $(SRC:.c=.o)
+DEP = $(SRC:.c=.d)
+
+CFLAGS_LIB = $(CFLAGS_SO) $(ATMOSPHERE_INCS) -Isrc -DHTRDR_SHARED_BUILD
+
+library: core .config_atmosphere htrdr-atmosphere.pc $(DEP)
+	@$(MAKE) -fMakefile.atmosphere \
+	$$(for i in $(DEP); do echo -f $${i}; done) $(LIBNAME)
+
+core:
+	@$(MAKE) -fMakefile.core
+
+.config_atmosphere: config.mk
+	$(PKG_CONFIG) --atleast-version $(HTSKY_VERSION) htsky
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	$(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx
+	echo 'config done' > $@
+
+$(LIBNAME): libhtrdr-atmosphere.o
+	$(AR) -rc $@ $?
+	$(RANLIB) $@
+
+libhtrdr-atmosphere.o: $(OBJ)
+	$(LD) -r $(OBJ) -o $@
+	$(OBJCOPY) $(OCPFLAGS) $@
+
+$(DEP) $(OBJ): config.mk src/atmosphere/htrdr_atmosphere_args.h
+
+# Inference rules
+.SUFFIXES: .c .d .o
+.c.d:
+	@$(CC) $(CFLAGS_LIB) -MM -MT "$(@:.d=.o) $@" $< -MF $@
+
+.c.o:
+	$(CC) $(CFLAGS_LIB) -c $< -o $@
+
+################################################################################
+# Build the command
+################################################################################
+CMD_SRC = src/commands/htrdr_atmosphere_cmd.c
+CMD_OBJ = $(CMD_SRC:.c=.o)
+CMD_DEP = $(CMD_SRC:.c=.d)
+
+CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-core htrdr-atmosphere rsys)
+LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-core htrdr-atmosphere rsys)
+
+command: library $(CMD_DEP)
+	@$(MAKE) -fMakefile.atmosphere -f$(CMD_DEP) htrdr-atmosphere
+
+htrdr-atmosphere: $(CMD_OBJ) $(LIBNAME)
+	$(CC) $(CFLAGS_CMD) -o $@ $(CMD_OBJ) $(LDFLAGS_CMD)
+
+$(CMD_DEP) $(CMD_OBJ): config.mk htrdr-atmosphere.pc
+
+$(CMD_DEP):
+	@$(CC) $(CFLAGS_CMD) -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
+
+$(CMD_OBJ):
+	$(CC) $(CFLAGS_CMD) -c $(@:.o=.c) -o $@
+
+################################################################################
+# Generate files from template
+################################################################################
+src/atmosphere/htrdr_atmosphere_args.h: config.mk src/atmosphere/htrdr_atmosphere_args.h.in
+	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
+	    -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME)/g' \
+	    $@.in > $@
+
+htrdr-atmosphere.pc: config.mk htrdr-atmosphere.pc.in
+	sed -e 's/@VERSION@/$(VERSION)/g' \
+	    -e 's/@HTSKY_VERSION@/$(HTSKY_VERSION)/g' \
+	    -e 's/@RSYS_VERSION@/$(RSYS_VERSION)/g' \
+	    -e 's/@S3D_VERSION@/$(S3D_VERSION)/g' \
+	    -e 's/@SCAM_VERSION@/$(SCAM_VERSION)/g' \
+	    -e 's/@SSF_VERSION@/$(SSF_VERSION)/g' \
+	    -e 's/@SSP_VERSION@/$(SSP_VERSION)/g' \
+	    -e 's/@SVX_VERSION@/$(SVX_VERSION)/g' \
+	    $@.in > $@
+
+doc/htrdr-atmosphere.1: doc/htrdr-atmosphere.1.in
+	sed -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD)/g' \
+	    -e 's/@HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME@/$(HTRDR_ATMOSPHERE_ARGS_DEFAULT_SKY_MTL_NAME)/g' \
+	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MIN)/g' \
+	    -e 's/@HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX@/$(HTRDR_ARGS_CAMERA_PERSPECTIVE_FOV_EXCLUSIVE_MAX)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOCAL_DST)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_FOV)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS@/$(HTRDR_ARGS_DEFAULT_CAMERA_PERSPECTIVE_LENS_RADIUS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_POS@/$(HTRDR_ARGS_DEFAULT_CAMERA_POS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_TGT@/$(HTRDR_ARGS_DEFAULT_CAMERA_TGT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_CAMERA_UP@/$(HTRDR_ARGS_DEFAULT_CAMERA_UP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_WIDTH@/$(HTRDR_ARGS_DEFAULT_IMG_WIDTH)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_HEIGHT@/$(HTRDR_ARGS_DEFAULT_IMG_HEIGHT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_IMG_SPP@/$(HTRDR_ARGS_DEFAULT_IMG_SPP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_POS@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_POS)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_TGT@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_TGT)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_UP@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_UP)/g' \
+	    -e 's/@HTRDR_ARGS_DEFAULT_RECTANGLE_SZ@/$(HTRDR_ARGS_DEFAULT_RECTANGLE_SZ)/g'\
+	    $@.in > $@
+
+################################################################################
+# Miscellaneous
+################################################################################
+install: command doc/htrdr-atmosphere.1
+	@$(SHELL) install.sh 755 "$(DESTDIR)$(BINPREFIX)" htrdr-atmosphere
+	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/htrdr-atmosphere.1
+
+uninstall:
+	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr-atmosphere"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/htrdr-atmosphere.1"
+
+clean:
+	rm -f $(OBJ) $(DEP) $(LIBNAME)
+	rm -f $(CMD_OBJ) $(CMD_DEP) htrdr-atmosphere
+	rm -f .config_atmosphere libhtrdr-atmosphere.o htrdr-atmosphere.pc
+	rm -f doc/htrdr-atmosphere.1 src/atmosphere/htrdr_atmosphere_args.h
+
+lint: doc/htrdr-atmosphere.1
+	mandoc -Tlint -Wall doc/htrdr-atmosphere.1 || [ $$? -le 1 ]
