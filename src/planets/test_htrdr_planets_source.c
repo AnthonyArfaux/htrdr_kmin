@@ -237,7 +237,7 @@ test_spectrum_from_files(struct htrdr* htrdr, int argc, char** argv)
   struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
   struct htrdr_planets_source_spectrum spectrum = HTRDR_PLANETS_SOURCE_SPECTRUM_NULL;
   struct htrdr_planets_source* source = NULL;
-  size_t i;
+  int i;
 
   source_args.longitude = 0;
   source_args.latitude = 0;

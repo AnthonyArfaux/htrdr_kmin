@@ -32,6 +32,10 @@ default install uninstall lint clean:
 	@if [ "$(COMBUSTION)" == "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
 	@if [ "$(PLANETS)" == ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
 
+test:
+	@if [ "$(COMBUSTION)" == "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
+	@if [ "$(PLANETS)" == ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
+
 default: htrdr
 install: install_common
 uninstall: uninstall_common

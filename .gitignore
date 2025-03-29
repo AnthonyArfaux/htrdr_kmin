@@ -1,6 +1,7 @@
 *~
 *.[aod]
 [Bb]uild*
+*.bin
 .config*
 .gitignore
 htrdr
@@ -12,7 +13,10 @@ htrdr-combustion.1
 htrdr-planets
 htrdr-planets.1
 htrdr_version.h
+*.obj
 *.pc
 *.so
 *.sw[po]
 tags
+test_*
+!test_*.[ch]
