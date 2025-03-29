@@ -147,7 +147,7 @@ install:
 	fi
 
 uninstall:
-	rm -f "$(DESTDIR)$(LIBPREFIX)/$(LIBNAME)
+	rm -f "$(DESTDIR)$(LIBPREFIX)/$(LIBNAME)"
 
 clean:
 	rm -f $(LIBNAME) $(OBJ) $(DEP)

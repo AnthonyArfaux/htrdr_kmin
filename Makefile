@@ -27,6 +27,7 @@
 include config.mk
 
 default install uninstall lint clean:
+	@$(MAKE) -fMakefile.core $@
 	@if [ "$(ATMOSPHERE)" == "ENABLE" ]; then $(MAKE) -fMakefile.atmosphere $@; fi
 	@if [ "$(COMBUSTION)" == "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
 	@if [ "$(PLANETS)" == ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
@@ -51,7 +52,6 @@ install_common: htrdr
 	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/htrdr-materials.5
 	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/htrdr-obj.5
 	@$(SHELL) install.sh 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/rnrl.5
-	@$(MAKE) -fMakefile.core install
 
 uninstall_common:
 	rm -f "$(DESTDIR)$(BINPREFIX)/htrdr"
