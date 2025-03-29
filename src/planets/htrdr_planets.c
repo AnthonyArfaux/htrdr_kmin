@@ -21,7 +21,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _POSIX_C_SOURCE 200112L /* fdopen, nextafter, rint */
+#define _POSIX_C_SOURCE 200112L /* fdopen, nanosleep, nextafter, rint */
 
 #include "core/htrdr.h"
 #include "core/htrdr_ran_wlen_cie_xyz.h"
@@ -48,6 +48,9 @@
 #include <math.h> /* nextafter, rint */
 #include <unistd.h> /* close */
 #include <sys/stat.h>
+
+#include <mpi.h>
+#include <time.h>
 
 /*******************************************************************************
  * Helper function
@@ -86,9 +89,9 @@ setup_octree_storage
   rnatm_args->octrees_storage = NULL;
   rnatm_args->load_octrees_from_storage = 0;
 
-  if(!args->octrees_storage) goto exit;
+  if(!args->accel_struct.storage) goto exit;
 
-  fd = open(args->octrees_storage, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+  fd = open(args->accel_struct.storage, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
   if(fd < 0) { res = RES_IO_ERR; goto error; }
 
   rnatm_args->octrees_storage = fdopen(fd, "w+");
@@ -98,7 +101,7 @@ setup_octree_storage
    * descriptor */
   fd = -1;
 
-  err = stat(args->octrees_storage, &file_stat);
+  err = stat(args->accel_struct.storage, &file_stat);
   if(err < 0) { res = RES_IO_ERR; goto error; }
 
   if(file_stat.st_size != 0) {
@@ -111,7 +114,7 @@ exit:
   return res;
 error:
   htrdr_log_err(cmd->htrdr, "error opening the octree storage `%s' -- %s\n",
-    args->octrees_storage, res_to_cstr(res));
+    args->accel_struct.storage, res_to_cstr(res));
 
   if(fd >= 0) CHK(close(fd) == 0);
   if(rnatm_args->octrees_storage) CHK(fclose(rnatm_args->octrees_storage) == 0);
@@ -120,34 +123,83 @@ error:
   goto exit;
 }
 
+static void
+mpi_barrier(void)
+{
+  struct timespec t;
+  int complete = 0;
+  MPI_Request req;
+
+  t.tv_sec = 0;
+  t.tv_nsec = 10000000; /* 10ms */
+
+  /* Use an asynchronous barrier to avoid active waiting,
+   * and therefore wasted resources */
+  MPI_Ibarrier(MPI_COMM_WORLD, &req);
+
+  do {
+    nanosleep(&t, NULL);
+    MPI_Test(&req, &complete, MPI_STATUS_IGNORE);
+  } while(!complete);
+}
+
 static res_T
 setup_atmosphere
   (struct htrdr_planets* cmd,
    const struct htrdr_planets_args* args)
 {
-  struct rnatm_create_args rnatm_args = RNATM_CREATE_ARGS_DEFAULT;
+  struct rnatm_create_args rnatm = RNATM_CREATE_ARGS_DEFAULT;
   res_T res = RES_OK;
   ASSERT(cmd && args);
 
-  rnatm_args.gas = args->gas;
-  rnatm_args.aerosols = args->aerosols;
-  rnatm_args.naerosols = args->naerosols;
-  rnatm_args.name = "atmosphere";
-  rnatm_args.spectral_range[0] = args->spectral_domain.wlen_range[0];
-  rnatm_args.spectral_range[1] = args->spectral_domain.wlen_range[1];
-  rnatm_args.optical_thickness = args->optical_thickness;
-  rnatm_args.grid_definition_hint = args->octree_definition_hint;
-  rnatm_args.precompute_normals = args->precompute_normals;
-  rnatm_args.logger = htrdr_get_logger(cmd->htrdr);
-  rnatm_args.allocator = htrdr_get_allocator(cmd->htrdr);
-  rnatm_args.nthreads = args->nthreads;
-  rnatm_args.verbose = args->verbose;
+  rnatm.gas = args->gas;
+  rnatm.aerosols = args->aerosols;
+  rnatm.naerosols = args->naerosols;
+  rnatm.name = "atmosphere";
+  rnatm.spectral_range[0] = args->spectral_domain.wlen_range[0];
+  rnatm.spectral_range[1] = args->spectral_domain.wlen_range[1];
+  rnatm.optical_thickness = args->accel_struct.optical_thickness;
+  rnatm.grid_definition_hint = args->accel_struct.definition_hint;
+  rnatm.precompute_normals = args->precompute_normals;
+  rnatm.logger = htrdr_get_logger(cmd->htrdr);
+  rnatm.allocator = htrdr_get_allocator(cmd->htrdr);
+  rnatm.nthreads = args->accel_struct.nthreads;
+  rnatm.verbose = args->verbose;
 
-  res = setup_octree_storage(cmd, args, &rnatm_args);
-  if(res != RES_OK) goto error;
+  if(!args->accel_struct.storage || !args->accel_struct.master_only) {
+    /* From now on, either the octrees have to be built in memory, or all the
+     * processes have to build them. In all cases, all processes must create
+     * the atmopshere data structures. */
+    if((res = setup_octree_storage(cmd, args, &rnatm)) != RES_OK) goto error;
+    if((res = rnatm_create(&rnatm, &cmd->atmosphere)) != RES_OK) goto error;
 
-  res = rnatm_create(&rnatm_args, &cmd->atmosphere);
-  if(res != RES_OK) goto error;
+  } else {
+
+    const int is_master_process = htrdr_get_mpi_rank(cmd->htrdr) == 0;
+    /* A storage space is used and only the master process must fill it with the
+     * octrees it builds */
+
+    if(is_master_process) {
+      /* Octrees are built only by the master process and stored on disk.
+       * Note that in reality, octrees may already be constructed and stored in
+       * the storage provided. In any case, we can treat this special case as
+       * the general case, and therefore simply consider that in such situation,
+       * "construction" by the master process is only faster */
+      if((res = setup_octree_storage(cmd, args, &rnatm)) != RES_OK) goto error;
+      if((res = rnatm_create(&rnatm, &cmd->atmosphere)) != RES_OK) goto error;
+    }
+
+    /* Wait for octrees to be built by the master process */
+    mpi_barrier();
+
+    if(!is_master_process) {
+      /* Octrees have been built by the master process.
+       * Non master processes simply load them. */
+      if((res = setup_octree_storage(cmd, args, &rnatm)) != RES_OK) goto error;
+      ASSERT(rnatm.load_octrees_from_storage == 1);
+      if((res = rnatm_create(&rnatm, &cmd->atmosphere)) != RES_OK) goto error;
+    }
+  }
 
 exit:
   return res;

@@ -82,6 +82,25 @@ static const struct htrdr_planets_volrad_budget_args
 HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL =
   HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL__;
 
+/* Configure the building of the acceleration structure */
+struct htrdr_planets_accel_struct_build_args {
+  unsigned definition_hint; /* Hint on octree definition */
+  unsigned nthreads; /* Hint on the number of threads to use */
+  double optical_thickness; /* Threshold used during octree building */
+
+  /* Read/Write file where octrees are stored. May be NULL => octres are built
+   * at runtime and kept in memory */
+  char* storage;
+
+  /* Indicator defining whether the structure is built solely on the
+   * master process */
+  int master_only;
+};
+#define HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__ { 512, 8, 1, NULL, 1 }
+static const struct htrdr_planets_accel_struct_build_args
+HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL =
+  HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__;
+
 struct htrdr_planets_args {
   /* System data */
   struct rnatm_gas_args gas;
@@ -89,12 +108,8 @@ struct htrdr_planets_args {
   size_t naerosols;
   struct htrdr_planets_ground_args ground;
 
-  /* Read/Write file where octrees are stored. May be NULL => octres are built
-   * at runtime and kept in memory */
-  char* octrees_storage;
-
-  unsigned octree_definition_hint; /* Hint on octree definition */
-  double optical_thickness; /* Threshold used during octree building */
+  /* Configure the building of the acceleration structure */
+  struct htrdr_planets_accel_struct_build_args accel_struct;
 
   char* output; /* File where the result is written */
   struct htrdr_planets_spectral_args spectral_domain; /* Integration spectral domain */
@@ -107,7 +122,7 @@ struct htrdr_planets_args {
   struct htrdr_planets_volrad_budget_args volrad_budget;
 
   /* Miscellaneous arguments */
-  unsigned nthreads; /* Hint on the nimber of threads to use */
+  unsigned nthreads; /* Hint on the number of threads to use */
   enum htrdr_planets_args_output_type output_type;
   int precompute_normals; /* Pre-compute tetrahedron normals */
   int force_output_overwrite; /* Replace output if it exists */
@@ -120,10 +135,7 @@ struct htrdr_planets_args {
   0, /* Number of aerosols */                                                  \
   HTRDR_PLANETS_GROUND_ARGS_NULL__, /* Ground */                               \
                                                                                \
-  NULL, /* File where to dump octrees */                                       \
-                                                                               \
-  @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@, /* octree definition */   \
-  @HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@,                    \
+  HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__,                                \
                                                                                \
   NULL, /* Ouput file */                                                       \
   HTRDR_PLANETS_SPECTRAL_ARGS_DEFAULT__, /* Spectral domain */                 \

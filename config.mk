@@ -73,6 +73,7 @@ CC = cc
 LD = ld
 OBJCOPY = objcopy
 PKG_CONFIG = pkg-config
+PKG_CONFIG_LOCAL = PKG_CONFIG_PATH="./:$${PKG_CONFIG_PATH}" $(PKG_CONFIG)
 RANLIB = ranlib
 
 ################################################################################
@@ -98,30 +99,30 @@ SSP_VERSION = 0.14
 SVX_VERSION = 0.3
 
 # Atmosphere
-ATMOSPHERE_DPDC_CFLAGS =\
+ATMOSPHERE_INCS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --cflags htsky rsys s3d scam ssf star-sp svx)
-ATMOSPHERE_DPDC_LIBS =\
+ATMOSPHERE_LIBS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --libs htsky rsys s3d scam ssf star-sp svx) -lm
 
 # Combustion
-COMBUSTION_DPDC_CFLAGS =\
+COMBUSTION_INCS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --cflags atrstm rsys s3d scam ssf star-sp svx)
-COMBUSTION_DPDC_LIBS =\
+COMBUSTION_LIBS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --libs atrstm rsys s3d scam ssf star-sp svx) -lm
 
 # Core
-CORE_DPDC_CFLAGS =\
+CORE_INCS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --cflags aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp)\
  -fopenmp
-CORE_DPDC_LIBS =\
+CORE_LIBS =\
  $$($(PKG_CONFIG) $(PCFLAGS) --libs aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp)\
  -fopenmp -lm
 
 # Planets
-PLANETS_DPDC_CFLAGS=\
- $$($(PKG_CONFIG) $(PCFLAGS) --cflags rnatm rngrd rsys s3d sbuf scam ssf star-sp svx)
-PLANETS_DPDC_LIBS=\
- $$($(PKG_CONFIG) $(PCFLAGS) --libs rnatm rngrd rsys s3d sbuf scam ssf star-sp svx) -lm
+PLANETS_INCS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags $(MPI_PC) \
+ rnatm rngrd rsys s3d sbuf scam ssf star-sp svx)
+PLANETS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs $(MPI_PC) \
+ rnatm rngrd rsys s3d sbuf scam ssf star-sp svx) -lm
 
 ################################################################################
 # Compilation options

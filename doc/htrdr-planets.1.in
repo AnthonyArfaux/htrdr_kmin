@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 14, 2025
+.Dd March 17, 2025
 .Dt HTRDR-PLANETS 1
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -36,17 +36,15 @@
 .Nm
 .Op Fl dfhNv
 .Op Fl a Ar aerosol_opt Ns Op : Ns Ar aerosol_opt No ...
+.Op Fl b Ar accel_struct_build_opt Ns Op : Ns Ar accel_struct_build_opt No ...
 .Op Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 .Op Fl G Ar ground_opt Ns Op : Ns Ar ground_opt No ...
 .Op Fl i Ar image_opt Ns Op : Ns Ar image_opt No ...
-.Op Fl O Ar accel_struct_storage
 .Op Fl o Ar output
 .Op Fl r Ar volrad_budget_opt Ns Op : Ns Ar volrad_budget_opt No ...
 .Op Fl S Ar source_opt Ns Op : Ns Ar source_opt No ...
 .Op Fl s Ar spectral_opt Ns Op : Ns Ar spectral_opt No ...
-.Op Fl T Ar optical_thickness
 .Op Fl t Ar threads_count
-.Op Fl V Ar accel_struct_definition
 .Fl g Ar gas_opt Ns Op : Ns Ar gas_opt No ...
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .\" Detailed description
@@ -171,6 +169,82 @@ Note that this file and the tetrahedral mesh
 .Pq option Cm mesh
 must be consistent with each other, i.e. the nodes must be
 listed in the same order.
+.El
+.It Fl b Ar accel_struct_build_opt Ns Op : Ns Ar accel_struct_build_opt No ...
+Configure the building of the acceleration structures.
+.Pp
+The acceleration structures building options are as follows:
+.Bl -tag -width Ds
+.It Cm def= Ns Ar definition
+Advice on the definition of the atmospheric acceleration structures.
+Default is @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
+.It Cm nthreads= Ns Ar threads_count
+Advice on the number of threads to use.
+This number is different from that defined by the
+.Fl t
+option, as the construction of acceleration structures is not based on
+the same parallelization model as Monte Carlo integration.
+This construction may not benefit from too many threads, on the
+contrary.
+.Pp
+The default value is 8, i.e. a maximum of 8 threads are used to build
+acceleration structures.
+.It Cm proc= Ns Ar processes
+This option is only used when
+.Nm
+is run with multiple processes
+.Pq see Xr mpirun 1 .
+It defines the processes that must build the acceleration structures.
+.Pp
+The value
+.Cm all
+means that all processes build their own set of acceleration structures.
+This is the de facto configuration when no storage is used
+.Po
+i.e. the
+.Cm storage
+parameter is not set
+.Pc .
+.Pp
+If acceleration structure storage is defined
+.Pq Cm storage No parameter ,
+a value of
+.Cm all
+should only be used if each process has its own disk space on which its
+own set of acceleration structures is stored.
+If processes share a common disk space, the value should be
+.Cm master .
+This means that only the main process builds the acceleration
+structures, which are in fine shared with the other processes by
+storing the saved acceleration structures on a common disk space.
+.Pp
+The default value is
+.Cm master .
+.It Cm storage= Ns Ar accel_struct_file
+File where atmospheric acceleration structures are stored/loaded.
+.Pp
+If
+.Ar accel_struct_file
+does not exist, it is created and is used to store the built
+acceleration structures.
+.Pp
+If
+.Ar accel_struct_file
+exists, acceleration structures are loaded from it rather than built
+from scratch, resulting in significant acceleration of the preprocessing
+step.
+Note that if the data structures stored in
+.Ar accel_struct_file
+are not as expected (that is, the input atmospheric data or construction
+parameters are different), an error is notified and execution is
+stopped, thus avoiding the use of incorrect acceleration structures.
+.Pp
+By default, no storage file is used, i.e. acceleration structures are
+built from scratch and stored in memory.
+.It Cm tau= Ns Ar optical_thickness
+Optical thickness used as threshold criterion for building the
+acceleration structures.
+Default is @HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
 .El
 .It Fl C Ar persp_camera_opt Ns Op : Ns Ar persp_camera_opt No ...
 Set up a pinhole or thin-lens perspective camera.
@@ -308,24 +382,6 @@ all rather than re-evaluating them every time a tetrahedron is queried
 at a given position.
 In return, the memory space used to store normals increases the memory
 footprint.
-.It Fl O Ar accel_struct_storage
-File where atmospheric acceleration structures are stored/loaded.
-.Pp
-If
-.Ar accel_struct_storage
-does not exist, it is created and is used to store the built
-acceleration structures.
-.Pp
-If
-.Ar accel_struct_storage
-exists, acceleration structures are loaded from it rather than built
-from scratch, resulting in significant acceleration of the preprocessing
-step.
-Note that if the data structures stored in
-.Ar accel_struct_storage
-are not as expected (that is, the input atmospheric data or construction
-parameters are different), an error is notified and execution is
-stopped, thus avoiding the use of incorrect acceleration structures.
 .It Fl o Ar output
 Output file.
 If not defined, data is written to standard output.
@@ -424,18 +480,11 @@ and
 .Ar wlen_max
 are equal, the calculation is monochromatic.
 .El
-.It Fl T Ar optical_thickness
-Optical thickness used as threshold criterion for building the acceleration
-structures.
-Default is @HTRDR_PLANETS_ARGS_DEFAULT_OPTICAL_THICKNESS_THRESHOLD@.
 .It Fl t
 Advice on the number of threads to use.
 By default,
 .Nm
 uses many threads as processor cores.
-.It Fl V Ar accel_struct_definition
-Advice on the definition of the atmospheric acceleration structures.
-Default is @HTRDR_PLANETS_ARGS_DEFAULT_GRID_DEFINITION_HINT@.
 .It Fl v
 Make
 .Nm
@@ -651,7 +700,7 @@ htrdr-planets -v -N \\
 :mesh=ground_triangles.smsh\\
 :prop=ground_properties.rnsp\\
 :brdf=ground_brdfs.rnsl \\
-              -V 512 -T 10 -O storage_cie.bin \\
+              -b def=512:tau=10:storage=storage_cie.bin \\
               -fo image_CIE_XYZ.ht
 .Ed
 .Pp
@@ -671,8 +720,7 @@ while one wants to store/reload the acceleration structures for a
 spectral range between 10 and 20 microns.
 In any case, if the previous storage had been submitted, the command
 would have stopped with an error message, thus avoiding the use of the
-wrong acceleration structures
-.Pq see Fl O No option .
+wrong acceleration structures:
 .Bd -literal -offset Ds
 htrdr-planets -v -N \\
               -i def=800x600:spp=64 \\
@@ -693,7 +741,7 @@ htrdr-planets -v -N \\
 :mesh=ground_triangles.smsh\\
 :prop=ground_properties.rnsp\\
 :brdf=ground_brdfs.rnsl \\
-              -V 512 -T 10 -O storage_lw.bin \\
+              -b def=512:tau=10:storage=storage_lw.bin \\
               -fo image_infrared.ht
 .Ed
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""

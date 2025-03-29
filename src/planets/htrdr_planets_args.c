@@ -117,17 +117,32 @@ check_volrad_budget_args(const struct htrdr_planets_volrad_budget_args* args)
   return RES_OK;
 }
 
+static INLINE res_T
+check_accel_struct_build_args
+  (const struct htrdr_planets_accel_struct_build_args* args)
+{
+  if(!args) return RES_BAD_ARG;
+
+  /* Definition and number of threads cannot be null */
+  if(!args->definition_hint || !args->nthreads) return RES_BAD_ARG;
+
+  /* Invalid threshold */
+  if(args->optical_thickness < 0) return RES_BAD_ARG;
+
+  return RES_OK;
+}
+
 static void
 usage(void)
 {
   printf("usage: htrdr-planets [-dfhNv] [-a aerosol_opt[:aerosol_opt ...]]\n");
+  printf("                     [-b accel_struct_build_opt[:accel_struct_build_opt ...]]\n");
   printf("                     [-C persp_camera_opt[:persp_camera_opt ...]]\n");
   printf("                     [-G ground_opt[:ground_opt ...]]\n");
-  printf("                     [-i image_opt[:image_opt ...]] [-O accel_struct_storage]\n");
-  printf("                     [-o output] [-r volrad_budget_opt[:volrad_budget_opt ...]]\n");
+  printf("                     [-i image_opt[:image_opt ...]] [-o output]\n");
+  printf("                     [-r volrad_budget_opt[:volrad_budget_opt ...]]\n");
   printf("                     [-S source_opt[:source_opt ...]]\n");
-  printf("                     [-s spectral_opt[:spectral_opt ...]] [-T optical_thickness]\n");
-  printf("                     [-t threads_count] [-V accel_struct_definition]\n");
+  printf("                     [-s spectral_opt[:spectral_opt ...]] [-t threads_count]\n");
   printf("                     -g gas_opt[:gas_opt ...]\n");
 }
 
@@ -590,6 +605,85 @@ error:
   goto exit;
 }
 
+static res_T
+parse_accel_struct_build_parameters(const char* str, void* ptr)
+{
+  enum { DEF, NTHREADS, PROC, STORAGE, OPTIC_THICKNESS} iparam;
+  char buf[BUFSIZ];
+  struct htrdr_planets_args* args = ptr;
+  char* key;
+  char* val;
+  char* tk_ctx;
+  res_T res = RES_OK;
+
+  ASSERT(str && ptr);
+
+  if(strlen(str) >= sizeof(buf) -1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the parameters of the acceleration structures `%s'",
+      str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  key = strtok_r(buf, "=", &tk_ctx);
+  val = strtok_r(NULL, "", &tk_ctx);
+
+       if(!strcmp(key, "def")) iparam = DEF;
+  else if(!strcmp(key, "nthreads")) iparam = NTHREADS;
+  else if(!strcmp(key, "proc")) iparam = PROC;
+  else if(!strcmp(key, "storage")) iparam = STORAGE;
+  else if(!strcmp(key, "tau")) iparam = OPTIC_THICKNESS;
+  else {
+    fprintf(stderr, "Invalid acceleration structure parameter `%s'\n", key);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  switch(iparam) {
+    case DEF:
+      res = cstr_to_uint(val, &args->accel_struct.definition_hint);
+      if(res == RES_OK && args->accel_struct.definition_hint == 0)
+        res = RES_BAD_ARG;
+      break;
+    case NTHREADS:
+      res = cstr_to_uint(val, &args->accel_struct.nthreads);
+      if(res == RES_OK && args->accel_struct.nthreads == 0) res = RES_BAD_ARG;
+      break;
+    case PROC:
+      if(!strcmp(val, "all")) {
+        args->accel_struct.master_only = 0;
+      } else if(!strcmp(val, "master")) {
+        args->accel_struct.master_only = 1;
+      } else {
+        res = RES_BAD_ARG;
+      }
+      break;
+    case STORAGE:
+      if(args->accel_struct.storage) mem_rm(args->accel_struct.storage);
+      if(!(args->accel_struct.storage = str_dup(val))) res = RES_MEM_ERR;
+      break;
+    case OPTIC_THICKNESS:
+      res = cstr_to_double(val, &args->accel_struct.optical_thickness);
+      if(res == RES_OK && args->accel_struct.optical_thickness < 0)
+        res = RES_BAD_ARG;
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+  if(res != RES_OK) {
+    fprintf(stderr,
+      "Unable to parse the acceleration structure parameter `%s' -- %s\n",
+      str, res_to_cstr(res));
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -602,7 +696,7 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
 
   *args = HTRDR_PLANETS_ARGS_DEFAULT;
 
-  while((opt = getopt(argc, argv, "a:C:dfG:g:hi:NO:o:r:S:s:T:t:V:v")) != -1) {
+  while((opt = getopt(argc, argv, "a:b:C:dfG:g:hi:No:r:S:s:t:v")) != -1) {
     switch(opt) {
       case 'a':
         (void)sa_add(args->aerosols, 1);
@@ -612,6 +706,9 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
         if(res == RES_OK) {
           res = check_aerosol_args(args->aerosols+args->naerosols-1);
         }
+        break;
+      case 'b':
+        res = cstr_parse_list(optarg, ':', parse_accel_struct_build_parameters, args);
         break;
       case 'C':
         res = htrdr_args_camera_perspective_parse(&args->cam_persp, optarg);
@@ -644,7 +741,6 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
         res = htrdr_args_image_parse(&args->image, optarg);
         break;
       case 'N': args->precompute_normals = 1; break;
-      case 'O': args->octrees_storage = optarg; break;
       case 'o': args->output = optarg; break;
       case 'r':
         res = cstr_parse_list(optarg, ':', parse_volrad_budget_parameters, args);
@@ -656,17 +752,9 @@ htrdr_planets_args_init(struct htrdr_planets_args* args, int argc, char** argv)
       case 's':
         res = cstr_parse_list(optarg, ':', parse_spectral_parameters, args);
         break;
-      case 'T':
-        res = cstr_to_double(optarg, &args->optical_thickness);
-        if(res == RES_OK && args->optical_thickness < 0) res = RES_BAD_ARG;
-        break;
       case 't':
         res = cstr_to_uint(optarg, &args->nthreads);
         if(res == RES_OK && !args->nthreads) res = RES_BAD_ARG;
-        break;
-      case 'V':
-        res = cstr_to_uint(optarg, &args->octree_definition_hint);
-        if(res == RES_OK && !args->octree_definition_hint) res = RES_BAD_ARG;
         break;
       case 'v': args->verbose = 1; break;
       default: res = RES_BAD_ARG; break;
@@ -737,6 +825,7 @@ htrdr_planets_args_release(struct htrdr_planets_args* args)
   if(args->ground.name) mem_rm(args->ground.name);
   if(args->source.rnrl_filename) mem_rm(args->source.rnrl_filename);
   if(args->volrad_budget.smsh_filename) mem_rm(args->volrad_budget.smsh_filename);
+  if(args->accel_struct.storage) mem_rm(args->accel_struct.storage);
 
   FOR_EACH(i, 0, args->naerosols) {
     struct rnatm_aerosol_args* aerosol = args->aerosols + i;
@@ -770,9 +859,8 @@ htrdr_planets_args_check(const struct htrdr_planets_args* args)
   }
 
   /* Check the octree parameters */
-  if(args->octree_definition_hint == 0
-  || args->optical_thickness < 0)
-    return RES_BAD_ARG;
+  res = check_accel_struct_build_args(&args->accel_struct);
+  if(res != RES_OK) return res;
 
   /* Check the spectral domain */
   res = check_spectral_args(&args->spectral_domain);
