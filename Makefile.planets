@@ -114,8 +114,8 @@ TEST_SRC = src/planets/test_htrdr_planets_source.c
 TEST_OBJ = $(TEST_SRC:.c=.o)
 TEST_DEP = $(TEST_SRC:.c=.d)
 
-CFLAGS_TEST = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planets rsys)
-LDFLAGS_TEST = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planets rsys)
+CFLAGS_TEST = $(CFLAGS_EXE) $(PLANETS_INCS)
+LDFLAGS_TEST = $(LDFLAGS_EXE) $(PLANETS_LIBS)
 
 test: tests
 	./test_htrdr_planets_source > /dev/null 2>&1
@@ -123,8 +123,10 @@ test: tests
 tests: library $(TEST_DEP)
 	@$(MAKE) -fMakefile.planets -f$(TEST_DEP) test_htrdr_planets_source
 
+# Link with all obj files in the planet library since the test checks
+# hidden functions
 test_htrdr_planets_source: $(TEST_OBJ)
-	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) src/planets/htrdr_planets_source.o $(LDFLAGS_TEST)
+	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) $(OBJ) $(LDFLAGS_TEST)
 
 $(TEST_DEP):
 	@$(CC) $(CFLAGS_TEST) -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@

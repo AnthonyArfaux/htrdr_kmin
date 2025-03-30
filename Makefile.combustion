@@ -111,8 +111,8 @@ TEST_SRC = src/combustion/test_htrdr_combustion_laser.c
 TEST_OBJ = $(TEST_SRC:.c=.o)
 TEST_DEP = $(TEST_SRC:.c=.d)
 
-CFLAGS_TEST = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-combustion rsys)
-LDFLAGS_TEST = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-combustion rsys)
+CFLAGS_TEST = $(CFLAGS_EXE) $(COMBUSTION_INCS)
+LDFLAGS_TEST = $(LDFLAGS_EXE) $(COMBUSTION_LIBS)
 
 test: tests
 	./test_htrdr_combustion_laser > /dev/null 2>&1
@@ -120,8 +120,10 @@ test: tests
 tests: library $(TEST_DEP)
 	@$(MAKE) -fMakefile.combustion -f$(TEST_DEP) test_htrdr_combustion_laser
 
+# Link with all obj files in the combustion library since the test checks
+# hidden functions
 test_htrdr_combustion_laser: $(TEST_OBJ)
-	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) src/combustion/htrdr_combustion_laser.o $(LDFLAGS_TEST)
+	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) $(OBJ) $(LDFLAGS_TEST)
 
 $(TEST_DEP):
 	@$(CC) $(CFLAGS_TEST) -MM -MT "$(@:.d=.o) $@" $(@:.d=.c) -MF $@
