@@ -195,7 +195,7 @@ clean:
 	rm -f htrdr-combustion $(CMD_OBJ) $(CMD_DEP)
 	rm -f .config_combustion libhtrdr-combustion.o htrdr-combustion.pc
 	rm -f doc/htrdr-combustion.1 src/combustion/htrdr_combustion_args.h
-	rm -f test_htrdr_combustion_laser
+	rm -f test_htrdr_combustion_laser laser.obj
 
 lint: doc/htrdr-combustion.1
 	mandoc -Tlint -Wall doc/htrdr-combustion.1 || [ $$? -le 1 ]

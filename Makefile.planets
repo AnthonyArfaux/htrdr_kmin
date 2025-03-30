@@ -191,7 +191,7 @@ clean:
 	rm -f $(CMD_OBJ) $(CMD_DEP) htrdr-planets
 	rm -f .config_planets libhtrdr-planets.o htrdr-planets.pc
 	rm -f doc/htrdr-planets.1 src/planets/htrdr_planets_args.h
-	rm -f test_htrdr_planets_source
+	rm -f test_htrdr_planets_source rnrl.bin
 
 lint: doc/htrdr-planets.1
 	mandoc -Tlint -Wall doc/htrdr-planets.1 || [ $$? -le 1 ]
