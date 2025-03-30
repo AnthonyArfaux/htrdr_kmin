@@ -26,9 +26,9 @@
 
 include config.mk
 
-LIBNAME_STATIC = libhtrdr-core.a
-LIBNAME_SHARED = libhtrdr-core.so
-LIBNAME = $(LIBNAME_$(LIB_TYPE))
+LIBNAME_STATIC = $(CORE_NAME_STATIC)
+LIBNAME_SHARED = $(CORE_NAME_SHARED)
+LIBNAME = $(CORE_NAME)
 
 default: core
 

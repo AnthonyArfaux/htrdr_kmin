@@ -124,6 +124,13 @@ PLANETS_LIBS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs\
  $(MPI_PC) htrdr-core rnatm rngrd rsys s3d sbuf scam smsh ssf star-sp svx) -lm
 
 ################################################################################
+# Name of the core library
+################################################################################
+CORE_NAME_STATIC = libhtrdr-core.a
+CORE_NAME_SHARED = libhtrdr-core.so
+CORE_NAME = $(CORE_NAME_$(LIB_TYPE))
+
+################################################################################
 # Compilation options
 ################################################################################
 WFLAGS =\

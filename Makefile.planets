@@ -99,7 +99,7 @@ LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planet
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.planets -f$(CMD_DEP) htrdr-planets
 
-htrdr-planets: $(CMD_OBJ) $(LIBNAME)
+htrdr-planets: $(CMD_OBJ) $(LIBNAME) $(CORE_NAME)
 	$(CC) $(CFLAGS_CMD) -o $@ $(CMD_OBJ) $(LDFLAGS_CMD)
 
 $(CMD_DEP):
@@ -126,7 +126,7 @@ tests: library $(TEST_DEP)
 
 # Link with all obj files in the planet library since the test checks
 # hidden functions
-test_htrdr_planets_source: $(TEST_OBJ)
+test_htrdr_planets_source: $(TEST_OBJ) $(CORE_NAME)
 	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) $(OBJ) $(LDFLAGS_TEST)
 
 $(TEST_DEP):

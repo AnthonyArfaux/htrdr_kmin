@@ -96,7 +96,7 @@ LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-atmosp
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.atmosphere -f$(CMD_DEP) htrdr-atmosphere
 
-htrdr-atmosphere: $(CMD_OBJ) $(LIBNAME)
+htrdr-atmosphere: $(CMD_OBJ) $(LIBNAME) $(CORE_NAME)
 	$(CC) $(CFLAGS_CMD) -o $@ $(CMD_OBJ) $(LDFLAGS_CMD)
 
 $(CMD_DEP) $(CMD_OBJ): config.mk htrdr-atmosphere.pc

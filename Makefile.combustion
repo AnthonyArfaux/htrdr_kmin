@@ -96,7 +96,7 @@ LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-combus
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.combustion -f$(CMD_DEP) htrdr-combustion
 
-htrdr-combustion: $(CMD_OBJ) $(LIBNAME)
+htrdr-combustion: $(CMD_OBJ) $(LIBNAME) $(CORE_NAME)
 	$(CC) $(CFLAGS_CMD) -o $@ $(CMD_OBJ) $(LDFLAGS_CMD)
 
 $(CMD_DEP):
@@ -123,7 +123,7 @@ tests: library $(TEST_DEP)
 
 # Link with all obj files in the combustion library since the test checks
 # hidden functions
-test_htrdr_combustion_laser: $(TEST_OBJ)
+test_htrdr_combustion_laser: $(TEST_OBJ) $(CORE_NAME)
 	$(CC) $(CFLAGS_TEST) -o $@ $(TEST_OBJ) $(OBJ) $(LDFLAGS_TEST)
 
 $(TEST_DEP):
