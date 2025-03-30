@@ -177,6 +177,51 @@ test_spectrum(struct htrdr* htrdr)
 }
 
 static void
+test_spectrum_1_entry(struct htrdr* htrdr)
+{
+  struct htrdr_ran_wlen_discrete_create_args distrib_args =
+    HTRDR_RAN_WLEN_DISCRETE_CREATE_ARGS_NULL;
+  struct htrdr_ran_wlen_discrete* distrib = NULL;
+
+  struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
+  struct htrdr_planets_source_spectrum spectrum;
+  struct htrdr_planets_source* source = NULL;
+
+  FILE* fp = NULL;
+  char rnrl_filename[] = "rnrl.bin";
+  double range[2] = {0,0};
+  double lambda = 0;
+  double pdf = 0;
+
+  CHK(fp = fopen(rnrl_filename, "w"));
+  write_per_wlen_radiances(fp, 4096, 1, 16, 16);
+  CHK(fclose(fp) == 0);
+
+  source_args.rnrl_filename = rnrl_filename;
+  source_args.longitude = 0;
+  source_args.latitude = 0;
+  source_args.distance = 0;
+  source_args.radius = 1;
+  source_args.temperature = -1;
+  CHK(htrdr_planets_source_create(htrdr, &source_args, &source) == RES_OK);
+
+  range[0] = range[1] = 0;
+  CHK(htrdr_planets_source_get_spectrum(source, range, &spectrum) == RES_OK);
+
+  distrib_args.get = htrdr_planets_source_spectrum_at;
+  distrib_args.nwavelengths = spectrum.size;
+  distrib_args.context = &spectrum;
+  CHK(htrdr_ran_wlen_discrete_create(htrdr, &distrib_args, &distrib) == RES_OK);
+
+  lambda = htrdr_ran_wlen_discrete_sample(distrib, 0.3, 0.5, &pdf);
+  CHK(lambda == 0);
+  CHK(pdf == 1);
+
+  htrdr_planets_source_ref_put(source);
+  htrdr_ran_wlen_discrete_ref_put(distrib);
+}
+
+static void
 test_spectrum_fail(struct htrdr* htrdr)
 {
   struct htrdr_planets_source_args source_args = HTRDR_PLANETS_SOURCE_ARGS_NULL;
@@ -291,6 +336,7 @@ main(int argc, char** argv)
     test_spectrum_from_files(htrdr, argc, argv);
   } else {
     test_spectrum(htrdr);
+    test_spectrum_1_entry(htrdr);
     test_spectrum_fail(htrdr);
   }
 

@@ -239,8 +239,10 @@ htrdr_ran_wlen_discrete_create
 
   res = setup_per_wlen_radiance(ran, args);
   if(res != RES_OK) goto error;
-  res = setup_distribution(ran, args);
-  if(res != RES_OK) goto error;
+  if(ran->nbands != 0) {
+    res = setup_distribution(ran, args);
+    if(res != RES_OK) goto error;
+  }
 
 exit:
   *out_ran = ran;
@@ -271,42 +273,53 @@ htrdr_ran_wlen_discrete_sample
    const double r1,
    double* pdf) /* In nm⁻¹ */
 {
-  double* find = NULL;
-  const double* proba = NULL;
-  const double* cumul = NULL;
-  const double* wlens = NULL;
-  double w0, w1; /* Wavelengths of the sampled band in nm */
-  double lambda; /* Sampled wavelength in nm */
-  size_t iband = 0;
-  double r0_next = nextafter(r0, DBL_MAX);
+  double lambda = 0;
+
+  ASSERT(ran);
   ASSERT(0 <= r0 && r0 < 1);
   ASSERT(0 <= r1 && r1 < 1);
 
-  cumul = darray_double_cdata_get(&ran->cumul);
-  proba = darray_double_cdata_get(&ran->proba);
-  wlens = darray_double_cdata_get(&ran->wlens);
+  if(ran->nbands == 0) {
+    ASSERT(darray_double_size_get(&ran->wlens) == 1);
+    lambda = darray_double_cdata_get(&ran->wlens)[0];
+    if(pdf) *pdf = 1;
 
-  /* Sample a band. Use r0_next rather than r0 to find the first entry that is
-   * not less than *or equal* to r0 */
-  find = search_lower_bound
-    (&r0_next, cumul, ran->nbands, sizeof(double), cmp_dbl);
-  ASSERT(find);
+  } else {
+    double* find = NULL;
+    const double* proba = NULL;
+    const double* cumul = NULL;
+    const double* wlens = NULL;
+    double w0, w1; /* Wavelengths of the sampled band in nm */
+    size_t iband = 0;
+    double r0_next = nextafter(r0, DBL_MAX);
+    ASSERT(0 <= r0 && r0 < 1);
+    ASSERT(0 <= r1 && r1 < 1);
 
-  iband = (size_t)(find - cumul);
-  ASSERT(iband < ran->nbands);
-  ASSERT(cumul[iband] > r0 && (!iband || cumul[iband-1] <= r0));
+    cumul = darray_double_cdata_get(&ran->cumul);
+    proba = darray_double_cdata_get(&ran->proba);
+    wlens = darray_double_cdata_get(&ran->wlens);
 
-  /* Retrieve the boundaries of the sampled band */
-  w0 = wlens[iband+0];
-  w1 = wlens[iband+1];
+    /* Sample a band. Use r0_next rather than r0 to find the first entry that is
+     * not less than *or equal* to r0 */
+    find = search_lower_bound
+      (&r0_next, cumul, ran->nbands, sizeof(double), cmp_dbl);
+    ASSERT(find);
 
-  /* Uniformely sample the wavelength in [w0, w1[ */
-  lambda = w0 + r1 * (w1 - w0);
+    iband = (size_t)(find - cumul);
+    ASSERT(iband < ran->nbands);
+    ASSERT(cumul[iband] > r0 && (!iband || cumul[iband-1] <= r0));
 
-  if(pdf) {
-    const double pdf_wlen = 1.f / (w1-w0);
-    *pdf = proba[iband] * pdf_wlen;
+    /* Retrieve the boundaries of the sampled band */
+    w0 = wlens[iband+0];
+    w1 = wlens[iband+1];
+
+    /* Uniformely sample the wavelength in [w0, w1[ */
+    lambda = w0 + r1 * (w1 - w0);
+
+    if(pdf) {
+      const double pdf_wlen = 1.f / (w1-w0);
+      *pdf = proba[iband] * pdf_wlen;
+    }
   }
-
   return lambda;
 }
