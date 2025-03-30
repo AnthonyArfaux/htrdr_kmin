@@ -95,34 +95,33 @@ S3D_VERSION = 0.10
 SBUF_VERSION = 0.1
 SCAM_VERSION = 0.2
 SSF_VERSION = 0.9
+SMSH_VERSION = 0.1
 SSP_VERSION = 0.14
 SVX_VERSION = 0.3
 
 # Atmosphere
-ATMOSPHERE_INCS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --cflags htsky rsys s3d scam ssf star-sp svx)
-ATMOSPHERE_LIBS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --libs htsky rsys s3d scam ssf star-sp svx) -lm
+ATMOSPHERE_INCS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --cflags\
+ htrdr-core htsky rsys s3d scam ssf star-sp svx)
+ATMOSPHERE_LIBS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs\
+ htrdr-core htsky rsys s3d scam ssf star-sp svx) -lm
 
 # Combustion
-COMBUSTION_INCS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --cflags atrstm rsys s3d scam ssf star-sp svx)
-COMBUSTION_LIBS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --libs atrstm rsys s3d scam ssf star-sp svx) -lm
+COMBUSTION_INCS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --cflags\
+ atrstm htrdr-core rsys s3d scam ssf star-sp svx)
+COMBUSTION_LIBS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs\
+ atrstm htrdr-core rsys s3d scam ssf star-sp svx) -lm
 
 # Core
-CORE_INCS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --cflags aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp)\
- -fopenmp
-CORE_LIBS =\
- $$($(PKG_CONFIG) $(PCFLAGS) --libs aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp)\
- -fopenmp -lm
+CORE_INCS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --cflags\
+ aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp) -fopenmp
+CORE_LIBS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs\
+ aw $(MPI_PC) mrumtl rsys s3d scam ssf star-sp) -fopenmp -lm
 
 # Planets
-PLANETS_INCS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags $(MPI_PC) \
- rnatm rngrd rsys s3d sbuf scam ssf star-sp svx)
-PLANETS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs $(MPI_PC) \
- rnatm rngrd rsys s3d sbuf scam ssf star-sp svx) -lm
+PLANETS_INCS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --cflags\
+ $(MPI_PC) htrdr-core rnatm rngrd rsys s3d sbuf scam smsh ssf star-sp svx)
+PLANETS_LIBS = $$($(PKG_CONFIG_LOCAL) $(PCFLAGS) --libs\
+ $(MPI_PC) htrdr-core rnatm rngrd rsys s3d sbuf scam smsh ssf star-sp svx) -lm
 
 ################################################################################
 # Compilation options

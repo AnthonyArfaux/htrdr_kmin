@@ -83,6 +83,8 @@ that calculate the radiance are used for computing various quantities:
 - [Star Buffer](https://gitlab.com/meso-star/star-buffer)
   (optional; required by PLANETS)
 - [Star Camera](https://gitlab.com/meso-star/star-camera)
+- [Star Mesh](https://gitlab.com/meso-star/star-mesh)
+  (optional; required by PLANETS)
 - [Star Scattering Functions](https://gitlab.com/meso-star/star-sf)
 - [Star SamPling](https://gitlab.com/meso-star/star-sp)
 - [Star VoXel](https://gitlab.com/meso-star/star-vx)

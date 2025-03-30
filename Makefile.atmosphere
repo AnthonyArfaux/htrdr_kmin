@@ -89,8 +89,8 @@ CMD_SRC = src/commands/htrdr_atmosphere_cmd.c
 CMD_OBJ = $(CMD_SRC:.c=.o)
 CMD_DEP = $(CMD_SRC:.c=.d)
 
-CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-core htrdr-atmosphere rsys)
-LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-core htrdr-atmosphere rsys)
+CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-atmosphere)
+LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-atmosphere)
 
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.atmosphere -f$(CMD_DEP) htrdr-atmosphere

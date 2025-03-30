@@ -61,6 +61,7 @@ core:
 	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
 	$(PKG_CONFIG) --atleast-version $(SBUF_VERSION) sbuf
 	$(PKG_CONFIG) --atleast-version $(SCAM_VERSION) scam
+	$(PKG_CONFIG) --atleast-version $(SMSH_VERSION) smsh
 	$(PKG_CONFIG) --atleast-version $(SSF_VERSION) ssf
 	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
 	$(PKG_CONFIG) --atleast-version $(SVX_VERSION) svx
@@ -91,8 +92,8 @@ CMD_SRC = src/commands/htrdr_planets_cmd.c
 CMD_OBJ = $(CMD_SRC:.c=.o)
 CMD_DEP = $(CMD_SRC:.c=.d)
 
-CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-core htrdr-planets rsys)
-LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-core htrdr-planets rsys)
+CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-planets)
+LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-planets)
 
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.planets -f$(CMD_DEP) htrdr-planets
@@ -148,6 +149,7 @@ htrdr-planets.pc: config.mk htrdr-planets.pc.in
 	    -e 's/@S3D_VERSION@/$(S3D_VERSION)/g' \
 	    -e 's/@SBUF_VERSION@/$(SBUF_VERSION)/g' \
 	    -e 's/@SCAM_VERSION@/$(SCAM_VERSION)/g' \
+	    -e 's/@SMSH_VERSION@/$(SMSH_VERSION)/g' \
 	    -e 's/@SSF_VERSION@/$(SSF_VERSION)/g' \
 	    -e 's/@SSP_VERSION@/$(SSP_VERSION)/g' \
 	    -e 's/@SVX_VERSION@/$(SVX_VERSION)/g' \

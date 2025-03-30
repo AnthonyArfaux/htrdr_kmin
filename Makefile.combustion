@@ -89,8 +89,8 @@ CMD_SRC = src/commands/htrdr_combustion_cmd.c
 CMD_OBJ = $(CMD_SRC:.c=.o)
 CMD_DEP = $(CMD_SRC:.c=.d)
 
-CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-core htrdr-combustion rsys)
-LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-core htrdr-combustion rsys)
+CFLAGS_CMD = $(CFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --cflags htrdr-combustion)
+LDFLAGS_CMD = $(LDFLAGS_EXE) $$($(PKG_CONFIG_LOCAL) --static --libs htrdr-combustion)
 
 command: library $(CMD_DEP)
 	@$(MAKE) -fMakefile.combustion -f$(CMD_DEP) htrdr-combustion
