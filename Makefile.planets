@@ -44,7 +44,8 @@ SRC =\
 OBJ = $(SRC:.c=.o)
 DEP = $(SRC:.c=.d)
 
-CFLAGS_LIB = $(CFLAGS_SO) $(PLANETS_INCS) -Isrc -DHTRDR_SHARED_BUILD
+# Use CFLAGS_EXE because the object files will be linked as executables
+CFLAGS_LIB = $(CFLAGS_EXE) $(PLANETS_INCS) -DHTRDR_SHARED_BUILD
 
 library: core .config_planets htrdr-planets.pc $(DEP)
 	@$(MAKE) -fMakefile.planets \

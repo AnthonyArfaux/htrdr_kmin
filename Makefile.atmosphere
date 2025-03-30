@@ -45,7 +45,8 @@ SRC =\
 OBJ = $(SRC:.c=.o)
 DEP = $(SRC:.c=.d)
 
-CFLAGS_LIB = $(CFLAGS_SO) $(ATMOSPHERE_INCS) -Isrc -DHTRDR_SHARED_BUILD
+# Use CFLAGS_EXE because the object files will be linked as executables
+CFLAGS_LIB = $(CFLAGS_EXE) $(ATMOSPHERE_INCS) -DHTRDR_SHARED_BUILD
 
 library: core .config_atmosphere htrdr-atmosphere.pc $(DEP)
 	@$(MAKE) -fMakefile.atmosphere \

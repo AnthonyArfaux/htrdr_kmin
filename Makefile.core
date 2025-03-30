@@ -54,7 +54,12 @@ SRC =\
 OBJ = $(SRC:.c=.o)
 DEP = $(SRC:.c=.d)
 
-CFLAGS_CORE = $(CFLAGS_SO) -Isrc -DHTRDR_SHARED_BUILD $(CORE_INCS)
+# Use CFLAGS_EXE when the library is built as a static library because
+# the object files will be linked as executables.
+CFLAGS_STATIC = $(CFLAGS_EXE)
+CFLAGS_SHARED = $(CFLAGS_SO)
+
+CFLAGS_CORE = $(CFLAGS_$(LIB_TYPE)) -Isrc -DHTRDR_SHARED_BUILD $(CORE_INCS)
 LDFLAGS_CORE = $(LDFLAGS_SO) $(CORE_LIBS)
 
 core: .config_core htrdr-core.pc $(DEP)
