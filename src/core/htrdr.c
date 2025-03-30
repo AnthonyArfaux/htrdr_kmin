@@ -369,8 +369,12 @@ htrdr_create
   }
 
   FOR_EACH(ithread, 0, htrdr->nthreads) {
+    const size_t per_thread_size =
+      4*1024*1024 /* 4 MB for the RNG cache */
+    + 16*1024; /* 16 KB for remaining allocations */
+
     res = mem_init_lifo_allocator
-      (&htrdr->lifo_allocators[ithread], htrdr->allocator, 16384);
+      (&htrdr->lifo_allocators[ithread], htrdr->allocator, per_thread_size);
     if(res != RES_OK) {
       htrdr_log_err(htrdr,
         "%s: could not initialise the LIFO allocator of the thread %lu -- %s.\n",
