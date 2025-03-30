@@ -21,21 +21,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifdef HTRDR_BUILD_PLANETS
-  #include "planets/htrdr_planets.h"
-#else
-  #include <stdio.h>
-#endif
+#include "planets/htrdr_planets.h"
 
 int
 main(int argc, char** argv)
 {
-#ifdef HTRDR_BUILD_PLANETS
   return htrdr_planets_main(argc, argv);
-#else
-  (void)argc, (void)argv;
-  fprintf(stderr,
-    "The htrdr-planets command is not available in this htrdr build.\n");
-  return 1;
-#endif
 }

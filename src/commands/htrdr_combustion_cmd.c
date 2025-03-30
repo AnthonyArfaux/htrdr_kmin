@@ -21,21 +21,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifdef HTRDR_BUILD_COMBUSTION
-  #include "combustion/htrdr_combustion.h"
-#else
-  #include <stdio.h>
-#endif
+#include "combustion/htrdr_combustion.h"
 
 int
 main(int argc, char** argv)
 {
-#ifdef HTRDR_BUILD_COMBUSTION
   return htrdr_combustion_main(argc, argv);
-#else
-  (void)argc, (void)argv;
-  fprintf(stderr,
-    "The htrdr-combustion command is not available in this htrdr build.\n");
-  return 1;
-#endif
 }
