@@ -155,6 +155,6 @@ uninstall:
 	rm -f "$(DESTDIR)$(LIBPREFIX)/$(LIBNAME)"
 
 clean:
-	rm -f $(LIBNAME) $(OBJ) $(DEP)
+	rm -f $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(OBJ) $(DEP)
 	rm -f libhtrdr-core.o .config_core htrdr-core.pc
 	rm -f src/core/htrdr_args.h src/core/htrdr_version.h
