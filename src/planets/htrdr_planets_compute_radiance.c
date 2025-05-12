@@ -504,8 +504,6 @@ volume_scattering
 
   ssf_phase_sample(phase, args->rng, wo, sc_dir, NULL);
 
-  /* Sample a direction toward the source */
-  pdf = htrdr_planets_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
 
   /* In short wave, manage the contribution of the external source */
   switch(cmd->spectral_domain.type) {
@@ -515,6 +513,9 @@ volume_scattering
 
     case HTRDR_SPECTRAL_SW:
     case HTRDR_SPECTRAL_SW_CIE_XYZ:
+
+      /* Sample a direction toward the source */
+      pdf = htrdr_planets_source_sample_direction(cmd->source, args->rng, sc_pos, wi);
       /* Calculate the direct contribution at the scattering position */
       Ld = direct_contribution(cmd, args, sc_pos, wi, NULL);
       rho = ssf_phase_eval(phase, wo, wi);

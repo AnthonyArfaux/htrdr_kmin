@@ -4,7 +4,7 @@ VERSION_PATCH = 0
 
 VERSION = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
-PREFIX = /usr/local
+PREFIX = /home/arfaux/Models/HTRDR_GCM_mod/build
 BINPREFIX = $(PREFIX)/bin
 DOCPREFIX = $(PREFIX)/share/doc
 INCPREFIX = $(PREFIX)/include
@@ -14,12 +14,12 @@ MANPREFIX = $(PREFIX)/share/man
 # Define the features supported, i.e. the htrdr commands to be built.
 # Any value other than ENABLE disables the corresponding functionality.
 # So, simply comment on a feature to deactivate it.
-ATMOSPHERE = ENABLE
-COMBUSTION = ENABLE
+ATMOSPHERE = DISABLE
+COMBUSTION = DISABLE
 PLANETS = ENABLE
 
-LIB_TYPE = SHARED
-#LIB_TYPE = STATIC
+#LIB_TYPE = SHARED
+LIB_TYPE = STATIC
 
 BUILD_TYPE = RELEASE
 #BUILD_TYPE = DEBUG

@@ -28,13 +28,13 @@ include config.mk
 
 default install uninstall lint clean:
 	@$(MAKE) -fMakefile.core $@
-	@if [ "$(ATMOSPHERE)" == "ENABLE" ]; then $(MAKE) -fMakefile.atmosphere $@; fi
-	@if [ "$(COMBUSTION)" == "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
-	@if [ "$(PLANETS)" == ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
+	@if [ "$(ATMOSPHERE)" = "ENABLE" ]; then $(MAKE) -fMakefile.atmosphere $@; fi
+	@if [ "$(COMBUSTION)" = "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
+	@if [ "$(PLANETS)" = ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
 
 test:
-	@if [ "$(COMBUSTION)" == "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
-	@if [ "$(PLANETS)" == ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
+	@if [ "$(COMBUSTION)" = "ENABLE" ]; then $(MAKE) -fMakefile.combustion $@; fi
+	@if [ "$(PLANETS)" = ENABLE ]; then $(MAKE) -fMakefile.planets $@; fi
 
 default: htrdr
 install: install_common

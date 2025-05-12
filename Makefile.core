@@ -147,7 +147,7 @@ htrdr-core.pc: config.mk htrdr-core.pc.in
 # Miscellaneous
 ################################################################################
 install:
-	@if [ "$(LIB_TYPE)" == "SHARED" ]; then \
+	@if [ "$(LIB_TYPE)" = "SHARED" ]; then \
 	  $(SHELL) install.sh 755 "$(DESTDIR)$(LIBPREFIX)" $(LIBNAME); \
 	fi
 

@@ -64,6 +64,13 @@ htrdr_planets_source_sample_direction
    const double pos[3], /* Position from which direction is sampled */
    double dir[3]);
 
+extern LOCAL_SYM double
+htrdr_planets_source_sample_direction_out
+  (const struct htrdr_planets_source* source,
+  struct ssp_rng* rng,
+  const double pos[3], /* Position from which direction is sampled */
+  double dir[3]);
+
 extern LOCAL_SYM double /* In W/m²/sr/m */
 htrdr_planets_source_get_radiance
   (const struct htrdr_planets_source* source,

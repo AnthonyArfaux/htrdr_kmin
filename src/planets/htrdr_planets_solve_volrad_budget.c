@@ -237,6 +237,126 @@ realisation
   return weight;
 }
 
+static double
+realisation_cone
+  (struct htrdr_planets* cmd,
+   const struct htrdr_solve_item_args* args,
+   const struct smsh_desc* volrad_mesh_desc)
+{
+  struct planets_compute_radiance_args rad_args =
+    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
+
+  /* Spectral integration */
+  double wlen = 0; /* Wavelength [nm] */
+  double wlen_pdf_nm = 0; /* Wavelength pdf [nm^-1] */
+  double wlen_pdf_m = 0; /* Wavelength pdf [m^-1] */
+  size_t iband = 0; /* Spectral band */
+  size_t iquad = 0; /* Quadrature point */
+
+  /* Spatial & angular integration */
+  double dir[3] = {0,0,0};
+  double pos[3] = {0,0,0};
+
+  double S = 0; /* Source [W/m^2/sr/m] */
+  double L = 0; /* Radiance [W/m^2/sr/m] */
+  double ka = 0; /* Absorption coefficient */
+
+  /* Monte Carlo weight */
+  double weight = 0; /* weight [W/m^3] */
+
+  /* For sampling in cone */
+  const struct htrdr_planets_source* source;
+  double dir_pdf=0;
+  source = cmd->source;
+
+  /* Preconditions */
+  ASSERT(cmd && args && volrad_mesh_desc);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
+  ASSERT(source);
+
+  spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
+  position_sampling(args, volrad_mesh_desc, pos);
+  dir_pdf = htrdr_planets_source_sample_direction(source, args->rng, pos, dir);
+
+  /* Compute the radiance in W/m^2/sr/m */
+  d3_set(rad_args.path_org, pos);
+  d3_set(rad_args.path_dir, dir);
+  rad_args.rng = args->rng;
+  rad_args.ithread = args->ithread;
+  rad_args.wlen = wlen; /* [nm] */
+  rad_args.iband = iband;
+  rad_args.iquad = iquad;
+  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
+
+  ka = get_ka(cmd, pos, iband, iquad);
+  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
+
+  weight =  ka * (L - S) / (wlen_pdf_m * dir_pdf); /* [W/m^3] */
+  return weight;
+}
+
+static double
+realisation_out_of_cone
+  (struct htrdr_planets* cmd,
+   const struct htrdr_solve_item_args* args,
+   const struct smsh_desc* volrad_mesh_desc)
+{
+  struct planets_compute_radiance_args rad_args =
+    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
+
+  /* Spectral integration */
+  double wlen = 0; /* Wavelength [nm] */
+  double wlen_pdf_nm = 0; /* Wavelength pdf [nm^-1] */
+  double wlen_pdf_m = 0; /* Wavelength pdf [m^-1] */
+  size_t iband = 0; /* Spectral band */
+  size_t iquad = 0; /* Quadrature point */
+
+  /* Spatial & angular integration */
+  double dir[3] = {0,0,0};
+  double pos[3] = {0,0,0};
+
+  double S = 0; /* Source [W/m^2/sr/m] */
+  double L = 0; /* Radiance [W/m^2/sr/m] */
+  double ka = 0; /* Absorption coefficient */
+
+  /* Monte Carlo weight */
+  double weight = 0; /* weight [W/m^3] */
+
+  /* For sampling out of cone cone */
+  const struct htrdr_planets_source* source;
+  double dir_pdf=0;
+  source = cmd->source;
+
+  /* Preconditions */
+  ASSERT(cmd && args && volrad_mesh_desc);
+  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
+  ASSERT(source);
+
+  spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
+  position_sampling(args, volrad_mesh_desc, pos);
+  dir_pdf = htrdr_planets_source_sample_direction_out(source, args->rng, pos, dir);
+
+  /* Compute the radiance in W/m^2/sr/m */
+  d3_set(rad_args.path_org, pos);
+  d3_set(rad_args.path_dir, dir);
+  rad_args.rng = args->rng;
+  rad_args.ithread = args->ithread;
+  rad_args.wlen = wlen; /* [nm] */
+  rad_args.iband = iband;
+  rad_args.iquad = iquad;
+  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
+
+  ka = get_ka(cmd, pos, iband, iquad);
+  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
+
+  weight = ka * (L - S) / (wlen_pdf_m * dir_pdf); /* [W/m^3] */
+  return weight;
+}
+
 static void
 solve_volumic_radiative_budget
   (struct htrdr* htrdr,
@@ -276,8 +396,16 @@ solve_volumic_radiative_budget
     /* Start of realisation time recording */
     time_current(&t0);
 
-    /* Run the realisation */
-    w = realisation(cmd, args, &volrad_mesh_desc);
+    if (cmd->spectral_domain.type == HTRDR_SPECTRAL_LW) {
+      /* Run the realisation */
+      w = realisation(cmd, args, &volrad_mesh_desc);
+    }
+    else{
+      /* Run the realisation within source cone */
+      w = realisation_cone(cmd, args, &volrad_mesh_desc);
+      /* Run the realisation out of source cone */
+      w += realisation_out_of_cone(cmd, args, &volrad_mesh_desc);
+    }
 
     /* Stop time recording */
     time_sub(&t0, time_current(&t1), &t0);

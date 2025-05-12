@@ -296,6 +296,40 @@ htrdr_planets_source_sample_direction
   return pdf;
 }
 
+double
+htrdr_planets_source_sample_direction_out
+  (const struct htrdr_planets_source* source,
+   struct ssp_rng* rng,
+   const double pos[3],
+   double dir[3])
+{
+  double main_dir[3];
+  double half_angle; /* In radians */
+  double cos_half_angle;
+  double dst; /* In m */
+  double pdf;
+  ASSERT(source && rng && pos && dir);
+
+  /* compute the direction of `pos' toward the center of the source */
+  d3_sub(main_dir, source->position, pos);
+
+  /* Normalize the direction and keep the distance from `pos' to the center of
+   * the source */
+  dst = d3_normalize(main_dir, main_dir);
+  CHK(dst > source->radius);
+
+  /* Sample the source according to its solid angle,
+   * i.e. 2*PI*(1 - cos(half_angle)) */
+  half_angle = asin(source->radius/dst);
+  cos_half_angle = - cos(half_angle);
+  main_dir[0] = -main_dir[0]; 
+  main_dir[1] = -main_dir[1]; 
+  main_dir[2] = -main_dir[2]; 
+  ssp_ran_sphere_cap_uniform(rng, main_dir, cos_half_angle, dir, &pdf);
+
+  return pdf;
+}
+
 double /* In W/m²/sr/m */
 htrdr_planets_source_get_radiance
   (const struct htrdr_planets_source* source,
