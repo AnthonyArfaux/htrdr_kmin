@@ -77,6 +77,15 @@ struct planets_voxel_radiative_budget {
   HTRDR_ACCUM_NULL__                                                           \
 }
 
+enum planets_radiance_cpnt_flag {
+  PLANETS_RADIANCE_CPNT_DIRECT = BIT(0),
+  PLANETS_RADIANCE_CPNT_DIFFUSE = BIT(1),
+  PLANETS_RADIANCE_CPNT_NONE = 0,
+  PLANETS_RADIANCE_CPNT_ALL =
+    PLANETS_RADIANCE_CPNT_DIRECT
+  | PLANETS_RADIANCE_CPNT_DIFFUSE
+};
+
 struct planets_compute_radiance_args {
   struct ssp_rng* rng;
   size_t ithread; /* Index of the thread executing the function */
@@ -87,8 +96,11 @@ struct planets_compute_radiance_args {
   double wlen; /* In nm */
   size_t iband; /* Spectral band index */
   size_t iquad; /* Quadrature point */
+
+  int component; /* Combination of planets_radiance_cpnt_flag */
 };
-#define PLANETS_COMPUTE_RADIANCE_ARGS_NULL__ {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0}
+#define PLANETS_COMPUTE_RADIANCE_ARGS_NULL__ \
+  {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0, PLANETS_RADIANCE_CPNT_ALL}
 static const struct planets_compute_radiance_args
 PLANETS_COMPUTE_RADIANCE_ARGS_NULL = PLANETS_COMPUTE_RADIANCE_ARGS_NULL__;
 

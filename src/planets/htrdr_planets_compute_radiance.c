@@ -504,7 +504,6 @@ volume_scattering
 
   ssf_phase_sample(phase, args->rng, wo, sc_dir, NULL);
 
-
   /* In short wave, manage the contribution of the external source */
   switch(cmd->spectral_domain.type) {
     case HTRDR_SPECTRAL_LW:
@@ -604,15 +603,33 @@ planets_compute_radiance
   double L = 0; /* Radiance in W/m²/sr/m */
   size_t nsc = 0; /* Number of surface or volume scatterings (for debug) */
   int longwave = 0;
+  int shortwave = 0;
+  int direct = 0;
+  int diffuse = 0;
   ASSERT(cmd && check_planets_compute_radiance_args(cmd, args) == RES_OK);
 
   d3_set(pos, args->path_org);
   d3_set(dir, args->path_dir);
-  longwave = cmd->spectral_domain.type == HTRDR_SPECTRAL_LW;
 
-  if(!longwave && htrdr_planets_source_is_targeted(cmd->source, pos, dir)) {
+  longwave = cmd->spectral_domain.type == HTRDR_SPECTRAL_LW;
+  shortwave = !longwave;
+
+  /* In shortwave define which components are enabled */
+  if(shortwave) {
+    direct = (args->component & PLANETS_RADIANCE_CPNT_DIRECT) != 0;
+    diffuse = (args->component & PLANETS_RADIANCE_CPNT_DIFFUSE) != 0;
+  }
+
+  /* Handle direct shortwave contribution */
+  if(shortwave
+  && direct
+  && htrdr_planets_source_is_targeted(cmd->source, pos, dir)) {
     L = direct_contribution(cmd, args, pos, dir, NULL); /* In W/m²/sr/m */
   }
+
+  /* Nothing left to do: if only the diffuse component is required
+   * in the SW, the diffuse component should not be computed */
+  if(shortwave && !diffuse) return L;
 
   for(;;) {
     double ev_pos[3];

@@ -35,6 +35,13 @@
 
 #include <rsys/clock_time.h>
 
+enum weight_type {
+  DIRECT, /* 0 */
+  DIFFUSE, /* 1 */
+  TOTAL, /* 2 */
+  WEIGHTS_COUNT /* 3 */
+};
+
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -183,11 +190,12 @@ get_ka
   return ka;
 }
 
-static double
+static void
 realisation
   (struct htrdr_planets* cmd,
    const struct htrdr_solve_item_args* args,
-   const struct smsh_desc* volrad_mesh_desc)
+   const struct smsh_desc* volrad_mesh_desc,
+   double weights[WEIGHTS_COUNT]) /* [W/m^3] */
 {
   struct planets_compute_radiance_args rad_args =
     PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
@@ -200,161 +208,69 @@ realisation
   size_t iquad = 0; /* Quadrature point */
 
   /* Spatial & angular integration */
+  double dir_src[3] = {0,0,0}; /* Direction toward the source */
   double dir[3] = {0,0,0};
   double pos[3] = {0,0,0};
+  double dir_src_pdf = 0;
+  double dir_pdf = 0;
 
   double S = 0; /* Source [W/m^2/sr/m] */
-  double L = 0; /* Radiance [W/m^2/sr/m] */
+  double L_direct  = 0; /* Direct radiance [W/m^2/sr/m] */
+  double L_diffuse = 0; /* Diffuse radiance [W/m^2/sr/m] */
   double ka = 0; /* Absorption coefficient */
-
-  /* Monte Carlo weight */
-  double weight = 0; /* weight [W/m^3] */
 
   /* Preconditions */
   ASSERT(cmd && args && volrad_mesh_desc);
   ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
 
+  /* Initialise the weights */
+  memset(weights, 0, sizeof(double)*WEIGHTS_COUNT);
+
   spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
   position_sampling(args, volrad_mesh_desc, pos);
-  ssp_ran_sphere_uniform(args->rng, dir, NULL/*pdf*/);
+  ssp_ran_sphere_uniform(args->rng, dir, &dir_pdf);
 
   /* Compute the radiance in W/m^2/sr/m */
   d3_set(rad_args.path_org, pos);
-  d3_set(rad_args.path_dir, dir);
   rad_args.rng = args->rng;
   rad_args.ithread = args->ithread;
   rad_args.wlen = wlen; /* [nm] */
   rad_args.iband = iband;
   rad_args.iquad = iquad;
-  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+  if(cmd->spectral_domain.type == HTRDR_SPECTRAL_LW) {
+    /* In the longwave (radiation due to the medium), simply sample a radiative
+     * path for the sampled direction and position: the radiance is considered
+     * as purely diffuse. */
+    d3_set(rad_args.path_dir, dir);
+    L_direct  = 0.0;
+    L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+  } else {
+    /* In the so-called shortwave region (actually, the radiation due the
+     * external source) is decomposed in its direct and diffuse components */
+
+    dir_src_pdf = htrdr_planets_source_sample_direction
+      (cmd->source, args->rng, pos, dir_src);
+
+    d3_set(rad_args.path_dir, dir_src);
+    rad_args.component = PLANETS_RADIANCE_CPNT_DIRECT;
+    L_direct = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+    d3_set(rad_args.path_dir, dir);
+    rad_args.component = PLANETS_RADIANCE_CPNT_DIFFUSE;
+    L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+  }
 
   S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
 
   ka = get_ka(cmd, pos, iband, iquad);
   wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
 
-  weight = ka * (L - S) * 4*PI / wlen_pdf_m; /* [W/m^3] */
-  return weight;
-}
-
-static double
-realisation_cone
-  (struct htrdr_planets* cmd,
-   const struct htrdr_solve_item_args* args,
-   const struct smsh_desc* volrad_mesh_desc)
-{
-  struct planets_compute_radiance_args rad_args =
-    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
-
-  /* Spectral integration */
-  double wlen = 0; /* Wavelength [nm] */
-  double wlen_pdf_nm = 0; /* Wavelength pdf [nm^-1] */
-  double wlen_pdf_m = 0; /* Wavelength pdf [m^-1] */
-  size_t iband = 0; /* Spectral band */
-  size_t iquad = 0; /* Quadrature point */
-
-  /* Spatial & angular integration */
-  double dir[3] = {0,0,0};
-  double pos[3] = {0,0,0};
-
-  double S = 0; /* Source [W/m^2/sr/m] */
-  double L = 0; /* Radiance [W/m^2/sr/m] */
-  double ka = 0; /* Absorption coefficient */
-
-  /* Monte Carlo weight */
-  double weight = 0; /* weight [W/m^3] */
-
-  /* For sampling in cone */
-  const struct htrdr_planets_source* source;
-  double dir_pdf=0;
-  source = cmd->source;
-
-  /* Preconditions */
-  ASSERT(cmd && args && volrad_mesh_desc);
-  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
-  ASSERT(source);
-
-  spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
-  position_sampling(args, volrad_mesh_desc, pos);
-  dir_pdf = htrdr_planets_source_sample_direction(source, args->rng, pos, dir);
-
-  /* Compute the radiance in W/m^2/sr/m */
-  d3_set(rad_args.path_org, pos);
-  d3_set(rad_args.path_dir, dir);
-  rad_args.rng = args->rng;
-  rad_args.ithread = args->ithread;
-  rad_args.wlen = wlen; /* [nm] */
-  rad_args.iband = iband;
-  rad_args.iquad = iquad;
-  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
-
-  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
-
-  ka = get_ka(cmd, pos, iband, iquad);
-  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
-
-  weight =  ka * (L - S) / (wlen_pdf_m * dir_pdf); /* [W/m^3] */
-  return weight;
-}
-
-static double
-realisation_out_of_cone
-  (struct htrdr_planets* cmd,
-   const struct htrdr_solve_item_args* args,
-   const struct smsh_desc* volrad_mesh_desc)
-{
-  struct planets_compute_radiance_args rad_args =
-    PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
-
-  /* Spectral integration */
-  double wlen = 0; /* Wavelength [nm] */
-  double wlen_pdf_nm = 0; /* Wavelength pdf [nm^-1] */
-  double wlen_pdf_m = 0; /* Wavelength pdf [m^-1] */
-  size_t iband = 0; /* Spectral band */
-  size_t iquad = 0; /* Quadrature point */
-
-  /* Spatial & angular integration */
-  double dir[3] = {0,0,0};
-  double pos[3] = {0,0,0};
-
-  double S = 0; /* Source [W/m^2/sr/m] */
-  double L = 0; /* Radiance [W/m^2/sr/m] */
-  double ka = 0; /* Absorption coefficient */
-
-  /* Monte Carlo weight */
-  double weight = 0; /* weight [W/m^3] */
-
-  /* For sampling out of cone cone */
-  const struct htrdr_planets_source* source;
-  double dir_pdf=0;
-  source = cmd->source;
-
-  /* Preconditions */
-  ASSERT(cmd && args && volrad_mesh_desc);
-  ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
-  ASSERT(source);
-
-  spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
-  position_sampling(args, volrad_mesh_desc, pos);
-  dir_pdf = htrdr_planets_source_sample_direction_out(source, args->rng, pos, dir);
-
-  /* Compute the radiance in W/m^2/sr/m */
-  d3_set(rad_args.path_org, pos);
-  d3_set(rad_args.path_dir, dir);
-  rad_args.rng = args->rng;
-  rad_args.ithread = args->ithread;
-  rad_args.wlen = wlen; /* [nm] */
-  rad_args.iband = iband;
-  rad_args.iquad = iquad;
-  L = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
-
-  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
-
-  ka = get_ka(cmd, pos, iband, iquad);
-  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
-
-  weight = ka * (L - S) / (wlen_pdf_m * dir_pdf); /* [W/m^3] */
-  return weight;
+  /* Calculate the weights [W/m^3] */
+  weights[DIRECT]  = ka * (L_direct  - S) / (wlen_pdf_m * dir_src_pdf);
+  weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
+  weights[TOTAL]   = weights[DIRECT] + weights[DIFFUSE];
 }
 
 static void
@@ -390,30 +306,22 @@ solve_volumic_radiative_budget
     struct time t0, t1;
 
     /* Monte Carlo weights */
-    double w = 0; /* [W/m^3] */
+    double w[WEIGHTS_COUNT] = {0}; /* [W/m^3] */
     double usec = 0; /* [us] */
 
     /* Start of realisation time recording */
     time_current(&t0);
 
-    if (cmd->spectral_domain.type == HTRDR_SPECTRAL_LW) {
-      /* Run the realisation */
-      w = realisation(cmd, args, &volrad_mesh_desc);
-    }
-    else{
-      /* Run the realisation within source cone */
-      w = realisation_cone(cmd, args, &volrad_mesh_desc);
-      /* Run the realisation out of source cone */
-      w += realisation_out_of_cone(cmd, args, &volrad_mesh_desc);
-    }
+    /* Run the realisation */
+    realisation(cmd, args, &volrad_mesh_desc, w);
 
     /* Stop time recording */
     time_sub(&t0, time_current(&t1), &t0);
     usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
 
     /* Update the volumic radiance budget accumulator */
-    budget.sum_weights += w;
-    budget.sum_weights_sqr += w*w;
+    budget.sum_weights += w[TOTAL];
+    budget.sum_weights_sqr += w[TOTAL]*w[TOTAL];
     budget.nweights += 1;
 
     /* Update the per realisation time accumulator */
