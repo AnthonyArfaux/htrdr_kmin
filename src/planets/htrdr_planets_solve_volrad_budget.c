@@ -230,6 +230,11 @@ realisation
   position_sampling(args, volrad_mesh_desc, pos);
   ssp_ran_sphere_uniform(args->rng, dir, &dir_pdf);
 
+  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
+
+  ka = get_ka(cmd, pos, iband, iquad);
+  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
+
   /* Compute the radiance in W/m^2/sr/m */
   d3_set(rad_args.path_org, pos);
   rad_args.rng = args->rng;
@@ -243,8 +248,11 @@ realisation
      * path for the sampled direction and position: the radiance is considered
      * as purely diffuse. */
     d3_set(rad_args.path_dir, dir);
-    L_direct  = 0.0;
     L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+    /* Calculate the weights [W/m^3] */
+    weights[DIRECT]  = 0.0;
+    weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
 
   } else {
     /* In the so-called shortwave region (actually, the radiation due the
@@ -260,16 +268,14 @@ realisation
     d3_set(rad_args.path_dir, dir);
     rad_args.component = PLANETS_RADIANCE_CPNT_DIFFUSE;
     L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
+
+
+    /* Calculate the weights [W/m^3] */
+    weights[DIRECT]  = ka * (L_direct  - S) / (wlen_pdf_m * dir_src_pdf);
+    weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
   }
 
-  S = get_source(cmd, pos, wlen); /* [W/m^2/sr/m] */
-
-  ka = get_ka(cmd, pos, iband, iquad);
-  wlen_pdf_m = wlen_pdf_nm * 1.e9; /* Transform pdf from nm^-1 to m^-1 */
-
   /* Calculate the weights [W/m^3] */
-  weights[DIRECT]  = ka * (L_direct  - S) / (wlen_pdf_m * dir_src_pdf);
-  weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
   weights[TOTAL]   = weights[DIRECT] + weights[DIFFUSE];
 }
 
