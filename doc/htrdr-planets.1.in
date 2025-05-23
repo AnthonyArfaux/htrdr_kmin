@@ -20,7 +20,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd March 17, 2025
+.Dd May 23, 2025
 .Dt HTRDR-PLANETS 1
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -554,21 +554,26 @@ The other values are set to 0.
 .Ss Volumic Radiative Budget
 For volumic radiative budget
 .Pq option Fl r
-the output is a list of 7 ASCII values per line, with as many lines as
+the output is a list of 15 ASCII values per line, with as many lines as
 there are tetrahedra in the volume mesh as an argument to the
 .Fl r
 option.
 The lines follow the order of the input meshes.
 .Pp
-For each line, the first 2 values correspond to the expected value of
-the volumic radiative budget of the tetrahedron (in W/m^3) and its
-standard error.
+The total radiative volumic budget is decomposed into its direct and
+diffuse components.
+For each component
+.Pq total, direct and diffuse parts ,
+the following information is recorded: the average
+.Bq W/m^3 ,
+the associated standard deviation
+.Bq W/m^3 ,
+the sum of Monte Carlo weights and the sum of squared weights.
+The purpose of these last two values is to help calculate the expected value
+and the standard deviation of the volumic radiative budget for a set of
+tetrahedra.
 .Pp
-The following 3 values are the sum of the Monte Carlo weights, the sum
-of the Monte Carlo weights squared, and the total number of Monte Carlo
-weights used to calculate the preceding quantities.
-Their purpose is to help calculate the expected value and standard error
-of the volumic radiative budget for a set of tetrahedra.
+After these 12 values, the total number of realisations is recorded.
 .Pp
 Finally, the last two values are the estimate and associated standard
 error of the calculation time per radiative path.

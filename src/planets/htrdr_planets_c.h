@@ -68,12 +68,23 @@ struct planets_pixel_image {
   HTRDR_ACCUM_NULL__                                                           \
 }
 
+enum planets_volrad_weight_type {
+  PLANETS_VOLRAD_TOTAL, /* 0 */
+  PLANETS_VOLRAD_DIRECT, /* 1 */
+  PLANETS_VOLRAD_DIFFUSE, /* 2 */
+  PLANETS_VOLRAD_WEIGHTS_COUNT /* 3 */
+};
+
 struct planets_voxel_radiative_budget {
-  struct htrdr_accum volrad_budget; /* W/m^3 */
+  struct htrdr_accum volrad_budget[PLANETS_VOLRAD_WEIGHTS_COUNT]; /* W/m^3 */
   struct htrdr_accum time; /* In us */
 };
-#define PLANETS_VOXEL_RADIATIVE_BUDGET {                                       \
-  HTRDR_ACCUM_NULL__,                                                          \
+#define PLANETS_VOXEL_RADIATIVE_BUDGET_NULL__ {                                \
+  {                                                                            \
+    HTRDR_ACCUM_NULL__,                                                        \
+    HTRDR_ACCUM_NULL__,                                                        \
+    HTRDR_ACCUM_NULL__                                                         \
+  },                                                                           \
   HTRDR_ACCUM_NULL__                                                           \
 }
 

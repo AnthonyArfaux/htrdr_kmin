@@ -35,13 +35,6 @@
 
 #include <rsys/clock_time.h>
 
-enum weight_type {
-  DIRECT, /* 0 */
-  DIFFUSE, /* 1 */
-  TOTAL, /* 2 */
-  WEIGHTS_COUNT /* 3 */
-};
-
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -195,7 +188,7 @@ realisation
   (struct htrdr_planets* cmd,
    const struct htrdr_solve_item_args* args,
    const struct smsh_desc* volrad_mesh_desc,
-   double weights[WEIGHTS_COUNT]) /* [W/m^3] */
+   double weights[PLANETS_VOLRAD_WEIGHTS_COUNT]) /* [W/m^3] */
 {
   struct planets_compute_radiance_args rad_args =
     PLANETS_COMPUTE_RADIANCE_ARGS_NULL;
@@ -224,7 +217,7 @@ realisation
   ASSERT(cmd->output_type == HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET);
 
   /* Initialise the weights */
-  memset(weights, 0, sizeof(double)*WEIGHTS_COUNT);
+  memset(weights, 0, sizeof(double)*PLANETS_VOLRAD_WEIGHTS_COUNT);
 
   spectral_sampling(cmd, args, &wlen, &wlen_pdf_nm, &iband, &iquad);
   position_sampling(args, volrad_mesh_desc, pos);
@@ -251,8 +244,8 @@ realisation
     L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
 
     /* Calculate the weights [W/m^3] */
-    weights[DIRECT]  = 0.0;
-    weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
+    weights[PLANETS_VOLRAD_DIRECT]  = 0.0;
+    weights[PLANETS_VOLRAD_DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
 
   } else {
     /* In the so-called shortwave region (actually, the radiation due the
@@ -269,14 +262,15 @@ realisation
     rad_args.component = PLANETS_RADIANCE_CPNT_DIFFUSE;
     L_diffuse = planets_compute_radiance(cmd, &rad_args); /* [W/m^2/sr/m] */
 
-
     /* Calculate the weights [W/m^3] */
-    weights[DIRECT]  = ka * (L_direct  - S) / (wlen_pdf_m * dir_src_pdf);
-    weights[DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
+    weights[PLANETS_VOLRAD_DIRECT]  = ka * (L_direct  - S) / (wlen_pdf_m * dir_src_pdf);
+    weights[PLANETS_VOLRAD_DIFFUSE] = ka * (L_diffuse - S) / (wlen_pdf_m * dir_pdf);
   }
 
   /* Calculate the weights [W/m^3] */
-  weights[TOTAL]   = weights[DIRECT] + weights[DIFFUSE];
+  weights[PLANETS_VOLRAD_TOTAL] =
+    weights[PLANETS_VOLRAD_DIRECT]
+  + weights[PLANETS_VOLRAD_DIFFUSE];
 }
 
 static void
@@ -287,10 +281,6 @@ solve_volumic_radiative_budget
 {
   /* Volumic mesh on which volumic radiative budget is estimated */
   struct smsh_desc volrad_mesh_desc = SMSH_DESC_NULL;
-
-  /* Monte Carlo accumulators */
-  struct htrdr_accum budget = HTRDR_ACCUM_NULL;
-  struct htrdr_accum time = HTRDR_ACCUM_NULL;
 
   /* Miscellaneous */
   struct htrdr_planets* cmd = NULL;
@@ -312,8 +302,10 @@ solve_volumic_radiative_budget
     struct time t0, t1;
 
     /* Monte Carlo weights */
-    double w[WEIGHTS_COUNT] = {0}; /* [W/m^3] */
+    double w[PLANETS_VOLRAD_WEIGHTS_COUNT] = {0}; /* [W/m^3] */
     double usec = 0; /* [us] */
+
+    int iweight = 0;
 
     /* Start of realisation time recording */
     time_current(&t0);
@@ -325,28 +317,26 @@ solve_volumic_radiative_budget
     time_sub(&t0, time_current(&t1), &t0);
     usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
 
-    /* Update the volumic radiance budget accumulator */
-    budget.sum_weights += w[TOTAL];
-    budget.sum_weights_sqr += w[TOTAL]*w[TOTAL];
-    budget.nweights += 1;
+    FOR_EACH(iweight, 0, PLANETS_VOLRAD_WEIGHTS_COUNT){
+      /* Update the volumic radiance budget accumulator */
+      voxel->volrad_budget[iweight].sum_weights += w[iweight];
+      voxel->volrad_budget[iweight].sum_weights_sqr += w[iweight]*w[iweight];
+      voxel->volrad_budget[iweight].nweights += 1;
+    }
 
     /* Update the per realisation time accumulator */
-    time.sum_weights += usec;
-    time.sum_weights_sqr += usec*usec;
-    time.nweights += 1;
+    voxel->time.sum_weights += usec;
+    voxel->time.sum_weights_sqr += usec*usec;
+    voxel->time.nweights += 1;
   }
-
-  /* Write voxel data */
-  voxel->volrad_budget = budget;
-  voxel->time = time;
 }
 
 static res_T
 write_buffer
   (struct htrdr_planets* cmd,
    struct htrdr_buffer* buf,
-   struct htrdr_accum* budget, /* W/m^3 */
-   struct htrdr_accum* time, /* us */
+   struct htrdr_accum* out_budget, /* W/m^3 */
+   struct htrdr_accum* out_time, /* us */
    FILE* stream)
 {
   struct htrdr_buffer_layout layout = HTRDR_BUFFER_LAYOUT_NULL;
@@ -360,38 +350,50 @@ write_buffer
   (void)cmd;
 
   /* Reset global accumulators */
-  *budget = HTRDR_ACCUM_NULL;
-  *time = HTRDR_ACCUM_NULL;
+  *out_budget = HTRDR_ACCUM_NULL;
+  *out_time = HTRDR_ACCUM_NULL;
 
   FOR_EACH(x, 0, layout.width) {
     struct planets_voxel_radiative_budget* voxel = htrdr_buffer_at(buf, x, 0);
-    struct htrdr_estimate estim_budget = HTRDR_ESTIMATE_NULL;
     struct htrdr_estimate estim_time = HTRDR_ESTIMATE_NULL;
+    struct htrdr_accum* budget = NULL;
+    int iestim = 0;
 
-    htrdr_accum_get_estimation(&voxel->volrad_budget, &estim_budget);
-    htrdr_accum_get_estimation(&voxel->time, &estim_time);
+    budget = voxel->volrad_budget;
+    FOR_EACH(iestim, 0, PLANETS_VOLRAD_WEIGHTS_COUNT) {
+      struct htrdr_estimate estim_budget = HTRDR_ESTIMATE_NULL;
 
-    /* Write the estimate of the volumic radiative budget */
-    fprintf(stream, "%g %g ", estim_budget.E, estim_budget.SE);
+      /* Write the estimate of the volumic radiative budget */
+      htrdr_accum_get_estimation(&budget[iestim], &estim_budget);
+      fprintf(stream, "%g %g ", estim_budget.E, estim_budget.SE);
 
-    /* Write the accumulator of the volumic radiative budget */
-    fprintf(stream, "%g %g %lu ",
-      voxel->volrad_budget.sum_weights,
-      voxel->volrad_budget.sum_weights_sqr,
-      (unsigned long)voxel->volrad_budget.nweights);
+      /* Write the accumulator of the volumic radiative budget */
+      fprintf(stream, "%g %g ",
+        budget[iestim].sum_weights,
+        budget[iestim].sum_weights_sqr);
+    }
+
+    /* Write the number of realisations.
+     * It must be the same for all components */
+    ASSERT(budget[PLANETS_VOLRAD_TOTAL].nweights
+        == budget[PLANETS_VOLRAD_DIRECT].nweights);
+    ASSERT(budget[PLANETS_VOLRAD_TOTAL].nweights
+        == budget[PLANETS_VOLRAD_DIFFUSE].nweights);
+    fprintf(stream, "%lu ", (unsigned long)budget[PLANETS_VOLRAD_TOTAL].nweights);
 
     /* Write the estimate of the per realisation time */
+    htrdr_accum_get_estimation(&voxel->time, &estim_time);
     fprintf(stream, "%g %g\n", estim_time.E, estim_time.SE);
 
-    /* Update the overall volumic radiative budget accumulator */
-    budget->sum_weights += voxel->volrad_budget.sum_weights;
-    budget->sum_weights_sqr += voxel->volrad_budget.sum_weights_sqr;
-    budget->nweights += voxel->volrad_budget.nweights;
+    /* Update the overall (total) volumic radiative budget accumulator */
+    out_budget->sum_weights += budget[PLANETS_VOLRAD_TOTAL].sum_weights;
+    out_budget->sum_weights_sqr += budget[PLANETS_VOLRAD_TOTAL].sum_weights_sqr;
+    out_budget->nweights += budget[PLANETS_VOLRAD_TOTAL].nweights;
 
     /* Update the overall per realisation time accumulator */
-    time->sum_weights += voxel->time.sum_weights;
-    time->sum_weights_sqr += voxel->time.sum_weights_sqr;
-    time->nweights += voxel->time.nweights;
+    out_time->sum_weights += voxel->time.sum_weights;
+    out_time->sum_weights_sqr += voxel->time.sum_weights_sqr;
+    out_time->nweights += voxel->time.nweights;
   }
    return RES_OK;
 }
