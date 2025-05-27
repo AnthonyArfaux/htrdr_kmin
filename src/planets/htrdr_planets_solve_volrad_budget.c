@@ -346,7 +346,7 @@ write_buffer
   size_t x = 0;
 
   /* Preconditions */
-  ASSERT(cmd && buf && budget && time && stream);
+  ASSERT(cmd && buf && out_budget && out_time && stream);
 
   htrdr_buffer_get_layout(buf, &layout);
   ASSERT(layout.height == 1);
