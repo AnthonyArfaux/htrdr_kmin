@@ -87,6 +87,8 @@ struct planets_voxel_radiative_budget {
   },                                                                           \
   HTRDR_ACCUM_NULL__                                                           \
 }
+static const struct planets_voxel_radiative_budget
+PLANETS_VOXEL_RADIATIVE_BUDGET_NULL = PLANETS_VOXEL_RADIATIVE_BUDGET_NULL__;
 
 enum planets_radiance_cpnt_flag {
   PLANETS_RADIANCE_CPNT_DIRECT = BIT(0),

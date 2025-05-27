@@ -297,6 +297,9 @@ solve_volumic_radiative_budget
 
   SMSH(get_desc(cmd->volrad_mesh, &volrad_mesh_desc));
 
+  /* Initialse voxel accumulators to 0 */
+  *voxel = PLANETS_VOXEL_RADIATIVE_BUDGET_NULL;
+
   FOR_EACH(i, 0, args->nrealisations) {
     /* Time recording */
     struct time t0, t1;
