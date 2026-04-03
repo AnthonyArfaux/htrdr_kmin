@@ -598,8 +598,8 @@ find_event
   /* Look for an atmospheric collision */
   range[0] = 0;
   range[1] = hit.distance;
-  dst = sample_distance(cmd, args, evt->cells, radcoef, pos, dir, range);
-  /* dst = sample_distance_kmin(cmd, args, evt->cells, radcoef, pos, dir, range); */
+  /* dst = sample_distance(cmd, args, evt->cells, radcoef, pos, dir, range); */
+  dst = sample_distance_kmin(cmd, args, evt->cells, radcoef, pos, dir, range);
 
   /* Event occurs in volume */
   if(!DISTANCE_NONE(dst)) {

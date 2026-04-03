@@ -73,7 +73,6 @@ draw_pixel_xwave
   time = HTRDR_ACCUM_NULL;
 
   while(relative_error > args->spp/100.) {
-  /* FOR_EACH(isamp, 0, args->spp) { */
     struct time t0, t1;
     struct scam_sample sample = SCAM_SAMPLE_NULL;
     struct scam_ray ray = SCAM_RAY_NULL;
