@@ -148,9 +148,6 @@ draw_pixel_xwave
 
     weight /= pdf; /* In W/m²/sr */
 
-	fprintf(stdout, "%g %g %g \n", weight, rad_args.transmission,
-			rad_args.sum_contributions / pdf);
-
     /* End of time recording per realisation */
     time_sub(&t0, time_current(&t1), &t0);
     usec = (double)time_val(&t0, TIME_NSEC) * 0.001;
