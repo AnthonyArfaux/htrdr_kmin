@@ -79,6 +79,39 @@ struct sample_distance_context {
 static const struct sample_distance_context SAMPLE_DISTANCE_CONTEXT_NULL =
   SAMPLE_DISTANCE_CONTEXT_NULL__;
 
+/* Arguments of the filtering function used to sample a position */
+struct sample_distance_kmin_context {
+  struct ssp_rng* rng;
+  struct rnatm* atmosphere;
+  size_t iband;
+  size_t iquad;
+  double wavelength; /* In nm */
+  enum rnatm_radcoef radcoef;
+  double Ts; /* Sample optical thickness */
+
+  /* Output data */
+  struct rnatm_cell_pos* cells;
+  double distance;
+  double transmission;
+  double sum_contributions;
+  double source;
+};
+#define SAMPLE_DISTANCE_KMIN_CONTEXT_NULL__ {                                       \
+  NULL, NULL, 0, 0, 0, RNATM_RADCOEFS_COUNT__, 0, NULL, DBL_MAX, 0, 0, 0            \
+}
+static const struct sample_distance_kmin_context SAMPLE_DISTANCE_KMIN_CONTEXT_NULL =
+  SAMPLE_DISTANCE_KMIN_CONTEXT_NULL__;
+
+struct sum_kmin_context{
+  struct rnatm* atmosphere;
+  double accum;
+};
+#define SUM_KMIN_CONTEXT_NULL__ {                                             \
+  NULL, 0                                                                     \
+}
+static const struct sum_kmin_context SUM_KMIN_CONTEXT_NULL = 
+  SUM_KMIN_CONTEXT_NULL__;
+
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -137,11 +170,14 @@ sample_position_hit_filter
 
   dst_travelled = hit->distance[0];
 
-  /* Get the k_min, k_max of the voxel */
+ /* Get the k_min, k_max of the voxel */
   k_min = rnatm_get_k_svx_voxel
-    (ctx->atmosphere, &hit->voxel, ctx->radcoef, RNATM_SVX_OP_MIN);
+    (ctx->atmosphere, &hit->voxel, RNATM_RADCOEF_Ka, RNATM_SVX_OP_MIN);
   k_max = rnatm_get_k_svx_voxel
-    (ctx->atmosphere, &hit->voxel, ctx->radcoef, RNATM_SVX_OP_MAX);
+    (ctx->atmosphere, &hit->voxel, RNATM_RADCOEF_Kext, RNATM_SVX_OP_MAX);
+
+  /* fprintf(stdout, "%g %g %g %g \n", k_min, k_max, (k_max-k_min)/k_max,dst_travelled ); */
+  /*fprintf(stdout, "%g %g \n", k_min, k_max);*/
 
   /* Configure the common input arguments to retrieve the radiative coefficient
    * of a given position */
@@ -197,6 +233,155 @@ sample_position_hit_filter
   return pursue_traversal;
 }
 
+static int
+sample_position_hit_filter_kmin
+  (const struct svx_hit* hit,
+   const double org[3],
+   const double dir[3],
+   const double range[2],
+   void* context)
+{
+  struct rnatm_get_radcoef_args get_k_args = RNATM_GET_RADCOEF_ARGS_NULL;
+  struct sample_distance_kmin_context* ctx = context;
+  double k_min = 0;
+  double k_max = 0;
+  double dst_travelled = 0;
+  int pursue_traversal = 1;
+  double wlen_m = ctx->wavelength * 1e-9;  /* m */
+  ASSERT(hit && org && range && context);
+  (void)range;
+
+  dst_travelled = hit->distance[0];
+
+  /* Get the k_min, k_max of the voxel */
+  k_min = rnatm_get_k_svx_voxel
+    (ctx->atmosphere, &hit->voxel, RNATM_RADCOEF_Ka, RNATM_SVX_OP_MIN);
+  k_max = rnatm_get_k_svx_voxel
+    (ctx->atmosphere, &hit->voxel, RNATM_RADCOEF_Kext, RNATM_SVX_OP_MAX);
+
+  /* fprintf(stdout, "%g %g %g %g \n", k_min, k_max, (k_max-k_min)/k_max, dst_travelled); */
+
+  /* Configure the common input arguments to retrieve the radiative coefficient
+   * of a given position */
+  get_k_args.cells = ctx->cells;
+  get_k_args.iband = ctx->iband;
+  get_k_args.iquad = ctx->iquad;
+  get_k_args.radcoef = ctx->radcoef;
+  get_k_args.k_min = k_min;
+  get_k_args.k_max = k_max;
+
+  for(;;) {
+    /* Compute the optical thickness of the voxel */
+    const double vox_dst = hit->distance[1] - dst_travelled;
+    const double T = vox_dst * (k_max - k_min);
+
+    /* A collision occurs behind the voxel */
+    if(ctx->Ts > T) {
+      const double distance = ssp_ran_exp_truncated(ctx->rng, k_min, vox_dst);
+      const double pdf = 1 - exp( - k_min * vox_dst);
+      double Leq = 0;
+      double temperature = 0;
+      double pos_emission[3] = {0,0,0};
+      struct rnatm_cell_pos cell_pos = RNATM_CELL_POS_NULL;
+
+      pos_emission[0] = org[0] + (dst_travelled + distance) * dir[0];
+      pos_emission[1] = org[1] + (dst_travelled + distance) * dir[1];
+      pos_emission[2] = org[2] + (dst_travelled + distance) * dir[2];
+
+      /* Fetch the source temperature */
+      RNATM(fetch_cell(ctx->atmosphere, pos_emission, RNATM_GAS, &cell_pos));
+      RNATM(cell_get_gas_temperature(ctx->atmosphere, &cell_pos, &temperature));
+      Leq = htrdr_planck_monochromatic(wlen_m, temperature); /* [W/m^2/sr/m] */
+
+      /* add the contribution of the sampled position */
+      ctx->sum_contributions += ctx->transmission * pdf * (Leq - ctx->source);
+
+	  /* fprintf(stdout, " %g %g %g %g %g \n", */
+		/* ctx->transmission,  Leq, ctx->source, (Leq - ctx->source), pdf); */
+
+      /* update the transmission along the path already traveled*/
+      ctx->transmission *= exp( - vox_dst * k_min);
+
+      ctx->Ts -= T;
+      pursue_traversal = 1;
+      break;
+
+    /* A collision occurs in the voxel */
+    } else {
+      const double vox_dst_collision = ctx->Ts / (k_max - k_min);
+      double pos[3];
+      double  k, r;
+
+      const double distance = ssp_ran_exp_truncated(ctx->rng, k_min, vox_dst_collision);
+      const double pdf = 1 - exp( - k_min * vox_dst_collision);
+      double Leq = 0;
+      double temperature = 0;
+      double pos_emission[3] = {0,0,0};
+      struct rnatm_cell_pos cell_pos = RNATM_CELL_POS_NULL;
+
+      pos_emission[0] = org[0] + (dst_travelled + distance) * dir[0];
+      pos_emission[1] = org[1] + (dst_travelled + distance) * dir[1];
+      pos_emission[2] = org[2] + (dst_travelled + distance) * dir[2];
+
+      /* Fetch the source temperature */
+      RNATM(fetch_cell(ctx->atmosphere, pos_emission, RNATM_GAS, &cell_pos));
+      RNATM(cell_get_gas_temperature(ctx->atmosphere, &cell_pos, &temperature));
+      Leq = htrdr_planck_monochromatic(wlen_m, temperature); /* [W/m^2/sr/m] */
+
+      /* add the contribution of the sampled position */
+      ctx->sum_contributions += ctx->transmission * pdf * (Leq - ctx->source);
+
+	  /* fprintf(stdout, "collision %g %g %g %g \n", Leq, ctx->source, (Leq - ctx->source), pdf); */
+
+      /* update the transmission along the path already traveled*/
+      ctx->transmission *= exp( - vox_dst_collision * k_min);
+
+      /* Calculate the distance travelled to the collision to be queried */
+      dst_travelled += vox_dst_collision;
+
+      /* Retrieve the radiative coefficient at the collision position */
+      pos[0] = org[0] + dst_travelled * dir[0];
+      pos[1] = org[1] + dst_travelled * dir[1];
+      pos[2] = org[2] + dst_travelled * dir[2];
+      RNATM(fetch_cell_list(ctx->atmosphere, pos, get_k_args.cells, NULL));
+      RNATM(get_radcoef(ctx->atmosphere, &get_k_args, &k));
+
+      r = ssp_rng_canonical(ctx->rng);
+
+      /* Null collision */
+      if(r > (k - k_min)/(k_max - k_min)) {
+        ctx->Ts = ssp_ran_exp(ctx->rng, 1);
+
+      /* Real collision */
+      } else {
+        ctx->distance = dst_travelled;
+        pursue_traversal = 0;
+        break;
+      }
+    }
+  }
+
+  return pursue_traversal;
+}
+
+static int
+sum_kmin_filter
+  (const struct svx_hit* hit,
+   const double org[3],
+   const double dir[3],
+   const double range[2],
+   void* context)
+{
+  struct sum_kmin_context* ctx = context;
+  /* Get the k_min of the voxel */
+  double k_min = rnatm_get_k_svx_voxel
+    (ctx->atmosphere, &hit->voxel, RNATM_RADCOEF_Ka, RNATM_SVX_OP_MIN);
+
+  /*fprintf(stdout, "%g %g \n", k_min, (hit->distance[1] - hit->distance[0]));*/
+  ctx->accum += k_min * (hit->distance[1] - hit->distance[0]);
+  return 1;
+}
+
 static double
 sample_distance
   (struct htrdr_planets* cmd,
@@ -210,6 +395,7 @@ sample_distance
   struct rnatm_trace_ray_args rt = RNATM_TRACE_RAY_ARGS_NULL;
   struct sample_distance_context ctx = SAMPLE_DISTANCE_CONTEXT_NULL;
   struct svx_hit hit;
+  double k_min_accu = 0;
   ASSERT(cmd && args && cells && pos && dir && d3_is_normalized(dir) && range);
   ASSERT((unsigned)radcoef < RNATM_RADCOEFS_COUNT__);
   ASSERT(range[0] < range[1]);
@@ -242,6 +428,90 @@ sample_distance
   } else { /* A (real) collision occured */
     return ctx.distance;
   }
+}
+
+static double
+sample_distance_kmin
+  (struct htrdr_planets* cmd,
+   struct planets_compute_radiance_args* args,
+   struct rnatm_cell_pos* cells,
+   const enum rnatm_radcoef radcoef,
+   const double pos[3],
+   const double dir[3],
+   const double range[2])
+{
+  struct rnatm_trace_ray_args rt = RNATM_TRACE_RAY_ARGS_NULL;
+  struct sample_distance_kmin_context ctx = SAMPLE_DISTANCE_KMIN_CONTEXT_NULL;
+  struct svx_hit hit;
+  ASSERT(cmd && args && cells && pos && dir && d3_is_normalized(dir) && range);
+  ASSERT((unsigned)radcoef < RNATM_RADCOEFS_COUNT__);
+  ASSERT(range[0] < range[1]);
+
+  /* Sample an optical thickness */
+  ctx.Ts = ssp_ran_exp(args->rng, 1);
+
+  /* Setup the remaining arguments of the RT context */
+  ctx.rng = args->rng;
+  ctx.atmosphere = cmd->atmosphere;
+  ctx.iband = args->iband;
+  ctx.iquad = args->iquad;
+  ctx.wavelength = args->wlen;
+  ctx.radcoef = radcoef;
+  ctx.cells = cells;
+  ctx.transmission = args->transmission;
+  ctx.sum_contributions = args->sum_contributions;
+  ctx.source = args->source;
+
+  /* Trace the ray into the atmosphere */
+  d3_set(rt.ray_org, pos);
+  d3_set(rt.ray_dir, dir);
+  rt.ray_range[0] = range[0];
+  rt.ray_range[1] = range[1];
+  rt.filter = sample_position_hit_filter_kmin;
+  rt.context = &ctx;
+  rt.iband = args->iband;
+  rt.iquad = args->iquad;
+  RNATM(trace_ray(cmd->atmosphere, &rt, &hit));
+
+  args->transmission = ctx.transmission;
+  args->sum_contributions = ctx.sum_contributions;
+
+  if(SVX_HIT_NONE(&hit)) { /* No collision found */
+    return INF;
+  } else { /* A (real) collision occured */
+    return ctx.distance;
+  }
+}
+
+double
+trace_kmin
+  (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
+   const double pos[3],
+   const double dir[3],
+   const double range[2])
+{
+  struct rnatm_trace_ray_args rt = RNATM_TRACE_RAY_ARGS_NULL;
+  struct sum_kmin_context ctx = SUM_KMIN_CONTEXT_NULL;
+  struct svx_hit hit;
+  ASSERT(cmd && args && cells && pos && dir && d3_is_normalized(dir) && range);
+  ASSERT(range[0] < range[1]);
+
+  /* Setup the remaining arguments of the RT context */
+  ctx.atmosphere = cmd->atmosphere;
+
+  /* Trace the ray into the atmosphere */
+  d3_set(rt.ray_org, pos);
+  d3_set(rt.ray_dir, dir);
+  rt.ray_range[0] = range[0];
+  rt.ray_range[1] = range[1];
+  rt.filter = sum_kmin_filter;
+  rt.context = &ctx;
+  rt.iband = args->iband;
+  rt.iquad = args->iquad;
+  RNATM(trace_ray(cmd->atmosphere, &rt, &hit));
+
+  return ctx.accum;
 }
 
 static INLINE double
@@ -303,7 +573,7 @@ direct_contribution
 static void
 find_event
   (struct htrdr_planets* cmd,
-   const struct planets_compute_radiance_args* args,
+   struct planets_compute_radiance_args* args,
    const enum rnatm_radcoef radcoef,
    const double pos[3],
    const double dir[3],
@@ -328,7 +598,8 @@ find_event
   /* Look for an atmospheric collision */
   range[0] = 0;
   range[1] = hit.distance;
-  dst = sample_distance(cmd, args, evt->cells, radcoef, pos, dir, range);
+  /* dst = sample_distance(cmd, args, evt->cells, radcoef, pos, dir, range); */
+  dst = sample_distance_kmin(cmd, args, evt->cells, radcoef, pos, dir, range);
 
   /* Event occurs in volume */
   if(!DISTANCE_NONE(dst)) {
@@ -552,6 +823,10 @@ sample_volume_event_type
   RNATM(get_radcoef(cmd->atmosphere, &get_k_args, &kext));
 
   r = ssp_rng_canonical(args->rng);
+
+  /* we temporary force an absorption */
+  /* return RNATM_RADCOEF_Ka; Absorption */
+
   if(r < ka / kext) {
     return RNATM_RADCOEF_Ka; /* Absorption */
   } else {
@@ -594,7 +869,7 @@ get_temperature
 double /* Radiance in W/m²/sr/m */
 planets_compute_radiance
   (struct htrdr_planets* cmd,
-   const struct planets_compute_radiance_args* args)
+   struct planets_compute_radiance_args* args)
 {
   struct s3d_hit hit_from = S3D_HIT_NULL;
   struct event ev;
@@ -676,6 +951,8 @@ planets_compute_radiance
     ++nsc;
   }
 
+  /* fprintf(stdout, "%d \n", nsc); */
+
   /* From there, a valid event means that the path has stopped in surface or
    * volume absorption. In longwave, add the contribution of the internal
    * source */
@@ -684,6 +961,5 @@ planets_compute_radiance
     const double temperature = get_temperature(cmd, &ev); /* In K */
     L += htrdr_planck_monochromatic(wlen_m, temperature);
   }
-
   return L; /* In W/m²/sr/m */
 }

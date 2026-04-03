@@ -59,6 +59,9 @@ draw_pixel_xwave
   ASSERT(htrdr && htrdr_draw_pixel_args_check(args) && data);
   (void)htrdr;
 
+  double relative_error = 100;
+  size_t count = 0;
+
   cmd  = args->context;
   ASSERT(cmd);
   ASSERT(cmd->spectral_domain.type == HTRDR_SPECTRAL_SW
@@ -69,7 +72,8 @@ draw_pixel_xwave
   radiance = HTRDR_ACCUM_NULL;
   time = HTRDR_ACCUM_NULL;
 
-  FOR_EACH(isamp, 0, args->spp) {
+  while(relative_error > args->spp/100.) {
+  /* FOR_EACH(isamp, 0, args->spp) { */
     struct time t0, t1;
     struct scam_sample sample = SCAM_SAMPLE_NULL;
     struct scam_ray ray = SCAM_RAY_NULL;
@@ -80,6 +84,10 @@ draw_pixel_xwave
     size_t iband[2];
     size_t iquad;
     double usec;
+
+    struct htrdr_estimate estimate = HTRDR_ESTIMATE_NULL;
+
+	count += 1;
 
     /* Begin the registration of the time spent to in the realisation */
     time_current(&t0);
@@ -130,10 +138,18 @@ draw_pixel_xwave
     rad_args.wlen = wlen[0];
     rad_args.iband = iband[0];
     rad_args.iquad = iquad;
+    rad_args.transmission = 1;
+    rad_args.sum_contributions = 0;
     weight = planets_compute_radiance(cmd, &rad_args);
     ASSERT(weight >= 0);
 
+	weight *= rad_args.transmission;
+	weight += rad_args.sum_contributions;
+
     weight /= pdf; /* In W/m²/sr */
+
+	fprintf(stdout, "%g %g %g \n", weight, rad_args.transmission,
+			rad_args.sum_contributions / pdf);
 
     /* End of time recording per realisation */
     time_sub(&t0, time_current(&t1), &t0);
@@ -148,7 +164,14 @@ draw_pixel_xwave
     time.sum_weights += usec;
     time.sum_weights_sqr += usec*usec;
     time.nweights += 1;
+
+    htrdr_accum_get_estimation(&radiance, &estimate);
+	relative_error = estimate.SE / estimate.E;
+	if(relative_error == 0 || radiance.nweights < 1000) relative_error = 1;
+	/* fprintf(stdout, "%g %g \n", relative_error, args->spp/100.); */
   }
+
+  fprintf(stdout, "Ray count: %u \n", count);
 
   /* Flush pixel data */
   pixel->radiance = radiance;

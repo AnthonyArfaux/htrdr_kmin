@@ -111,9 +111,13 @@ struct planets_compute_radiance_args {
   size_t iquad; /* Quadrature point */
 
   int component; /* Combination of planets_radiance_cpnt_flag */
+
+  double transmission; /* transmission along the path already traveled */
+  double sum_contributions; /* sum of the exchange along the path */
+  double source; /* radiance of the atmosphere at the origin of the ray */
 };
 #define PLANETS_COMPUTE_RADIANCE_ARGS_NULL__ \
-  {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0, PLANETS_RADIANCE_CPNT_ALL}
+  {NULL, 0, {0,0,0}, {0,0,0}, 0, 0, 0, PLANETS_RADIANCE_CPNT_ALL, 1, 0, 0}
 static const struct planets_compute_radiance_args
 PLANETS_COMPUTE_RADIANCE_ARGS_NULL = PLANETS_COMPUTE_RADIANCE_ARGS_NULL__;
 
@@ -164,6 +168,14 @@ planets_get_pixel_format
 extern LOCAL_SYM double
 planets_compute_radiance
   (struct htrdr_planets* cmd,
-   const struct planets_compute_radiance_args* args);
+   struct planets_compute_radiance_args* args);
+
+extern LOCAL_SYM double
+trace_kmin
+ (struct htrdr_planets* cmd,
+   const struct planets_compute_radiance_args* args,
+   const double pos[3],
+   const double dir[3],
+   const double range[2]);
 
 #endif /* HTRDR_PLANETS_C_H */

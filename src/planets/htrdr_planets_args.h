@@ -1,0 +1,177 @@
+/* Copyright (C) 2018-2019, 2022-2025 Centre National de la Recherche Scientifique
+ * Copyright (C) 2020-2022 Institut Mines Télécom Albi-Carmaux
+ * Copyright (C) 2022-2025 Institut de Physique du Globe de Paris
+ * Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
+ * Copyright (C) 2022-2025 Université de Reims Champagne-Ardenne
+ * Copyright (C) 2022-2025 Université de Versaille Saint-Quentin
+ * Copyright (C) 2018-2019, 2022-2025 Université Paul Sabatier
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#ifndef HTRDR_PLANETS_ARGS_H
+#define HTRDR_PLANETS_ARGS_H
+
+#include "core/htrdr_args.h"
+
+#include <rad-net/rnatm.h>
+#include <rsys/rsys.h>
+
+#include <limits.h> /* UINT_MAX */
+
+enum htrdr_planets_args_output_type {
+  HTRDR_PLANETS_ARGS_OUTPUT_IMAGE,
+  HTRDR_PLANETS_ARGS_OUTPUT_OCTREES,
+  HTRDR_PLANETS_ARGS_OUTPUT_VOLUMIC_RADIATIVE_BUDGET,
+  HTRDR_PLANETS_ARGS_OUTPUT_TYPES_COUNT__
+};
+
+struct htrdr_planets_spectral_args {
+  double wlen_range[2]; /* Spectral range in nm */
+  enum htrdr_spectral_type type;
+};
+#define HTRDR_PLANETS_SPECTRAL_ARGS_DEFAULT__ {                                \
+  HTRDR_RAN_WLEN_CIE_XYZ_RANGE_DEFAULT__, /* Spectral range */                 \
+  HTRDR_SPECTRAL_SW_CIE_XYZ, /* Spectral type */                               \
+}
+static const struct htrdr_planets_spectral_args
+HTRDR_PLANETS_SPECTRAL_ARGS_DEFAULT = HTRDR_PLANETS_SPECTRAL_ARGS_DEFAULT__;
+
+struct htrdr_planets_source_args {
+  /* Radiance of the source per wavelength. May be NULL */
+  char* rnrl_filename;
+
+  double longitude; /* In [-180, 180] degrees */
+  double latitude; /* In [-90, 90] degrees */
+  double distance; /* In km */
+  double radius; /* In km */
+  double temperature; /* In Kelvin */
+};
+#define HTRDR_PLANETS_SOURCE_ARGS_NULL__ {NULL,0,0,0,-1,-1}
+static const struct htrdr_planets_source_args HTRDR_PLANETS_SOURCE_ARGS_NULL =
+  HTRDR_PLANETS_SOURCE_ARGS_NULL__;
+
+struct htrdr_planets_ground_args {
+  char* smsh_filename; /* The Star-Mesh geometry */
+  char* props_filename; /* Per triangle physical properties */
+  char* mtllst_filename; /* List of used materials */
+  char* name;
+};
+#define HTRDR_PLANETS_GROUND_ARGS_NULL__ {NULL,NULL,NULL,NULL}
+static const struct htrdr_planets_ground_args HTRDR_PLANETS_GROUND_ARGS_NULL =
+  HTRDR_PLANETS_GROUND_ARGS_NULL__;
+
+struct htrdr_planets_volrad_budget_args {
+  char* smsh_filename; /* The Star-Mesh geometry */
+  unsigned spt; /* Number of MC realisations per tetrahedron */
+};
+#define HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL__ {                              \
+  NULL, 1000                         \
+}
+static const struct htrdr_planets_volrad_budget_args
+HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL =
+  HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL__;
+
+/* Configure the building of the acceleration structure */
+struct htrdr_planets_accel_struct_build_args {
+  unsigned definition_hint; /* Hint on octree definition */
+  unsigned nthreads; /* Hint on the number of threads to use */
+  double optical_thickness; /* Threshold used during octree building */
+
+  /* Read/Write file where octrees are stored. May be NULL => octres are built
+   * at runtime and kept in memory */
+  char* storage;
+
+  /* Indicator defining whether the structure is built solely on the
+   * master process */
+  int master_only;
+};
+#define HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__ { 512, 8, 1, NULL, 1 }
+static const struct htrdr_planets_accel_struct_build_args
+HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL =
+  HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__;
+
+struct htrdr_planets_args {
+  /* System data */
+  struct rnatm_gas_args gas;
+  struct rnatm_aerosol_args* aerosols;
+  size_t naerosols;
+  struct htrdr_planets_ground_args ground;
+
+  /* Configure the building of the acceleration structure */
+  struct htrdr_planets_accel_struct_build_args accel_struct;
+
+  char* output; /* File where the result is written */
+  struct htrdr_planets_spectral_args spectral_domain; /* Integration spectral domain */
+  struct htrdr_planets_source_args source;
+  struct htrdr_args_image image;
+
+  struct htrdr_args_camera_perspective cam_persp; /* Perspective camera */
+
+  /* Input parameters for volumic radiative budget calculation */
+  struct htrdr_planets_volrad_budget_args volrad_budget;
+
+  /* Miscellaneous arguments */
+  unsigned nthreads; /* Hint on the number of threads to use */
+  enum htrdr_planets_args_output_type output_type;
+  int precompute_normals; /* Pre-compute tetrahedron normals */
+  int force_output_overwrite; /* Replace output if it exists */
+  int verbose; /* Verbose level */
+  int quit; /* Stop the command */
+};
+#define HTRDR_PLANETS_ARGS_DEFAULT__ {                                         \
+  RNATM_GAS_ARGS_NULL__, /* Gas */                                             \
+  NULL, /* List of aerosols */                                                 \
+  0, /* Number of aerosols */                                                  \
+  HTRDR_PLANETS_GROUND_ARGS_NULL__, /* Ground */                               \
+                                                                               \
+  HTRDR_PLANETS_ACCEL_STRUCT_BUILD_ARGS_NULL__,                                \
+                                                                               \
+  NULL, /* Ouput file */                                                       \
+  HTRDR_PLANETS_SPECTRAL_ARGS_DEFAULT__, /* Spectral domain */                 \
+  HTRDR_PLANETS_SOURCE_ARGS_NULL__, /* Source */                               \
+  HTRDR_ARGS_IMAGE_DEFAULT__, /* Image */                                      \
+                                                                               \
+  HTRDR_ARGS_CAMERA_PERSPECTIVE_DEFAULT__, /* Perspective camera */            \
+                                                                               \
+  HTRDR_PLANETS_VOLRAD_BUDGET_ARGS_NULL__, /* Volumic radiative budget */      \
+                                                                               \
+  UINT_MAX, /* Number of threads */                                            \
+  HTRDR_PLANETS_ARGS_OUTPUT_IMAGE,                                             \
+  0, /* Force output overwrite */                                              \
+  0, /* Precompute normals */                                                  \
+  0, /* Verbosity level */                                                     \
+  0 /* Stop the command */                                                     \
+}
+static const struct htrdr_planets_args HTRDR_PLANETS_ARGS_DEFAULT =
+  HTRDR_PLANETS_ARGS_DEFAULT__;
+
+extern LOCAL_SYM res_T
+htrdr_planets_args_init
+  (struct htrdr_planets_args* args,
+   int argc,
+   char** argv);
+
+extern LOCAL_SYM void
+htrdr_planets_args_release
+  (struct htrdr_planets_args* args);
+
+extern LOCAL_SYM res_T
+htrdr_planets_args_check
+  (const struct htrdr_planets_args* args);
+
+extern LOCAL_SYM res_T
+htrdr_planets_source_args_check
+  (const struct htrdr_planets_source_args* args);
+
+#endif /* HTRDR_PLANETS_ARGS_H */
